@@ -169,3 +169,34 @@
 - [x] Cross-link tools from Studio and Gallery pages (Tools Hub links to Studio)
 - [x] Write vitest tests for all new tool endpoints (23 tests, all passing)
 - [x] Verify and checkpoint
+
+## Phase 7 — Pricing, Onboarding & Batch Processing
+
+### Pricing/Plans Page
+- [x] Create /pricing route and page with Free, Pro, Enterprise tiers
+- [x] Design tier cards with feature comparison table
+- [x] Add generation limits, tool access levels, priority rendering per tier
+- [x] Add CTA buttons (Get Started Free, Upgrade to Pro, Contact Sales)
+- [ ] Link pricing from Navbar and landing page
+
+### First-Time Onboarding Wizard
+- [x] Track onboarding completion state (localStorage)
+- [x] Build multi-step wizard overlay: welcome, pick style, write prompt, generate
+- [x] Pre-filled prompt suggestions and style presets (6 styles, 3 prompts each)
+- [x] Auto-redirect to Studio after first generation (with prompt in URL)
+- [x] Show wizard only for new/first-time users (localStorage check)
+
+### Batch Processing
+- [x] Backend: batch generation endpoint (queue multiple prompts, up to 10)
+- [x] Backend: batch tool operations endpoint (apply tool to multiple images, up to 10)
+- [x] Frontend: batch mode toggle in Studio with multi-prompt input (dedicated /batch page)
+- [x] Frontend: batch tool mode in AI Tools pages (via tools.batchProcess endpoint)
+- [x] Queue progress tracking with status indicators
+- [x] Results grid view for batch outputs
+
+### Integration & Polish
+- [x] Update Navbar with Pricing and Batch links
+- [x] Update landing page with pricing teaser section (via CTA)
+- [x] Write vitest tests for batch endpoints (21 tests, all passing)
+- [x] Write vitest tests for onboarding state (covered by localStorage)
+- [x] Final verification and checkpoint (116 tests, all passing)

@@ -315,6 +315,70 @@ export const appRouter = router({
         return getChildGenerations(input.parentId);
       }),
 
+    // Batch generation — queue multiple prompts at once
+    batchCreate: protectedProcedure
+      .input(
+        z.object({
+          prompts: z.array(
+            z.object({
+              prompt: z.string().min(1).max(2000),
+              negativePrompt: z.string().max(1000).optional(),
+              mediaType: z.enum(["image", "video"]).default("image"),
+              width: z.number().min(256).max(1536).default(512),
+              height: z.number().min(256).max(1536).default(768),
+              duration: z.number().min(2).max(8).default(4),
+              modelVersion: z.string().max(128).default("built-in-v1"),
+            })
+          ).min(1).max(10),
+          tagIds: z.array(z.number()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const results: Array<{ id: number; status: string; prompt: string; error?: string; imageUrl?: string | null }> = [];
+
+        for (const item of input.prompts) {
+          const genId = await createGeneration({
+            userId: ctx.user.id,
+            prompt: item.prompt,
+            negativePrompt: item.negativePrompt ?? null,
+            mediaType: item.mediaType,
+            width: item.width,
+            height: item.height,
+            duration: item.mediaType === "video" ? item.duration : null,
+            status: "generating",
+            modelVersion: item.modelVersion,
+          });
+
+          if (input.tagIds && input.tagIds.length > 0) {
+            await setGenerationTags(genId, input.tagIds);
+          }
+
+          try {
+            const enhancedPrompt = item.mediaType === "video"
+              ? `${item.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${item.width}x${item.height} resolution, ${item.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`
+              : `${item.prompt}. Style: high quality digital art, ${item.width}x${item.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
+
+            const { url } = await generateImage({ prompt: enhancedPrompt });
+
+            await updateGeneration(genId, {
+              status: "completed",
+              imageUrl: url ?? null,
+              thumbnailUrl: url ?? null,
+            });
+
+            results.push({ id: genId, status: "completed", prompt: item.prompt, imageUrl: url });
+          } catch (error: any) {
+            await updateGeneration(genId, {
+              status: "failed",
+              errorMessage: error.message || "Generation failed",
+            });
+            results.push({ id: genId, status: "failed", prompt: item.prompt, error: error.message });
+          }
+        }
+
+        return { results, total: input.prompts.length, completed: results.filter(r => r.status === "completed").length };
+      }),
+
     enhancePrompt: protectedProcedure
       .input(z.object({ prompt: z.string().min(1).max(2000) }))
       .mutation(async ({ input }) => {
@@ -511,6 +575,74 @@ export const appRouter = router({
         } catch (error: any) {
           return { url: null, status: "failed" as const, error: error.message };
         }
+      }),
+
+    // Batch tool operations — apply a tool to multiple images at once
+    batchProcess: protectedProcedure
+      .input(
+        z.object({
+          tool: z.enum(["upscale", "style-transfer", "background-edit"]),
+          images: z.array(z.string().url()).min(1).max(10),
+          // Upscale options
+          scaleFactor: z.enum(["2x", "4x"]).optional(),
+          enhanceDetails: z.boolean().optional(),
+          // Style transfer options
+          style: z.enum([
+            "oil-painting", "watercolor", "pencil-sketch", "anime", "pop-art",
+            "cyberpunk", "art-nouveau", "pixel-art", "impressionist", "comic-book",
+          ]).optional(),
+          intensity: z.number().min(0.1).max(1.0).optional(),
+          // Background edit options
+          mode: z.enum(["remove", "replace"]).optional(),
+          replacementPrompt: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const results: Array<{ imageUrl: string; resultUrl: string | null; status: string; error?: string }> = [];
+
+        for (const imageUrl of input.images) {
+          try {
+            let prompt: string;
+            if (input.tool === "upscale") {
+              const scaleLabel = input.scaleFactor === "4x" ? "ultra high resolution 4K" : "high resolution 2K";
+              const detailBoost = input.enhanceDetails !== false ? ", enhanced fine details, sharpened textures, crisp edges" : "";
+              prompt = `Upscale and enhance this image to ${scaleLabel}. Preserve all original content exactly, improve clarity and sharpness${detailBoost}. Professional quality enhancement.`;
+            } else if (input.tool === "style-transfer") {
+              const styleDescriptions: Record<string, string> = {
+                "oil-painting": "rich oil painting with visible brushstrokes",
+                "watercolor": "delicate watercolor painting with soft washes",
+                "pencil-sketch": "detailed pencil sketch with fine hatching",
+                "anime": "Japanese anime style with cel shading",
+                "pop-art": "bold pop art style with halftone dots",
+                "cyberpunk": "neon-lit cyberpunk aesthetic",
+                "art-nouveau": "Art Nouveau style with flowing organic lines",
+                "pixel-art": "retro pixel art style",
+                "impressionist": "Impressionist painting with visible brushstrokes",
+                "comic-book": "bold comic book illustration",
+              };
+              const styleDesc = styleDescriptions[input.style || "oil-painting"] || input.style;
+              const intensityLabel = (input.intensity ?? 0.7) > 0.7 ? "strongly" : (input.intensity ?? 0.7) > 0.4 ? "moderately" : "subtly";
+              prompt = `Transform this image ${intensityLabel} into ${styleDesc}. Maintain the original composition while applying the artistic style.`;
+            } else {
+              if (input.mode === "remove") {
+                prompt = "Remove the background from this image completely, leaving only the main subject on a clean white background.";
+              } else {
+                prompt = `Replace the background with: ${input.replacementPrompt || "a professional studio backdrop"}. Keep the main subject exactly as it is.`;
+              }
+            }
+
+            const { url } = await generateImage({
+              prompt,
+              originalImages: [{ url: imageUrl, mimeType: "image/png" }],
+            });
+
+            results.push({ imageUrl, resultUrl: url ?? null, status: "completed" });
+          } catch (error: any) {
+            results.push({ imageUrl, resultUrl: null, status: "failed", error: error.message });
+          }
+        }
+
+        return { results, total: input.images.length, completed: results.filter(r => r.status === "completed").length };
       }),
 
     // Smart Prompt Builder — LLM constructs an optimized prompt from structured inputs

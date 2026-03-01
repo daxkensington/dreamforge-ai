@@ -28,7 +28,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import OnboardingWizard, { useOnboarding } from "@/components/OnboardingWizard";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -214,9 +215,29 @@ function ParticleCanvas() {
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const { data: stats } = trpc.gallery.stats.useQuery();
+  const { completed: onboardingDone, markCompleted } = useOnboarding();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && !onboardingDone) {
+      setShowOnboarding(true);
+    }
+  }, [isAuthenticated, onboardingDone]);
 
   return (
     <PageLayout>
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={() => {
+            markCompleted();
+            setShowOnboarding(false);
+          }}
+          onDismiss={() => {
+            markCompleted();
+            setShowOnboarding(false);
+          }}
+        />
+      )}
       {/* Hero Section */}
       <section className="relative overflow-hidden min-h-[90vh] flex items-center">
         <ParticleCanvas />

@@ -49,7 +49,7 @@ import {
   Clapperboard,
   Link2,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const MODEL_OPTIONS = [
@@ -78,6 +78,17 @@ const VIDEO_PRESETS = [
 export default function Workspace() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState("");
+
+  // Accept prompt from onboarding wizard via URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wizardPrompt = params.get("prompt");
+    if (wizardPrompt) {
+      setPrompt(wizardPrompt);
+      // Clean up URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(768);
   const [height, setHeight] = useState(768);

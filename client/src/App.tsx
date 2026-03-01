@@ -15,6 +15,8 @@ import ToolUpscaler from "./pages/ToolUpscaler";
 import ToolStyleTransfer from "./pages/ToolStyleTransfer";
 import ToolBackground from "./pages/ToolBackground";
 import ToolPromptBuilder from "./pages/ToolPromptBuilder";
+import BatchStudio from "./pages/BatchStudio";
+import Pricing from "./pages/Pricing";
 
 function Router() {
   return (
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/tools/style-transfer" component={ToolStyleTransfer} />
       <Route path="/tools/background" component={ToolBackground} />
       <Route path="/tools/prompt-builder" component={ToolPromptBuilder} />
+      <Route path="/batch" component={BatchStudio} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />
       <Route path="/404" component={NotFound} />
