@@ -144,3 +144,12 @@
 - [x] Verify all pages render correctly with new copy
 - [x] Run all existing tests (72/72 passed)
 - [x] Deliver brand strategy report with checkpoint
+
+## Phase 5 — Platform Rebrand (New Name)
+- [x] Research AI tool naming patterns and conventions
+- [x] Generate candidate names (short, memorable, creative)
+- [x] Verify domain/brand availability for top candidates
+- [x] Present shortlist to user for selection — user chose "DreamForge"
+- [x] Apply chosen name across all pages, components, and metadata
+- [ ] Update VITE_APP_TITLE via Management UI Settings (user action)
+- [x] Run all tests and verify (72/72 passed)

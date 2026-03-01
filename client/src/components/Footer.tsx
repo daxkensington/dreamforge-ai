@@ -13,13 +13,12 @@ export default function Footer() {
                 <Wand2 className="h-4 w-4 text-primary" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold tracking-tight leading-none">GenesisSynth</span>
-                <span className="text-[9px] font-medium text-muted-foreground tracking-widest uppercase leading-none mt-0.5">Lab</span>
+                <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent">DreamForge</span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
               AI-powered creative studio for generating stunning images and videos.
-              Describe your vision, choose your style, and let AI bring it to life.
+              Describe your vision, choose your style, and forge your dreams into reality.
             </p>
           </div>
 
@@ -64,7 +63,7 @@ export default function Footer() {
 
         <div className="border-t border-border/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} GenesisSynth Lab. All AI-generated content.
+            &copy; {new Date().getFullYear()} DreamForge. All AI-generated content.
           </p>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             Made with <Heart className="h-3 w-3 text-red-500 fill-red-500" /> for creators

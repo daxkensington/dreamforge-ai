@@ -41,11 +41,8 @@ export default function Navbar() {
             <Wand2 className="h-5 w-5 text-primary" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold tracking-tight leading-none">
-              GenesisSynth
-            </span>
-            <span className="text-[10px] font-medium text-muted-foreground tracking-widest uppercase leading-none mt-0.5">
-              Lab
+            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent">
+              DreamForge
             </span>
           </div>
         </Link>

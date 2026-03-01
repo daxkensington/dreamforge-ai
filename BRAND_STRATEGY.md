@@ -1,8 +1,8 @@
-# GenesisSynth Lab — Brand Strategy & Positioning Guide
+# DreamForge — Brand Strategy & Positioning Guide
 
 ## Executive Summary
 
-GenesisSynth Lab is pivoting from an academic synthetic media research platform to a consumer-facing AI creative studio. This document defines the brand positioning, messaging framework, tone of voice, and implementation guidelines that will drive the rebrand across all touchpoints — from the landing page to in-app copy.
+DreamForge (formerly GenesisSynth Lab) has pivoted from an academic synthetic media research platform to a consumer-facing AI creative studio. This document defines the brand positioning, messaging framework, tone of voice, and implementation guidelines that will drive the rebrand across all touchpoints — from the landing page to in-app copy.
 
 ---
 
@@ -10,7 +10,7 @@ GenesisSynth Lab is pivoting from an academic synthetic media research platform 
 
 ### Position Statement
 
-GenesisSynth Lab is **the AI creative studio** where creators generate stunning images and bring them to life as animated video clips — all in one unified platform. Unlike tools that specialize in either images or video, GenesisSynth Lab offers a seamless pipeline from prompt to image to animated video, giving creators complete control over their visual storytelling.
+DreamForge is **the AI creative studio** where creators generate stunning images and bring them to life as animated video clips — all in one unified platform. Unlike tools that specialize in either images or video, DreamForge offers a seamless pipeline from prompt to image to animated video, giving creators complete control over their visual storytelling.
 
 ### Key Differentiators
 

@@ -66,7 +66,7 @@ export default function GalleryDetail() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `genesis-synth-${item.id}.${gen.mediaType === "video" ? "mp4" : "png"}`;
+      a.download = `dreamforge-${item.id}.${gen.mediaType === "video" ? "mp4" : "png"}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

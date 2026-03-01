@@ -133,7 +133,7 @@ export default function Gallery() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `genesis-synth-export-${Date.now()}.json`;
+      a.download = `dreamforge-export-${Date.now()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
