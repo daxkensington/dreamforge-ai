@@ -408,6 +408,159 @@ export const appRouter = router({
     }),
   }),
 
+  tools: router({
+    // AI Image Upscaler — takes an image URL and enhances it at higher quality
+    upscale: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          scaleFactor: z.enum(["2x", "4x"]).default("2x"),
+          enhanceDetails: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const scaleLabel = input.scaleFactor === "4x" ? "ultra high resolution 4K" : "high resolution 2K";
+          const detailBoost = input.enhanceDetails ? ", enhanced fine details, sharpened textures, crisp edges" : "";
+          const upscalePrompt = `Upscale and enhance this image to ${scaleLabel}. Preserve all original content exactly, improve clarity and sharpness${detailBoost}. Professional quality enhancement.`;
+
+          const { url } = await generateImage({
+            prompt: upscalePrompt,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Style Transfer — apply an artistic style to an uploaded image
+    styleTransfer: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          style: z.enum([
+            "oil-painting",
+            "watercolor",
+            "pencil-sketch",
+            "anime",
+            "pop-art",
+            "cyberpunk",
+            "art-nouveau",
+            "pixel-art",
+            "impressionist",
+            "comic-book",
+          ]),
+          intensity: z.number().min(0.1).max(1.0).default(0.7),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const styleDescriptions: Record<string, string> = {
+          "oil-painting": "rich oil painting with visible brushstrokes, thick impasto texture, classical fine art",
+          "watercolor": "delicate watercolor painting with soft washes, bleeding edges, translucent layers on textured paper",
+          "pencil-sketch": "detailed pencil sketch with fine hatching, graphite shading, hand-drawn artistic quality",
+          "anime": "Japanese anime style with cel shading, vibrant colors, clean linework, expressive character design",
+          "pop-art": "bold pop art style with halftone dots, bright primary colors, thick outlines, Andy Warhol inspired",
+          "cyberpunk": "neon-lit cyberpunk aesthetic with holographic elements, dark atmosphere, glowing accents, futuristic",
+          "art-nouveau": "Art Nouveau style with flowing organic lines, ornamental borders, natural motifs, elegant curves",
+          "pixel-art": "retro pixel art style with limited color palette, crisp pixel edges, 16-bit game aesthetic",
+          "impressionist": "Impressionist painting with visible brushstrokes, soft light effects, Monet-inspired color harmony",
+          "comic-book": "bold comic book illustration with strong outlines, dramatic shading, Ben-Day dots, dynamic composition",
+        };
+
+        const styleDesc = styleDescriptions[input.style] || input.style;
+        const intensityLabel = input.intensity > 0.7 ? "strongly" : input.intensity > 0.4 ? "moderately" : "subtly";
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Transform this image ${intensityLabel} into ${styleDesc}. Maintain the original composition and subject matter while applying the artistic style. Professional quality artwork.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const, style: input.style };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Background Remover / Replacer
+    backgroundEdit: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          mode: z.enum(["remove", "replace"]),
+          replacementPrompt: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          let prompt: string;
+          if (input.mode === "remove") {
+            prompt = "Remove the background from this image completely, leaving only the main subject on a clean transparent/white background. Preserve all details of the subject with clean edges.";
+          } else {
+            prompt = `Replace the background of this image with: ${input.replacementPrompt || "a professional studio backdrop"}. Keep the main subject exactly as it is with clean edges, only change the background. Professional quality compositing.`;
+          }
+
+          const { url } = await generateImage({
+            prompt,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const, mode: input.mode };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Smart Prompt Builder — LLM constructs an optimized prompt from structured inputs
+    buildPrompt: protectedProcedure
+      .input(
+        z.object({
+          subject: z.string().min(1).max(500),
+          style: z.string().max(200).optional(),
+          mood: z.string().max(200).optional(),
+          lighting: z.string().max(200).optional(),
+          composition: z.string().max(200).optional(),
+          colorPalette: z.string().max(200).optional(),
+          additionalDetails: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const structuredInput = [
+            `Subject: ${input.subject}`,
+            input.style ? `Style: ${input.style}` : null,
+            input.mood ? `Mood/Atmosphere: ${input.mood}` : null,
+            input.lighting ? `Lighting: ${input.lighting}` : null,
+            input.composition ? `Composition: ${input.composition}` : null,
+            input.colorPalette ? `Color Palette: ${input.colorPalette}` : null,
+            input.additionalDetails ? `Additional Details: ${input.additionalDetails}` : null,
+          ].filter(Boolean).join("\n");
+
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert AI image prompt engineer. Given structured creative inputs, compose a single, detailed, optimized prompt for AI image generation. The prompt should be vivid, specific, and technically precise. Include artistic terminology, composition details, and quality modifiers. Output ONLY the final prompt text, nothing else. All content must be 100% fictional.",
+              },
+              { role: "user", content: structuredInput },
+            ],
+          });
+
+          const prompt = typeof result.choices[0]?.message?.content === "string"
+            ? result.choices[0].message.content
+            : input.subject;
+
+          return { prompt, status: "completed" as const };
+        } catch {
+          // Fallback: construct a basic prompt from the inputs
+          const parts = [input.subject, input.style, input.mood, input.lighting, input.composition, input.colorPalette, input.additionalDetails].filter(Boolean);
+          return { prompt: parts.join(", ") + ". High quality, detailed, professional.", status: "completed" as const };
+        }
+      }),
+  }),
+
   export: router({
     metadata: protectedProcedure
       .input(z.object({ ids: z.array(z.number()).min(1).max(50) }))

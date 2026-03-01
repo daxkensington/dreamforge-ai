@@ -18,11 +18,13 @@ import {
   Shield,
   User,
   LogOut,
+  Wrench,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navLinks = [
+  { href: "/tools", label: "AI Tools", icon: Wrench },
   { href: "/gallery", label: "Gallery", icon: Image },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
 ];
@@ -31,6 +33,8 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isToolsActive = location.startsWith("/tools");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -51,7 +55,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
-            const isActive = location === link.href;
+            const isActive = link.href === "/tools" ? isToolsActive : location === link.href;
             return (
               <Link
                 key={link.href}
@@ -113,6 +117,12 @@ export default function Navbar() {
                     Studio
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/tools" className="flex items-center gap-2 cursor-pointer">
+                    <Wrench className="h-4 w-4" />
+                    AI Tools
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}
@@ -149,7 +159,7 @@ export default function Navbar() {
           <nav className="container py-4 flex flex-col gap-1">
             {navLinks.map((link) => {
               if (link.auth && !isAuthenticated) return null;
-              const isActive = location === link.href;
+              const isActive = link.href === "/tools" ? isToolsActive : location === link.href;
               return (
                 <Link
                   key={link.href}

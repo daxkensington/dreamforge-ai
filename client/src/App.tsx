@@ -10,6 +10,11 @@ import GalleryDetail from "./pages/GalleryDetail";
 import Workspace from "./pages/Workspace";
 import Moderation from "./pages/Moderation";
 import Profile from "./pages/Profile";
+import Tools from "./pages/Tools";
+import ToolUpscaler from "./pages/ToolUpscaler";
+import ToolStyleTransfer from "./pages/ToolStyleTransfer";
+import ToolBackground from "./pages/ToolBackground";
+import ToolPromptBuilder from "./pages/ToolPromptBuilder";
 
 function Router() {
   return (
@@ -18,6 +23,11 @@ function Router() {
       <Route path="/gallery" component={Gallery} />
       <Route path="/gallery/:id" component={GalleryDetail} />
       <Route path="/workspace" component={Workspace} />
+      <Route path="/tools" component={Tools} />
+      <Route path="/tools/upscaler" component={ToolUpscaler} />
+      <Route path="/tools/style-transfer" component={ToolStyleTransfer} />
+      <Route path="/tools/background" component={ToolBackground} />
+      <Route path="/tools/prompt-builder" component={ToolPromptBuilder} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />
       <Route path="/404" component={NotFound} />

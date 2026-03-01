@@ -23,6 +23,9 @@ import {
   SlidersHorizontal,
   Star,
   Globe,
+  Maximize,
+  Scissors,
+  Wrench,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useRef, useCallback } from "react";
@@ -674,6 +677,90 @@ export default function Home() {
               ))}
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* AI Tools Suite */}
+      <section className="py-24 md:py-32 relative overflow-hidden border-y border-border/50 bg-card/20">
+        <div className="absolute inset-0 bg-grid opacity-20" />
+        <div className="container relative">
+          <div className="text-center mb-16">
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-sm font-medium text-primary mb-3 uppercase tracking-widest"
+            >
+              AI Tools Suite
+            </motion.p>
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+            >
+              Professional Tools,{" "}
+              <span className="gradient-text">Zero Complexity</span>
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={2}
+              className="text-muted-foreground max-w-xl mx-auto text-lg"
+            >
+              Upscale, stylize, edit backgrounds, and build perfect prompts — all powered by AI.
+            </motion.p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            {[
+              { icon: Maximize, title: "Image Upscaler", desc: "Enhance resolution up to 4x with AI-powered detail sharpening.", gradient: "from-blue-500 to-cyan-400", href: "/tools/upscaler" },
+              { icon: Palette, title: "Style Transfer", desc: "Transform photos into oil paintings, anime, cyberpunk, and more.", gradient: "from-violet-500 to-fuchsia-400", href: "/tools/style-transfer" },
+              { icon: Scissors, title: "Background Editor", desc: "Remove or replace backgrounds instantly with clean edges.", gradient: "from-emerald-500 to-teal-400", href: "/tools/background" },
+              { icon: Wand2, title: "Prompt Builder", desc: "Craft optimized prompts with visual controls and AI assistance.", gradient: "from-amber-500 to-orange-400", href: "/tools/prompt-builder" },
+            ].map((tool, i) => (
+              <motion.div
+                key={tool.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={scaleIn}
+                custom={i}
+              >
+                <Link href={tool.href}>
+                  <div className="group relative p-6 rounded-2xl border border-border/50 bg-card/50 hover:bg-card hover:border-border/80 transition-all duration-500 hover:shadow-lg hover:shadow-primary/5 h-full cursor-pointer">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg mb-4 group-hover:scale-110 transition-transform`}>
+                      <tool.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-base font-semibold mb-2 group-hover:text-primary transition-colors">{tool.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{tool.desc}</p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            custom={5}
+            className="text-center mt-10"
+          >
+            <Button asChild variant="outline" size="lg" className="font-medium gap-2 bg-transparent">
+              <Link href="/tools">
+                <Wrench className="h-4 w-4" />
+                Explore All Tools
+              </Link>
+            </Button>
+          </motion.div>
         </div>
       </section>
 

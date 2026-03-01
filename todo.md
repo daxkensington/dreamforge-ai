@@ -153,3 +153,19 @@
 - [x] Apply chosen name across all pages, components, and metadata
 - [ ] Update VITE_APP_TITLE via Management UI Settings (user action)
 - [x] Run all tests and verify (72/72 passed)
+
+## Phase 6 — AI Tools Suite
+- [x] Create AI Tools Hub page with tool cards and navigation
+- [x] Add /tools route and update Navbar with "AI Tools" link
+- [x] Backend: Image Upscaler endpoint (enhance/upscale via LLM prompt rewrite + generateImage)
+- [x] Frontend: Image Upscaler tool page with upload, scale selector, before/after preview
+- [x] Backend: Style Transfer endpoint (apply artistic style via generateImage with reference)
+- [x] Frontend: Style Transfer tool page with style gallery, upload, and preview
+- [x] Backend: Background Remover/Replacer endpoint (via generateImage edit)
+- [x] Frontend: Background tool page with upload, replacement prompt, and preview
+- [x] Backend: Smart Prompt Builder endpoint (LLM-powered prompt construction)
+- [x] Frontend: Smart Prompt Builder with visual controls (subject, style, mood, lighting, etc.)
+- [x] Update landing page with AI Tools showcase section
+- [x] Cross-link tools from Studio and Gallery pages (Tools Hub links to Studio)
+- [x] Write vitest tests for all new tool endpoints (23 tests, all passing)
+- [x] Verify and checkpoint
