@@ -126,7 +126,7 @@ export default function Gallery() {
           mediaType: item.generation?.mediaType,
           dimensions: `${item.generation?.width}x${item.generation?.height}`,
           tags: item.tags?.map((t: any) => t.name),
-          researcher: item.userName,
+          creator: item.userName,
         }));
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
@@ -155,10 +155,10 @@ export default function Gallery() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-primary" />
-              Research Gallery
+              Community Gallery
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Browse approved synthetic outputs for academic study
+              Discover stunning AI-generated art from our creator community
               {galleryData && <span className="ml-1">({total} items)</span>}
             </p>
           </div>
@@ -356,7 +356,7 @@ export default function Gallery() {
               {hasFilters ? "No results match your filters" : "No gallery items yet"}
             </p>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
-              {hasFilters ? "Try adjusting your search or filter criteria" : "Be the first to submit synthetic media for research review"}
+              {hasFilters ? "Try adjusting your search or filter criteria" : "Be the first to share your AI creations with the community"}
             </p>
             {hasFilters && (
               <Button variant="outline" size="sm" onClick={clearFilters} className="bg-transparent">Clear Filters</Button>
@@ -409,7 +409,7 @@ export default function Gallery() {
                             {item.generation?.imageUrl ? (
                               <img
                                 src={item.generation.imageUrl}
-                                alt={item.title || "Synthetic output"}
+                                alt={item.title || "AI artwork"}
                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 loading="lazy"
                               />

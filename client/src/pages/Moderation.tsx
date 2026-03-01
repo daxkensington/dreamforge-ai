@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,7 +83,7 @@ export default function Moderation() {
           <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h1 className="text-2xl font-bold mb-4">Access Restricted</h1>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            The moderation queue is only accessible to administrators and lead researchers.
+            The moderation queue is only accessible to administrators.
           </p>
           {!isAuthenticated && (
             <Button onClick={() => (window.location.href = getLoginUrl())}>Sign in</Button>
@@ -104,7 +103,7 @@ export default function Moderation() {
               Moderation Queue
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review and approve submissions for the public research gallery
+              Review and approve community submissions before they go live
             </p>
           </div>
         </div>
@@ -312,9 +311,7 @@ export default function Moderation() {
           </TabsContent>
         </Tabs>
 
-        <div className="mt-8">
-          <DisclaimerBanner compact />
-        </div>
+
       </div>
 
       {/* Review Dialog */}
@@ -328,7 +325,7 @@ export default function Moderation() {
           <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
               {reviewAction === "approved"
-                ? "This item will be published to the public research gallery."
+                ? "This item will be published to the community gallery."
                 : "This item will be rejected and will not appear in the gallery."}
             </p>
             <div>

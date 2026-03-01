@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,7 +81,7 @@ export default function Profile() {
         <div className="container py-24 text-center">
           <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h1 className="text-2xl font-bold mb-4">Sign in Required</h1>
-          <p className="text-muted-foreground mb-6">Please sign in to view your researcher profile.</p>
+          <p className="text-muted-foreground mb-6">Please sign in to view your profile.</p>
           <Button onClick={() => (window.location.href = getLoginUrl())}>Sign in</Button>
         </div>
       </PageLayout>
@@ -94,13 +93,13 @@ export default function Profile() {
       <div className="container py-8 md:py-12">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-8 flex items-center gap-2">
           <User className="h-6 w-6 text-primary" />
-          Researcher Profile
+          My Profile
         </h1>
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Total Generations", value: stats.total, icon: Sparkles, color: "text-primary" },
+            { label: "Total Creations", value: stats.total, icon: Sparkles, color: "text-primary" },
             { label: "Completed", value: stats.completed, icon: CheckCircle, color: "text-emerald-500" },
             { label: "Images", value: stats.images, icon: Image, color: "text-blue-500" },
             { label: "Videos", value: stats.videos, icon: Film, color: "text-fuchsia-500" },
@@ -152,23 +151,23 @@ export default function Profile() {
                 <div>
                   <Label htmlFor="institution" className="flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5" />
-                    Institution
+                    About
                   </Label>
                   <Input
                     id="institution"
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
-                    placeholder="e.g., MIT Media Lab"
+                    placeholder="e.g., Digital artist, 3D designer"
                     className="mt-1.5"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="bio">Research Bio</Label>
+                  <Label htmlFor="bio">Bio</Label>
                   <Textarea
                     id="bio"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    placeholder="Brief description of your research interests..."
+                    placeholder="Tell us about yourself and what you create..."
                     rows={4}
                     className="mt-1.5"
                   />
@@ -221,10 +220,10 @@ export default function Profile() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Image className="h-4 w-4 text-primary" />
-                    Recent Generations
+                    Recent Creations
                   </CardTitle>
                   <Button asChild variant="outline" size="sm" className="bg-transparent">
-                    <Link href="/workspace">Go to Workspace</Link>
+                    <Link href="/workspace">Go to Studio</Link>
                   </Button>
                 </div>
               </CardHeader>
@@ -238,9 +237,9 @@ export default function Profile() {
                 ) : !generations || generations.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Image className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">No generations yet</p>
+                    <p className="text-sm">No creations yet</p>
                     <Button asChild variant="link" size="sm" className="mt-2">
-                      <Link href="/workspace">Create your first generation</Link>
+                      <Link href="/workspace">Create your first artwork</Link>
                     </Button>
                   </div>
                 ) : (
@@ -292,9 +291,7 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            <div className="mt-6">
-              <DisclaimerBanner compact />
-            </div>
+
           </motion.div>
         </div>
       </div>

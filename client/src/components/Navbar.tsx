@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  FlaskConical,
+  Wand2,
   Menu,
   X,
   Sparkles,
@@ -23,8 +23,8 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navLinks = [
-  { href: "/gallery", label: "Research Gallery", icon: Image },
-  { href: "/workspace", label: "Workspace", icon: Sparkles, auth: true },
+  { href: "/gallery", label: "Gallery", icon: Image },
+  { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
 ];
 
 export default function Navbar() {
@@ -38,7 +38,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 group-hover:bg-primary/15 transition-colors">
-            <FlaskConical className="h-5 w-5 text-primary" />
+            <Wand2 className="h-5 w-5 text-primary" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-semibold tracking-tight leading-none">
@@ -100,7 +100,7 @@ export default function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 <div className="px-3 py-2">
-                  <p className="text-sm font-medium truncate">{user?.name || "Researcher"}</p>
+                  <p className="text-sm font-medium truncate">{user?.name || "Creator"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
                 </div>
                 <DropdownMenuSeparator />
@@ -113,7 +113,7 @@ export default function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/workspace" className="flex items-center gap-2 cursor-pointer">
                     <Sparkles className="h-4 w-4" />
-                    Workspace
+                    Studio
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

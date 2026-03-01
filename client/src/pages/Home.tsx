@@ -1,27 +1,27 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  FlaskConical,
   Image,
   Sparkles,
-  Shield,
-  Download,
-  Search,
   Layers,
   Zap,
   Eye,
   Video,
-  Cpu,
-  BarChart3,
-  Lock,
   Film,
   Wand2,
+  Play,
+  Palette,
+  Users,
+  TrendingUp,
+  MousePointerClick,
+  Clapperboard,
+  SlidersHorizontal,
+  Star,
   Globe,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -48,53 +48,53 @@ const scaleIn = {
 const features = [
   {
     icon: Sparkles,
-    title: "AI Prompt Workspace",
-    desc: "Craft natural-language descriptions and generate fictional synthetic media with AI-powered prompt enhancement.",
+    title: "Text-to-Image Generation",
+    desc: "Describe any scene and watch AI bring it to life. Choose from multiple models for the perfect style, from photorealistic to artistic.",
     gradient: "from-violet-500/20 to-indigo-500/20",
     iconColor: "text-violet-400",
   },
   {
     icon: Film,
-    title: "Video Generation Engine",
-    desc: "Generate 2-8 second synthetic video clips from text using AnimateDiff. Control duration, resolution, and motion style.",
+    title: "AI Video Clips",
+    desc: "Create 2-8 second animated video clips from text. Control duration, motion style, and resolution for scroll-stopping content.",
     gradient: "from-fuchsia-500/20 to-pink-500/20",
     iconColor: "text-fuchsia-400",
   },
   {
-    icon: Image,
-    title: "Research Gallery",
-    desc: "Browse approved synthetic outputs with advanced taxonomic tagging for systematic academic study.",
+    icon: Clapperboard,
+    title: "Image-to-Video Animation",
+    desc: "Transform any generated image into a cinematic video clip. Choose from 6 motion styles — smooth pan, parallax drift, cinematic sweep, and more.",
     gradient: "from-cyan-500/20 to-blue-500/20",
     iconColor: "text-cyan-400",
   },
   {
-    icon: Search,
-    title: "Advanced Search & Filter",
-    desc: "Filter by tags, date, model version, and media type. Sort by newest, oldest, or most viewed.",
+    icon: Wand2,
+    title: "AI Prompt Enhancement",
+    desc: "Not sure what to write? Let AI refine your prompt into a detailed, optimized description that produces stunning results.",
     gradient: "from-emerald-500/20 to-teal-500/20",
     iconColor: "text-emerald-400",
   },
   {
-    icon: Shield,
-    title: "Moderation Queue",
-    desc: "All submissions pass through researcher-led review ensuring quality and alignment with research ethics.",
+    icon: SlidersHorizontal,
+    title: "Professional Controls",
+    desc: "Fine-tune every detail with negative prompts, custom resolutions, model selection, and advanced generation parameters.",
     gradient: "from-amber-500/20 to-orange-500/20",
     iconColor: "text-amber-400",
   },
   {
-    icon: Download,
-    title: "ZIP Export Tools",
-    desc: "Download generated assets with complete prompt metadata as ZIP archives ready for academic papers.",
+    icon: Globe,
+    title: "Community Gallery",
+    desc: "Share your best creations with the community. Discover trending art, explore styles, and get inspired by other creators.",
     gradient: "from-purple-500/20 to-fuchsia-500/20",
     iconColor: "text-purple-400",
   },
 ];
 
-const principles = [
-  { icon: Lock, title: "Zero Real People", desc: "All content is 100% mathematically generated. No real individuals are depicted or referenced." },
-  { icon: Cpu, title: "Open Models", desc: "Built on open-source diffusion architectures for full transparency and reproducibility." },
-  { icon: BarChart3, title: "Research-First", desc: "Every feature designed to support peer-reviewed academic study of synthetic media." },
-  { icon: Layers, title: "Taxonomic Tagging", desc: "Structured classification across genres, themes, styles, and subjects for rigorous analysis." },
+const workflow = [
+  { step: "01", icon: MousePointerClick, title: "Describe It", desc: "Type a prompt describing the image or video you want to create." },
+  { step: "02", icon: Sparkles, title: "Generate It", desc: "AI transforms your words into stunning visuals in seconds." },
+  { step: "03", icon: Play, title: "Animate It", desc: "Turn any image into a cinematic video clip with one click." },
+  { step: "04", icon: Star, title: "Share It", desc: "Publish to the gallery and inspire the community." },
 ];
 
 function ParticleCanvas() {
@@ -135,7 +135,7 @@ function ParticleCanvas() {
         vy: (Math.random() - 0.5) * 0.4,
         r: Math.random() * 2.5 + 0.5,
         o: Math.random() * 0.5 + 0.1,
-        hue: Math.random() * 60 + 250, // violet to blue range
+        hue: Math.random() * 60 + 250,
       });
     }
 
@@ -148,7 +148,6 @@ function ParticleCanvas() {
       const my = mouseRef.current.y;
 
       for (const p of particles) {
-        // Mouse interaction - gentle attraction
         const dmx = mx - p.x;
         const dmy = my - p.y;
         const distMouse = Math.sqrt(dmx * dmx + dmy * dmy);
@@ -158,25 +157,20 @@ function ParticleCanvas() {
           p.vy += (dmy / distMouse) * force;
         }
 
-        // Damping
         p.vx *= 0.99;
         p.vy *= 0.99;
-
         p.x += p.vx;
         p.y += p.vy;
         if (p.x < 0 || p.x > w) p.vx *= -1;
         if (p.y < 0 || p.y > h) p.vy *= -1;
 
-        // Pulsing opacity
         const pulse = Math.sin(Date.now() * 0.001 + p.hue) * 0.15;
-
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         ctx.fillStyle = `hsla(${p.hue}, 70%, 65%, ${p.o + pulse})`;
         ctx.fill();
       }
 
-      // Draw connections
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
@@ -237,12 +231,12 @@ export default function Home() {
               custom={0}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-8"
             >
-              <FlaskConical className="h-4 w-4 text-primary" />
+              <Sparkles className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-primary">
-                Academic Research Platform
+                AI Creative Studio
               </span>
               <span className="h-1 w-1 rounded-full bg-primary/50" />
-              <span className="text-xs text-muted-foreground">v2.0</span>
+              <span className="text-xs text-muted-foreground">Image + Video + Animation</span>
             </motion.div>
 
             <motion.h1
@@ -252,9 +246,9 @@ export default function Home() {
               custom={1}
               className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]"
             >
-              The Future of{" "}
-              <span className="gradient-text">Synthetic Media</span>{" "}
-              Research
+              Create{" "}
+              <span className="gradient-text">Beyond</span>{" "}
+              Imagination
             </motion.h1>
 
             <motion.p
@@ -264,9 +258,8 @@ export default function Home() {
               custom={2}
               className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed"
             >
-              A controlled environment for scholars to study how diffusion-based models
-              generate fictional visual content. Generate images and videos, analyze creativity
-              and bias, and contribute to peer-reviewed research.
+              Generate stunning images, create animated video clips, and bring your ideas to life —
+              all from a single prompt. The AI creative studio built for creators who think visually.
             </motion.p>
 
             <motion.div
@@ -280,7 +273,7 @@ export default function Home() {
                 <Button asChild size="lg" className="font-medium gap-2 px-8 h-12 text-base glow-primary">
                   <Link href="/workspace">
                     <Sparkles className="h-5 w-5" />
-                    Open Workspace
+                    Start Creating
                   </Link>
                 </Button>
               ) : (
@@ -290,18 +283,18 @@ export default function Home() {
                   onClick={() => (window.location.href = getLoginUrl())}
                 >
                   <Zap className="h-5 w-5" />
-                  Get Started Free
+                  Start Creating Free
                 </Button>
               )}
               <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-12 text-base bg-transparent">
                 <Link href="/gallery">
                   <Eye className="h-5 w-5" />
-                  Browse Gallery
+                  Explore Gallery
                 </Link>
               </Button>
             </motion.div>
 
-            {/* Floating badges */}
+            {/* Floating capability badges */}
             <motion.div
               initial="hidden"
               animate="visible"
@@ -310,11 +303,11 @@ export default function Home() {
               className="flex flex-wrap items-center justify-center gap-3 mt-12"
             >
               {[
-                { label: "Image Generation", icon: Image },
-                { label: "Video Clips", icon: Film },
+                { label: "Text to Image", icon: Image },
+                { label: "Text to Video", icon: Film },
+                { label: "Image to Video", icon: Clapperboard },
                 { label: "AI Enhancement", icon: Wand2 },
-                { label: "ZIP Export", icon: Download },
-                { label: "Moderation", icon: Shield },
+                { label: "Community Gallery", icon: Users },
               ].map((item) => (
                 <span key={item.label} className="px-3 py-1.5 rounded-full text-xs font-medium glass-card text-muted-foreground flex items-center gap-1.5">
                   <item.icon className="h-3 w-3" />
@@ -332,10 +325,10 @@ export default function Home() {
         <div className="container relative py-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto text-center">
             {[
-              { value: stats?.totalGenerations?.toLocaleString() ?? "0", label: "Generations", icon: Sparkles },
-              { value: stats?.totalItems?.toLocaleString() ?? "0", label: "Gallery Items", icon: Image },
-              { value: stats?.totalViews?.toLocaleString() ?? "0", label: "Research Views", icon: Eye },
-              { value: "12", label: "Research Tags", icon: Layers },
+              { value: stats?.totalGenerations?.toLocaleString() ?? "0", label: "Creations Made", icon: Sparkles },
+              { value: stats?.totalItems?.toLocaleString() ?? "0", label: "In Gallery", icon: Image },
+              { value: stats?.totalViews?.toLocaleString() ?? "0", label: "Total Views", icon: Eye },
+              { value: "6", label: "Motion Styles", icon: Play },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -358,10 +351,79 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Video Generation Highlight */}
+      {/* How It Works — Workflow */}
       <section className="py-24 md:py-32 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-fuchsia-500/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px]" />
+        <div className="container relative">
+          <div className="text-center mb-16">
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-sm font-medium text-primary mb-3 uppercase tracking-widest"
+            >
+              How It Works
+            </motion.p>
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+            >
+              From Prompt to{" "}
+              <span className="gradient-text-warm">Motion</span>{" "}
+              in Minutes
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={2}
+              className="text-muted-foreground max-w-xl mx-auto text-lg"
+            >
+              Create stunning visuals in four simple steps. No design skills required.
+            </motion.p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            {workflow.map((item, i) => (
+              <motion.div
+                key={item.step}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={scaleIn}
+                custom={i}
+                className="relative text-center p-6 rounded-2xl border border-border/30 bg-card/30 hover:bg-card/50 transition-all duration-300 group"
+              >
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  STEP {item.step}
+                </span>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mx-auto mb-4 mt-2 group-hover:bg-primary/15 transition-colors">
+                  <item.icon className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+                {i < workflow.length - 1 && (
+                  <div className="hidden lg:block absolute top-1/2 -right-3 text-muted-foreground/30">
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Image-to-Video Highlight */}
+      <section className="py-24 md:py-32 relative overflow-hidden border-y border-border/50 bg-card/20">
+        <div className="absolute inset-0 bg-grid opacity-20" />
         <div className="container relative">
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -373,24 +435,24 @@ export default function Home() {
                 custom={0}
               >
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-card mb-6">
-                  <Film className="h-3.5 w-3.5 text-fuchsia-400" />
-                  <span className="text-xs font-medium text-fuchsia-400">New in v2.0</span>
+                  <Clapperboard className="h-3.5 w-3.5 text-fuchsia-400" />
+                  <span className="text-xs font-medium text-fuchsia-400">Unique Feature</span>
                 </div>
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-                  AI Video{" "}
-                  <span className="gradient-text-warm">Generation</span>{" "}
-                  Engine
+                  Still to{" "}
+                  <span className="gradient-text-warm">Motion</span>{" "}
+                  in One Click
                 </h2>
                 <p className="text-muted-foreground text-lg leading-relaxed mb-8">
-                  Generate 2-8 second synthetic video clips from text descriptions using AnimateDiff models.
-                  Control duration, resolution, and motion style for your research needs.
+                  Generate an image, then animate it into a cinematic video clip. Choose from 6 motion styles
+                  to bring your creations to life — no video editing skills needed.
                 </p>
                 <div className="space-y-3">
                   {[
-                    "AnimateDiff v2 & Lightning models",
-                    "Configurable 2-8 second duration",
-                    "Up to 1024x1024 resolution",
-                    "Cinematic motion & fluid animation",
+                    "Smooth Pan & Gentle Zoom",
+                    "Parallax Drift & Cinematic Sweep",
+                    "Breathing Motion & Particle Flow",
+                    "Adjustable 2-8 second duration",
                   ].map((item, i) => (
                     <motion.div
                       key={item}
@@ -408,6 +470,21 @@ export default function Home() {
                     </motion.div>
                   ))}
                 </div>
+                <motion.div
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  variants={fadeUp}
+                  custom={5}
+                  className="mt-8"
+                >
+                  <Button asChild className="gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white">
+                    <Link href="/workspace">
+                      <Play className="h-4 w-4" />
+                      Try Image-to-Video
+                    </Link>
+                  </Button>
+                </motion.div>
               </motion.div>
 
               <motion.div
@@ -421,27 +498,41 @@ export default function Home() {
                 <div className="rounded-2xl border border-border/50 bg-card/50 p-6 space-y-4">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-fuchsia-500/10 flex items-center justify-center">
-                      <Video className="h-5 w-5 text-fuchsia-400" />
+                      <Clapperboard className="h-5 w-5 text-fuchsia-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold">Video Workspace</p>
-                      <p className="text-xs text-muted-foreground">AnimateDiff v2</p>
+                      <p className="text-sm font-semibold">Animate Image</p>
+                      <p className="text-xs text-muted-foreground">Cinematic Sweep • 4s</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-muted/30 border border-border/30 p-3 text-center">
+                      <Image className="h-5 w-5 text-violet-400 mx-auto mb-1.5" />
+                      <p className="text-[10px] text-muted-foreground">Source Image</p>
+                    </div>
+                    <div className="rounded-xl bg-muted/30 border border-fuchsia-500/30 p-3 text-center">
+                      <Video className="h-5 w-5 text-fuchsia-400 mx-auto mb-1.5" />
+                      <p className="text-[10px] text-fuchsia-400">Animated Video</p>
                     </div>
                   </div>
                   <div className="rounded-xl bg-muted/30 border border-border/30 p-4">
                     <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-                      "A phoenix rising from crystalline flames, cinematic slow motion, particle effects, volumetric lighting"
+                      "A phoenix rising from crystalline flames, cinematic slow motion, particle effects"
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Film className="h-3 w-3" /> 4s clip</span>
-                    <span className="flex items-center gap-1"><Cpu className="h-3 w-3" /> 768x768</span>
-                    <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> AnimateDiff</span>
+                  <div className="flex flex-wrap gap-2">
+                    {["Smooth Pan", "Gentle Zoom", "Parallax Drift", "Cinematic Sweep", "Breathing", "Particle Flow"].map((s) => (
+                      <span key={s} className={`text-[10px] px-2 py-1 rounded-md border ${s === "Cinematic Sweep" ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-400" : "border-border/30 text-muted-foreground"}`}>
+                        {s}
+                      </span>
+                    ))}
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-500 animate-pulse" />
+                    <div className="h-full w-full rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-500" />
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center">Generating video frames...</p>
+                  <p className="text-[10px] text-emerald-400 text-center flex items-center justify-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Animation complete
+                  </p>
                 </div>
                 <div className="absolute -top-4 -right-4 h-24 w-24 bg-fuchsia-500/10 rounded-full blur-[40px]" />
                 <div className="absolute -bottom-4 -left-4 h-20 w-20 bg-violet-500/10 rounded-full blur-[30px]" />
@@ -464,7 +555,7 @@ export default function Home() {
               custom={0}
               className="text-sm font-medium text-primary mb-3 uppercase tracking-widest"
             >
-              Platform Capabilities
+              Everything You Need
             </motion.p>
             <motion.h2
               initial="hidden"
@@ -474,7 +565,7 @@ export default function Home() {
               custom={1}
               className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
             >
-              Built for Rigorous Research
+              Powerful Tools for Creators
             </motion.h2>
             <motion.p
               initial="hidden"
@@ -484,7 +575,7 @@ export default function Home() {
               custom={2}
               className="text-muted-foreground max-w-xl mx-auto text-lg"
             >
-              Every feature designed to support systematic academic study of generative AI outputs.
+              Generate images, create videos, animate your art, and share with a global community — all in one platform.
             </motion.p>
           </div>
 
@@ -515,56 +606,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Research Principles */}
-      <section className="py-24 border-t border-border/50 bg-card/20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid opacity-20" />
-        <div className="container relative">
-          <div className="text-center mb-16">
-            <motion.p
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={0}
-              className="text-sm font-medium text-primary mb-3 uppercase tracking-widest"
-            >
-              Research Ethics
-            </motion.p>
-            <motion.h2
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={1}
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
-            >
-              Principled by Design
-            </motion.h2>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            {principles.map((p, i) => (
-              <motion.div
-                key={p.title}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={scaleIn}
-                custom={i}
-                className="text-center p-6 rounded-2xl border border-border/30 bg-card/30 hover:bg-card/50 transition-colors"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 mx-auto mb-4">
-                  <p.icon className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-2">{p.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{p.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Research Taxonomy */}
+      {/* Style Tags */}
       <section className="py-24 md:py-32">
         <div className="container">
           <div className="max-w-3xl mx-auto">
@@ -577,7 +619,7 @@ export default function Home() {
                 custom={0}
                 className="text-sm font-medium text-primary mb-3 uppercase tracking-widest"
               >
-                Classification System
+                Explore Styles
               </motion.p>
               <motion.h2
                 initial="hidden"
@@ -587,7 +629,7 @@ export default function Home() {
                 custom={1}
                 className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
               >
-                Research Taxonomy
+                Every Style Imaginable
               </motion.h2>
               <motion.p
                 initial="hidden"
@@ -597,7 +639,7 @@ export default function Home() {
                 custom={2}
                 className="text-muted-foreground text-lg"
               >
-                Structured academic classification across multiple dimensions.
+                From fantasy landscapes to cyberpunk cityscapes — create in any genre or aesthetic.
               </motion.p>
             </div>
 
@@ -613,19 +655,19 @@ export default function Home() {
                 { label: "Fantasy", color: "bg-violet-500/15 text-violet-400 border-violet-500/20" },
                 { label: "Sci-Fi", color: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" },
                 { label: "Mythological", color: "bg-amber-500/15 text-amber-400 border-amber-500/20" },
-                { label: "Stylized Dynamics", color: "bg-pink-500/15 text-pink-400 border-pink-500/20" },
-                { label: "Abstract Eroticism", color: "bg-red-500/15 text-red-400 border-red-500/20" },
-                { label: "Surreal Anatomy", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
                 { label: "Cyberpunk", color: "bg-purple-500/15 text-purple-400 border-purple-500/20" },
                 { label: "Impressionist", color: "bg-blue-500/15 text-blue-400 border-blue-500/20" },
-                { label: "Biomechanical", color: "bg-slate-500/15 text-slate-400 border-slate-500/20" },
-                { label: "Cosmic Horror", color: "bg-indigo-500/15 text-indigo-400 border-indigo-500/20" },
                 { label: "Art Nouveau", color: "bg-orange-500/15 text-orange-400 border-orange-500/20" },
                 { label: "Ethereal", color: "bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/20" },
+                { label: "Cosmic Horror", color: "bg-indigo-500/15 text-indigo-400 border-indigo-500/20" },
+                { label: "Biomechanical", color: "bg-slate-500/15 text-slate-400 border-slate-500/20" },
+                { label: "Surreal", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+                { label: "Abstract", color: "bg-red-500/15 text-red-400 border-red-500/20" },
+                { label: "Cinematic", color: "bg-pink-500/15 text-pink-400 border-pink-500/20" },
               ].map((tag) => (
                 <span
                   key={tag.label}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border ${tag.color} transition-transform hover:scale-105`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium border ${tag.color} transition-transform hover:scale-105 cursor-default`}
                 >
                   {tag.label}
                 </span>
@@ -649,7 +691,7 @@ export default function Home() {
               custom={0}
               className="text-3xl md:text-5xl font-bold tracking-tight mb-6"
             >
-              Begin Your Research
+              Ready to Create?
             </motion.h2>
             <motion.p
               initial="hidden"
@@ -659,7 +701,7 @@ export default function Home() {
               custom={1}
               className="text-muted-foreground mb-10 max-w-lg mx-auto text-lg"
             >
-              Join scholars exploring the intersection of AI, creativity, and synthetic media generation.
+              Join thousands of creators using AI to bring their ideas to life. Start generating images and videos today.
             </motion.p>
             <motion.div
               initial="hidden"
@@ -671,7 +713,7 @@ export default function Home() {
               {isAuthenticated ? (
                 <Button asChild size="lg" className="font-medium gap-2 px-10 h-12 text-base glow-primary">
                   <Link href="/workspace">
-                    Open Workspace
+                    Start Creating
                     <ArrowRight className="h-5 w-5" />
                   </Link>
                 </Button>
@@ -681,7 +723,7 @@ export default function Home() {
                   className="font-medium gap-2 px-10 h-12 text-base glow-primary"
                   onClick={() => (window.location.href = getLoginUrl())}
                 >
-                  Sign in to Start
+                  Get Started Free
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               )}
@@ -690,10 +732,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Bottom Disclaimer */}
+      {/* Bottom Note */}
       <section className="pb-8">
         <div className="container">
-          <DisclaimerBanner />
+          <p className="text-center text-xs text-muted-foreground/60">
+            All content generated by GenesisSynth Lab is AI-created. No real individuals are depicted.
+          </p>
         </div>
       </section>
     </PageLayout>

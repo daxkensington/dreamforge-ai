@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -269,13 +268,12 @@ export default function Workspace() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <Wand2 className="h-6 w-6 text-primary" />
-              Prompt Workspace
+              Creative Studio
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Generate 100% synthetic fictional scenes for academic research
+              Describe your vision and let AI bring it to life
             </p>
           </div>
-          <DisclaimerBanner compact />
         </div>
 
         {/* Mini Stats Bar */}
@@ -336,7 +334,7 @@ export default function Workspace() {
                     />
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                       <Film className="h-3 w-3" />
-                      Generates a {duration}-second synthetic video clip using AnimateDiff
+                      Creates a {duration}-second animated video clip
                     </p>
                   </div>
                 )}
@@ -752,12 +750,12 @@ export default function Workspace() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="h-5 w-5 text-primary" />
-              Submit to Research Gallery
+              Share to Gallery
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Your submission will be reviewed by a moderator before appearing in the public research gallery.
+              Your creation will be reviewed before appearing in the community gallery.
             </p>
             <div>
               <Label htmlFor="submit-title">Title</Label>
@@ -780,8 +778,7 @@ export default function Workspace() {
                 className="mt-1.5"
               />
             </div>
-            <DisclaimerBanner compact />
-          </div>
+            </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} className="bg-transparent">
               Cancel
@@ -897,7 +894,6 @@ export default function Workspace() {
               </div>
             </div>
 
-            <DisclaimerBanner compact />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAnimateDialogOpen(false)} className="bg-transparent">

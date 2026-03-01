@@ -115,3 +115,32 @@
 ### Testing
 - [x] Vitest tests for animateImage endpoint validation
 - [x] Vitest tests for input validation (duration, source generation)
+
+## Phase 4 — Pivot to AI Generation Tool (Marketing Rebrand)
+
+### Research & Strategy
+- [x] Research competitor AI generation tools (Midjourney, DALL-E, Leonardo, Runway, etc.)
+- [x] Analyze positioning, messaging, and landing page patterns
+- [x] Develop brand strategy document with positioning, taglines, value props
+
+### Landing Page Rebrand
+- [x] Rewrite hero section: consumer-focused headline, subtext, CTAs
+- [x] Update feature cards from academic to creator/prosumer language
+- [x] Add social proof section (stats bar with creator-focused labels)
+- [x] Add "How It Works" workflow section and image-to-video highlight
+- [x] Update visual style for broader consumer appeal
+
+### UI Copy Updates
+- [x] Workspace: remove academic/research language, use creator-focused copy
+- [x] Gallery: rebrand from "Research Gallery" to community showcase
+- [x] Profile: update labels and descriptions
+- [x] Moderation: adjust language for content moderation (not academic review)
+- [x] Navbar: update navigation labels
+- [x] Footer: update links and branding
+- [x] DisclaimerBanner: update from academic disclaimer to AI generation disclaimer
+- [x] Page titles and meta descriptions
+
+### Testing & Delivery
+- [x] Verify all pages render correctly with new copy
+- [x] Run all existing tests (72/72 passed)
+- [x] Deliver brand strategy report with checkpoint

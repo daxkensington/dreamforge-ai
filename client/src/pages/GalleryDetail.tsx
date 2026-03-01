@@ -1,9 +1,7 @@
-import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
@@ -49,10 +47,8 @@ export default function GalleryDetail() {
       mediaType: gen?.mediaType,
       dimensions: `${gen?.width}x${gen?.height}`,
       tags: item.tags?.map((t: any) => ({ name: t.name, slug: t.slug, category: t.category })),
-      researcher: item.userName,
-      institution: item.userInstitution,
+      creator: item.userName,
       createdAt: item.createdAt,
-      disclaimer: "100% synthetic media — all content mathematically generated, no real individuals depicted or harmed.",
     };
     navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
     setCopied(true);
@@ -145,7 +141,7 @@ export default function GalleryDetail() {
                 <>
                   <img
                     src={gen.imageUrl}
-                    alt={item.title || "Synthetic output"}
+                    alt={item.title || "AI artwork"}
                     className="w-full h-auto"
                   />
                   {gen.mediaType === "video" && (
@@ -172,9 +168,7 @@ export default function GalleryDetail() {
                 </div>
               )}
             </div>
-            <div className="mt-4">
-              <DisclaimerBanner compact />
-            </div>
+
           </motion.div>
 
           {/* Details Panel */}
@@ -200,13 +194,13 @@ export default function GalleryDetail() {
             <div className="rounded-xl border border-border/50 bg-card/50 p-4 space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Researcher:</span>
+                <span className="text-muted-foreground">Creator:</span>
                 <span className="font-medium">{item.userName || "Anonymous"}</span>
               </div>
               {item.userInstitution && (
                 <div className="flex items-center gap-3 text-sm">
                   <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Institution:</span>
+                  <span className="text-muted-foreground">Bio:</span>
                   <span className="font-medium">{item.userInstitution}</span>
                 </div>
               )}
@@ -252,7 +246,7 @@ export default function GalleryDetail() {
               <div>
                 <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <Layers className="h-4 w-4 text-primary" />
-                  Research Tags
+                  Tags
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {item.tags.map((tag: any) => (
@@ -317,8 +311,6 @@ export default function GalleryDetail() {
               </Button>
             </div>
 
-            <Separator />
-            <DisclaimerBanner />
           </motion.div>
         </div>
       </div>
