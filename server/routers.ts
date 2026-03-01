@@ -26,6 +26,8 @@ import {
   setGenerationTags,
   updateGeneration,
   updateUserProfile,
+  getUserUsageStats,
+  getUserActivityTimeline,
 } from "./db";
 import { storagePut } from "./storage";
 
@@ -53,6 +55,25 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await updateUserProfile(ctx.user.id, input);
         return { success: true };
+      }),
+
+    getUsageStats: protectedProcedure.query(async ({ ctx }) => {
+      const stats = await getUserUsageStats(ctx.user.id);
+      if (!stats) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not fetch usage stats" });
+      return stats;
+    }),
+
+    getActivityTimeline: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(100).default(30),
+          offset: z.number().min(0).default(0),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const limit = input?.limit ?? 30;
+        const offset = input?.offset ?? 0;
+        return getUserActivityTimeline(ctx.user.id, limit, offset);
       }),
   }),
 

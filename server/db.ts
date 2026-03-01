@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, or, sql, asc, count } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, like, lte, or, sql, asc, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -496,6 +496,191 @@ export async function getGenerationsForExport(ids: number[]) {
     ...g,
     tags: tagMap[g.id] || [],
   }));
+}
+
+// ─── Usage Analytics Helpers ────────────────────────────────────────────────
+
+export async function getUserUsageStats(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Total counts by media type and status
+  const genCounts = await db
+    .select({
+      mediaType: generations.mediaType,
+      status: generations.status,
+      count: count(),
+    })
+    .from(generations)
+    .where(eq(generations.userId, userId))
+    .groupBy(generations.mediaType, generations.status);
+
+  const stats = {
+    totalGenerations: 0,
+    completedGenerations: 0,
+    failedGenerations: 0,
+    images: 0,
+    videos: 0,
+    animations: 0, // parentGenerationId not null
+  };
+
+  for (const row of genCounts) {
+    stats.totalGenerations += row.count;
+    if (row.status === "completed") {
+      stats.completedGenerations += row.count;
+      if (row.mediaType === "image") stats.images += row.count;
+      if (row.mediaType === "video") stats.videos += row.count;
+    }
+    if (row.status === "failed") stats.failedGenerations += row.count;
+  }
+
+  // Count animations (video with parentGenerationId)
+  const animCount = await db
+    .select({ count: count() })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        eq(generations.status, "completed"),
+        sql`${generations.parentGenerationId} IS NOT NULL`
+      )
+    );
+  stats.animations = animCount[0]?.count ?? 0;
+
+  // Model usage breakdown
+  const modelUsage = await db
+    .select({
+      modelVersion: generations.modelVersion,
+      count: count(),
+    })
+    .from(generations)
+    .where(and(eq(generations.userId, userId), eq(generations.status, "completed")))
+    .groupBy(generations.modelVersion)
+    .orderBy(desc(count()));
+
+  // Gallery stats for this user
+  const galleryCount = await db
+    .select({ count: count() })
+    .from(galleryItems)
+    .where(eq(galleryItems.userId, userId));
+
+  const viewsResult = await db
+    .select({ total: sql<number>`COALESCE(SUM(${galleryItems.viewCount}), 0)` })
+    .from(galleryItems)
+    .where(eq(galleryItems.userId, userId));
+
+  // Daily activity for last 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const dateExpr = sql`DATE(${generations.createdAt})`;
+  const dailyActivity = await db
+    .select({
+      date: sql<string>`DATE(${generations.createdAt})`.as("activity_date"),
+      count: count(),
+    })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        gte(generations.createdAt, thirtyDaysAgo)
+      )
+    )
+    .groupBy(sql`activity_date`)
+    .orderBy(asc(sql`activity_date`));
+
+  // Free tier limits
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const monthlyImages = await db
+    .select({ count: count() })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        eq(generations.mediaType, "image"),
+        gte(generations.createdAt, monthStart)
+      )
+    );
+
+  const monthlyVideos = await db
+    .select({ count: count() })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        eq(generations.mediaType, "video"),
+        gte(generations.createdAt, monthStart)
+      )
+    );
+
+  const monthlyAnimations = await db
+    .select({ count: count() })
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        sql`${generations.parentGenerationId} IS NOT NULL`,
+        gte(generations.createdAt, monthStart)
+      )
+    );
+
+  return {
+    ...stats,
+    modelUsage: modelUsage.map((m) => ({ model: m.modelVersion, count: m.count })),
+    galleryItems: galleryCount[0]?.count ?? 0,
+    totalViews: Number(viewsResult[0]?.total ?? 0),
+    dailyActivity: dailyActivity.map((d) => ({ date: d.date, count: d.count })),
+    monthlyUsage: {
+      images: monthlyImages[0]?.count ?? 0,
+      videos: monthlyVideos[0]?.count ?? 0,
+      animations: monthlyAnimations[0]?.count ?? 0,
+    },
+    quota: {
+      images: { used: monthlyImages[0]?.count ?? 0, limit: 25 },
+      videos: { used: monthlyVideos[0]?.count ?? 0, limit: 5 },
+      animations: { used: monthlyAnimations[0]?.count ?? 0, limit: 3 },
+      gallerySubmissions: { used: galleryCount[0]?.count ?? 0, limit: 5 },
+    },
+  };
+}
+
+export async function getUserActivityTimeline(
+  userId: number,
+  limit = 30,
+  offset = 0
+) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+
+  const totalResult = await db
+    .select({ count: count() })
+    .from(generations)
+    .where(eq(generations.userId, userId));
+
+  const items = await db
+    .select({
+      id: generations.id,
+      prompt: generations.prompt,
+      mediaType: generations.mediaType,
+      modelVersion: generations.modelVersion,
+      status: generations.status,
+      imageUrl: generations.imageUrl,
+      parentGenerationId: generations.parentGenerationId,
+      animationStyle: generations.animationStyle,
+      createdAt: generations.createdAt,
+    })
+    .from(generations)
+    .where(eq(generations.userId, userId))
+    .orderBy(desc(generations.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    items,
+    total: totalResult[0]?.count ?? 0,
+  };
 }
 
 export async function getGalleryStats() {

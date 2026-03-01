@@ -200,3 +200,25 @@
 - [x] Write vitest tests for batch endpoints (21 tests, all passing)
 - [x] Write vitest tests for onboarding state (covered by localStorage)
 - [x] Final verification and checkpoint (116 tests, all passing)
+
+## Phase 8 — User Dashboard with Usage Analytics
+
+### Backend
+- [x] Create user.getUsageStats endpoint (generation counts by type, tool usage, daily activity)
+- [x] Create user.getActivityTimeline endpoint (recent generation history with timestamps)
+- [x] Calculate remaining quota based on plan tier (Free tier limits)
+- [x] Aggregate most-used tools and models
+
+### Frontend — Profile Dashboard
+- [x] Add dashboard tab/section to Profile page (Dashboard + Profile tabs)
+- [x] Stats overview cards: total generations, images, videos, animations, gallery views
+- [x] Remaining quota display with animated progress bars (Free tier limits)
+- [x] Most-used tools/models breakdown (visual bars)
+- [x] Activity chart: 30-day sparkline with tooltips
+- [x] Recent activity timeline with thumbnails, status, and timestamps
+- [x] Responsive layout for mobile (2-col → 6-col grid)
+
+### Testing
+- [x] Vitest tests for user.getUsageStats endpoint (9 tests)
+- [x] Vitest tests for user.getActivityTimeline endpoint (8 tests)
+- [x] Final verification and checkpoint (133 tests, all passing)
