@@ -204,11 +204,12 @@ export async function getGalleryItems(options: {
   search?: string;
   modelVersion?: string;
   featured?: boolean;
+  sort?: "newest" | "oldest" | "most_viewed";
 }) {
   const db = await getDb();
   if (!db) return { items: [], total: 0 };
 
-  const { limit = 24, offset = 0, tagSlugs, search, modelVersion, featured } = options;
+  const { limit = 24, offset = 0, tagSlugs, search, modelVersion, featured, sort = "newest" } = options;
 
   const conditions = [];
 
@@ -277,7 +278,13 @@ export async function getGalleryItems(options: {
     .innerJoin(generations, eq(galleryItems.generationId, generations.id))
     .innerJoin(users, eq(galleryItems.userId, users.id))
     .where(where)
-    .orderBy(desc(galleryItems.createdAt))
+    .orderBy(
+      sort === "most_viewed"
+        ? desc(galleryItems.viewCount)
+        : sort === "oldest"
+        ? asc(galleryItems.createdAt)
+        : desc(galleryItems.createdAt)
+    )
     .limit(limit)
     .offset(offset);
 

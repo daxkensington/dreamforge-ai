@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
@@ -34,22 +36,57 @@ import {
   XCircle,
   Send,
   Clock,
-  Download,
   ExternalLink,
+  Video,
+  Film,
+  Settings2,
+  Zap,
+  RotateCcw,
+  Timer,
+  Cpu,
+  Maximize,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const MODEL_OPTIONS = [
+  { value: "built-in-v1", label: "Built-in Generator v1", desc: "Default image model", types: ["image"] },
+  { value: "stable-diffusion-xl", label: "Stable Diffusion XL", desc: "High-quality images", types: ["image"] },
+  { value: "stable-diffusion-3", label: "Stable Diffusion 3", desc: "Latest architecture", types: ["image"] },
+  { value: "animatediff-v2", label: "AnimateDiff v2", desc: "Video generation", types: ["video"] },
+  { value: "animatediff-lightning", label: "AnimateDiff Lightning", desc: "Fast video clips", types: ["video"] },
+];
+
+const PRESET_PROMPTS = [
+  "A crystalline dragon perched atop a floating island surrounded by aurora borealis, digital art style",
+  "Biomechanical jellyfish drifting through a neon-lit underwater cyberpunk city, volumetric lighting",
+  "Ancient mythological temple overgrown with bioluminescent flora, surreal dreamscape",
+  "Abstract geometric forms dancing in zero gravity, iridescent metallic surfaces, art nouveau influence",
+  "Ethereal forest spirit composed of flowing light particles, impressionist watercolor style",
+];
+
+const VIDEO_PRESETS = [
+  "A phoenix rising from crystalline flames, cinematic slow motion, particle effects",
+  "Ocean waves transforming into liquid mercury under a neon sky, smooth motion",
+  "Mechanical clockwork butterfly taking flight from a steampunk garden, fluid animation",
+  "Abstract paint strokes flowing and morphing into cosmic nebula patterns, dreamlike motion",
+];
 
 export default function Workspace() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [width, setWidth] = useState(512);
+  const [width, setWidth] = useState(768);
   const [height, setHeight] = useState(768);
+  const [mediaType, setMediaType] = useState<"image" | "video">("image");
+  const [duration, setDuration] = useState(4);
+  const [modelVersion, setModelVersion] = useState("built-in-v1");
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submitGenId, setSubmitGenId] = useState<number | null>(null);
   const [submitTitle, setSubmitTitle] = useState("");
   const [submitDesc, setSubmitDesc] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { data: tags } = trpc.tags.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: generations, refetch: refetchGens } = trpc.generation.list.useQuery(
@@ -59,10 +96,15 @@ export default function Workspace() {
 
   const utils = trpc.useUtils();
 
+  const filteredModels = useMemo(
+    () => MODEL_OPTIONS.filter((m) => m.types.includes(mediaType)),
+    [mediaType]
+  );
+
   const generateMutation = trpc.generation.create.useMutation({
     onSuccess: (data) => {
       if (data.status === "completed") {
-        toast.success("Generation completed!");
+        toast.success(`${data.mediaType === "video" ? "Video" : "Image"} generation completed!`);
       } else if (data.status === "failed") {
         toast.error(`Generation failed: ${data.error || "Unknown error"}`);
       }
@@ -74,7 +116,7 @@ export default function Workspace() {
   const enhanceMutation = trpc.generation.enhancePrompt.useMutation({
     onSuccess: (data) => {
       setPrompt(data.enhanced);
-      toast.success("Prompt enhanced!");
+      toast.success("Prompt enhanced with AI!");
     },
     onError: () => toast.error("Failed to enhance prompt"),
   });
@@ -86,9 +128,20 @@ export default function Workspace() {
       setSubmitTitle("");
       setSubmitDesc("");
       setSubmitGenId(null);
+      refetchGens();
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const handleMediaTypeChange = (type: "image" | "video") => {
+    setMediaType(type);
+    // Auto-select appropriate model
+    if (type === "video") {
+      setModelVersion("animatediff-v2");
+    } else {
+      setModelVersion("built-in-v1");
+    }
+  };
 
   const handleGenerate = () => {
     if (!prompt.trim()) {
@@ -98,9 +151,11 @@ export default function Workspace() {
     generateMutation.mutate({
       prompt: prompt.trim(),
       negativePrompt: negativePrompt.trim() || undefined,
-      mediaType: "image",
+      mediaType,
       width,
       height,
+      duration: mediaType === "video" ? duration : undefined,
+      modelVersion,
       tagIds: selectedTags.length > 0 ? selectedTags : undefined,
     });
   };
@@ -111,16 +166,41 @@ export default function Workspace() {
     );
   };
 
-  const stableTagIds = useMemo(() => selectedTags, [selectedTags.join(",")]);
+  const usePreset = (p: string) => {
+    setPrompt(p);
+    toast.info("Preset prompt loaded");
+  };
+
+  // Compute stats
+  const genStats = useMemo(() => {
+    if (!generations) return { total: 0, completed: 0, images: 0, videos: 0 };
+    return {
+      total: generations.length,
+      completed: generations.filter((g: any) => g.status === "completed").length,
+      images: generations.filter((g: any) => g.mediaType === "image" && g.status === "completed").length,
+      videos: generations.filter((g: any) => g.mediaType === "video" && g.status === "completed").length,
+    };
+  }, [generations]);
 
   if (authLoading) {
     return (
       <PageLayout>
         <div className="container py-12">
-          <Skeleton className="h-8 w-48 mb-8" />
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-4 w-64 mb-8" />
+          <div className="grid grid-cols-4 gap-3 mb-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
           <div className="grid lg:grid-cols-5 gap-8">
-            <Skeleton className="h-96 lg:col-span-2" />
-            <Skeleton className="h-96 lg:col-span-3" />
+            <div className="lg:col-span-2 space-y-4">
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-96 rounded-xl" />
+            </div>
+            <div className="lg:col-span-3">
+              <Skeleton className="h-[500px] rounded-xl" />
+            </div>
           </div>
         </div>
       </PageLayout>
@@ -131,25 +211,35 @@ export default function Workspace() {
     return (
       <PageLayout>
         <div className="container py-24 text-center">
-          <Sparkles className="h-12 w-12 mx-auto mb-4 text-primary" />
-          <h1 className="text-2xl font-bold mb-4">Sign in to Access Workspace</h1>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            The prompt workspace requires authentication. Sign in to begin generating synthetic research media.
-          </p>
-          <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-            Sign in
-          </Button>
+          <div className="max-w-md mx-auto">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mx-auto mb-6">
+              <Sparkles className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold mb-4">Sign in to Access Workspace</h1>
+            <p className="text-muted-foreground mb-8">
+              The prompt workspace requires authentication. Sign in to begin generating synthetic research media.
+            </p>
+            <Button onClick={() => (window.location.href = getLoginUrl())} size="lg" className="glow-primary">
+              Sign in to Continue
+            </Button>
+          </div>
         </div>
       </PageLayout>
     );
   }
 
+  const currentPresets = mediaType === "video" ? VIDEO_PRESETS : PRESET_PROMPTS;
+
   return (
     <PageLayout>
       <div className="container py-8 md:py-12">
-        <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Prompt Workspace</h1>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Wand2 className="h-6 w-6 text-primary" />
+              Prompt Workspace
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Generate 100% synthetic fictional scenes for academic research
             </p>
@@ -157,26 +247,116 @@ export default function Workspace() {
           <DisclaimerBanner compact />
         </div>
 
+        {/* Mini Stats Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {[
+            { label: "Total", value: genStats.total, icon: Sparkles, color: "text-primary" },
+            { label: "Completed", value: genStats.completed, icon: CheckCircle, color: "text-emerald-500" },
+            { label: "Images", value: genStats.images, icon: Image, color: "text-blue-500" },
+            { label: "Videos", value: genStats.videos, icon: Film, color: "text-fuchsia-500" },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card/50"
+            >
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              <div>
+                <p className="text-lg font-bold leading-none">{stat.value}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{stat.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="grid lg:grid-cols-5 gap-8">
-          {/* Prompt Panel */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Left Panel - Prompt Configuration */}
+          <div className="lg:col-span-2 space-y-5">
+            {/* Media Type Toggle */}
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="p-4">
+                <Tabs value={mediaType} onValueChange={(v) => handleMediaTypeChange(v as "image" | "video")}>
+                  <TabsList className="w-full grid grid-cols-2">
+                    <TabsTrigger value="image" className="gap-2">
+                      <Image className="h-4 w-4" />
+                      Image
+                    </TabsTrigger>
+                    <TabsTrigger value="video" className="gap-2">
+                      <Video className="h-4 w-4" />
+                      Video Clip
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {mediaType === "video" && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Timer className="h-3 w-3" />
+                        Duration: {duration}s
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground">2-8 seconds</span>
+                    </div>
+                    <Slider
+                      value={[duration]}
+                      onValueChange={([v]) => setDuration(v)}
+                      min={2}
+                      max={8}
+                      step={1}
+                      className="w-full"
+                    />
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                      <Film className="h-3 w-3" />
+                      Generates a {duration}-second synthetic video clip using AnimateDiff
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Model Selector - Always Visible */}
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="p-4">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2">
+                  <Cpu className="h-3 w-3" />
+                  Model
+                </Label>
+                <Select value={modelVersion} onValueChange={setModelVersion}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredModels.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        <div className="flex items-center gap-2">
+                          <span>{m.label}</span>
+                          <span className="text-[10px] text-muted-foreground">— {m.desc}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            {/* Main Prompt Card */}
             <Card className="border-border/50 bg-card/50">
               <CardHeader className="pb-4">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Wand2 className="h-4 w-4 text-primary" />
-                  Prompt Configuration
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Scene Description
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="prompt">Scene Description</Label>
                   <Textarea
-                    id="prompt"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe a fictional scene... e.g., 'A crystalline dragon perched atop a floating island surrounded by aurora borealis, digital art style'"
-                    rows={5}
-                    className="mt-1.5 font-mono text-sm"
+                    placeholder={
+                      mediaType === "video"
+                        ? "Describe a motion scene... e.g., 'A phoenix rising from crystalline flames, cinematic slow motion, particle effects'"
+                        : "Describe a fictional scene... e.g., 'A crystalline dragon perched atop a floating island surrounded by aurora borealis, digital art style'"
+                    }
+                    rows={6}
+                    className="font-mono text-sm resize-none"
                     maxLength={2000}
                   />
                   <div className="flex items-center justify-between mt-2">
@@ -188,78 +368,121 @@ export default function Workspace() {
                       size="sm"
                       onClick={() => enhanceMutation.mutate({ prompt })}
                       disabled={!prompt.trim() || enhanceMutation.isPending}
-                      className="text-xs"
+                      className="text-xs gap-1.5 text-primary hover:text-primary"
                     >
                       {enhanceMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <Sparkles className="h-3 w-3 mr-1" />
+                        <Zap className="h-3 w-3" />
                       )}
                       Enhance with AI
                     </Button>
                   </div>
                 </div>
 
+                {/* Preset Prompts */}
                 <div>
-                  <Label htmlFor="negative">Negative Prompt (optional)</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {mediaType === "video" ? "Video Presets" : "Quick Presets"}
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {currentPresets.map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={() => usePreset(p)}
+                        className="text-[10px] px-2 py-1 rounded-md bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors truncate max-w-[200px]"
+                        title={p}
+                      >
+                        {p.slice(0, 40)}...
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Negative Prompt */}
+                <div>
+                  <Label htmlFor="negative" className="text-sm">Negative Prompt</Label>
                   <Textarea
                     id="negative"
                     value={negativePrompt}
                     onChange={(e) => setNegativePrompt(e.target.value)}
                     placeholder="Elements to avoid..."
                     rows={2}
-                    className="mt-1.5 font-mono text-sm"
+                    className="mt-1.5 font-mono text-sm resize-none"
                     maxLength={1000}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Width</Label>
-                    <Select
-                      value={String(width)}
-                      onValueChange={(v) => setWidth(Number(v))}
+                {/* Advanced Settings Toggle */}
+                <button
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Advanced Settings
+                  <span className="ml-auto text-[10px]">{showAdvanced ? "Hide" : "Show"}</span>
+                </button>
+
+                <AnimatePresence>
+                  {showAdvanced && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden space-y-4"
                     >
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="512">512px</SelectItem>
-                        <SelectItem value="768">768px</SelectItem>
-                        <SelectItem value="1024">1024px</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Height</Label>
-                    <Select
-                      value={String(height)}
-                      onValueChange={(v) => setHeight(Number(v))}
-                    >
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="512">512px</SelectItem>
-                        <SelectItem value="768">768px</SelectItem>
-                        <SelectItem value="1024">1024px</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                      {/* Dimensions */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm flex items-center gap-1.5">
+                            <Maximize className="h-3 w-3" />
+                            Width
+                          </Label>
+                          <Select value={String(width)} onValueChange={(v) => setWidth(Number(v))}>
+                            <SelectTrigger className="mt-1.5">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="512">512px</SelectItem>
+                              <SelectItem value="768">768px</SelectItem>
+                              <SelectItem value="1024">1024px</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm flex items-center gap-1.5">
+                            <Maximize className="h-3 w-3" />
+                            Height
+                          </Label>
+                          <Select value={String(height)} onValueChange={(v) => setHeight(Number(v))}>
+                            <SelectTrigger className="mt-1.5">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="512">512px</SelectItem>
+                              <SelectItem value="768">768px</SelectItem>
+                              <SelectItem value="1024">1024px</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Tags */}
                 {tags && tags.length > 0 && (
                   <div>
-                    <Label>Research Tags</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <Label className="text-sm">Research Tags</Label>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
                       {tags.map((tag) => (
                         <Badge
                           key={tag.id}
                           variant={selectedTags.includes(tag.id) ? "default" : "outline"}
-                          className={`cursor-pointer transition-colors text-xs ${
+                          className={`cursor-pointer transition-all text-xs ${
                             selectedTags.includes(tag.id)
-                              ? ""
+                              ? "shadow-sm"
                               : "bg-transparent hover:bg-accent"
                           }`}
                           onClick={() => toggleTag(tag.id)}
@@ -271,21 +494,26 @@ export default function Workspace() {
                   </div>
                 )}
 
+                {/* Generate Button */}
                 <Button
                   onClick={handleGenerate}
                   disabled={!prompt.trim() || generateMutation.isPending}
-                  className="w-full font-medium"
+                  className="w-full font-medium h-12 text-base glow-primary"
                   size="lg"
                 >
                   {generateMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Generating {mediaType === "video" ? "Video" : "Image"}...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate Synthetic Media
+                      {mediaType === "video" ? (
+                        <Video className="h-5 w-5 mr-2" />
+                      ) : (
+                        <Sparkles className="h-5 w-5 mr-2" />
+                      )}
+                      Generate {mediaType === "video" ? `${duration}s Video Clip` : "Image"}
                     </>
                   )}
                 </Button>
@@ -293,106 +521,172 @@ export default function Workspace() {
             </Card>
           </div>
 
-          {/* Results Panel */}
+          {/* Right Panel - Generation History */}
           <div className="lg:col-span-3">
             <Card className="border-border/50 bg-card/50">
               <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Image className="h-4 w-4 text-primary" />
-                  Generation History
-                  {generations && (
-                    <span className="text-xs text-muted-foreground font-normal ml-auto">
-                      {generations.length} items
-                    </span>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Image className="h-4 w-4 text-primary" />
+                    Generation History
+                  </CardTitle>
+                  {generations && generations.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {generations.length} items
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={() => refetchGens()} className="h-7 w-7 p-0">
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </div>
                   )}
-                </CardTitle>
+                </div>
               </CardHeader>
               <CardContent>
                 {!generations || generations.length === 0 ? (
-                  <div className="text-center py-16 text-muted-foreground">
-                    <Image className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <div className="text-center py-20 text-muted-foreground">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mx-auto mb-4">
+                      <Image className="h-8 w-8 opacity-30" />
+                    </div>
                     <p className="text-sm font-medium mb-1">No generations yet</p>
-                    <p className="text-xs">Enter a prompt and generate your first synthetic output</p>
+                    <p className="text-xs max-w-xs mx-auto">
+                      Enter a prompt and generate your first synthetic output. Try one of the preset prompts to get started.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-4">
-                    {generations.map((gen) => (
-                      <div
-                        key={gen.id}
-                        className="group rounded-xl border border-border/50 overflow-hidden hover:border-border transition-colors"
-                      >
-                        {/* Image */}
-                        <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                          {gen.status === "completed" && gen.imageUrl ? (
-                            <img
-                              src={gen.imageUrl}
-                              alt="Synthetic output"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : gen.status === "generating" ? (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                            </div>
-                          ) : gen.status === "failed" ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-destructive">
-                              <XCircle className="h-8 w-8 mb-2" />
-                              <span className="text-xs">Failed</span>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Clock className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
+                    <AnimatePresence mode="popLayout">
+                      {generations.map((gen) => (
+                        <motion.div
+                          key={gen.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="group rounded-xl border border-border/50 overflow-hidden hover:border-border/80 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                        >
+                          {/* Media Preview */}
+                          <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden">
+                            {gen.status === "completed" && gen.imageUrl ? (
+                              <>
+                                <img
+                                  src={gen.imageUrl}
+                                  alt="Synthetic output"
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                                {gen.mediaType === "video" && (
+                                  <div className="absolute top-2 left-2 video-badge px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Film className="h-3 w-3 text-white" />
+                                    <span className="text-[10px] text-white font-medium">
+                                      {gen.duration || 4}s
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            ) : gen.status === "generating" || gen.status === "pending" ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                <div className="relative">
+                                  <div className="h-12 w-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    {gen.mediaType === "video" ? (
+                                      <Video className="h-4 w-4 text-primary/60" />
+                                    ) : (
+                                      <Sparkles className="h-4 w-4 text-primary/60" />
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <span className="text-xs text-muted-foreground capitalize block">{gen.status}...</span>
+                                  <span className="text-[10px] text-muted-foreground/60">
+                                    {gen.mediaType === "video" ? "Rendering video frames" : "Generating image"}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : gen.status === "failed" ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center text-destructive gap-2">
+                                <XCircle className="h-8 w-8" />
+                                <span className="text-xs">Generation Failed</span>
+                                {gen.errorMessage && (
+                                  <span className="text-[10px] text-muted-foreground max-w-[200px] text-center">{gen.errorMessage}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Clock className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
 
-                          {/* Overlay actions */}
-                          {gen.status === "completed" && gen.imageUrl && (
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setSubmitGenId(gen.id);
-                                  setSubmitDialogOpen(true);
-                                }}
-                                className="text-xs"
-                              >
-                                <Send className="h-3 w-3 mr-1" />
-                                Submit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                asChild
-                                className="text-xs"
-                              >
-                                <a href={gen.imageUrl} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  View
-                                </a>
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                            {/* Hover overlay */}
+                            {gen.status === "completed" && gen.imageUrl && (
+                              <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSubmitGenId(gen.id);
+                                    setSubmitDialogOpen(true);
+                                  }}
+                                  className="text-xs h-8 gap-1.5"
+                                >
+                                  <Send className="h-3 w-3" />
+                                  Submit to Gallery
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  asChild
+                                  className="text-xs h-8 gap-1.5"
+                                >
+                                  <a href={gen.imageUrl} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="h-3 w-3" />
+                                    Open
+                                  </a>
+                                </Button>
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Info */}
-                        <div className="p-3">
-                          <p className="text-xs text-foreground truncate">{gen.prompt}</p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(gen.createdAt).toLocaleDateString()}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              {gen.status === "completed" && (
-                                <CheckCircle className="h-3 w-3 text-emerald-500" />
-                              )}
-                              <span className="text-[10px] text-muted-foreground capitalize">
-                                {gen.status}
+                          {/* Info */}
+                          <div className="p-3 space-y-2">
+                            <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{gen.prompt}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(gen.createdAt).toLocaleDateString()}
+                                </span>
+                                {gen.mediaType === "video" && (
+                                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-transparent border-fuchsia-500/30 text-fuchsia-400">
+                                    <Film className="h-2.5 w-2.5 mr-0.5" />
+                                    {gen.duration || 4}s Video
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {gen.status === "completed" && (
+                                  <CheckCircle className="h-3 w-3 text-emerald-500" />
+                                )}
+                                {gen.status === "generating" && (
+                                  <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                                )}
+                                {gen.status === "failed" && (
+                                  <XCircle className="h-3 w-3 text-destructive" />
+                                )}
+                                <span className="text-[10px] text-muted-foreground capitalize">
+                                  {gen.status}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground font-mono">
+                                {gen.modelVersion}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground">
+                                {gen.width}x{gen.height}
                               </span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </div>
                 )}
               </CardContent>
@@ -403,13 +697,16 @@ export default function Workspace() {
 
       {/* Submit to Gallery Dialog */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Submit to Research Gallery</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-primary" />
+              Submit to Research Gallery
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Your submission will be reviewed by a moderator before appearing in the public gallery.
+              Your submission will be reviewed by a moderator before appearing in the public research gallery.
             </p>
             <div>
               <Label htmlFor="submit-title">Title</Label>

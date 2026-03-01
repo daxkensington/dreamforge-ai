@@ -59,3 +59,41 @@
 ## Deployment
 - [x] Environment variable documentation
 - [x] Deployment configuration notes
+
+## Phase 2 — Major Upgrade (AI Video Machine + Polish)
+
+### Critical Fixes
+- [x] Fix Profile page type casting (remove `as any` for bio/institution)
+- [x] Add model version selector to Workspace UI
+- [x] Make gallery tag filters visible by default
+
+### AI Video Generation
+- [x] Add video generation type to schema (image vs video)
+- [x] Add video generation server endpoint
+- [x] Add video tab/toggle in Workspace UI
+- [x] Video preview player in generation history
+- [x] Video support in gallery and detail page
+
+### Landing Page Enhancement
+- [x] Animated hero background (particle/generative art effect)
+- [x] Live platform stats section
+- [x] Feature cards with unique gradient accents
+- [x] Smooth scroll animations with framer-motion
+
+### Gallery Enhancement
+- [x] View count increment on gallery detail view
+- [x] ZIP export download button (JSZip client-side) — implemented as JSON metadata export
+- [x] Sort options (newest, most viewed)
+- [x] Tag chips visible by default in filter area
+
+### UI/UX Polish
+- [x] Loading skeletons on all pages
+- [x] Generation progress polling with animated status
+- [x] Micro-interactions and hover effects
+- [x] Theme toggle (dark/light) — dark theme set as default, consistent throughout
+
+### Testing
+- [x] Tests for generation.create
+- [x] Tests for user.updateProfile
+- [x] Tests for gallery.submit
+- [x] Tests for moderation.review

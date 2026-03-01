@@ -85,6 +85,8 @@ export const appRouter = router({
           mediaType: z.enum(["image", "video"]).default("image"),
           width: z.number().min(256).max(1536).default(512),
           height: z.number().min(256).max(1536).default(768),
+          duration: z.number().min(2).max(8).default(4),
+          modelVersion: z.string().max(128).default("built-in-v1"),
           tagIds: z.array(z.number()).optional(),
         })
       )
@@ -97,17 +99,23 @@ export const appRouter = router({
           mediaType: input.mediaType,
           width: input.width,
           height: input.height,
+          duration: input.mediaType === "video" ? input.duration : null,
           status: "generating",
-          modelVersion: "built-in-v1",
+          modelVersion: input.modelVersion,
         });
 
         if (input.tagIds && input.tagIds.length > 0) {
           await setGenerationTags(genId, input.tagIds);
         }
 
-        // Generate image asynchronously
+        // Generate media
         try {
-          const enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
+          let enhancedPrompt: string;
+          if (input.mediaType === "video") {
+            enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
+          } else {
+            enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
+          }
 
           const { url } = await generateImage({ prompt: enhancedPrompt });
 
@@ -117,7 +125,7 @@ export const appRouter = router({
             thumbnailUrl: url ?? null,
           });
 
-          return { id: genId, status: "completed", imageUrl: url };
+          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType };
         } catch (error: any) {
           await updateGeneration(genId, {
             status: "failed",
@@ -233,6 +241,7 @@ export const appRouter = router({
           search: z.string().optional(),
           modelVersion: z.string().optional(),
           featured: z.boolean().optional(),
+          sort: z.enum(["newest", "oldest", "most_viewed"]).optional(),
         }).optional()
       )
       .query(async ({ input }) => {
