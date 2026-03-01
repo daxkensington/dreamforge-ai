@@ -11,6 +11,11 @@ import {
   Sparkles,
   Zap,
   Star,
+  Pipette,
+  Layers,
+  PenTool,
+  Smile,
+  ScanSearch,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -62,6 +67,61 @@ const tools = [
     badge: "AI-Powered",
     features: ["Visual controls", "Style presets", "One-click generate"],
   },
+  {
+    id: "color-palette",
+    title: "Color Palette Extractor",
+    description: "Extract dominant colors from any image and discover harmonious palettes, complementary schemes, and mood analysis.",
+    icon: Pipette,
+    href: "/tools/color-palette",
+    gradient: "from-pink-500 to-rose-400",
+    bgGlow: "bg-pink-500/10",
+    badge: "New",
+    features: ["Hex extraction", "Color harmonies", "Mood analysis"],
+  },
+  {
+    id: "variations",
+    title: "Image Variations",
+    description: "Generate multiple creative variations of any image with different styles, moods, and artistic interpretations.",
+    icon: Layers,
+    href: "/tools/variations",
+    gradient: "from-indigo-500 to-purple-400",
+    bgGlow: "bg-indigo-500/10",
+    badge: "New",
+    features: ["2-6 variations", "4 style modes", "Batch download"],
+  },
+  {
+    id: "inpainting",
+    title: "Inpainting Editor",
+    description: "Edit specific parts of your image with natural language. Describe what to change and AI handles the rest.",
+    icon: PenTool,
+    href: "/tools/inpainting",
+    gradient: "from-teal-500 to-cyan-400",
+    bgGlow: "bg-teal-500/10",
+    badge: "New",
+    features: ["Text-based editing", "Region targeting", "Style preservation"],
+  },
+  {
+    id: "face-enhancer",
+    title: "Face Enhancer",
+    description: "Enhance and restore portrait quality with AI-powered retouching. Fix artifacts, sharpen details, and improve faces.",
+    icon: Smile,
+    href: "/tools/face-enhancer",
+    gradient: "from-rose-500 to-pink-400",
+    bgGlow: "bg-rose-500/10",
+    badge: "New",
+    features: ["3 enhancement levels", "Identity preservation", "Portrait retouching"],
+  },
+  {
+    id: "image-to-prompt",
+    title: "Image to Prompt",
+    description: "Reverse-engineer any image into a detailed generation prompt. Analyze style, mood, composition, and more.",
+    icon: ScanSearch,
+    href: "/tools/image-to-prompt",
+    gradient: "from-amber-500 to-yellow-400",
+    bgGlow: "bg-amber-500/10",
+    badge: "New",
+    features: ["Prompt extraction", "Tag detection", "Use in Studio"],
+  },
 ];
 
 export default function Tools() {
@@ -94,8 +154,8 @@ export default function Tools() {
               </h1>
 
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-                Professional-grade AI tools that transform your creative workflow.
-                Upscale, stylize, edit backgrounds, and build perfect prompts — all in one place.
+                9 professional-grade AI tools that transform your creative workflow.
+                Upscale, stylize, edit, analyze, and build — all in one place.
               </p>
 
               <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
@@ -118,7 +178,7 @@ export default function Tools() {
 
         {/* Tools Grid */}
         <section className="container pb-20">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {tools.map((tool, index) => (
               <motion.div
                 key={tool.id}

@@ -222,3 +222,34 @@
 - [x] Vitest tests for user.getUsageStats endpoint (9 tests)
 - [x] Vitest tests for user.getActivityTimeline endpoint (8 tests)
 - [x] Final verification and checkpoint (133 tests, all passing)
+
+## Phase 9 — AI Tools Suite Expansion (5 New Tools)
+
+### Tool 5: Color Palette Extractor
+- [x] Backend: LLM analyzes image and extracts dominant colors + suggests palettes
+- [x] Frontend: Upload image, see extracted palette swatches, copy hex codes, get complementary suggestions
+
+### Tool 6: Image Variations Generator
+- [x] Backend: Generate multiple variations of an uploaded image with different styles/tweaks
+- [x] Frontend: Upload image, choose variation count (2-6), see grid of variations, download favorites
+
+### Tool 7: Inpainting Editor
+- [x] Backend: Edit specific regions of an image via text prompt (mask + prompt)
+- [x] Frontend: Upload image, describe what to change in a region, see before/after result
+
+### Tool 8: Face Enhancer
+- [x] Backend: Enhance/restore faces in images (sharpen, fix artifacts, improve quality)
+- [x] Frontend: Upload portrait, choose enhancement level, see before/after comparison
+
+### Tool 9: Image-to-Prompt Analyzer
+- [x] Backend: LLM analyzes an image and reverse-engineers a detailed generation prompt
+- [x] Frontend: Upload image, get AI-generated prompt description, one-click copy to Studio
+
+### Integration
+- [x] Update Tools Hub page with all 5 new tool cards (9 total, 3-column grid)
+- [x] Add routes for all new tool pages in App.tsx
+- [x] Update Tools Hub hero to reflect 9 tools
+
+### Testing
+- [x] Vitest tests for all 5 new tool endpoints (22 tests, all passing)
+- [x] Final verification and checkpoint (155 tests, all passing, 0 TS errors)

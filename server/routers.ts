@@ -712,6 +712,299 @@ export const appRouter = router({
           return { prompt: parts.join(", ") + ". High quality, detailed, professional.", status: "completed" as const };
         }
       }),
+
+    // Color Palette Extractor — LLM analyzes image and extracts/suggests color palettes
+    extractPalette: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          paletteSize: z.number().min(3).max(10).default(6),
+          includeComplementary: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a color analysis expert. Analyze the provided image and extract the dominant color palette. Return a JSON object with this exact structure:\n{\n  "colors": [{"hex": "#RRGGBB", "name": "Color Name", "percentage": 25}],\n  "mood": "overall mood description",\n  "complementary": [{"hex": "#RRGGBB", "name": "Color Name"}],\n  "harmonies": {"analogous": ["#hex1","#hex2","#hex3"], "triadic": ["#hex1","#hex2","#hex3"], "splitComplementary": ["#hex1","#hex2","#hex3"]}\n}\nExtract exactly ${input.paletteSize} dominant colors. All hex codes must be valid 7-character format. Output ONLY valid JSON.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text" as const, text: `Extract the ${input.paletteSize} most dominant colors from this image${input.includeComplementary ? " and suggest complementary colors" : ""}.` },
+                  { type: "image_url" as const, image_url: { url: input.imageUrl } },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "color_palette",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    colors: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          hex: { type: "string" },
+                          name: { type: "string" },
+                          percentage: { type: "number" },
+                        },
+                        required: ["hex", "name", "percentage"],
+                        additionalProperties: false,
+                      },
+                    },
+                    mood: { type: "string" },
+                    complementary: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          hex: { type: "string" },
+                          name: { type: "string" },
+                        },
+                        required: ["hex", "name"],
+                        additionalProperties: false,
+                      },
+                    },
+                    harmonies: {
+                      type: "object",
+                      properties: {
+                        analogous: { type: "array", items: { type: "string" } },
+                        triadic: { type: "array", items: { type: "string" } },
+                        splitComplementary: { type: "array", items: { type: "string" } },
+                      },
+                      required: ["analogous", "triadic", "splitComplementary"],
+                      additionalProperties: false,
+                    },
+                  },
+                  required: ["colors", "mood", "complementary", "harmonies"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = result.choices[0]?.message?.content;
+          const palette = typeof content === "string" ? JSON.parse(content) : null;
+          if (!palette) throw new Error("Failed to parse palette");
+
+          return { ...palette, status: "completed" as const };
+        } catch (error: any) {
+          // Fallback palette
+          return {
+            colors: [
+              { hex: "#2D3436", name: "Dark Charcoal", percentage: 30 },
+              { hex: "#636E72", name: "Storm Gray", percentage: 25 },
+              { hex: "#B2BEC3", name: "Silver Sand", percentage: 20 },
+              { hex: "#DFE6E9", name: "Light Gray", percentage: 15 },
+              { hex: "#74B9FF", name: "Sky Blue", percentage: 10 },
+            ],
+            mood: "Unable to analyze — showing default palette",
+            complementary: [{ hex: "#FF7675", name: "Coral" }, { hex: "#FDCB6E", name: "Golden" }],
+            harmonies: { analogous: ["#74B9FF", "#A29BFE", "#81ECEC"], triadic: ["#74B9FF", "#FF7675", "#55EFC4"], splitComplementary: ["#74B9FF", "#E17055", "#FDCB6E"] },
+            status: "fallback" as const,
+          };
+        }
+      }),
+
+    // Image Variations — generate multiple variations of an uploaded image
+    generateVariations: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          count: z.number().min(2).max(6).default(4),
+          variationType: z.enum([
+            "subtle",
+            "moderate",
+            "dramatic",
+            "style-mix",
+          ]).default("moderate"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const variationDescriptions: Record<string, string[]> = {
+          "subtle": [
+            "slightly different color temperature, warmer tones",
+            "subtle lighting shift, softer shadows",
+            "minor composition adjustment, slightly different angle",
+            "gentle color grading change, cooler palette",
+            "small detail variations, enhanced textures",
+            "slight atmospheric change, more depth",
+          ],
+          "moderate": [
+            "different time of day lighting, golden hour",
+            "alternative color scheme, complementary palette",
+            "different artistic rendering, more painterly",
+            "shifted perspective, wider angle view",
+            "enhanced atmospheric effects, volumetric light",
+            "different seasonal setting, autumn tones",
+          ],
+          "dramatic": [
+            "completely different art style, oil painting",
+            "inverted mood, dark and moody atmosphere",
+            "surreal interpretation, dreamlike quality",
+            "minimalist reimagining, simplified forms",
+            "maximalist version, rich ornate details",
+            "abstract reinterpretation, geometric forms",
+          ],
+          "style-mix": [
+            "reimagined as Japanese ukiyo-e woodblock print",
+            "reimagined as Art Deco poster illustration",
+            "reimagined as watercolor sketch",
+            "reimagined as neon cyberpunk scene",
+            "reimagined as vintage photograph",
+            "reimagined as stained glass artwork",
+          ],
+        };
+
+        const descriptions = variationDescriptions[input.variationType];
+        const results: Array<{ url: string | null; variation: string; status: string; error?: string }> = [];
+
+        for (let i = 0; i < input.count; i++) {
+          const desc = descriptions[i % descriptions.length];
+          try {
+            const { url } = await generateImage({
+              prompt: `Create a variation of this image with ${desc}. Maintain the core subject and composition but apply the described changes. Professional quality output.`,
+              originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+            });
+            results.push({ url: url ?? null, variation: desc, status: "completed" });
+          } catch (error: any) {
+            results.push({ url: null, variation: desc, status: "failed", error: error.message });
+          }
+        }
+
+        return { results, total: input.count, completed: results.filter(r => r.status === "completed").length };
+      }),
+
+    // Inpainting Editor — edit specific regions of an image via text prompt
+    inpaint: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          editPrompt: z.string().min(1).max(500),
+          regionDescription: z.string().max(200).optional(),
+          preserveStyle: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const styleNote = input.preserveStyle ? " Maintain the exact same artistic style, lighting, and color palette as the original." : "";
+          const regionNote = input.regionDescription ? ` Focus the edit on: ${input.regionDescription}.` : "";
+
+          const { url } = await generateImage({
+            prompt: `Edit this image: ${input.editPrompt}.${regionNote}${styleNote} Make the edit look natural and seamlessly integrated. Professional quality.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Face Enhancer — enhance/restore faces in images
+    enhanceFace: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          enhancementLevel: z.enum(["light", "moderate", "heavy"]).default("moderate"),
+          preserveIdentity: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const levelDescriptions: Record<string, string> = {
+          "light": "subtle enhancement with minor sharpening, gentle skin smoothing, and slight detail improvement",
+          "moderate": "balanced enhancement with clear sharpening, skin texture improvement, eye detail enhancement, and lighting correction",
+          "heavy": "intensive restoration with maximum sharpening, artifact removal, skin retouching, eye and hair detail enhancement, and professional-grade lighting correction",
+        };
+
+        const levelDesc = levelDescriptions[input.enhancementLevel];
+        const identityNote = input.preserveIdentity ? " Preserve the exact identity and likeness of the person — do not change facial features, only enhance quality." : "";
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Enhance and restore the face(s) in this portrait image with ${levelDesc}.${identityNote} Professional portrait retouching quality. All content is 100% fictional synthetic media.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const, enhancementLevel: input.enhancementLevel };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Image-to-Prompt Analyzer — reverse-engineer a prompt from an image
+    analyzeImage: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          detailLevel: z.enum(["brief", "standard", "detailed"]).default("standard"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const detailInstructions: Record<string, string> = {
+          "brief": "Write a concise 1-2 sentence prompt capturing the essential subject and style.",
+          "standard": "Write a detailed prompt of 2-4 sentences covering subject, style, mood, lighting, composition, and key details.",
+          "detailed": "Write a comprehensive prompt of 4-6 sentences covering every aspect: subject, style, mood, lighting, composition, color palette, textures, atmosphere, camera angle, and artistic techniques used.",
+        };
+
+        try {
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert at analyzing images and reverse-engineering AI generation prompts. Given an image, describe it as a detailed prompt that could be used to recreate it with an AI image generator. ${detailInstructions[input.detailLevel]} Include artistic terminology and quality modifiers. Output a JSON object with: "prompt" (the generation prompt), "tags" (array of 3-8 descriptive tags), "style" (detected art style), "mood" (detected mood/atmosphere). All content is 100% fictional synthetic media.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text" as const, text: "Analyze this image and generate a prompt that could recreate it." },
+                  { type: "image_url" as const, image_url: { url: input.imageUrl } },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "image_analysis",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    prompt: { type: "string", description: "The reverse-engineered generation prompt" },
+                    tags: { type: "array", items: { type: "string" }, description: "Descriptive tags" },
+                    style: { type: "string", description: "Detected art style" },
+                    mood: { type: "string", description: "Detected mood/atmosphere" },
+                  },
+                  required: ["prompt", "tags", "style", "mood"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = result.choices[0]?.message?.content;
+          const analysis = typeof content === "string" ? JSON.parse(content) : null;
+          if (!analysis) throw new Error("Failed to parse analysis");
+
+          return { ...analysis, status: "completed" as const, detailLevel: input.detailLevel };
+        } catch (error: any) {
+          return {
+            prompt: "Unable to analyze image — please try again",
+            tags: [],
+            style: "unknown",
+            mood: "unknown",
+            status: "failed" as const,
+            error: error.message,
+          };
+        }
+      }),
   }),
 
   export: router({

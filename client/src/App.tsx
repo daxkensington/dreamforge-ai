@@ -15,6 +15,11 @@ import ToolUpscaler from "./pages/ToolUpscaler";
 import ToolStyleTransfer from "./pages/ToolStyleTransfer";
 import ToolBackground from "./pages/ToolBackground";
 import ToolPromptBuilder from "./pages/ToolPromptBuilder";
+import ToolColorPalette from "./pages/ToolColorPalette";
+import ToolVariations from "./pages/ToolVariations";
+import ToolInpainting from "./pages/ToolInpainting";
+import ToolFaceEnhancer from "./pages/ToolFaceEnhancer";
+import ToolImageToPrompt from "./pages/ToolImageToPrompt";
 import BatchStudio from "./pages/BatchStudio";
 import Pricing from "./pages/Pricing";
 
@@ -30,6 +35,11 @@ function Router() {
       <Route path="/tools/style-transfer" component={ToolStyleTransfer} />
       <Route path="/tools/background" component={ToolBackground} />
       <Route path="/tools/prompt-builder" component={ToolPromptBuilder} />
+      <Route path="/tools/color-palette" component={ToolColorPalette} />
+      <Route path="/tools/variations" component={ToolVariations} />
+      <Route path="/tools/inpainting" component={ToolInpainting} />
+      <Route path="/tools/face-enhancer" component={ToolFaceEnhancer} />
+      <Route path="/tools/image-to-prompt" component={ToolImageToPrompt} />
       <Route path="/batch" component={BatchStudio} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
