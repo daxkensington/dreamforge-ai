@@ -97,3 +97,21 @@
 - [x] Tests for user.updateProfile
 - [x] Tests for gallery.submit
 - [x] Tests for moderation.review
+
+## Phase 3 — Image-to-Video Animation Pipeline
+
+### Backend
+- [x] Add image-to-video generation endpoint (animateImage)
+- [x] Link parent image generation to child video generation in DB
+- [x] Store animation parameters (duration, motion style) in metadata
+
+### Frontend
+- [x] Add "Animate" button on completed image generation cards in Workspace
+- [x] Create AnimateDialog with duration and motion style controls
+- [x] Show animation progress/loading state
+- [x] Display resulting video in generation history with parent link
+- [x] Video playback indicator on animated items
+
+### Testing
+- [x] Vitest tests for animateImage endpoint validation
+- [x] Vitest tests for input validation (duration, source generation)

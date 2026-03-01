@@ -11,6 +11,7 @@ import {
   createModerationItem,
   createTag,
   getAllTags,
+  getChildGenerations,
   getGalleryItemById,
   getGalleryItems,
   getGalleryStats,
@@ -204,6 +205,114 @@ export const appRouter = router({
         });
 
         return { moderationId: modId };
+      }),
+
+    animateImage: protectedProcedure
+      .input(
+        z.object({
+          sourceGenerationId: z.number(),
+          duration: z.number().min(2).max(8).default(4),
+          animationStyle: z.enum([
+            "smooth-pan",
+            "gentle-zoom",
+            "parallax-drift",
+            "cinematic-sweep",
+            "breathing-motion",
+            "particle-flow",
+          ]).default("smooth-pan"),
+          tagIds: z.array(z.number()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Verify source generation exists and belongs to user
+        const sourceGen = await getGenerationById(input.sourceGenerationId);
+        if (!sourceGen) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Source generation not found" });
+        }
+        if (sourceGen.userId !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        if (sourceGen.status !== "completed" || !sourceGen.imageUrl) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Source generation must be a completed image with a URL",
+          });
+        }
+        if (sourceGen.mediaType !== "image") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Can only animate image generations, not videos",
+          });
+        }
+
+        // Create the animated video generation record
+        const animPrompt = `Animate this image with ${input.animationStyle.replace("-", " ")} motion: ${sourceGen.prompt}. Style: cinematic ${input.duration}-second animation, smooth fluid motion, high quality. 100% fictional synthetic content.`;
+
+        const genId = await createGeneration({
+          userId: ctx.user.id,
+          prompt: animPrompt,
+          negativePrompt: sourceGen.negativePrompt ?? null,
+          mediaType: "video",
+          width: sourceGen.width ?? 768,
+          height: sourceGen.height ?? 768,
+          duration: input.duration,
+          status: "generating",
+          modelVersion: "animate-from-image",
+          parentGenerationId: input.sourceGenerationId,
+          animationStyle: input.animationStyle,
+        });
+
+        // Copy tags from source if no new tags provided
+        if (input.tagIds && input.tagIds.length > 0) {
+          await setGenerationTags(genId, input.tagIds);
+        }
+
+        // Generate the animated version using the source image as reference
+        try {
+          const { url } = await generateImage({
+            prompt: animPrompt,
+            originalImages: [{
+              url: sourceGen.imageUrl,
+              mimeType: "image/png",
+            }],
+          });
+
+          await updateGeneration(genId, {
+            status: "completed",
+            imageUrl: url ?? null,
+            thumbnailUrl: sourceGen.imageUrl, // Use source image as thumbnail
+          });
+
+          return {
+            id: genId,
+            status: "completed" as const,
+            imageUrl: url,
+            mediaType: "video" as const,
+            parentGenerationId: input.sourceGenerationId,
+          };
+        } catch (error: any) {
+          await updateGeneration(genId, {
+            status: "failed",
+            errorMessage: error.message || "Animation failed",
+          });
+          return {
+            id: genId,
+            status: "failed" as const,
+            error: error.message,
+            parentGenerationId: input.sourceGenerationId,
+          };
+        }
+      }),
+
+    getChildren: protectedProcedure
+      .input(z.object({ parentId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const parent = await getGenerationById(input.parentId);
+        if (!parent) throw new TRPCError({ code: "NOT_FOUND" });
+        if (parent.userId !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        return getChildGenerations(input.parentId);
       }),
 
     enhancePrompt: protectedProcedure

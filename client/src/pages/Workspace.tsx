@@ -45,6 +45,10 @@ import {
   Timer,
   Cpu,
   Maximize,
+  Play,
+  ArrowRight,
+  Clapperboard,
+  Link2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,6 +91,10 @@ export default function Workspace() {
   const [submitTitle, setSubmitTitle] = useState("");
   const [submitDesc, setSubmitDesc] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [animateDialogOpen, setAnimateDialogOpen] = useState(false);
+  const [animateGenId, setAnimateGenId] = useState<number | null>(null);
+  const [animateDuration, setAnimateDuration] = useState(4);
+  const [animateStyle, setAnimateStyle] = useState<string>("smooth-pan");
 
   const { data: tags } = trpc.tags.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: generations, refetch: refetchGens } = trpc.generation.list.useQuery(
@@ -132,6 +140,29 @@ export default function Workspace() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const animateMutation = trpc.generation.animateImage.useMutation({
+    onSuccess: (data) => {
+      if (data.status === "completed") {
+        toast.success("Image animated into video clip!");
+      } else if (data.status === "failed") {
+        toast.error(`Animation failed: ${data.error || "Unknown error"}`);
+      }
+      setAnimateDialogOpen(false);
+      setAnimateGenId(null);
+      refetchGens();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleAnimate = () => {
+    if (!animateGenId) return;
+    animateMutation.mutate({
+      sourceGenerationId: animateGenId,
+      duration: animateDuration,
+      animationStyle: animateStyle as any,
+    });
+  };
 
   const handleMediaTypeChange = (type: "image" | "video") => {
     setMediaType(type);
@@ -630,6 +661,20 @@ export default function Workspace() {
                                   <Send className="h-3 w-3" />
                                   Submit to Gallery
                                 </Button>
+                                {gen.mediaType === "image" && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => {
+                                      setAnimateGenId(gen.id);
+                                      setAnimateDialogOpen(true);
+                                    }}
+                                    className="text-xs h-8 gap-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white border-0"
+                                  >
+                                    <Play className="h-3 w-3" />
+                                    Animate
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="secondary"
@@ -675,13 +720,19 @@ export default function Workspace() {
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground font-mono">
                                 {gen.modelVersion}
                               </span>
                               <span className="text-[9px] text-muted-foreground">
                                 {gen.width}x{gen.height}
                               </span>
+                              {(gen as any).parentGenerationId && (
+                                <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-transparent border-cyan-500/30 text-cyan-400">
+                                  <Link2 className="h-2.5 w-2.5 mr-0.5" />
+                                  Animated
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </motion.div>
@@ -755,6 +806,119 @@ export default function Workspace() {
                 <Send className="h-4 w-4 mr-2" />
               )}
               Submit for Review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Animate Image Dialog */}
+      <Dialog open={animateDialogOpen} onOpenChange={setAnimateDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clapperboard className="h-5 w-5 text-fuchsia-500" />
+              Animate Image to Video
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-4">
+            <p className="text-sm text-muted-foreground">
+              Transform your static image into a short animated video clip. Choose a motion style and duration below.
+            </p>
+
+            {/* Source Image Preview */}
+            {animateGenId && generations && (() => {
+              const sourceGen = generations.find((g: any) => g.id === animateGenId);
+              if (!sourceGen || !sourceGen.imageUrl) return null;
+              return (
+                <div className="relative rounded-lg overflow-hidden border border-border/50">
+                  <img
+                    src={sourceGen.imageUrl}
+                    alt="Source image"
+                    className="w-full h-40 object-cover"
+                  />
+                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                    <p className="text-xs text-white/80 line-clamp-1">{sourceGen.prompt}</p>
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-primary/80 text-white text-[10px]">
+                      <Image className="h-2.5 w-2.5 mr-1" />
+                      Source Image
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Animation Style */}
+            <div>
+              <Label className="text-sm font-medium mb-3 block">Motion Style</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "smooth-pan", label: "Smooth Pan", desc: "Gentle horizontal/vertical movement" },
+                  { value: "gentle-zoom", label: "Gentle Zoom", desc: "Slow zoom in or out" },
+                  { value: "parallax-drift", label: "Parallax Drift", desc: "Layered depth movement" },
+                  { value: "cinematic-sweep", label: "Cinematic Sweep", desc: "Dramatic camera sweep" },
+                  { value: "breathing-motion", label: "Breathing Motion", desc: "Subtle pulsing effect" },
+                  { value: "particle-flow", label: "Particle Flow", desc: "Flowing particle overlay" },
+                ].map((style) => (
+                  <button
+                    key={style.value}
+                    onClick={() => setAnimateStyle(style.value)}
+                    className={`text-left p-3 rounded-lg border transition-all duration-200 ${
+                      animateStyle === style.value
+                        ? "border-fuchsia-500 bg-fuchsia-500/10 ring-1 ring-fuchsia-500/30"
+                        : "border-border/50 hover:border-border hover:bg-muted/30"
+                    }`}
+                  >
+                    <span className="text-xs font-medium block">{style.label}</span>
+                    <span className="text-[10px] text-muted-foreground">{style.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">Duration</Label>
+                <span className="text-sm font-mono text-fuchsia-400">{animateDuration}s</span>
+              </div>
+              <Slider
+                value={[animateDuration]}
+                onValueChange={([v]) => setAnimateDuration(v)}
+                min={2}
+                max={8}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between mt-1">
+                <span className="text-[10px] text-muted-foreground">2s</span>
+                <span className="text-[10px] text-muted-foreground">8s</span>
+              </div>
+            </div>
+
+            <DisclaimerBanner compact />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnimateDialogOpen(false)} className="bg-transparent">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAnimate}
+              disabled={animateMutation.isPending}
+              className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+            >
+              {animateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Animating...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Animate to Video
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

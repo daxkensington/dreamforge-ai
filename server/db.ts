@@ -165,6 +165,16 @@ export async function getUserGenerations(userId: number, limit = 50, offset = 0)
     .offset(offset);
 }
 
+export async function getChildGenerations(parentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(generations)
+    .where(eq(generations.parentGenerationId, parentId))
+    .orderBy(desc(generations.createdAt));
+}
+
 export async function getGenerationWithTags(generationId: number) {
   const db = await getDb();
   if (!db) return null;

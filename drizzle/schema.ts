@@ -77,6 +77,8 @@ export const generations = mysqlTable("generations", {
     .default("pending")
     .notNull(),
   errorMessage: text("errorMessage"),
+  parentGenerationId: int("parentGenerationId"), // links animated video to source image
+  animationStyle: varchar("animationStyle", { length: 64 }), // motion style for animation
   metadata: json("metadata"), // extra generation params
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
