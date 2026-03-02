@@ -16,6 +16,12 @@ import {
   PenTool,
   Smile,
   ScanSearch,
+  Expand,
+  Eraser,
+  Type,
+  Blend,
+  PenLine,
+  SunMedium,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -122,6 +128,72 @@ const tools = [
     badge: "New",
     features: ["Prompt extraction", "Tag detection", "Use in Studio"],
   },
+  {
+    id: "outpainting",
+    title: "Image Expander",
+    description: "Extend images beyond their borders with AI outpainting. Choose direction, expansion size, and describe the fill content.",
+    icon: Expand,
+    href: "/tools/outpainting",
+    gradient: "from-sky-500 to-cyan-400",
+    bgGlow: "bg-sky-500/10",
+    badge: "New",
+    features: ["5 directions", "3 expansion sizes", "Custom fill"],
+  },
+  {
+    id: "object-eraser",
+    title: "Object Eraser",
+    description: "Remove unwanted objects from images cleanly. Describe what to remove and AI fills the gap naturally.",
+    icon: Eraser,
+    href: "/tools/object-eraser",
+    gradient: "from-rose-500 to-pink-400",
+    bgGlow: "bg-rose-500/10",
+    badge: "New",
+    features: ["Smart removal", "3 fill methods", "Quick presets"],
+  },
+  {
+    id: "text-effects",
+    title: "AI Text Effects",
+    description: "Generate stunning stylized text with AI-powered effects. Fire, neon, gold, ice, galaxy, and more.",
+    icon: Type,
+    href: "/tools/text-effects",
+    gradient: "from-amber-500 to-orange-400",
+    bgGlow: "bg-amber-500/10",
+    badge: "Creative",
+    features: ["10 effect styles", "4 backgrounds", "4 sizes"],
+  },
+  {
+    id: "image-blender",
+    title: "Image Blender",
+    description: "Blend and mashup two images into one creative output. Merge, double-exposure, collage, morph, or dreamscape.",
+    icon: Blend,
+    href: "/tools/image-blender",
+    gradient: "from-fuchsia-500 to-violet-500",
+    bgGlow: "bg-fuchsia-500/10",
+    badge: "Creative",
+    features: ["5 blend modes", "Strength control", "Dual upload"],
+  },
+  {
+    id: "sketch-to-image",
+    title: "Sketch to Image",
+    description: "Transform rough sketches and drawings into polished images. Choose output style and fidelity level.",
+    icon: PenLine,
+    href: "/tools/sketch-to-image",
+    gradient: "from-teal-500 to-emerald-400",
+    bgGlow: "bg-teal-500/10",
+    badge: "New",
+    features: ["6 output styles", "3 fidelity levels", "Description hints"],
+  },
+  {
+    id: "color-grading",
+    title: "AI Color Grading",
+    description: "Apply cinematic color grades and film looks to your images. 10 professional presets with adjustable intensity.",
+    icon: SunMedium,
+    href: "/tools/color-grading",
+    gradient: "from-orange-500 to-amber-400",
+    bgGlow: "bg-orange-500/10",
+    badge: "New",
+    features: ["10 film grades", "3 intensities", "Before/after"],
+  },
 ];
 
 export default function Tools() {
@@ -154,8 +226,8 @@ export default function Tools() {
               </h1>
 
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-                9 professional-grade AI tools that transform your creative workflow.
-                Upscale, stylize, edit, analyze, and build — all in one place.
+                15 professional-grade AI tools that transform your creative workflow.
+                Upscale, stylize, edit, blend, sketch, grade, and build — all in one place.
               </p>
 
               <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">

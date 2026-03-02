@@ -20,6 +20,12 @@ import ToolVariations from "./pages/ToolVariations";
 import ToolInpainting from "./pages/ToolInpainting";
 import ToolFaceEnhancer from "./pages/ToolFaceEnhancer";
 import ToolImageToPrompt from "./pages/ToolImageToPrompt";
+import ToolOutpainting from "./pages/ToolOutpainting";
+import ToolObjectEraser from "./pages/ToolObjectEraser";
+import ToolTextEffects from "./pages/ToolTextEffects";
+import ToolImageBlender from "./pages/ToolImageBlender";
+import ToolSketchToImage from "./pages/ToolSketchToImage";
+import ToolColorGrading from "./pages/ToolColorGrading";
 import BatchStudio from "./pages/BatchStudio";
 import Pricing from "./pages/Pricing";
 
@@ -40,6 +46,12 @@ function Router() {
       <Route path="/tools/inpainting" component={ToolInpainting} />
       <Route path="/tools/face-enhancer" component={ToolFaceEnhancer} />
       <Route path="/tools/image-to-prompt" component={ToolImageToPrompt} />
+      <Route path="/tools/outpainting" component={ToolOutpainting} />
+      <Route path="/tools/object-eraser" component={ToolObjectEraser} />
+      <Route path="/tools/text-effects" component={ToolTextEffects} />
+      <Route path="/tools/image-blender" component={ToolImageBlender} />
+      <Route path="/tools/sketch-to-image" component={ToolSketchToImage} />
+      <Route path="/tools/color-grading" component={ToolColorGrading} />
       <Route path="/batch" component={BatchStudio} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />

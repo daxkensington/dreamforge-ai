@@ -253,3 +253,35 @@
 ### Testing
 - [x] Vitest tests for all 5 new tool endpoints (22 tests, all passing)
 - [x] Final verification and checkpoint (155 tests, all passing, 0 TS errors)
+
+## Phase 10 — AI Tools Expansion v3 (Competitor Research-Driven)
+
+### Tool 10: Outpainting / Image Expander
+- [x] Backend: Expand image beyond borders using generateImage with original as reference
+- [x] Frontend: Upload image, choose expansion direction (up/down/left/right/all), set canvas size, preview result
+
+### Tool 11: Object Eraser
+- [x] Backend: Remove unwanted objects from images via text description + generateImage edit
+- [x] Frontend: Upload image, describe what to remove, see before/after with clean removal
+
+### Tool 12: AI Text Effects
+- [x] Backend: Generate stylized text/typography using LLM prompt + generateImage
+- [x] Frontend: Enter text, choose effect style (fire, water, neon, gold, ice, nature, galaxy, chrome, graffiti, crystal), preview and download
+
+### Tool 13: Image Blender / Mashup
+- [x] Backend: Blend two images into one creative output using generateImage with both as references
+- [x] Frontend: Upload two images, choose blend mode (merge, double-exposure, collage, morph, dreamscape), see result
+
+### Tool 14: Sketch to Image
+- [x] Backend: Convert rough sketches to polished images via generateImage with sketch as reference
+- [x] Frontend: Upload sketch or draw on canvas, describe desired output, see polished result
+
+### Tool 15: AI Color Grading
+- [x] Backend: Apply cinematic color grades using LLM to describe grade + generateImage edit
+- [x] Frontend: Upload image, choose preset grade (cinematic, vintage, moody, bright, noir, sunset), see before/after
+
+### Integration
+- [x] Update Tools Hub with all 6 new tool cards (15 total)
+- [x] Add routes for all new tool pages in App.tsx
+- [x] Write vitest tests for all 6 new tool endpoints (25 tests, all passing)
+- [x] Final verification and checkpoint (177 tests, all passing, 0 TS errors, 15 tools verified)

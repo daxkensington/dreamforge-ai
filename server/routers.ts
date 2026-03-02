@@ -939,6 +939,217 @@ export const appRouter = router({
         }
       }),
 
+    // Outpainting / Image Expander — extend images beyond their borders
+    outpaint: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          direction: z.enum(["up", "down", "left", "right", "all"]).default("all"),
+          expansionAmount: z.enum(["small", "medium", "large"]).default("medium"),
+          fillDescription: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const directionPrompts: Record<string, string> = {
+          "up": "Extend the top of this image upward, seamlessly continuing the scene above",
+          "down": "Extend the bottom of this image downward, seamlessly continuing the scene below",
+          "left": "Extend the left side of this image, seamlessly continuing the scene to the left",
+          "right": "Extend the right side of this image, seamlessly continuing the scene to the right",
+          "all": "Extend this image outward in all directions, seamlessly expanding the entire scene",
+        };
+        const sizeDescriptions: Record<string, string> = {
+          "small": "by about 25%",
+          "medium": "by about 50%",
+          "large": "by about 100%, doubling the canvas",
+        };
+        const fillNote = input.fillDescription ? ` Fill the new area with: ${input.fillDescription}.` : " Fill the new area with contextually appropriate content that matches the existing scene.";
+
+        try {
+          const { url } = await generateImage({
+            prompt: `${directionPrompts[input.direction]} ${sizeDescriptions[input.expansionAmount]}.${fillNote} Maintain perfect style consistency, matching colors, lighting, perspective, and artistic style. The expansion should look completely natural and seamless. Professional quality.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, direction: input.direction };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Object Eraser — remove unwanted objects from images
+    eraseObject: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          objectDescription: z.string().min(1).max(500),
+          fillMethod: z.enum(["auto", "blur", "pattern"]).default("auto"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const fillMethods: Record<string, string> = {
+          "auto": "Fill the removed area with contextually appropriate content that blends seamlessly with the surrounding scene",
+          "blur": "Fill the removed area with a smooth blurred version of the surrounding colors",
+          "pattern": "Fill the removed area by extending the surrounding patterns and textures",
+        };
+        try {
+          const { url } = await generateImage({
+            prompt: `Remove the following object from this image: ${input.objectDescription}. ${fillMethods[input.fillMethod]}. The result should look completely natural as if the object was never there. Maintain the exact same style, lighting, and quality of the original image. Professional quality output.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Text Effects — generate stylized text/typography
+    textEffects: protectedProcedure
+      .input(
+        z.object({
+          text: z.string().min(1).max(100),
+          effectStyle: z.enum(["fire", "water", "neon", "gold", "ice", "nature", "galaxy", "chrome", "graffiti", "crystal"]).default("neon"),
+          backgroundColor: z.enum(["dark", "light", "transparent", "gradient"]).default("dark"),
+          fontSize: z.enum(["small", "medium", "large", "extra-large"]).default("large"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const effectDescriptions: Record<string, string> = {
+          "fire": "blazing fire and flames, burning embers, orange and red glow, smoke wisps",
+          "water": "flowing water and liquid, ocean waves, blue translucent, water droplets, reflections",
+          "neon": "bright neon glow, electric tubes, cyberpunk style, vivid pink/blue/purple light, dark background with glow",
+          "gold": "luxurious gold metallic, ornate embossing, shimmering golden light, premium elegant feel",
+          "ice": "frozen ice crystals, frost, icicles, cold blue-white glow, winter frozen effect",
+          "nature": "growing vines, leaves, flowers, moss, organic natural textures, green and earth tones",
+          "galaxy": "cosmic nebula, stars, space dust, aurora colors, deep space purple and blue",
+          "chrome": "polished chrome metal, mirror reflections, silver metallic sheen, futuristic",
+          "graffiti": "street art spray paint, urban wall texture, bold colors, dripping paint, grunge",
+          "crystal": "transparent crystal facets, rainbow light refractions, gemstone quality, prismatic",
+        };
+        const bgDescriptions: Record<string, string> = {
+          "dark": "on a dark black background",
+          "light": "on a clean white background",
+          "transparent": "on a minimal background with subtle gradient",
+          "gradient": "on a complementary gradient background",
+        };
+        const sizeDescriptions: Record<string, string> = {
+          "small": "compact lettering",
+          "medium": "medium-sized bold lettering",
+          "large": "large prominent bold lettering",
+          "extra-large": "massive dominating bold lettering filling the frame",
+        };
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Create stunning AI-generated text art: the word "${input.text}" rendered with ${effectDescriptions[input.effectStyle]} effect. ${sizeDescriptions[input.fontSize]}, ${bgDescriptions[input.backgroundColor]}. The text should be clearly readable and the effect should be dramatic and visually impressive. Typography art, text effects, digital art, ultra high quality, 4K resolution.`,
+          });
+          return { url, status: "completed" as const, text: input.text, effect: input.effectStyle };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Image Blender / Mashup — blend two images into one creative output
+    blendImages: protectedProcedure
+      .input(
+        z.object({
+          imageUrl1: z.string().url(),
+          imageUrl2: z.string().url(),
+          blendMode: z.enum(["merge", "double-exposure", "collage", "morph", "dreamscape"]).default("merge"),
+          blendStrength: z.number().min(0.1).max(1.0).default(0.5),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const blendDescriptions: Record<string, string> = {
+          "merge": "Seamlessly merge these two images into a single cohesive composition, blending elements from both naturally",
+          "double-exposure": "Create a cinematic double-exposure effect combining these two images, with one image overlaid transparently on the other like a film photography technique",
+          "collage": "Create an artistic collage that combines elements from both images in a creative, visually striking arrangement",
+          "morph": "Create a surreal morph between these two images, blending their subjects and environments into a dreamlike hybrid",
+          "dreamscape": "Create a fantastical dreamscape that combines the essence of both images into an otherworldly scene",
+        };
+
+        try {
+          const { url } = await generateImage({
+            prompt: `${blendDescriptions[input.blendMode]}. Blend intensity: ${Math.round(input.blendStrength * 100)}%. Professional quality, visually stunning, artistic composition. High resolution output.`,
+            originalImages: [
+              { url: input.imageUrl1, mimeType: "image/png" },
+              { url: input.imageUrl2, mimeType: "image/png" },
+            ],
+          });
+          return { url, status: "completed" as const, blendMode: input.blendMode };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Sketch to Image — convert rough sketches to polished images
+    sketchToImage: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          description: z.string().min(1).max(1000),
+          outputStyle: z.enum(["realistic", "digital-art", "anime", "oil-painting", "watercolor", "3d-render"]).default("digital-art"),
+          detailLevel: z.enum(["low", "medium", "high"]).default("medium"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const styleDescriptions: Record<string, string> = {
+          "realistic": "photorealistic rendering, lifelike details, natural lighting, high-resolution photography quality",
+          "digital-art": "polished digital art, clean lines, vibrant colors, professional illustration quality",
+          "anime": "anime/manga art style, cel-shaded, expressive, Japanese animation quality",
+          "oil-painting": "classical oil painting style, visible brushstrokes, rich textures, fine art gallery quality",
+          "watercolor": "delicate watercolor painting, soft washes, flowing colors, artistic paper texture",
+          "3d-render": "3D rendered, volumetric lighting, subsurface scattering, Octane/Blender quality render",
+        };
+        const detailDescriptions: Record<string, string> = {
+          "low": "simplified, clean, minimal detail",
+          "medium": "balanced detail, clear definition",
+          "high": "extremely detailed, intricate, maximum resolution",
+        };
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Transform this rough sketch into a polished, finished artwork: ${input.description}. Style: ${styleDescriptions[input.outputStyle]}. Detail level: ${detailDescriptions[input.detailLevel]}. Use the sketch as a structural guide for composition and layout, but create a fully realized, professional-quality final image. The output should look like a finished piece, not a sketch.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, style: input.outputStyle };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Color Grading — apply cinematic color grades to images
+    colorGrade: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          grade: z.enum(["cinematic", "vintage", "moody", "bright", "noir", "sunset", "teal-orange", "pastel", "dramatic", "film-noir"]).default("cinematic"),
+          intensity: z.number().min(0.1).max(1.0).default(0.7),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const gradeDescriptions: Record<string, string> = {
+          "cinematic": "cinematic color grading with rich contrast, teal shadows and warm highlights, Hollywood blockbuster look",
+          "vintage": "vintage film look with faded colors, warm amber tones, slight grain, 1970s photography feel",
+          "moody": "dark moody atmosphere, desaturated with deep shadows, cool blue-green undertones, brooding feel",
+          "bright": "bright and airy, lifted shadows, soft warm tones, clean and fresh feel, lifestyle photography",
+          "noir": "film noir style, high contrast black and white with dramatic shadows and highlights",
+          "sunset": "golden hour warmth, rich orange and pink tones, soft glowing light, romantic atmosphere",
+          "teal-orange": "popular teal and orange color grade, complementary color split, modern cinema look",
+          "pastel": "soft pastel color palette, muted tones, dreamy and ethereal, gentle light",
+          "dramatic": "high drama, intense contrast, vivid saturated colors, bold and impactful",
+          "film-noir": "classic black and white film noir, deep blacks, bright whites, dramatic side lighting, detective movie aesthetic",
+        };
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Apply ${gradeDescriptions[input.grade]} color grading to this image at ${Math.round(input.intensity * 100)}% intensity. Maintain the original composition and subjects, only modify the color treatment and mood. Professional color grading quality, like a professional colorist's work.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, grade: input.grade };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
     // Image-to-Prompt Analyzer — reverse-engineer a prompt from an image
     analyzeImage: protectedProcedure
       .input(
