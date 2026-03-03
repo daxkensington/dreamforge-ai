@@ -285,3 +285,31 @@
 - [x] Add routes for all new tool pages in App.tsx
 - [x] Write vitest tests for all 6 new tool endpoints (25 tests, all passing)
 - [x] Final verification and checkpoint (177 tests, all passing, 0 TS errors, 15 tools verified)
+
+## Phase 11 — Video Generation Expansion
+
+### Backend — Video Tools
+- [x] Video Storyboard Generator: LLM generates multi-scene storyboard from a concept, each scene gets an image
+- [x] Video Scene Director: Generate keyframe sequence from narrative prompt with camera directions
+- [x] Video Style Transfer: Apply artistic styles to video generation context
+- [x] Video Upscaler: Enhance video quality/resolution
+- [x] Video Soundtrack Suggester: LLM analyzes video concept and suggests music mood, tempo, genre
+- [x] Text-to-Video Script: LLM writes detailed video script with scene breakdowns, camera angles, timing
+
+### Frontend — Video Studio & Tools
+- [x] Dedicated Video Studio page (/video-studio) with video-first workflow
+- [x] Storyboard view: visual scene-by-scene layout with thumbnails, descriptions, timing
+- [x] Scene Director: narrative prompt → keyframe sequence with camera directions
+- [x] Video timeline preview with scene cards
+- [x] Video tool pages: /video-studio/storyboard, /video-studio/scene-director, /video-studio/script, /video-studio/style-transfer, /video-studio/upscaler, /video-studio/soundtrack
+- [x] Video-specific preset prompts and templates
+
+### Integration
+- [x] Update Tools Hub with video tools section (Video Studio section on homepage)
+- [x] Add Video Studio link to Navbar
+- [x] Update landing page with video generation showcase
+- [x] Cross-link between Video Studio and image Studio
+
+### Testing
+- [x] Vitest tests for all 6 video endpoints (22 tests, all passing)
+- [x] Final verification and checkpoint (199 tests, all passing, 0 TS errors)

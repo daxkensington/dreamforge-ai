@@ -1218,6 +1218,379 @@ export const appRouter = router({
       }),
   }),
 
+  video: router({
+    // Video Storyboard Generator — LLM creates multi-scene storyboard from a concept
+    generateStoryboard: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(2000),
+          sceneCount: z.number().min(2).max(8).default(4),
+          aspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).default("16:9"),
+          style: z.enum(["cinematic", "anime", "documentary", "music-video", "commercial", "abstract"]).default("cinematic"),
+          generateImages: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const storyboardResult = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a professional storyboard artist and video director. Given a video concept, create a detailed storyboard with ${input.sceneCount} scenes. Style: ${input.style}. Aspect ratio: ${input.aspectRatio}. For each scene provide: scene number, duration in seconds, camera angle/movement, visual description (detailed enough for AI image generation), dialogue/narration if any, mood/atmosphere, and transition to next scene. Output as JSON.`,
+              },
+              { role: "user", content: `Create a storyboard for: ${input.concept}` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "storyboard",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", description: "Video title" },
+                    synopsis: { type: "string", description: "Brief video synopsis" },
+                    totalDuration: { type: "number", description: "Estimated total duration in seconds" },
+                    scenes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          sceneNumber: { type: "number" },
+                          duration: { type: "number", description: "Duration in seconds" },
+                          cameraAngle: { type: "string" },
+                          cameraMovement: { type: "string" },
+                          visualDescription: { type: "string" },
+                          narration: { type: "string" },
+                          mood: { type: "string" },
+                          transition: { type: "string" },
+                        },
+                        required: ["sceneNumber", "duration", "cameraAngle", "cameraMovement", "visualDescription", "narration", "mood", "transition"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["title", "synopsis", "totalDuration", "scenes"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = storyboardResult.choices[0]?.message?.content;
+          const storyboard = typeof content === "string" ? JSON.parse(content) : null;
+          if (!storyboard) throw new Error("Failed to parse storyboard");
+
+          // Optionally generate images for each scene
+          if (input.generateImages) {
+            const scenesWithImages = [];
+            for (const scene of storyboard.scenes) {
+              try {
+                const { url } = await generateImage({
+                  prompt: `${scene.visualDescription}. Camera: ${scene.cameraAngle}, ${scene.cameraMovement}. Mood: ${scene.mood}. Style: ${input.style} filmmaking, ${input.aspectRatio} aspect ratio. Professional cinematography, high production value.`,
+                });
+                scenesWithImages.push({ ...scene, imageUrl: url ?? null });
+              } catch {
+                scenesWithImages.push({ ...scene, imageUrl: null });
+              }
+            }
+            storyboard.scenes = scenesWithImages;
+          }
+
+          return { ...storyboard, status: "completed" as const, style: input.style };
+        } catch (error: any) {
+          return { title: "", synopsis: "", totalDuration: 0, scenes: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Video Scene Director — generate keyframe sequence from narrative prompt
+    directScene: protectedProcedure
+      .input(
+        z.object({
+          narrative: z.string().min(1).max(2000),
+          keyframeCount: z.number().min(2).max(6).default(4),
+          cameraStyle: z.enum(["static", "tracking", "crane", "handheld", "drone", "steadicam"]).default("tracking"),
+          mood: z.enum(["epic", "intimate", "tense", "dreamy", "energetic", "melancholic"]).default("epic"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const directorResult = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a film director creating a keyframe sequence. Camera style: ${input.cameraStyle}. Mood: ${input.mood}. Create ${input.keyframeCount} keyframes that tell a visual story. For each keyframe: describe the exact visual composition, camera position, lighting, and how it transitions from the previous frame. Output as JSON.`,
+              },
+              { role: "user", content: `Direct this scene: ${input.narrative}` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "scene_direction",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    sceneTitle: { type: "string" },
+                    overallDirection: { type: "string" },
+                    keyframes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          frameNumber: { type: "number" },
+                          timestamp: { type: "string", description: "Timecode like 00:00" },
+                          composition: { type: "string" },
+                          cameraPosition: { type: "string" },
+                          lighting: { type: "string" },
+                          movement: { type: "string" },
+                          notes: { type: "string" },
+                        },
+                        required: ["frameNumber", "timestamp", "composition", "cameraPosition", "lighting", "movement", "notes"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["sceneTitle", "overallDirection", "keyframes"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = directorResult.choices[0]?.message?.content;
+          const direction = typeof content === "string" ? JSON.parse(content) : null;
+          if (!direction) throw new Error("Failed to parse direction");
+
+          // Generate keyframe images
+          const keyframesWithImages = [];
+          for (const kf of direction.keyframes) {
+            try {
+              const { url } = await generateImage({
+                prompt: `${kf.composition}. Camera: ${kf.cameraPosition}. Lighting: ${kf.lighting}. ${kf.movement}. Cinematic ${input.mood} mood, ${input.cameraStyle} camera style. Professional cinematography, film still quality.`,
+              });
+              keyframesWithImages.push({ ...kf, imageUrl: url ?? null });
+            } catch {
+              keyframesWithImages.push({ ...kf, imageUrl: null });
+            }
+          }
+          direction.keyframes = keyframesWithImages;
+
+          return { ...direction, status: "completed" as const, cameraStyle: input.cameraStyle, mood: input.mood };
+        } catch (error: any) {
+          return { sceneTitle: "", overallDirection: "", keyframes: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Video Style Transfer — apply artistic style to video generation
+    styleTransfer: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          videoStyle: z.enum(["anime", "noir", "watercolor", "oil-painting", "pixel-art", "comic-book", "claymation", "retro-vhs"]).default("anime"),
+          preserveMotion: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const styleDescriptions: Record<string, string> = {
+          "anime": "Japanese anime style, cel-shaded, vibrant colors, clean lines, Studio Ghibli quality",
+          "noir": "film noir style, high contrast black and white, dramatic shadows, 1940s detective film",
+          "watercolor": "delicate watercolor painting, soft washes, flowing colors, artistic paper texture",
+          "oil-painting": "classical oil painting, visible brushstrokes, rich textures, museum gallery quality",
+          "pixel-art": "retro pixel art style, 16-bit aesthetic, clean pixel edges, nostalgic gaming look",
+          "comic-book": "bold comic book style, thick outlines, halftone dots, speech bubble ready, pop art colors",
+          "claymation": "claymation/stop-motion style, clay texture, rounded forms, Wallace & Gromit aesthetic",
+          "retro-vhs": "retro VHS aesthetic, scan lines, color bleeding, tracking artifacts, 1980s home video",
+        };
+        const motionNote = input.preserveMotion ? " Preserve the original composition and subject positioning exactly." : "";
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Transform this image into ${styleDescriptions[input.videoStyle]} style.${motionNote} This is a keyframe for video production. Professional quality, consistent style application. Cinematic composition.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, style: input.videoStyle };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Video Upscaler — enhance video frame quality
+    upscaleFrame: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          scaleFactor: z.enum(["2x", "4x"]).default("2x"),
+          enhanceDetails: z.boolean().default(true),
+          denoiseLevel: z.enum(["none", "light", "heavy"]).default("light"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const denoiseDesc: Record<string, string> = {
+          "none": "",
+          "light": " Apply light denoising to clean up minor artifacts.",
+          "heavy": " Apply heavy denoising to remove significant noise and compression artifacts.",
+        };
+        const detailNote = input.enhanceDetails ? " Enhance fine details, sharpen edges, and improve texture clarity." : "";
+
+        try {
+          const { url } = await generateImage({
+            prompt: `Upscale and enhance this video frame to ${input.scaleFactor} resolution. Maintain perfect fidelity to the original content.${detailNote}${denoiseDesc[input.denoiseLevel]} Professional video post-production quality. Preserve colors, contrast, and artistic intent exactly. Ultra high resolution, crystal clear output.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, scaleFactor: input.scaleFactor };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Video Soundtrack Suggester — LLM suggests music for video concept
+    suggestSoundtrack: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(2000),
+          duration: z.number().min(5).max(300).default(30),
+          mood: z.enum(["epic", "calm", "tense", "happy", "sad", "mysterious", "energetic", "romantic"]).default("epic"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a professional music supervisor for film and video. Given a video concept, suggest detailed soundtrack recommendations. Consider mood: ${input.mood}, duration: ${input.duration}s. Provide genre, tempo (BPM), key instruments, reference tracks, and a detailed description of the ideal soundtrack. Also suggest sound effects. Output as JSON.`,
+              },
+              { role: "user", content: `Suggest soundtrack for: ${input.concept}` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "soundtrack_suggestion",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    primaryGenre: { type: "string" },
+                    subGenres: { type: "array", items: { type: "string" } },
+                    tempo: { type: "string", description: "BPM range" },
+                    keyInstruments: { type: "array", items: { type: "string" } },
+                    moodProgression: { type: "string" },
+                    description: { type: "string" },
+                    referenceTracks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          title: { type: "string" },
+                          artist: { type: "string" },
+                          reason: { type: "string" },
+                        },
+                        required: ["title", "artist", "reason"],
+                        additionalProperties: false,
+                      },
+                    },
+                    soundEffects: { type: "array", items: { type: "string" } },
+                    licensingNotes: { type: "string" },
+                  },
+                  required: ["primaryGenre", "subGenres", "tempo", "keyInstruments", "moodProgression", "description", "referenceTracks", "soundEffects", "licensingNotes"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = result.choices[0]?.message?.content;
+          const suggestion = typeof content === "string" ? JSON.parse(content) : null;
+          if (!suggestion) throw new Error("Failed to parse suggestion");
+
+          return { ...suggestion, status: "completed" as const, mood: input.mood, duration: input.duration };
+        } catch (error: any) {
+          return {
+            primaryGenre: "", subGenres: [], tempo: "", keyInstruments: [], moodProgression: "",
+            description: "Unable to generate suggestion", referenceTracks: [], soundEffects: [], licensingNotes: "",
+            status: "failed" as const, error: error.message,
+          };
+        }
+      }),
+
+    // Text-to-Video Script — LLM writes detailed video script
+    generateScript: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(2000),
+          duration: z.number().min(10).max(300).default(60),
+          format: z.enum(["narrative", "commercial", "tutorial", "music-video", "documentary", "social-media"]).default("narrative"),
+          tone: z.enum(["professional", "casual", "dramatic", "humorous", "inspirational"]).default("professional"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a professional video scriptwriter. Write a detailed video script for a ${input.duration}-second ${input.format} video. Tone: ${input.tone}. Include scene-by-scene breakdown with: visual descriptions, camera directions, narration/dialogue, timing, and production notes. Output as JSON.`,
+              },
+              { role: "user", content: `Write a video script for: ${input.concept}` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "video_script",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    logline: { type: "string" },
+                    targetDuration: { type: "number" },
+                    format: { type: "string" },
+                    scenes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          sceneNumber: { type: "number" },
+                          startTime: { type: "string" },
+                          endTime: { type: "string" },
+                          location: { type: "string" },
+                          visualDescription: { type: "string" },
+                          cameraDirection: { type: "string" },
+                          narration: { type: "string" },
+                          dialogue: { type: "string" },
+                          soundDesign: { type: "string" },
+                          productionNotes: { type: "string" },
+                        },
+                        required: ["sceneNumber", "startTime", "endTime", "location", "visualDescription", "cameraDirection", "narration", "dialogue", "soundDesign", "productionNotes"],
+                        additionalProperties: false,
+                      },
+                    },
+                    productionBudget: { type: "string" },
+                    equipmentNeeded: { type: "array", items: { type: "string" } },
+                  },
+                  required: ["title", "logline", "targetDuration", "format", "scenes", "productionBudget", "equipmentNeeded"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = result.choices[0]?.message?.content;
+          const script = typeof content === "string" ? JSON.parse(content) : null;
+          if (!script) throw new Error("Failed to parse script");
+
+          return { ...script, status: "completed" as const, tone: input.tone };
+        } catch (error: any) {
+          return {
+            title: "", logline: "", targetDuration: 0, format: "", scenes: [],
+            productionBudget: "", equipmentNeeded: [],
+            status: "failed" as const, error: error.message,
+          };
+        }
+      }),
+  }),
+
   export: router({
     metadata: protectedProcedure
       .input(z.object({ ids: z.array(z.number()).min(1).max(50) }))

@@ -21,12 +21,14 @@ import {
   Wrench,
   Layers,
   CreditCard,
+  Film,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navLinks = [
   { href: "/tools", label: "AI Tools", icon: Wrench },
+  { href: "/video-studio", label: "Video Studio", icon: Film, auth: true },
   { href: "/gallery", label: "Gallery", icon: Image },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/batch", label: "Batch", icon: Layers, auth: true },
@@ -39,6 +41,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isToolsActive = location.startsWith("/tools");
+  const isVideoStudioActive = location.startsWith("/video-studio");
   const isBatchActive = location === "/batch";
 
   return (
@@ -60,7 +63,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
-            const isActive = link.href === "/tools" ? isToolsActive : link.href === "/batch" ? isBatchActive : location === link.href;
+            const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : location === link.href;
             return (
               <Link
                 key={link.href}
@@ -134,6 +137,12 @@ export default function Navbar() {
                     Batch Studio
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/video-studio" className="flex items-center gap-2 cursor-pointer">
+                    <Film className="h-4 w-4" />
+                    Video Studio
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}
@@ -170,7 +179,7 @@ export default function Navbar() {
           <nav className="container py-4 flex flex-col gap-1">
             {navLinks.map((link) => {
               if (link.auth && !isAuthenticated) return null;
-              const isActive = link.href === "/tools" ? isToolsActive : link.href === "/batch" ? isBatchActive : location === link.href;
+              const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : location === link.href;
               return (
                 <Link
                   key={link.href}

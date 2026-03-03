@@ -28,6 +28,13 @@ import ToolSketchToImage from "./pages/ToolSketchToImage";
 import ToolColorGrading from "./pages/ToolColorGrading";
 import BatchStudio from "./pages/BatchStudio";
 import Pricing from "./pages/Pricing";
+import VideoStudio from "./pages/VideoStudio";
+import ToolStoryboard from "./pages/ToolStoryboard";
+import ToolSceneDirector from "./pages/ToolSceneDirector";
+import ToolVideoStyleTransfer from "./pages/ToolVideoStyleTransfer";
+import ToolVideoUpscaler from "./pages/ToolVideoUpscaler";
+import ToolSoundtrackSuggester from "./pages/ToolSoundtrackSuggester";
+import ToolTextToVideoScript from "./pages/ToolTextToVideoScript";
 
 function Router() {
   return (
@@ -53,6 +60,13 @@ function Router() {
       <Route path="/tools/sketch-to-image" component={ToolSketchToImage} />
       <Route path="/tools/color-grading" component={ToolColorGrading} />
       <Route path="/batch" component={BatchStudio} />
+      <Route path="/video-studio" component={VideoStudio} />
+      <Route path="/video-studio/storyboard" component={ToolStoryboard} />
+      <Route path="/video-studio/scene-director" component={ToolSceneDirector} />
+      <Route path="/video-studio/style-transfer" component={ToolVideoStyleTransfer} />
+      <Route path="/video-studio/upscaler" component={ToolVideoUpscaler} />
+      <Route path="/video-studio/soundtrack" component={ToolSoundtrackSuggester} />
+      <Route path="/video-studio/script" component={ToolTextToVideoScript} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />
