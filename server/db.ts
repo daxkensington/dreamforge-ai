@@ -9,6 +9,9 @@ import {
   galleryItems,
   moderationQueue,
   videoProjects,
+  projectCollaborators,
+  projectShareTokens,
+  projectRevisions,
   type InsertGeneration,
   type InsertTag,
   type InsertGalleryItem,
@@ -788,4 +791,224 @@ export async function deleteVideoProject(id: number, userId: number) {
     .delete(videoProjects)
     .where(and(eq(videoProjects.id, id), eq(videoProjects.userId, userId)));
   return { success: true };
+}
+
+// ─── Collaboration Helpers ──────────────────────────────────────────────────
+
+export async function createShareToken(data: {
+  projectId: number;
+  token: string;
+  permission: "viewer" | "editor";
+  createdBy: number;
+  expiresAt?: Date;
+  maxUses?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(projectShareTokens).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function getShareToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(projectShareTokens)
+    .where(eq(projectShareTokens.token, token))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function incrementShareTokenUse(tokenId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(projectShareTokens)
+    .set({ useCount: sql`${projectShareTokens.useCount} + 1` })
+    .where(eq(projectShareTokens.id, tokenId));
+}
+
+export async function deactivateShareToken(tokenId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Only the creator can deactivate
+  await db
+    .update(projectShareTokens)
+    .set({ active: false })
+    .where(and(eq(projectShareTokens.id, tokenId), eq(projectShareTokens.createdBy, userId)));
+}
+
+export async function listShareTokens(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(projectShareTokens)
+    .where(and(eq(projectShareTokens.projectId, projectId), eq(projectShareTokens.active, true)))
+    .orderBy(desc(projectShareTokens.createdAt));
+}
+
+export async function addCollaborator(data: {
+  projectId: number;
+  userId: number;
+  role: "viewer" | "editor";
+  invitedBy: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Check if already a collaborator
+  const existing = await db
+    .select()
+    .from(projectCollaborators)
+    .where(
+      and(
+        eq(projectCollaborators.projectId, data.projectId),
+        eq(projectCollaborators.userId, data.userId)
+      )
+    )
+    .limit(1);
+  if (existing.length > 0) {
+    // Update role if already exists
+    await db
+      .update(projectCollaborators)
+      .set({ role: data.role })
+      .where(eq(projectCollaborators.id, existing[0].id));
+    return { id: existing[0].id, action: "updated" as const };
+  }
+  const result = await db.insert(projectCollaborators).values(data);
+  return { id: result[0].insertId, action: "created" as const };
+}
+
+export async function listCollaborators(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: projectCollaborators.id,
+      userId: projectCollaborators.userId,
+      role: projectCollaborators.role,
+      userName: users.name,
+      userEmail: users.email,
+      createdAt: projectCollaborators.createdAt,
+    })
+    .from(projectCollaborators)
+    .leftJoin(users, eq(projectCollaborators.userId, users.id))
+    .where(eq(projectCollaborators.projectId, projectId))
+    .orderBy(desc(projectCollaborators.createdAt));
+}
+
+export async function removeCollaborator(collaboratorId: number, projectOwnerId: number, projectId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Verify the caller owns the project
+  const project = await db
+    .select()
+    .from(videoProjects)
+    .where(and(eq(videoProjects.id, projectId), eq(videoProjects.userId, projectOwnerId)))
+    .limit(1);
+  if (!project.length) throw new Error("Not authorized");
+  await db
+    .delete(projectCollaborators)
+    .where(and(eq(projectCollaborators.id, collaboratorId), eq(projectCollaborators.projectId, projectId)));
+  return { success: true };
+}
+
+export async function listSharedWithMe(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      collaboratorId: projectCollaborators.id,
+      role: projectCollaborators.role,
+      projectId: videoProjects.id,
+      projectTitle: videoProjects.title,
+      projectType: videoProjects.type,
+      projectDescription: videoProjects.description,
+      ownerName: users.name,
+      ownerId: videoProjects.userId,
+      updatedAt: videoProjects.updatedAt,
+      createdAt: videoProjects.createdAt,
+    })
+    .from(projectCollaborators)
+    .innerJoin(videoProjects, eq(projectCollaborators.projectId, videoProjects.id))
+    .leftJoin(users, eq(videoProjects.userId, users.id))
+    .where(eq(projectCollaborators.userId, userId))
+    .orderBy(desc(videoProjects.updatedAt));
+}
+
+export async function getUserCollaboratorRole(projectId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(projectCollaborators)
+    .where(
+      and(
+        eq(projectCollaborators.projectId, projectId),
+        eq(projectCollaborators.userId, userId)
+      )
+    )
+    .limit(1);
+  return rows[0]?.role ?? null;
+}
+
+// ─── Version History Helpers ────────────────────────────────────────────────
+
+export async function createRevision(data: {
+  projectId: number;
+  userId: number;
+  version: number;
+  data: unknown;
+  changeNote?: string;
+  source?: "manual" | "ai-refinement" | "revert" | "template";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(projectRevisions).values({
+    ...data,
+    source: data.source ?? "manual",
+  });
+  return { id: result[0].insertId };
+}
+
+export async function listRevisions(projectId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: projectRevisions.id,
+      version: projectRevisions.version,
+      changeNote: projectRevisions.changeNote,
+      source: projectRevisions.source,
+      userName: users.name,
+      userId: projectRevisions.userId,
+      createdAt: projectRevisions.createdAt,
+    })
+    .from(projectRevisions)
+    .leftJoin(users, eq(projectRevisions.userId, users.id))
+    .where(eq(projectRevisions.projectId, projectId))
+    .orderBy(desc(projectRevisions.version))
+    .limit(limit);
+}
+
+export async function getRevision(revisionId: number, projectId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(projectRevisions)
+    .where(and(eq(projectRevisions.id, revisionId), eq(projectRevisions.projectId, projectId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getLatestRevisionVersion(projectId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ maxVersion: sql<number>`COALESCE(MAX(${projectRevisions.version}), 0)` })
+    .from(projectRevisions)
+    .where(eq(projectRevisions.projectId, projectId));
+  return rows[0]?.maxVersion ?? 0;
 }

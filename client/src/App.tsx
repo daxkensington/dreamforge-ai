@@ -35,6 +35,8 @@ import ToolVideoStyleTransfer from "./pages/ToolVideoStyleTransfer";
 import ToolVideoUpscaler from "./pages/ToolVideoUpscaler";
 import ToolSoundtrackSuggester from "./pages/ToolSoundtrackSuggester";
 import ToolTextToVideoScript from "./pages/ToolTextToVideoScript";
+import ProjectDetail from "./pages/ProjectDetail";
+import JoinProject from "./pages/JoinProject";
 
 function Router() {
   return (
@@ -67,6 +69,8 @@ function Router() {
       <Route path="/video-studio/upscaler" component={ToolVideoUpscaler} />
       <Route path="/video-studio/soundtrack" component={ToolSoundtrackSuggester} />
       <Route path="/video-studio/script" component={ToolTextToVideoScript} />
+      <Route path="/video-studio/project/:id" component={ProjectDetail} />
+      <Route path="/video-studio/join/:token" component={JoinProject} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />

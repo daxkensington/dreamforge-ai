@@ -20,7 +20,7 @@ import {
   ChevronRight, Video, Wand2, Layers, Save, FolderOpen,
   Download, Trash2, BookOpen, LayoutTemplate, Plus, Search,
   Rocket, GraduationCap, Mic, Smartphone, Clapperboard as Clap,
-  Waves
+  Waves, Users
 } from "lucide-react";
 
 // ─── Storyboard Tab ───────────────────────────────────────────────
@@ -842,11 +842,17 @@ function SoundtrackTab() {
 
 // ─── My Projects Section ─────────────────────────────────────────
 function MyProjectsSection() {
+  const [, navigate] = useLocation();
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"mine" | "shared">("mine");
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.videoProject.list.useQuery(
     typeFilter === "all" ? undefined : { type: typeFilter as any }
+  );
+
+  const { data: sharedProjects, isLoading: sharedLoading } = trpc.videoProject.sharedWithMe.useQuery(
+    undefined, { enabled: viewMode === "shared" }
   );
 
   const deleteProject = trpc.videoProject.delete.useMutation({
@@ -873,84 +879,164 @@ function MyProjectsSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <FolderOpen className="w-5 h-5 text-violet-400" /> My Projects
-        </h3>
-        <div className="flex gap-1.5">
-          {[
-            { id: "all", label: "All" },
-            { id: "storyboard", label: "Storyboards" },
-            { id: "script", label: "Scripts" },
-            { id: "scene-direction", label: "Scenes" },
-            { id: "soundtrack", label: "Soundtracks" },
-          ].map((f) => (
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-violet-400" /> Projects
+          </h3>
+          <div className="flex gap-1 bg-background/30 rounded-lg p-0.5 border border-border/40">
             <button
-              key={f.id}
-              onClick={() => setTypeFilter(f.id)}
-              className={`px-3 py-1 text-xs rounded-full transition-all ${
-                typeFilter === f.id
-                  ? "bg-violet-500/20 text-violet-300 border border-violet-500/40"
-                  : "bg-background/30 text-muted-foreground border border-border/40 hover:border-violet-500/30"
+              onClick={() => setViewMode("mine")}
+              className={`px-3 py-1 text-xs rounded-md transition-all ${
+                viewMode === "mine" ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {f.label}
+              My Projects
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode("shared")}
+              className={`px-3 py-1 text-xs rounded-md transition-all ${
+                viewMode === "shared" ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Shared with Me
+            </button>
+          </div>
         </div>
+        {viewMode === "mine" && (
+          <div className="flex gap-1.5">
+            {[
+              { id: "all", label: "All" },
+              { id: "storyboard", label: "Storyboards" },
+              { id: "script", label: "Scripts" },
+              { id: "scene-direction", label: "Scenes" },
+              { id: "soundtrack", label: "Soundtracks" },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setTypeFilter(f.id)}
+                className={`px-3 py-1 text-xs rounded-full transition-all ${
+                  typeFilter === f.id
+                    ? "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                    : "bg-background/30 text-muted-foreground border border-border/40 hover:border-violet-500/30"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
-        </div>
-      )}
-
-      {data && data.projects.length === 0 && (
-        <div className="text-center py-12 border border-dashed border-border/40 rounded-xl">
-          <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">No saved projects yet</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Generate a storyboard or script and save it here</p>
-        </div>
-      )}
-
-      {data && data.projects.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.projects.map((project: any) => (
-            <div
-              key={project.id}
-              className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-violet-500/30 transition-colors group"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${typeColors[project.type] || "bg-muted"}`}>
-                  {typeIcons[project.type]}
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400"
-                  onClick={() => deleteProject.mutate({ id: project.id })}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-              <h4 className="text-sm font-semibold text-foreground line-clamp-1">{project.title}</h4>
-              {project.description && (
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
-              )}
-              <div className="flex items-center gap-2 mt-3">
-                <Badge variant="outline" className="text-xs capitalize">{project.type.replace("-", " ")}</Badge>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(project.updatedAt).toLocaleDateString()}
-                </span>
-              </div>
+      {/* My Projects View */}
+      {viewMode === "mine" && (
+        <>
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
             </div>
-          ))}
-        </div>
+          )}
+
+          {data && data.projects.length === 0 && (
+            <div className="text-center py-12 border border-dashed border-border/40 rounded-xl">
+              <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No saved projects yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Generate a storyboard or script and save it here</p>
+            </div>
+          )}
+
+          {data && data.projects.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data.projects.map((project: any) => (
+                <div
+                  key={project.id}
+                  className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-violet-500/30 transition-colors group cursor-pointer"
+                  onClick={() => navigate(`/video-studio/project/${project.id}`)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${typeColors[project.type] || "bg-muted"}`}>
+                      {typeIcons[project.type]}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400"
+                      onClick={(e) => { e.stopPropagation(); deleteProject.mutate({ id: project.id }); }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground line-clamp-1">{project.title}</h4>
+                  {project.description && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-3">
+                    <Badge variant="outline" className="text-xs capitalize">{project.type.replace("-", " ")}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(project.updatedAt).toLocaleDateString()}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data && data.total > 20 && (
+            <p className="text-xs text-center text-muted-foreground">Showing {data.projects.length} of {data.total} projects</p>
+          )}
+        </>
       )}
 
-      {data && data.total > 20 && (
-        <p className="text-xs text-center text-muted-foreground">Showing {data.projects.length} of {data.total} projects</p>
+      {/* Shared with Me View */}
+      {viewMode === "shared" && (
+        <>
+          {sharedLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+            </div>
+          )}
+
+          {sharedProjects && sharedProjects.length === 0 && (
+            <div className="text-center py-12 border border-dashed border-border/40 rounded-xl">
+              <Users className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No shared projects yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Projects shared with you via invite links will appear here</p>
+            </div>
+          )}
+
+          {sharedProjects && sharedProjects.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sharedProjects.map((sp: any) => (
+                <div
+                  key={sp.collaboratorId}
+                  className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-violet-500/30 transition-colors group cursor-pointer"
+                  onClick={() => navigate(`/video-studio/project/${sp.projectId}`)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${typeColors[sp.projectType] || "bg-muted"}`}>
+                      {typeIcons[sp.projectType]}
+                    </div>
+                    <Badge variant="outline" className={`text-xs ${
+                      sp.role === "editor" ? "text-amber-400 border-amber-500/40" : "text-blue-400 border-blue-500/40"
+                    }`}>
+                      {sp.role}
+                    </Badge>
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground line-clamp-1">{sp.projectTitle}</h4>
+                  <p className="text-xs text-muted-foreground mt-1">by {sp.ownerName || "Unknown"}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Badge variant="outline" className="text-xs capitalize">{sp.projectType?.replace("-", " ")}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(sp.updatedAt).toLocaleDateString()}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

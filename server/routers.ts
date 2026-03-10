@@ -33,6 +33,20 @@ import {
   getVideoProject,
   listVideoProjects,
   deleteVideoProject,
+  createShareToken,
+  getShareToken,
+  incrementShareTokenUse,
+  deactivateShareToken,
+  listShareTokens,
+  addCollaborator,
+  listCollaborators,
+  removeCollaborator,
+  listSharedWithMe,
+  getUserCollaboratorRole,
+  createRevision,
+  listRevisions,
+  getRevision,
+  getLatestRevisionVersion,
 } from "./db";
 import { storagePut } from "./storage";
 
@@ -1793,16 +1807,39 @@ export const appRouter = router({
           data: z.any(),
           thumbnailUrl: z.string().optional(),
           templateId: z.string().optional(),
+          changeNote: z.string().max(500).optional(),
+          source: z.enum(["manual", "ai-refinement", "revert", "template"]).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         if (input.id) {
-          await updateVideoProject(input.id, ctx.user.id, {
-            title: input.title,
-            description: input.description ?? undefined,
-            data: input.data,
-            thumbnailUrl: input.thumbnailUrl ?? undefined,
-          });
+          // Check if user is owner or editor collaborator
+          const project = await getVideoProject(input.id, ctx.user.id);
+          const collabRole = project ? null : await getUserCollaboratorRole(input.id, ctx.user.id);
+          if (!project && collabRole !== "editor") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this project" });
+          }
+          const ownerId = project ? ctx.user.id : (await getVideoProject(input.id, 0 as any))?.userId ?? ctx.user.id;
+          // Auto-save revision before updating
+          try {
+            const latestVersion = await getLatestRevisionVersion(input.id);
+            await createRevision({
+              projectId: input.id,
+              userId: ctx.user.id,
+              version: latestVersion + 1,
+              data: input.data,
+              changeNote: input.changeNote ?? "Manual save",
+              source: (input.source as any) ?? "manual",
+            });
+          } catch (_) { /* revision save is best-effort */ }
+          if (project) {
+            await updateVideoProject(input.id, ctx.user.id, {
+              title: input.title,
+              description: input.description ?? undefined,
+              data: input.data,
+              thumbnailUrl: input.thumbnailUrl ?? undefined,
+            });
+          }
           return { id: input.id, action: "updated" as const };
         }
         const { id } = await createVideoProject({
@@ -1886,6 +1923,267 @@ export const appRouter = router({
         const template = VIDEO_TEMPLATES.find((t) => t.id === input.id);
         if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
         return template;
+      }),
+
+    // ─── Collaboration ────────────────────────────────────────────
+    createShareLink: protectedProcedure
+      .input(
+        z.object({
+          projectId: z.number(),
+          permission: z.enum(["viewer", "editor"]).default("viewer"),
+          expiresInHours: z.number().min(1).max(720).optional(),
+          maxUses: z.number().min(1).max(100).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Verify ownership
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        const expiresAt = input.expiresInHours
+          ? new Date(Date.now() + input.expiresInHours * 60 * 60 * 1000)
+          : undefined;
+        const { id } = await createShareToken({
+          projectId: input.projectId,
+          token,
+          permission: input.permission,
+          createdBy: ctx.user.id,
+          expiresAt,
+          maxUses: input.maxUses,
+        });
+        return { id, token, permission: input.permission, expiresAt };
+      }),
+
+    acceptShareLink: protectedProcedure
+      .input(z.object({ token: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const shareToken = await getShareToken(input.token);
+        if (!shareToken || !shareToken.active) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired share link" });
+        }
+        if (shareToken.expiresAt && new Date(shareToken.expiresAt) < new Date()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Share link has expired" });
+        }
+        if (shareToken.maxUses && shareToken.useCount >= shareToken.maxUses) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Share link has reached maximum uses" });
+        }
+        // Don't add owner as collaborator
+        const project = await getVideoProject(shareToken.projectId, ctx.user.id);
+        if (project) {
+          return { projectId: shareToken.projectId, role: "owner" as const, alreadyOwner: true };
+        }
+        const { action } = await addCollaborator({
+          projectId: shareToken.projectId,
+          userId: ctx.user.id,
+          role: shareToken.permission,
+          invitedBy: shareToken.createdBy,
+        });
+        await incrementShareTokenUse(shareToken.id);
+        return { projectId: shareToken.projectId, role: shareToken.permission, action };
+      }),
+
+    listCollaborators: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found or not authorized" });
+        return listCollaborators(input.projectId);
+      }),
+
+    removeCollaborator: protectedProcedure
+      .input(z.object({ collaboratorId: z.number(), projectId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await removeCollaborator(input.collaboratorId, ctx.user.id, input.projectId);
+        return { success: true };
+      }),
+
+    listShareTokens: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        return listShareTokens(input.projectId);
+      }),
+
+    deactivateShareToken: protectedProcedure
+      .input(z.object({ tokenId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deactivateShareToken(input.tokenId, ctx.user.id);
+        return { success: true };
+      }),
+
+    sharedWithMe: protectedProcedure.query(async ({ ctx }) => {
+      return listSharedWithMe(ctx.user.id);
+    }),
+
+    // Get a shared project (for collaborators)
+    getShared: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        // Check if owner
+        const ownProject = await getVideoProject(input.id, ctx.user.id);
+        if (ownProject) return { ...ownProject, accessRole: "owner" as const };
+        // Check if collaborator
+        const role = await getUserCollaboratorRole(input.id, ctx.user.id);
+        if (!role) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found or not authorized" });
+        // Fetch project without owner check (use a raw query approach)
+        const db = (await import("./db")).getDb;
+        const dbInst = await db();
+        if (!dbInst) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { videoProjects: vp } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await dbInst.select().from(vp).where(eq(vp.id, input.id)).limit(1);
+        if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND" });
+        return { ...rows[0], accessRole: role };
+      }),
+
+    // ─── Version History ──────────────────────────────────────────
+    listRevisions: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        // Verify access (owner or collaborator)
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        const collabRole = project ? null : await getUserCollaboratorRole(input.projectId, ctx.user.id);
+        if (!project && !collabRole) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Project not found or not authorized" });
+        }
+        return listRevisions(input.projectId);
+      }),
+
+    getRevision: protectedProcedure
+      .input(z.object({ revisionId: z.number(), projectId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        const collabRole = project ? null : await getUserCollaboratorRole(input.projectId, ctx.user.id);
+        if (!project && !collabRole) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Not authorized" });
+        }
+        const revision = await getRevision(input.revisionId, input.projectId);
+        if (!revision) throw new TRPCError({ code: "NOT_FOUND", message: "Revision not found" });
+        return revision;
+      }),
+
+    revertToRevision: protectedProcedure
+      .input(z.object({ revisionId: z.number(), projectId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "FORBIDDEN", message: "Only the project owner can revert" });
+        const revision = await getRevision(input.revisionId, input.projectId);
+        if (!revision) throw new TRPCError({ code: "NOT_FOUND", message: "Revision not found" });
+        // Save current state as a revision first
+        const latestVersion = await getLatestRevisionVersion(input.projectId);
+        await createRevision({
+          projectId: input.projectId,
+          userId: ctx.user.id,
+          version: latestVersion + 1,
+          data: project.data,
+          changeNote: `Reverted to version ${revision.version}`,
+          source: "revert",
+        });
+        // Apply the old revision data
+        await updateVideoProject(input.projectId, ctx.user.id, {
+          data: revision.data,
+        });
+        return { success: true, revertedToVersion: revision.version };
+      }),
+
+    // ─── AI Refinement ───────────────────────────────────────────
+    refineProject: protectedProcedure
+      .input(
+        z.object({
+          projectId: z.number(),
+          feedback: z.string().min(5).max(2000),
+          focusAreas: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        const collabRole = project ? null : await getUserCollaboratorRole(input.projectId, ctx.user.id);
+        if (!project && collabRole !== "editor") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to refine this project" });
+        }
+        // Get the actual project data
+        let projectData = project;
+        if (!projectData) {
+          const { videoProjects: vp } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const db = (await import("./db")).getDb;
+          const dbInst = await db();
+          if (!dbInst) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          const rows = await dbInst.select().from(vp).where(eq(vp.id, input.projectId)).limit(1);
+          projectData = rows[0] ?? null;
+        }
+        if (!projectData) throw new TRPCError({ code: "NOT_FOUND" });
+
+        const focusAreasStr = input.focusAreas?.length
+          ? `Focus areas: ${input.focusAreas.join(", ")}`
+          : "";
+
+        const systemPrompt = projectData.type === "script"
+          ? `You are a professional video script consultant. You will receive a video script as JSON and user feedback. Return an IMPROVED version of the script as JSON with the same structure. Improve the script based on the feedback while maintaining the overall concept. ${focusAreasStr}`
+          : projectData.type === "storyboard"
+          ? `You are a professional storyboard consultant. You will receive a storyboard as JSON and user feedback. Return an IMPROVED version of the storyboard as JSON with the same structure. Improve the storyboard based on the feedback while maintaining the overall concept. ${focusAreasStr}`
+          : `You are a professional video production consultant. You will receive project data as JSON and user feedback. Return an IMPROVED version as JSON with the same structure. ${focusAreasStr}`;
+
+        try {
+          const response = await invokeLLM({
+            messages: [
+              { role: "system", content: systemPrompt },
+              {
+                role: "user",
+                content: `Current project data:\n${JSON.stringify(projectData.data, null, 2)}\n\nUser feedback: ${input.feedback}`,
+              },
+            ],
+            response_format: { type: "json_object" },
+          });
+
+          const content = response.choices[0].message.content;
+          const refined = JSON.parse(typeof content === "string" ? content : "{}");
+
+          return {
+            status: "completed" as const,
+            originalData: projectData.data,
+            refinedData: refined,
+            projectId: input.projectId,
+            projectType: projectData.type,
+          };
+        } catch (err) {
+          return {
+            status: "failed" as const,
+            originalData: projectData.data,
+            refinedData: null,
+            projectId: input.projectId,
+            projectType: projectData.type,
+          };
+        }
+      }),
+
+    // Apply refined data to project
+    applyRefinement: protectedProcedure
+      .input(
+        z.object({
+          projectId: z.number(),
+          refinedData: z.any(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.projectId, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        // Save revision
+        const latestVersion = await getLatestRevisionVersion(input.projectId);
+        await createRevision({
+          projectId: input.projectId,
+          userId: ctx.user.id,
+          version: latestVersion + 1,
+          data: input.refinedData,
+          changeNote: "AI refinement applied",
+          source: "ai-refinement",
+        });
+        // Update project
+        await updateVideoProject(input.projectId, ctx.user.id, {
+          data: input.refinedData,
+        });
+        return { success: true, version: latestVersion + 1 };
       }),
   }),
 

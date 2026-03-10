@@ -346,3 +346,42 @@
 - [x] Vitest tests for PDF export (client-side, covered by exportData endpoint test)
 - [x] Vitest tests for template listing endpoint
 - [x] Final verification and checkpoint (218 tests passing, 0 TS errors)
+
+## Phase 13 — Collaboration, Version History & AI Refinement
+
+### Collaboration Features
+- [x] Add projectCollaborators table (id, projectId, userId, role, invitedBy, createdAt)
+- [x] Add projectShareTokens table (id, projectId, token, permission, expiresAt, createdAt)
+- [x] Backend: createShareLink endpoint (generate unique token with permissions)
+- [x] Backend: acceptShareLink endpoint (join project via token)
+- [x] Backend: listCollaborators endpoint
+- [x] Backend: removeCollaborator endpoint
+- [x] Backend: listSharedWithMe endpoint (projects shared with current user)
+- [x] Frontend: Share dialog with link generation and permission controls
+- [x] Frontend: Collaborator list with role badges and remove option
+- [x] Frontend: "Shared with Me" tab in Video Studio hub
+
+### Version History
+- [x] Add projectRevisions table (id, projectId, userId, version, data, changeNote, createdAt)
+- [x] Backend: Auto-save revision on project update
+- [x] Backend: listRevisions endpoint (revision timeline for a project)
+- [x] Backend: getRevision endpoint (load specific revision)
+- [x] Backend: revertToRevision endpoint (restore project to a previous version)
+- [x] Frontend: Version history panel/timeline in project view
+- [x] Frontend: Revision comparison view (side-by-side diff)
+- [x] Frontend: Revert button with confirmation dialog
+
+### AI-Powered Project Refinement
+- [x] Backend: refineProject endpoint (takes project data + user feedback, returns improved version)
+- [x] LLM prompt engineering for storyboard refinement
+- [x] LLM prompt engineering for script refinement
+- [x] Frontend: "Refine with AI" button on saved projects
+- [x] Frontend: Feedback input dialog (what to improve, focus areas)
+- [x] Frontend: Refinement results with diff highlighting and "Apply" button
+- [x] Auto-save refined version as new revision
+
+### Testing
+- [x] Vitest tests for collaboration endpoints (29 tests, all passing)
+- [x] Vitest tests for version history endpoints (included in collaboration.test.ts)
+- [x] Vitest tests for AI refinement endpoint (included in collaboration.test.ts)
+- [x] Final verification and checkpoint (247 tests passing, 0 TS errors)

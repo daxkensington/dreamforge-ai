@@ -151,6 +151,51 @@ export const videoProjects = mysqlTable("videoProjects", {
 export type VideoProject = typeof videoProjects.$inferSelect;
 export type InsertVideoProject = typeof videoProjects.$inferInsert;
 
+// ─── Project Collaborators ─────────────────────────────────────────────────
+export const projectCollaborators = mysqlTable("projectCollaborators", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  userId: int("userId").notNull(),
+  role: mysqlEnum("collabRole", ["viewer", "editor"]).default("viewer").notNull(),
+  invitedBy: int("invitedBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProjectCollaborator = typeof projectCollaborators.$inferSelect;
+export type InsertProjectCollaborator = typeof projectCollaborators.$inferInsert;
+
+// ─── Project Share Tokens ──────────────────────────────────────────────────
+export const projectShareTokens = mysqlTable("projectShareTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  permission: mysqlEnum("sharePermission", ["viewer", "editor"]).default("viewer").notNull(),
+  createdBy: int("createdBy").notNull(),
+  expiresAt: timestamp("expiresAt"),
+  maxUses: int("maxUses"),
+  useCount: int("useCount").default(0).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProjectShareToken = typeof projectShareTokens.$inferSelect;
+export type InsertProjectShareToken = typeof projectShareTokens.$inferInsert;
+
+// ─── Project Revisions ─────────────────────────────────────────────────────
+export const projectRevisions = mysqlTable("projectRevisions", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  userId: int("userId").notNull(),
+  version: int("version").notNull(),
+  data: json("data").notNull(),
+  changeNote: text("changeNote"),
+  source: mysqlEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]).default("manual").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProjectRevision = typeof projectRevisions.$inferSelect;
+export type InsertProjectRevision = typeof projectRevisions.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),
@@ -209,6 +254,25 @@ export const tagsRelations = relations(tags, ({ many }) => ({
   generationTags: many(generationTags),
 }));
 
-export const videoProjectsRelations = relations(videoProjects, ({ one }) => ({
+export const videoProjectsRelations = relations(videoProjects, ({ one, many }) => ({
   user: one(users, { fields: [videoProjects.userId], references: [users.id] }),
+  collaborators: many(projectCollaborators),
+  shareTokens: many(projectShareTokens),
+  revisions: many(projectRevisions),
+}));
+
+export const projectCollaboratorsRelations = relations(projectCollaborators, ({ one }) => ({
+  project: one(videoProjects, { fields: [projectCollaborators.projectId], references: [videoProjects.id] }),
+  user: one(users, { fields: [projectCollaborators.userId], references: [users.id] }),
+  inviter: one(users, { fields: [projectCollaborators.invitedBy], references: [users.id] }),
+}));
+
+export const projectShareTokensRelations = relations(projectShareTokens, ({ one }) => ({
+  project: one(videoProjects, { fields: [projectShareTokens.projectId], references: [videoProjects.id] }),
+  creator: one(users, { fields: [projectShareTokens.createdBy], references: [users.id] }),
+}));
+
+export const projectRevisionsRelations = relations(projectRevisions, ({ one }) => ({
+  project: one(videoProjects, { fields: [projectRevisions.projectId], references: [videoProjects.id] }),
+  user: one(users, { fields: [projectRevisions.userId], references: [users.id] }),
 }));

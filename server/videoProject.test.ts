@@ -18,6 +18,9 @@ const mockUpdateVideoProject = vi.fn();
 const mockGetVideoProject = vi.fn();
 const mockListVideoProjects = vi.fn();
 const mockDeleteVideoProject = vi.fn();
+const mockCreateRevision = vi.fn();
+const mockGetLatestRevisionVersion = vi.fn();
+const mockGetUserCollaboratorRole = vi.fn();
 
 vi.mock("./db", async (importOriginal) => {
   const original = await importOriginal<typeof import("./db")>();
@@ -28,6 +31,9 @@ vi.mock("./db", async (importOriginal) => {
     getVideoProject: (...args: any[]) => mockGetVideoProject(...args),
     listVideoProjects: (...args: any[]) => mockListVideoProjects(...args),
     deleteVideoProject: (...args: any[]) => mockDeleteVideoProject(...args),
+    createRevision: (...args: any[]) => mockCreateRevision(...args),
+    getLatestRevisionVersion: (...args: any[]) => mockGetLatestRevisionVersion(...args),
+    getUserCollaboratorRole: (...args: any[]) => mockGetUserCollaboratorRole(...args),
   };
 });
 
@@ -135,6 +141,11 @@ describe("Video Project CRUD & Templates", () => {
   // ─── Save (Update) ────────────────────────────────────────────
   describe("videoProject.save (update)", () => {
     it("should update an existing project", async () => {
+      // getVideoProject is called to check ownership
+      mockGetVideoProject.mockResolvedValueOnce({ id: 42, userId: 1, type: "storyboard" });
+      // getLatestRevisionVersion for auto-revision
+      mockGetLatestRevisionVersion.mockResolvedValueOnce(1);
+      mockCreateRevision.mockResolvedValueOnce({ id: 200 });
       mockUpdateVideoProject.mockResolvedValueOnce({ success: true });
 
       const result = await caller.videoProject.save({
@@ -151,6 +162,7 @@ describe("Video Project CRUD & Templates", () => {
         title: "Updated Mars Storyboard",
         description: "Updated description",
         data: expect.any(Object),
+        thumbnailUrl: undefined,
       });
     });
   });
