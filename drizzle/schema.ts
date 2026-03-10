@@ -23,6 +23,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  referralCode: varchar("referralCode", { length: 32 }).unique(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -363,6 +364,20 @@ export const webhookEvents = mysqlTable("webhookEvents", {
 
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
 export type InsertWebhookEvent = typeof webhookEvents.$inferInsert;
+
+// ─── Referrals ────────────────────────────────────────────────────────────
+export const referrals = mysqlTable("referrals", {
+  id: int("id").autoincrement().primaryKey(),
+  referrerId: int("referrerId").notNull(),
+  referredUserId: int("referredUserId"),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  status: mysqlEnum("status", ["pending", "completed", "expired"]).default("pending").notNull(),
+  creditsAwarded: int("creditsAwarded").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+});
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
 
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({

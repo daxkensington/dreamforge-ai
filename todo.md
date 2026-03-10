@@ -597,3 +597,34 @@
 - [x] Test webhook event logging
 - [x] Test onboarding credit grant
 - [x] Final verification — all tests passing, 0 TS errors
+
+## Phase 18 — Usage Analytics, Low Credit Warning, Referral Credits
+
+### Credit Usage Analytics
+- [x] Backend: getUsageAnalytics endpoint (breakdown by tool type, daily/weekly/monthly)
+- [x] Backend: getUsageBreakdown endpoint (pie chart data by tool category)
+- [x] Frontend: "Usage" tab on Credits page with line chart of spending over time
+- [x] Frontend: Doughnut chart showing credits spent per tool type
+- [x] Frontend: Summary cards (total spent, most-used tool, average per day)
+
+### Low Credit Warning
+- [x] Backend: include lowCredit flag in getBalance response when balance < 10
+- [x] Frontend: Warning banner in Navbar when credits are low
+- [x] Frontend: Dismissible alert with "Buy Credits" CTA
+- [x] Show warning on generation pages when credits insufficient for the tool
+
+### Referral Credits
+- [x] Add referrals table (id, referrerId, referredUserId, code, status, creditsAwarded, createdAt)
+- [x] Add referralCode field to users table
+- [x] Backend: generateReferralCode endpoint (unique per user)
+- [x] Backend: applyReferralCode endpoint (on sign-up or first login)
+- [x] Backend: getReferralStats endpoint (total referrals, credits earned)
+- [x] Auto-grant bonus credits to referrer when referred user signs up
+- [x] Frontend: Referral page with unique link, copy button, stats
+- [x] Frontend: Referral input on Credits page for new users
+
+### Testing & Verification
+- [x] Test usage analytics endpoints
+- [x] Test low credit warning logic
+- [x] Test referral code generation and redemption
+- [x] Final verification — 367 tests passing, 0 TS errors

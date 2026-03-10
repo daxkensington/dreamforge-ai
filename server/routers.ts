@@ -65,6 +65,11 @@ import {
   adminRouter,
   createNotification,
 } from "./routersPhase15";
+import {
+  usageAnalyticsRouter,
+  referralRouter,
+  enhancedCreditsRouter,
+} from "./routers/phase18";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -2301,6 +2306,11 @@ export const appRouter = router({
   credits: creditsRouter,
   notifications: notificationsRouter,
   admin: adminRouter,
+
+  // ─── Phase 18 Routers ─────────────────────────────────────────────────
+  usageAnalytics: usageAnalyticsRouter,
+  referral: referralRouter,
+  enhancedCredits: enhancedCreditsRouter,
 
   export: router({
     metadata: protectedProcedure

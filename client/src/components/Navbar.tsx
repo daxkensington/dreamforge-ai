@@ -76,6 +76,9 @@ export default function Navbar() {
   const unreadCount = notifData?.unreadCount || 0;
   const creditBalance = balanceData?.balance ?? null;
 
+  // Low credit warning state
+  const lowCreditWarned = useRef(false);
+
   // Show welcome toast for new users
   useEffect(() => {
     if (welcomeShown.current) return;
@@ -90,6 +93,22 @@ export default function Navbar() {
       window.history.replaceState({}, "", "/");
     }
   }, [isAuthenticated]);
+
+  // Low credit warning toast
+  useEffect(() => {
+    if (lowCreditWarned.current) return;
+    if (creditBalance !== null && creditBalance > 0 && creditBalance < 10) {
+      lowCreditWarned.current = true;
+      toast.warning("Low Credit Balance", {
+        description: `You have ${creditBalance} credits remaining. Purchase more to keep creating.`,
+        duration: 10000,
+        action: {
+          label: "Buy Credits",
+          onClick: () => (window.location.href = "/credits"),
+        },
+      });
+    }
+  }, [creditBalance]);
 
   const isToolsActive = location.startsWith("/tools");
   const isVideoStudioActive = location.startsWith("/video-studio");
