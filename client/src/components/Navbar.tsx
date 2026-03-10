@@ -79,7 +79,43 @@ export default function Navbar() {
   // Low credit warning state
   const lowCreditWarned = useRef(false);
 
-  // Show welcome toast for new users
+  // Auto-apply referral code mutation
+  const autoApplyReferral = trpc.autoReferral.autoApply.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success("Referral Bonus Applied!", {
+          description: data.message,
+          duration: 8000,
+        });
+        if (data.tierAwarded) {
+          toast.success(`${data.tierAwarded.name} Tier Unlocked!`, {
+            description: `Your referrer earned ${data.tierAwarded.bonus} bonus credits!`,
+            duration: 6000,
+          });
+        }
+      }
+      sessionStorage.removeItem("dreamforge_referral");
+    },
+    onError: () => {
+      sessionStorage.removeItem("dreamforge_referral");
+    },
+  });
+
+  // Capture ?ref=CODE from URL and store in sessionStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      sessionStorage.setItem("dreamforge_referral", ref);
+      // Clean URL but keep other params
+      params.delete("ref");
+      const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
+
+  // Show welcome toast for new users + auto-apply referral
+  const referralApplied = useRef(false);
   useEffect(() => {
     if (welcomeShown.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -91,6 +127,23 @@ export default function Navbar() {
       });
       // Clean URL
       window.history.replaceState({}, "", "/");
+
+      // Auto-apply referral code if stored
+      const storedRef = sessionStorage.getItem("dreamforge_referral");
+      if (storedRef && !referralApplied.current) {
+        referralApplied.current = true;
+        autoApplyReferral.mutate({ code: storedRef });
+      }
+    }
+  }, [isAuthenticated]);
+
+  // Also try to apply referral for returning users who had a ref link
+  useEffect(() => {
+    if (referralApplied.current) return;
+    const storedRef = sessionStorage.getItem("dreamforge_referral");
+    if (storedRef && isAuthenticated) {
+      referralApplied.current = true;
+      autoApplyReferral.mutate({ code: storedRef });
     }
   }, [isAuthenticated]);
 

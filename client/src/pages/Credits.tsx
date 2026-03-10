@@ -42,7 +42,16 @@ import {
   AlertTriangle,
   X,
   ExternalLink,
+  Trophy,
+  Target,
+  Mail,
+  Settings,
+  Send,
+  ChevronRight,
+  Award,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // ─── Usage Chart Component (Canvas-based) ───────────────────────────────────
 function UsageDonutChart({
@@ -466,6 +475,9 @@ function ReferralSection() {
         </Card>
       )}
 
+      {/* Tiered Rewards Progress */}
+      <TierProgressSection />
+
       {/* Apply Referral Code */}
       <Card>
         <CardHeader>
@@ -493,6 +505,291 @@ function ReferralSection() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ─── Tier Progress Section ─────────────────────────────────────────────────
+function TierProgressSection() {
+  const { data: tierData, isLoading } = trpc.tieredReferral.getTierProgress.useQuery();
+
+  if (isLoading) {
+    return <div className="h-48 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  if (!tierData) return null;
+
+  const { totalReferrals, currentTier, nextTier, tiers, tierBonusesEarned } = tierData;
+
+  return (
+    <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-amber-500/10">
+            <Trophy className="w-6 h-6 text-amber-500" />
+          </div>
+          <div>
+            <CardTitle>Referral Tiers</CardTitle>
+            <CardDescription>
+              Unlock milestone bonuses as you refer more friends
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Current Status */}
+        <div className="flex items-center gap-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold">{totalReferrals}</div>
+            <div className="text-xs text-muted-foreground">Total Referrals</div>
+          </div>
+          {currentTier && (
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5" style={{ color: currentTier.color }} />
+              <div>
+                <div className="font-semibold" style={{ color: currentTier.color }}>
+                  {currentTier.name} Tier
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  +{tierBonusesEarned} bonus credits earned
+                </div>
+              </div>
+            </div>
+          )}
+          {!currentTier && (
+            <div className="text-sm text-muted-foreground">
+              Refer {nextTier?.threshold || 3} friends to unlock your first tier!
+            </div>
+          )}
+        </div>
+
+        {/* Progress to Next Tier */}
+        {nextTier && (
+          <div>
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-muted-foreground">
+                Progress to <span className="font-medium" style={{ color: nextTier.color }}>{nextTier.name}</span>
+              </span>
+              <span className="font-medium">
+                {totalReferrals} / {nextTier.threshold}
+              </span>
+            </div>
+            <div className="h-3 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min((totalReferrals / nextTier.threshold) * 100, 100)}%`,
+                  backgroundColor: nextTier.color,
+                }}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {nextTier.threshold - totalReferrals} more referral{nextTier.threshold - totalReferrals !== 1 ? "s" : ""} to earn <strong>+{nextTier.bonus} credits</strong>
+            </div>
+          </div>
+        )}
+
+        {/* All Tiers */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground mb-2">All Tiers</div>
+          <div className="grid gap-2">
+            {tiers.map((tier) => {
+              const isReached = totalReferrals >= tier.threshold;
+              const isCurrent = currentTier?.name === tier.name;
+              return (
+                <div
+                  key={tier.name}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                    isCurrent
+                      ? "border-2 bg-background/80 shadow-sm"
+                      : isReached
+                      ? "bg-muted/30 border-border/50"
+                      : "bg-muted/10 border-border/30 opacity-60"
+                  }`}
+                  style={isCurrent ? { borderColor: tier.color } : {}}
+                >
+                  <div className="flex items-center gap-3">
+                    <Award
+                      className="w-5 h-5"
+                      style={{ color: isReached ? tier.color : "hsl(var(--muted-foreground))" }}
+                    />
+                    <div>
+                      <div className="text-sm font-medium" style={isReached ? { color: tier.color } : {}}>
+                        {tier.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {tier.threshold} referrals
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={isReached ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      +{tier.bonus} credits
+                    </Badge>
+                    {isReached && (
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Digest Settings Section ───────────────────────────────────────────────
+function DigestSettingsSection() {
+  const { data: prefs, isLoading } = trpc.digest.getPreferences.useQuery();
+  const utils = trpc.useUtils();
+
+  const updatePrefs = trpc.digest.updatePreferences.useMutation({
+    onSuccess: () => {
+      toast.success("Digest preferences updated");
+      utils.digest.getPreferences.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update preferences");
+    },
+  });
+
+  const sendNow = trpc.digest.sendNow.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message || "Digest sent!");
+      } else {
+        toast.info(data.message || "No usage data to report");
+      }
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to send digest");
+    },
+  });
+
+  const { data: preview, isLoading: previewLoading } = trpc.digest.generatePreview.useQuery(
+    { period: prefs?.frequency || "weekly" },
+    { enabled: !!prefs }
+  );
+
+  if (isLoading) {
+    return <div className="h-32 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-blue-500/10">
+            <Mail className="w-6 h-6 text-blue-500" />
+          </div>
+          <div>
+            <CardTitle>Usage Digest</CardTitle>
+            <CardDescription>
+              Get periodic summaries of your credit usage and activity
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Toggle & Frequency */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={prefs?.enabled ?? false}
+              onCheckedChange={(checked) =>
+                updatePrefs.mutate({
+                  enabled: checked,
+                  frequency: prefs?.frequency || "weekly",
+                })
+              }
+            />
+            <Label className="text-sm font-medium">
+              {prefs?.enabled ? "Digest enabled" : "Digest disabled"}
+            </Label>
+          </div>
+          <Select
+            value={prefs?.frequency || "weekly"}
+            onValueChange={(v) =>
+              updatePrefs.mutate({
+                enabled: prefs?.enabled ?? false,
+                frequency: v as "weekly" | "monthly",
+              })
+            }
+          >
+            <SelectTrigger className="w-[120px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Last Sent */}
+        {prefs?.lastSentAt && (
+          <div className="text-xs text-muted-foreground">
+            Last digest sent: {new Date(prefs.lastSentAt).toLocaleString()}
+          </div>
+        )}
+
+        {/* Preview */}
+        {preview && (
+          <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-3">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Digest Preview
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <div className="text-lg font-bold">{preview.totalSpent}</div>
+                <div className="text-xs text-muted-foreground">Credits Used</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold">{preview.totalGenerations}</div>
+                <div className="text-xs text-muted-foreground">Generations</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold">{preview.avgPerDay}</div>
+                <div className="text-xs text-muted-foreground">Avg/Day</div>
+              </div>
+              <div>
+                <div className={`text-lg font-bold ${preview.comparedToPrevious.spentChange >= 0 ? "text-amber-500" : "text-emerald-500"}`}>
+                  {preview.comparedToPrevious.spentChange >= 0 ? "+" : ""}{preview.comparedToPrevious.spentChange}%
+                </div>
+                <div className="text-xs text-muted-foreground">vs Previous</div>
+              </div>
+            </div>
+            {preview.topTools.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-muted-foreground">Top Tools</div>
+                {preview.topTools.slice(0, 3).map((t) => (
+                  <div key={t.tool} className="flex items-center justify-between text-sm">
+                    <span className="capitalize">{t.tool.replace(/-/g, " ")}</span>
+                    <span className="text-muted-foreground">{t.credits} credits ({t.count} uses)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Send Now Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => sendNow.mutate()}
+          disabled={sendNow.isPending}
+          className="gap-2"
+        >
+          <Send className="w-4 h-4" />
+          {sendNow.isPending ? "Sending..." : "Send Digest Now"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -737,15 +1034,7 @@ export default function Credits() {
     });
   };
 
-  // Check for referral code in URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get("ref");
-    if (ref) {
-      // Store for later use
-      sessionStorage.setItem("dreamforge_referral", ref);
-    }
-  }, []);
+
 
   if (authLoading) {
     return (
@@ -879,6 +1168,10 @@ export default function Credits() {
             <TabsTrigger value="history">
               <Clock className="w-4 h-4 mr-2" />
               History
+            </TabsTrigger>
+            <TabsTrigger value="digest">
+              <Mail className="w-4 h-4 mr-2" />
+              Digest
             </TabsTrigger>
             <TabsTrigger value="pricing">
               <TrendingUp className="w-4 h-4 mr-2" />
@@ -1037,6 +1330,11 @@ export default function Credits() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Digest Tab */}
+          <TabsContent value="digest">
+            <DigestSettingsSection />
           </TabsContent>
 
           {/* Pricing Tab */}

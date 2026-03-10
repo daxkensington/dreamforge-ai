@@ -70,6 +70,11 @@ import {
   referralRouter,
   enhancedCreditsRouter,
 } from "./routers/phase18";
+import {
+  autoReferralRouter,
+  tieredReferralRouter,
+  digestRouter,
+} from "./routers/phase19";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -2311,6 +2316,11 @@ export const appRouter = router({
   usageAnalytics: usageAnalyticsRouter,
   referral: referralRouter,
   enhancedCredits: enhancedCreditsRouter,
+
+  // ─── Phase 19 Routers ─────────────────────────────────────────────────
+  autoReferral: autoReferralRouter,
+  tieredReferral: tieredReferralRouter,
+  digest: digestRouter,
 
   export: router({
     metadata: protectedProcedure

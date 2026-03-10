@@ -628,3 +628,34 @@
 - [x] Test low credit warning logic
 - [x] Test referral code generation and redemption
 - [x] Final verification — 367 tests passing, 0 TS errors
+
+## Phase 19 — Referral Auto-Apply, Tiered Rewards, Usage Digest
+
+### Referral Auto-Apply on Signup
+- [x] Capture ?ref=CODE URL parameter on landing and store in sessionStorage
+- [x] Auto-apply referral code on first login (after OAuth callback)
+- [x] Backend: autoApplyReferral endpoint that checks sessionStorage code
+- [x] Show toast notification when referral is auto-applied
+- [x] Handle edge cases (invalid code, self-referral, already referred)
+
+### Tiered Referral Rewards
+- [x] Define reward tiers (Bronze 3→30, Silver 7→50, Gold 15→100, Platinum 30→200, Diamond 50→500)
+- [x] Backend: checkAndAwardTierBonus logic after each successful referral
+- [x] Backend: getTierProgress endpoint (current tier, next tier, progress)
+- [x] Frontend: Tier progress display on Referrals tab (progress bar, milestones)
+- [x] Notification when user reaches a new tier
+
+### Usage Analytics Email Digest
+- [x] Backend: generateDigestContent helper (summarizes usage stats for a period)
+- [x] Backend: sendDigest endpoint using notification system
+- [x] Backend: digestPreferences endpoint (enable/disable, frequency: weekly/monthly)
+- [x] Add digestFrequency and digestEnabled fields to users table
+- [x] Frontend: Digest settings UI on Credits/Usage page
+- [x] Scheduled digest generation logic (cron-compatible endpoint)
+
+### Testing & Verification
+- [x] Test referral auto-apply flow
+- [x] Test tiered rewards calculation and awarding
+- [x] Test digest content generation
+- [x] Test digest preferences CRUD
+- [x] Final verification — 389 tests passing, 0 TS errors

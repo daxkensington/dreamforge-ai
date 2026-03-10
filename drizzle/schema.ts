@@ -24,6 +24,9 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   referralCode: varchar("referralCode", { length: 32 }).unique(),
+  digestEnabled: boolean("digestEnabled").default(false).notNull(),
+  digestFrequency: mysqlEnum("digestFrequency", ["weekly", "monthly"]).default("weekly").notNull(),
+  lastDigestSentAt: timestamp("lastDigestSentAt"),
 });
 
 export type User = typeof users.$inferSelect;
