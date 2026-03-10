@@ -874,6 +874,76 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Pro Features Section */}
+      <section className="py-24 md:py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid opacity-20" />
+        <div className="container relative">
+          <div className="text-center mb-16">
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-sm font-medium text-emerald-400 mb-3 uppercase tracking-widest"
+            >
+              Professional Tools
+            </motion.p>
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4"
+            >
+              Built for{" "}
+              <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Serious Creators</span>
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={2}
+              className="text-muted-foreground max-w-xl mx-auto text-lg"
+            >
+              Character consistency, brand kits, model comparison, smart search, and API access.
+            </motion.p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { icon: Users, title: "Character Library", desc: "Create persistent characters with detailed descriptions and style notes for consistent output across all generations.", gradient: "from-emerald-500 to-teal-500", href: "/characters" },
+              { icon: Palette, title: "Brand Kits", desc: "Save color palettes, typography, and style prompts as reusable presets. Start from built-in style presets.", gradient: "from-amber-500 to-orange-500", href: "/brand-kits" },
+              { icon: Layers, title: "Model Comparison", desc: "Generate the same prompt across multiple AI models side-by-side to find the perfect output.", gradient: "from-blue-500 to-indigo-500", href: "/models" },
+              { icon: Eye, title: "Smart Search", desc: "Search your entire generation history by prompt, media type, and status with instant filtering.", gradient: "from-violet-500 to-purple-500", href: "/search" },
+              { icon: Wand2, title: "AI Prompt Assistant", desc: "Improve any prompt with AI-powered suggestions. Get style, mood, composition, and lighting tips.", gradient: "from-pink-500 to-rose-500", href: "/workspace" },
+              { icon: Zap, title: "Public API", desc: "Integrate DreamForge into your apps with our REST API. Generate images, run tools, and manage projects programmatically.", gradient: "from-cyan-500 to-blue-500", href: "/api-docs" },
+            ].map((tool, i) => (
+              <motion.div
+                key={tool.title}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={scaleIn}
+                custom={i}
+              >
+                <Link href={tool.href}>
+                  <div className="group relative p-6 rounded-2xl border border-border/50 bg-card/50 hover:bg-card hover:border-emerald-500/30 transition-all duration-500 hover:shadow-lg hover:shadow-emerald-500/5 h-full cursor-pointer">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} shadow-lg mb-4 group-hover:scale-110 transition-transform`}>
+                      <tool.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="text-base font-semibold mb-2 group-hover:text-emerald-400 transition-colors">{tool.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{tool.desc}</p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />

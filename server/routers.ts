@@ -49,6 +49,16 @@ import {
   getLatestRevisionVersion,
 } from "./db";
 import { storagePut } from "./storage";
+import {
+  videoGenRouter,
+  socialRouter,
+  characterRouter,
+  modelRouter,
+  promptAssistRouter,
+  brandKitRouter,
+  searchRouter,
+  apiKeyRouter,
+} from "./routersExtended";
 
 // ─── Video Templates ─────────────────────────────────────────────────────────
 interface VideoTemplate {
@@ -2186,6 +2196,16 @@ export const appRouter = router({
         return { success: true, version: latestVersion + 1 };
       }),
   }),
+
+  // ─── Extended Feature Routers ──────────────────────────────────────────
+  videoGen: videoGenRouter,
+  social: socialRouter,
+  character: characterRouter,
+  models: modelRouter,
+  promptAssist: promptAssistRouter,
+  brandKit: brandKitRouter,
+  search: searchRouter,
+  apiKey: apiKeyRouter,
 
   export: router({
     metadata: protectedProcedure

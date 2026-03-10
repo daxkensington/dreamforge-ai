@@ -385,3 +385,99 @@
 - [x] Vitest tests for version history endpoints (included in collaboration.test.ts)
 - [x] Vitest tests for AI refinement endpoint (included in collaboration.test.ts)
 - [x] Final verification and checkpoint (247 tests passing, 0 TS errors)
+
+## Phase 14 — Full Improvement Roadmap
+
+### P0: Actual Video Generation Integration
+- [x] Backend: videoGeneration.generate endpoint — renders scene keyframes via image generation API
+- [x] Backend: videoGeneration.status endpoint for polling generation progress
+- [x] Frontend: "Generate Keyframes" button on storyboard scenes
+- [x] Frontend: Video generation progress indicator with scene-by-scene status
+- [x] Store generated scene keyframes in S3 and link to video projects
+
+### P1: Interactive Editing Canvas
+- [x] Install fabric.js for HTML5 Canvas editing
+- [x] Canvas component with brush tools, eraser, selection, and zoom
+- [x] Integrate canvas with inpainting — brush mask region, send to API
+- [x] Integrate canvas with outpainting — extend canvas bounds, send to API
+- [x] Canvas layer system (original, mask, result) with undo/redo
+
+### P2: Real-Time Generation Preview
+- [x] Backend: SSE endpoint for streaming generation progress
+- [x] Frontend: Progress bar with stage indicators (queued, processing, rendering, complete)
+- [x] Animated skeleton placeholder during generation
+- [x] Estimated time remaining display
+
+### P3: Gallery Social Features
+- [x] Add galleryLikes, galleryComments, userFollows tables
+- [x] Backend: like/unlike, comment CRUD, follow/unfollow endpoints
+- [x] Frontend: Like button with count on gallery cards
+- [x] Frontend: Comment section on gallery detail page
+- [x] Frontend: Follow button on user profiles
+- [x] Frontend: "Remix Prompt" button copies prompt to workspace
+- [x] Frontend: Following/Discover feed tabs in gallery
+
+### P4: Character Consistency System
+- [x] Add characters table (userId, name, description, referenceImages, styleNotes)
+- [x] Backend: character CRUD endpoints
+- [x] Backend: inject character description into generation prompts
+- [x] Frontend: Character library page
+- [x] Frontend: Character selector in workspace generation form
+
+### P5: Multi-Model Selection
+- [x] Define model registry with capabilities metadata
+- [x] Backend: listModels endpoint
+- [x] Frontend: Model selector in workspace with model cards
+- [x] Model comparison mode — same prompt across multiple models
+
+### P6: End-to-End Video Pipeline
+- [x] Backend: sequence storyboard scenes into timeline
+- [x] Backend: generate keyframe images per scene
+- [x] Frontend: Video timeline editor with scene clips
+- [x] Frontend: Scene reordering via drag-and-drop
+- [x] Frontend: Export timeline with all generated keyframes
+
+### P7: AI-Powered Prompt Assistant
+- [x] Backend: promptAssist endpoint (LLM improves/expands prompts)
+- [x] Backend: promptSuggest endpoint (style/mood/composition suggestions)
+- [x] Frontend: Collapsible prompt assistant sidebar in workspace
+- [x] Frontend: "Improve Prompt" one-click button
+- [x] Frontend: Suggestion chips and prompt history
+
+### P8: Style Presets and Brand Kits
+- [x] Add brandKits table (userId, name, colorPalette, stylePrompt, typography)
+- [x] Backend: brandKit CRUD endpoints
+- [x] Frontend: Brand kit manager page
+- [x] Frontend: Apply brand kit to generation
+- [x] Pre-built style presets (cinematic, anime, watercolor, etc.)
+
+### P9: Generation History with Smart Search
+- [x] Backend: searchGenerations with full-text search
+- [x] Backend: Filter by tool, date range, model, media type
+- [x] Frontend: Search bar with autocomplete in workspace
+- [x] Frontend: Advanced filter panel
+- [x] Frontend: "Regenerate with tweaks" from history
+
+### P10: Keyboard Shortcuts
+- [x] Global shortcut handler (Ctrl+Enter generate, Escape cancel)
+- [x] Workspace shortcuts (Ctrl+S, Ctrl+Z, arrow keys)
+- [x] Gallery shortcuts (arrows, L to like, C to comment)
+- [x] Keyboard shortcut help modal (?)
+
+### P11: Public API
+- [x] Add apiKeys table (userId, key, name, permissions, rateLimit)
+- [x] Backend: API key CRUD endpoints
+- [x] Backend: API middleware for key-based auth
+- [x] Public REST endpoints: /api/v1/generate, /api/v1/tools/*
+- [x] Rate limiting per API key
+- [x] Frontend: API key management in profile
+- [x] API documentation page with examples
+
+### Testing & Verification
+- [x] Vitest tests for video generation endpoints
+- [x] Vitest tests for gallery social features
+- [x] Vitest tests for character consistency endpoints
+- [x] Vitest tests for brand kit endpoints
+- [x] Vitest tests for API key management
+- [x] Vitest tests for prompt assistant endpoints
+- [x] Final verification — all tests passing, 0 TS errors

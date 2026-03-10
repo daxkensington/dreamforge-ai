@@ -22,6 +22,11 @@ import {
   Layers,
   CreditCard,
   Film,
+  Users,
+  Search,
+  Palette,
+  Key,
+  Code,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -32,6 +37,7 @@ const navLinks = [
   { href: "/gallery", label: "Gallery", icon: Image },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/batch", label: "Batch", icon: Layers, auth: true },
+  { href: "/characters", label: "Characters", icon: Users, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
 ];
 
@@ -43,6 +49,7 @@ export default function Navbar() {
   const isToolsActive = location.startsWith("/tools");
   const isVideoStudioActive = location.startsWith("/video-studio");
   const isBatchActive = location === "/batch";
+  const isCharactersActive = location === "/characters";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -63,7 +70,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
-            const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : location === link.href;
+            const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : link.href === "/characters" ? isCharactersActive : location === link.href;
             return (
               <Link
                 key={link.href}
@@ -141,6 +148,30 @@ export default function Navbar() {
                   <Link href="/video-studio" className="flex items-center gap-2 cursor-pointer">
                     <Film className="h-4 w-4" />
                     Video Studio
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/characters" className="flex items-center gap-2 cursor-pointer">
+                    <Users className="h-4 w-4" />
+                    Characters
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/brand-kits" className="flex items-center gap-2 cursor-pointer">
+                    <Palette className="h-4 w-4" />
+                    Brand Kits
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/search" className="flex items-center gap-2 cursor-pointer">
+                    <Search className="h-4 w-4" />
+                    Search History
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/api-keys" className="flex items-center gap-2 cursor-pointer">
+                    <Key className="h-4 w-4" />
+                    API Keys
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

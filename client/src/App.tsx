@@ -37,6 +37,13 @@ import ToolSoundtrackSuggester from "./pages/ToolSoundtrackSuggester";
 import ToolTextToVideoScript from "./pages/ToolTextToVideoScript";
 import ProjectDetail from "./pages/ProjectDetail";
 import JoinProject from "./pages/JoinProject";
+import Characters from "./pages/Characters";
+import BrandKits from "./pages/BrandKits";
+import ApiKeys from "./pages/ApiKeys";
+import SearchGenerations from "./pages/SearchGenerations";
+import ModelComparison from "./pages/ModelComparison";
+import ApiDocs from "./pages/ApiDocs";
+import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 function Router() {
   return (
@@ -71,6 +78,12 @@ function Router() {
       <Route path="/video-studio/script" component={ToolTextToVideoScript} />
       <Route path="/video-studio/project/:id" component={ProjectDetail} />
       <Route path="/video-studio/join/:token" component={JoinProject} />
+      <Route path="/characters" component={Characters} />
+      <Route path="/brand-kits" component={BrandKits} />
+      <Route path="/api-keys" component={ApiKeys} />
+      <Route path="/api-docs" component={ApiDocs} />
+      <Route path="/search" component={SearchGenerations} />
+      <Route path="/models" component={ModelComparison} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />
@@ -87,6 +100,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <KeyboardShortcutsModal />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

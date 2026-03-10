@@ -196,6 +196,103 @@ export const projectRevisions = mysqlTable("projectRevisions", {
 export type ProjectRevision = typeof projectRevisions.$inferSelect;
 export type InsertProjectRevision = typeof projectRevisions.$inferInsert;
 
+// ─── Gallery Likes ──────────────────────────────────────────────────────────
+export const galleryLikes = mysqlTable("galleryLikes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  galleryItemId: int("galleryItemId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GalleryLike = typeof galleryLikes.$inferSelect;
+
+// ─── Gallery Comments ──────────────────────────────────────────────────────
+export const galleryComments = mysqlTable("galleryComments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  galleryItemId: int("galleryItemId").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GalleryComment = typeof galleryComments.$inferSelect;
+
+// ─── User Follows ──────────────────────────────────────────────────────────
+export const userFollows = mysqlTable("userFollows", {
+  id: int("id").autoincrement().primaryKey(),
+  followerId: int("followerId").notNull(),
+  followingId: int("followingId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserFollow = typeof userFollows.$inferSelect;
+
+// ─── Characters (Consistency System) ───────────────────────────────────────
+export const characters = mysqlTable("characters", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  description: text("description"),
+  referenceImages: json("referenceImages"), // array of image URLs
+  styleNotes: text("styleNotes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Character = typeof characters.$inferSelect;
+export type InsertCharacter = typeof characters.$inferInsert;
+
+// ─── Brand Kits ────────────────────────────────────────────────────────────
+export const brandKits = mysqlTable("brandKits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  colorPalette: json("colorPalette"), // array of hex colors
+  stylePrompt: text("stylePrompt"),
+  typography: varchar("typography", { length: 256 }),
+  logoUrl: text("logoUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BrandKit = typeof brandKits.$inferSelect;
+export type InsertBrandKit = typeof brandKits.$inferInsert;
+
+// ─── API Keys ──────────────────────────────────────────────────────────────
+export const apiKeys = mysqlTable("apiKeys", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  keyHash: varchar("keyHash", { length: 128 }).notNull().unique(),
+  keyPrefix: varchar("keyPrefix", { length: 12 }).notNull(), // first 8 chars for display
+  permissions: json("permissions"), // array of allowed scopes
+  rateLimit: int("rateLimit").default(100), // requests per hour
+  lastUsedAt: timestamp("lastUsedAt"),
+  expiresAt: timestamp("expiresAt"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = typeof apiKeys.$inferInsert;
+
+// ─── Scene Keyframes (Video Generation) ────────────────────────────────────
+export const sceneKeyframes = mysqlTable("sceneKeyframes", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  sceneIndex: int("sceneIndex").notNull(),
+  prompt: text("prompt").notNull(),
+  imageUrl: text("imageUrl"),
+  status: mysqlEnum("keyframeStatus", ["pending", "generating", "completed", "failed"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SceneKeyframe = typeof sceneKeyframes.$inferSelect;
+export type InsertSceneKeyframe = typeof sceneKeyframes.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),
