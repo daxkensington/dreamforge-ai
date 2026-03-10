@@ -49,9 +49,23 @@ import {
   Send,
   ChevronRight,
   Award,
+  Crown,
+  Medal,
+  Timer,
+  Shield,
+  Flame,
+  Hash,
+  AtSign,
+  Globe,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Usage Chart Component (Canvas-based) ───────────────────────────────────
 function UsageDonutChart({
@@ -642,6 +656,172 @@ function TierProgressSection() {
   );
 }
 
+// ─── Leaderboard Section ──────────────────────────────────────────────────
+function LeaderboardSection() {
+  const { user } = useAuth() as any;
+  const { data: leaderboard, isLoading } = trpc.leaderboard.getLeaderboard.useQuery({ limit: 20 });
+  const { data: myRank } = trpc.leaderboard.getMyRank.useQuery(undefined, { enabled: !!user });
+
+  if (isLoading) {
+    return <div className="h-48 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  const rankIcons = [Crown, Medal, Award];
+  const rankColors = ["text-amber-400", "text-gray-400", "text-amber-600"];
+
+  return (
+    <Card className="border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-500/10">
+              <Crown className="w-6 h-6 text-indigo-500" />
+            </div>
+            <div>
+              <CardTitle>Referral Leaderboard</CardTitle>
+              <CardDescription>
+                Top referrers in the DreamForge community
+              </CardDescription>
+            </div>
+          </div>
+          {myRank?.rank && (
+            <Badge variant="outline" className="gap-1 border-indigo-500/30 text-indigo-400">
+              <Hash className="w-3 h-3" />
+              Your Rank: {myRank.rank} of {myRank.totalParticipants}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!leaderboard?.entries || leaderboard.entries.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            <p>No referrals yet — be the first!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {leaderboard.entries.map((entry) => {
+              const isMe = user && entry.userId === user.id;
+              const RankIcon = entry.rank <= 3 ? rankIcons[entry.rank - 1] : null;
+              const rankColor = entry.rank <= 3 ? rankColors[entry.rank - 1] : "text-muted-foreground";
+
+              return (
+                <div
+                  key={entry.rank}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isMe
+                      ? "bg-primary/10 border border-primary/20 shadow-sm"
+                      : entry.rank <= 3
+                      ? "bg-muted/60"
+                      : "bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
+                      entry.rank <= 3 ? "bg-background/80" : ""
+                    }`}>
+                      {RankIcon ? (
+                        <RankIcon className={`w-5 h-5 ${rankColor}`} />
+                      ) : (
+                        <span className="text-sm font-bold text-muted-foreground">
+                          {entry.rank}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        {entry.displayName}
+                        {isMe && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            You
+                          </Badge>
+                        )}
+                      </div>
+                      {entry.tier && (
+                        <div className="text-xs" style={{ color: entry.tier.color }}>
+                          {entry.tier.name} Tier
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">
+                      {entry.referralCount}
+                    </span>
+                    <span className="text-xs text-muted-foreground">referrals</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Credit Expiration Warning Section ────────────────────────────────────
+function CreditExpirationSection() {
+  const { data: expirationSummary } = trpc.creditExpiration.getExpirationSummary.useQuery();
+  const { data: expiringCredits } = trpc.creditExpiration.getExpiringCredits.useQuery();
+
+  if (!expirationSummary?.hasExpiringCredits) return null;
+
+  return (
+    <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-red-500/5">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-orange-500/10">
+            <Timer className="w-6 h-6 text-orange-500" />
+          </div>
+          <div>
+            <CardTitle className="text-orange-500">Credits Expiring Soon</CardTitle>
+            <CardDescription>
+              {expirationSummary.totalExpiringSoon} credits expiring within 7 days
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {expiringCredits?.expiringCredits && expiringCredits.expiringCredits.length > 0 ? (
+          <div className="space-y-2">
+            {expiringCredits.expiringCredits.map((credit) => (
+              <div
+                key={credit.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-orange-500/10"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-orange-500/10">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">
+                      {credit.description || "Bonus credits"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Expires in {credit.daysLeft} day{credit.daysLeft !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                  {credit.amount} credits
+                </Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            Use your credits before they expire!
+          </div>
+        )}
+        <div className="mt-4 p-3 rounded-lg bg-muted/30 text-xs text-muted-foreground">
+          <p>Bonus and referral credits expire after 90 days. Purchased credits never expire.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Digest Settings Section ───────────────────────────────────────────────
 function DigestSettingsSection() {
   const { data: prefs, isLoading } = trpc.digest.getPreferences.useQuery();
@@ -788,6 +968,101 @@ function DigestSettingsSection() {
           <Send className="w-4 h-4" />
           {sendNow.isPending ? "Sending..." : "Send Digest Now"}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Email Digest Section ─────────────────────────────────────────────────
+function EmailDigestSection() {
+  const { data: emailPrefs, isLoading } = trpc.emailDigest.getEmailPreferences.useQuery();
+  const utils = trpc.useUtils();
+
+  const updateEmailPrefs = trpc.emailDigest.updateEmailPreferences.useMutation({
+    onSuccess: () => {
+      toast.success("Email digest preferences updated");
+      utils.emailDigest.getEmailPreferences.invalidate();
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update email preferences");
+    },
+  });
+
+  const sendTestEmail = trpc.emailDigest.sendTestEmail.useMutation({
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast.success(data.message || "Test email sent!");
+      } else {
+        toast.info(data.message || "Could not send test email");
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to send test email");
+    },
+  });
+
+  if (isLoading) {
+    return <div className="h-32 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  return (
+    <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10">
+            <AtSign className="w-6 h-6 text-cyan-500" />
+          </div>
+          <div>
+            <CardTitle>Email Digest Delivery</CardTitle>
+            <CardDescription>
+              Receive your usage digest via email notification in addition to in-app
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={emailPrefs?.emailEnabled ?? false}
+              onCheckedChange={(checked) =>
+                updateEmailPrefs.mutate({ emailEnabled: checked })
+              }
+            />
+            <Label className="text-sm font-medium">
+              {emailPrefs?.emailEnabled ? "Email digest enabled" : "Email digest disabled"}
+            </Label>
+          </div>
+        </div>
+
+        {emailPrefs?.email ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Globe className="w-4 h-4" />
+            Digests will be sent to: <span className="font-medium text-foreground">{emailPrefs.email}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-amber-500">
+            <AlertTriangle className="w-4 h-4" />
+            No email address on file. Email digests will be sent as notifications.
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => sendTestEmail.mutate()}
+            disabled={sendTestEmail.isPending}
+            className="gap-2"
+          >
+            <Send className="w-4 h-4" />
+            {sendTestEmail.isPending ? "Sending..." : "Send Test Email"}
+          </Button>
+        </div>
+
+        <div className="p-3 rounded-lg bg-muted/30 text-xs text-muted-foreground">
+          <p>Email digests include a beautifully formatted HTML summary of your usage stats, top tools, spending trends, and balance. Enable both in-app and email digests for maximum visibility.</p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1079,6 +1354,9 @@ export default function Credits() {
           />
         )}
 
+        {/* Credit Expiration Warning */}
+        <CreditExpirationSection />
+
         {/* Balance Header */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
@@ -1265,7 +1543,10 @@ export default function Credits() {
 
           {/* Referrals Tab */}
           <TabsContent value="referrals">
-            <ReferralSection />
+            <div className="space-y-6">
+              <ReferralSection />
+              <LeaderboardSection />
+            </div>
           </TabsContent>
 
           {/* History Tab */}
@@ -1334,7 +1615,10 @@ export default function Credits() {
 
           {/* Digest Tab */}
           <TabsContent value="digest">
-            <DigestSettingsSection />
+            <div className="space-y-6">
+              <DigestSettingsSection />
+              <EmailDigestSection />
+            </div>
           </TabsContent>
 
           {/* Pricing Tab */}

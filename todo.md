@@ -659,3 +659,34 @@
 - [x] Test digest content generation
 - [x] Test digest preferences CRUD
 - [x] Final verification — 389 tests passing, 0 TS errors
+
+## Phase 20 — Referral Leaderboard, Credit Expiration, Email Digest Delivery
+
+### Referral Leaderboard
+- [x] Backend: getLeaderboard endpoint (top referrers with rank, count, tier)
+- [x] Backend: getMyRank endpoint (current user's position)
+- [x] Frontend: Leaderboard page/tab with ranked list, avatars, tier badges
+- [x] Anonymize names for privacy (show first 2 chars + ***)
+- [x] Highlight current user's position in the list
+
+### Credit Expiration System
+- [x] Add expiresAt field to creditTransactions table for bonus/signup credits
+- [x] Backend: getExpiringCredits endpoint (credits expiring within 7 days)
+- [x] Backend: processExpiredCredits endpoint (admin, deducts expired credits)
+- [x] Frontend: Expiration warning banner when credits are about to expire
+- [x] Frontend: Expiration countdown on Credits page balance card
+- [x] In-app notification when credits are within 3 days of expiring
+
+### Email Digest Delivery
+- [x] Integrate notification-based email digest delivery
+- [x] Backend: sendEmailDigest helper using notification system
+- [x] HTML email template for usage digest (responsive, branded)
+- [x] Update sendNow and scheduled digest to also send via email
+- [x] Frontend: Email preference toggle (in-app only vs in-app + email)
+- [x] Email address display and verification status on digest settings
+
+### Testing & Verification
+- [x] Test leaderboard ranking and privacy
+- [x] Test credit expiration logic and warnings
+- [x] Test email digest delivery
+- [x] Final verification — 405 tests passing, 0 TS errors

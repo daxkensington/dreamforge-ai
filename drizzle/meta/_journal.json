@@ -78,6 +78,13 @@
       "when": 1773112774463,
       "tag": "0010_cuddly_warpath",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1773114574076,
+      "tag": "0011_gray_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

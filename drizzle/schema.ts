@@ -27,6 +27,7 @@ export const users = mysqlTable("users", {
   digestEnabled: boolean("digestEnabled").default(false).notNull(),
   digestFrequency: mysqlEnum("digestFrequency", ["weekly", "monthly"]).default("weekly").notNull(),
   lastDigestSentAt: timestamp("lastDigestSentAt"),
+  emailDigestEnabled: boolean("emailDigestEnabled").default(false).notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -320,6 +321,8 @@ export const creditTransactions = mysqlTable("creditTransactions", {
   description: varchar("description", { length: 512 }),
   stripeSessionId: varchar("stripeSessionId", { length: 256 }),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 256 }),
+  expiresAt: timestamp("expiresAt"), // null = never expires; set for bonus/signup credits
+  expired: boolean("expired").default(false).notNull(), // true once credits have been deducted
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
