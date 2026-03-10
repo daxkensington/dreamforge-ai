@@ -28,8 +28,198 @@ import {
   updateUserProfile,
   getUserUsageStats,
   getUserActivityTimeline,
+  createVideoProject,
+  updateVideoProject,
+  getVideoProject,
+  listVideoProjects,
+  deleteVideoProject,
 } from "./db";
 import { storagePut } from "./storage";
+
+// ─── Video Templates ─────────────────────────────────────────────────────────
+interface VideoTemplate {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  toolType: "storyboard" | "script" | "scene-direction" | "soundtrack";
+  icon: string;
+  prefill: Record<string, unknown>;
+}
+
+const VIDEO_TEMPLATES: VideoTemplate[] = [
+  // Product & Commercial
+  {
+    id: "product-launch",
+    name: "Product Launch Video",
+    category: "commercial",
+    description: "A high-energy product reveal with dramatic lighting, close-up shots, and a compelling narrative arc from teaser to full reveal.",
+    toolType: "storyboard",
+    icon: "🚀",
+    prefill: {
+      concept: "A sleek new tech product emerges from darkness. Dramatic lighting reveals its design details one by one. Quick cuts showcase features while a confident voiceover builds excitement. Ends with the product floating in a clean white space with the brand logo.",
+      sceneCount: 6,
+      aspectRatio: "16:9",
+      style: "commercial",
+    },
+  },
+  {
+    id: "brand-story",
+    name: "Brand Story Documentary",
+    category: "commercial",
+    description: "An authentic brand origin story with interview-style segments, behind-the-scenes footage, and emotional storytelling.",
+    toolType: "script",
+    icon: "🎬",
+    prefill: {
+      concept: "Tell the founding story of a passionate artisan brand. Start with the founder in their workshop, intercut with old photos. Show the craft process in beautiful detail. Include customer testimonials. End with the team looking toward the future.",
+      duration: 180,
+      format: "documentary",
+      tone: "inspirational",
+    },
+  },
+  // Tutorial & Education
+  {
+    id: "tutorial-howto",
+    name: "How-To Tutorial",
+    category: "education",
+    description: "A clear, step-by-step tutorial with screen recordings, annotations, and a friendly presenter guiding viewers through the process.",
+    toolType: "script",
+    icon: "📚",
+    prefill: {
+      concept: "A friendly instructor walks through a creative process step by step. Each step is clearly numbered with on-screen graphics. Close-up shots show hand movements and details. Quick recap at the end with all steps summarized.",
+      duration: 300,
+      format: "tutorial",
+      tone: "friendly",
+    },
+  },
+  {
+    id: "explainer-animated",
+    name: "Animated Explainer",
+    category: "education",
+    description: "A motion graphics explainer that breaks down complex concepts into simple, engaging visual metaphors with smooth transitions.",
+    toolType: "storyboard",
+    icon: "✨",
+    prefill: {
+      concept: "An animated explainer that uses colorful geometric shapes to represent abstract concepts. Smooth morphing transitions between ideas. Clean typography appears alongside visuals. A warm narrator voice guides the viewer through three key points.",
+      sceneCount: 5,
+      aspectRatio: "16:9",
+      style: "abstract",
+    },
+  },
+  // Music & Entertainment
+  {
+    id: "music-video-cinematic",
+    name: "Cinematic Music Video",
+    category: "entertainment",
+    description: "A visually stunning music video with cinematic color grading, dramatic camera movements, and narrative storytelling synced to the beat.",
+    toolType: "storyboard",
+    icon: "🎵",
+    prefill: {
+      concept: "A cinematic music video following a lone figure through a neon-lit city at night. Slow-motion rain sequences, reflections in puddles, dramatic wide shots of empty streets. The mood shifts from melancholy to euphoric as the music builds. Ends with sunrise over the skyline.",
+      sceneCount: 8,
+      aspectRatio: "16:9",
+      style: "cinematic",
+    },
+  },
+  {
+    id: "music-video-performance",
+    name: "Performance Music Video",
+    category: "entertainment",
+    description: "A dynamic performance-focused video with creative stage lighting, multi-camera angles, and energetic editing synced to the rhythm.",
+    toolType: "scene-direction",
+    icon: "🎤",
+    prefill: {
+      narrative: "A band performs in a dramatic industrial warehouse. Multiple camera angles capture the energy — wide shots of the full band, close-ups on instruments, slow-motion crowd reactions. Lighting shifts with the music dynamics from moody blues to explosive reds.",
+      keyframeCount: 6,
+      mood: "energetic",
+    },
+  },
+  // Social Media
+  {
+    id: "social-reel",
+    name: "Social Media Reel",
+    category: "social",
+    description: "A fast-paced, attention-grabbing vertical video optimized for Instagram Reels and TikTok with trending transitions and hooks.",
+    toolType: "storyboard",
+    icon: "📱",
+    prefill: {
+      concept: "A punchy 30-second reel with a strong hook in the first 2 seconds. Quick cuts between lifestyle shots, product close-ups, and text overlays. Trending transition effects between scenes. Ends with a clear call-to-action and swipe-up prompt.",
+      sceneCount: 6,
+      aspectRatio: "9:16",
+      style: "commercial",
+    },
+  },
+  {
+    id: "social-testimonial",
+    name: "Customer Testimonial",
+    category: "social",
+    description: "An authentic customer story with talking-head interviews, B-roll of product usage, and emotional storytelling for social proof.",
+    toolType: "script",
+    icon: "💬",
+    prefill: {
+      concept: "A real customer shares their experience on camera. Intercut with B-roll of them using the product in their daily life. Include before/after moments. Subtle background music builds emotion. End with their genuine recommendation and a product shot.",
+      duration: 60,
+      format: "testimonial",
+      tone: "authentic",
+    },
+  },
+  // Narrative & Film
+  {
+    id: "short-film",
+    name: "Short Film",
+    category: "narrative",
+    description: "A compelling short film with three-act structure, character development, and cinematic production values.",
+    toolType: "script",
+    icon: "🎞️",
+    prefill: {
+      concept: "A short film about a street musician who discovers a mysterious instrument that plays music from people's memories. Three acts: discovery, experimentation with strangers' memories, and the emotional climax when they play their own forgotten memory.",
+      duration: 600,
+      format: "narrative",
+      tone: "dramatic",
+    },
+  },
+  {
+    id: "documentary-mini",
+    name: "Mini Documentary",
+    category: "narrative",
+    description: "A concise documentary with interview segments, archival footage, and investigative narration that tells a compelling real-world story.",
+    toolType: "script",
+    icon: "🎥",
+    prefill: {
+      concept: "A mini-documentary exploring an underground art movement. Interviews with key artists in their studios, footage of their creative process, archival clips of early exhibitions. Narration connects the personal stories to a broader cultural shift.",
+      duration: 480,
+      format: "documentary",
+      tone: "thoughtful",
+    },
+  },
+  // Atmosphere & Mood
+  {
+    id: "ambient-mood",
+    name: "Ambient Mood Piece",
+    category: "atmosphere",
+    description: "A meditative visual experience with slow camera movements, natural textures, and an immersive soundscape.",
+    toolType: "soundtrack",
+    icon: "🌊",
+    prefill: {
+      videoDescription: "A slow, meditative journey through natural landscapes. Macro shots of water droplets, time-lapse of clouds, gentle camera movements through misty forests. No dialogue — purely visual and auditory immersion. 4 minutes of calm.",
+      mood: "calm",
+      targetDuration: 240,
+    },
+  },
+  {
+    id: "trailer-teaser",
+    name: "Cinematic Trailer",
+    category: "atmosphere",
+    description: "A high-impact trailer with dramatic pacing, powerful sound design, and carefully timed reveals that build anticipation.",
+    toolType: "scene-direction",
+    icon: "⚡",
+    prefill: {
+      narrative: "A cinematic trailer that opens with silence and a single striking image. Quick flashes of dramatic moments build in intensity. Bass drops punctuate key reveals. The pace accelerates until a final dramatic pause, then the title card appears with a thunderous sound.",
+      keyframeCount: 8,
+      mood: "intense",
+    },
+  },
+];
 
 export const appRouter = router({
   system: systemRouter,
@@ -1588,6 +1778,114 @@ export const appRouter = router({
             status: "failed" as const, error: error.message,
           };
         }
+      }),
+  }),
+
+  videoProject: router({
+    // Save a video project
+    save: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().optional(), // if provided, update existing
+          type: z.enum(["storyboard", "script", "scene-direction", "soundtrack"]),
+          title: z.string().min(1).max(256),
+          description: z.string().max(1000).optional(),
+          data: z.any(),
+          thumbnailUrl: z.string().optional(),
+          templateId: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (input.id) {
+          await updateVideoProject(input.id, ctx.user.id, {
+            title: input.title,
+            description: input.description ?? undefined,
+            data: input.data,
+            thumbnailUrl: input.thumbnailUrl ?? undefined,
+          });
+          return { id: input.id, action: "updated" as const };
+        }
+        const { id } = await createVideoProject({
+          userId: ctx.user.id,
+          type: input.type,
+          title: input.title,
+          description: input.description ?? undefined,
+          data: input.data,
+          thumbnailUrl: input.thumbnailUrl ?? undefined,
+          templateId: input.templateId ?? undefined,
+        });
+        return { id, action: "created" as const };
+      }),
+
+    // List user's video projects
+    list: protectedProcedure
+      .input(
+        z.object({
+          type: z.enum(["storyboard", "script", "scene-direction", "soundtrack"]).optional(),
+          limit: z.number().min(1).max(50).optional(),
+          offset: z.number().min(0).optional(),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        return listVideoProjects(ctx.user.id, input);
+      }),
+
+    // Get a single video project
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.id, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        return project;
+      }),
+
+    // Delete a video project
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteVideoProject(input.id, ctx.user.id);
+        return { success: true };
+      }),
+
+    // Export project as structured data for PDF generation (client-side)
+    exportData: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const project = await getVideoProject(input.id, ctx.user.id);
+        if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+        return {
+          id: project.id,
+          type: project.type,
+          title: project.title,
+          description: project.description,
+          data: project.data,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        };
+      }),
+
+    // List available templates
+    templates: publicProcedure
+      .input(
+        z.object({
+          category: z.string().optional(),
+        }).default({})
+      )
+      .query(({ input }) => {
+        const templates = VIDEO_TEMPLATES;
+        if (input.category) {
+          return templates.filter((t) => t.category === input.category);
+        }
+        return templates;
+      }),
+
+    // Get a single template by ID
+    getTemplate: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .query(({ input }) => {
+        const template = VIDEO_TEMPLATES.find((t) => t.id === input.id);
+        if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+        return template;
       }),
   }),
 

@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, FileText, Clapperboard, Sparkles, Clock, MapPin, Camera as CameraIcon, Volume2, StickyNote } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { exportScriptPdf } from "@/lib/pdfExport";
+import { Loader2, FileText, Clapperboard, Sparkles, Clock, MapPin, Camera as CameraIcon, Volume2, StickyNote, Save, Download } from "lucide-react";
 
 const FORMATS = [
   { id: "narrative", label: "Narrative", desc: "Story-driven film" },
@@ -29,8 +33,11 @@ export default function ToolTextToVideoScript() {
   const [format, setFormat] = useState<string>("narrative");
   const [tone, setTone] = useState<string>("professional");
   const [duration, setDuration] = useState(60);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
 
   const script = trpc.video.generateScript.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleGenerate = () => {
     if (!concept.trim()) return;
@@ -40,6 +47,38 @@ export default function ToolTextToVideoScript() {
       format: format as any,
       tone: tone as any,
     });
+  };
+
+  const handleSave = () => {
+    if (!script.data || script.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "script",
+      title: saveTitle || script.data.title || "Untitled Script",
+      description: script.data.logline || concept.slice(0, 200),
+      data: script.data,
+    }, {
+      onSuccess: () => {
+        toast.success("Script saved to My Projects");
+        setSaveDialogOpen(false);
+        setSaveTitle("");
+      },
+      onError: () => toast.error("Failed to save script"),
+    });
+  };
+
+  const handleExportPdf = () => {
+    if (!script.data || script.data.status !== "completed") return;
+    exportScriptPdf({
+      title: script.data.title,
+      logline: script.data.logline,
+      targetDuration: script.data.targetDuration,
+      format: script.data.format,
+      tone: script.data.tone,
+      productionBudget: script.data.productionBudget,
+      equipmentNeeded: script.data.equipmentNeeded,
+      scenes: script.data.scenes,
+    });
+    toast.success("PDF downloaded");
   };
 
   return (
@@ -155,8 +194,20 @@ export default function ToolTextToVideoScript() {
           <div className="space-y-6">
             {/* Header */}
             <div className="rounded-xl border border-border/40 bg-card/50 p-6">
-              <h3 className="text-xl font-bold mb-2">{script.data.title}</h3>
-              <p className="text-sm text-muted-foreground italic mb-4">{script.data.logline}</p>
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="text-xl font-bold mb-2">{script.data.title}</h3>
+                  <p className="text-sm text-muted-foreground italic mb-4">{script.data.logline}</p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => { setSaveTitle(script.data?.title || ""); setSaveDialogOpen(true); }}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> Save
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleExportPdf}>
+                    <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="capitalize">{script.data.format}</Badge>
                 <Badge variant="outline" className="capitalize">{script.data.tone}</Badge>
@@ -190,19 +241,16 @@ export default function ToolTextToVideoScript() {
                     </Badge>
                   </div>
 
-                  {/* Visual Description */}
                   <div className="flex items-start gap-2">
                     <CameraIcon className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
                     <p className="text-sm text-foreground/90">{scene.visualDescription}</p>
                   </div>
 
-                  {/* Camera Direction */}
                   <div className="flex items-start gap-2">
                     <Clapperboard className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
                     <p className="text-xs text-muted-foreground">{scene.cameraDirection}</p>
                   </div>
 
-                  {/* Narration */}
                   {scene.narration && (
                     <div className="flex items-start gap-2">
                       <Volume2 className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
@@ -210,19 +258,16 @@ export default function ToolTextToVideoScript() {
                     </div>
                   )}
 
-                  {/* Dialogue */}
                   {scene.dialogue && (
                     <div className="pl-6 border-l-2 border-violet-500/30">
                       <p className="text-xs text-violet-300/80">{scene.dialogue}</p>
                     </div>
                   )}
 
-                  {/* Sound Design */}
                   {scene.soundDesign && (
                     <p className="text-xs text-muted-foreground/60">🔊 {scene.soundDesign}</p>
                   )}
 
-                  {/* Production Notes */}
                   {scene.productionNotes && (
                     <div className="flex items-start gap-2 bg-background/30 rounded-lg p-2">
                       <StickyNote className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
@@ -262,6 +307,28 @@ export default function ToolTextToVideoScript() {
           </div>
         )}
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Script</DialogTitle>
+            <DialogDescription>Save this script to your projects for later editing and export.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={saveTitle}
+            onChange={(e) => setSaveTitle(e.target.value)}
+            placeholder="Project title"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saveProject.isPending}>
+              {saveProject.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ToolPageLayout>
   );
 }

@@ -134,10 +134,28 @@ export const moderationQueue = mysqlTable("moderationQueue", {
 export type ModerationItem = typeof moderationQueue.$inferSelect;
 export type InsertModerationItem = typeof moderationQueue.$inferInsert;
 
+// ─── Video Projects ─────────────────────────────────────────────────────────
+export const videoProjects = mysqlTable("videoProjects", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["storyboard", "script", "scene-direction", "soundtrack"]).notNull(),
+  title: varchar("title", { length: 256 }).notNull(),
+  description: text("description"),
+  data: json("data").notNull(), // full project data (storyboard scenes, script scenes, etc.)
+  thumbnailUrl: text("thumbnailUrl"),
+  templateId: varchar("templateId", { length: 64 }), // if created from a template
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type VideoProject = typeof videoProjects.$inferSelect;
+export type InsertVideoProject = typeof videoProjects.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),
   galleryItems: many(galleryItems),
+  videoProjects: many(videoProjects),
 }));
 
 export const generationsRelations = relations(generations, ({ one, many }) => ({
@@ -189,4 +207,8 @@ export const moderationQueueRelations = relations(
 
 export const tagsRelations = relations(tags, ({ many }) => ({
   generationTags: many(generationTags),
+}));
+
+export const videoProjectsRelations = relations(videoProjects, ({ one }) => ({
+  user: one(users, { fields: [videoProjects.userId], references: [users.id] }),
 }));

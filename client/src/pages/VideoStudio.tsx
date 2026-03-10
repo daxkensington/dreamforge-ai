@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useMemo } from "react";
+import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -10,10 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { exportStoryboardPdf, exportScriptPdf } from "@/lib/pdfExport";
 import {
   Film, Clapperboard, Palette, Maximize, Music, FileText,
   Play, Loader2, ArrowRight, Sparkles, Clock, Camera,
-  ChevronRight, Video, Wand2, Layers
+  ChevronRight, Video, Wand2, Layers, Save, FolderOpen,
+  Download, Trash2, BookOpen, LayoutTemplate, Plus, Search,
+  Rocket, GraduationCap, Mic, Smartphone, Clapperboard as Clap,
+  Waves
 } from "lucide-react";
 
 // ─── Storyboard Tab ───────────────────────────────────────────────
@@ -22,8 +29,11 @@ function StoryboardTab() {
   const [sceneCount, setSceneCount] = useState("4");
   const [style, setStyle] = useState("cinematic");
   const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
 
   const storyboard = trpc.video.generateStoryboard.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleGenerate = () => {
     if (!concept.trim()) return;
@@ -34,6 +44,35 @@ function StoryboardTab() {
       aspectRatio: aspectRatio as any,
       generateImages: true,
     });
+  };
+
+  const handleSave = () => {
+    if (!storyboard.data || storyboard.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "storyboard",
+      title: saveTitle || storyboard.data.title || "Untitled Storyboard",
+      description: storyboard.data.synopsis || concept.slice(0, 200),
+      data: storyboard.data,
+    }, {
+      onSuccess: () => {
+        toast.success("Storyboard saved to My Projects");
+        setSaveDialogOpen(false);
+        setSaveTitle("");
+      },
+      onError: () => toast.error("Failed to save storyboard"),
+    });
+  };
+
+  const handleExportPdf = () => {
+    if (!storyboard.data || storyboard.data.status !== "completed") return;
+    exportStoryboardPdf({
+      title: storyboard.data.title,
+      synopsis: storyboard.data.synopsis,
+      totalDuration: storyboard.data.totalDuration,
+      style,
+      scenes: storyboard.data.scenes,
+    });
+    toast.success("PDF downloaded");
   };
 
   return (
@@ -118,12 +157,24 @@ function StoryboardTab() {
           {storyboard.data && storyboard.data.status === "completed" && (
             <div className="space-y-4">
               <div className="border border-border/50 rounded-xl p-4 bg-background/30">
-                <h3 className="text-lg font-semibold text-foreground">{storyboard.data.title}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{storyboard.data.synopsis}</p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{storyboard.data.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{storyboard.data.synopsis}</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => { setSaveTitle(storyboard.data?.title || ""); setSaveDialogOpen(true); }}>
+                      <Save className="w-3.5 h-3.5 mr-1" /> Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportPdf}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex gap-3 mt-2">
                   <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{storyboard.data.totalDuration}s</Badge>
                   <Badge variant="outline" className="text-xs"><Film className="w-3 h-3 mr-1" />{storyboard.data.scenes?.length} scenes</Badge>
-                  <Badge variant="outline" className="text-xs capitalize"><Palette className="w-3 h-3 mr-1" />{storyboard.data.style}</Badge>
+                  <Badge variant="outline" className="text-xs capitalize"><Palette className="w-3 h-3 mr-1" />{style}</Badge>
                 </div>
               </div>
 
@@ -174,6 +225,28 @@ function StoryboardTab() {
           )}
         </div>
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Storyboard</DialogTitle>
+            <DialogDescription>Save this storyboard to your projects for later editing and export.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={saveTitle}
+            onChange={(e) => setSaveTitle(e.target.value)}
+            placeholder="Project title"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saveProject.isPending}>
+              {saveProject.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -186,6 +259,7 @@ function SceneDirectorTab() {
   const [mood, setMood] = useState("epic");
 
   const director = trpc.video.directScene.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleDirect = () => {
     if (!narrative.trim()) return;
@@ -197,6 +271,19 @@ function SceneDirectorTab() {
     });
   };
 
+  const handleSave = () => {
+    if (!director.data || director.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "scene-direction",
+      title: director.data.sceneTitle || "Scene Direction",
+      description: narrative.slice(0, 200),
+      data: director.data,
+    }, {
+      onSuccess: () => toast.success("Scene direction saved to My Projects"),
+      onError: () => toast.error("Failed to save"),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -204,7 +291,7 @@ function SceneDirectorTab() {
           <div>
             <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Scene Narrative</label>
             <Textarea
-              placeholder="Describe the scene you want to direct... e.g., 'A lone astronaut walks across a barren Mars landscape toward a glowing structure on the horizon'"
+              placeholder="Describe the scene you want to direct..."
               value={narrative}
               onChange={(e) => setNarrative(e.target.value)}
               className="min-h-[120px] bg-background/50 border-border/50"
@@ -216,38 +303,32 @@ function SceneDirectorTab() {
               <Select value={keyframeCount} onValueChange={setKeyframeCount}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {[2, 3, 4, 5, 6].map((n) => (
+                  {[2, 3, 4, 5, 6, 8].map((n) => (
                     <SelectItem key={n} value={String(n)}>{n} keyframes</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Camera</label>
-              <Select value={cameraStyle} onValueChange={setCameraStyle}>
+              <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Mood</label>
+              <Select value={mood} onValueChange={setMood}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="static">Static</SelectItem>
-                  <SelectItem value="tracking">Tracking</SelectItem>
-                  <SelectItem value="crane">Crane</SelectItem>
-                  <SelectItem value="handheld">Handheld</SelectItem>
-                  <SelectItem value="drone">Drone</SelectItem>
-                  <SelectItem value="steadicam">Steadicam</SelectItem>
+                  {["epic", "intimate", "tense", "dreamy", "energetic", "melancholic", "mysterious", "playful"].map((m) => (
+                    <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Mood</label>
-            <Select value={mood} onValueChange={setMood}>
+            <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Camera Style</label>
+            <Select value={cameraStyle} onValueChange={setCameraStyle}>
               <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="epic">Epic</SelectItem>
-                <SelectItem value="intimate">Intimate</SelectItem>
-                <SelectItem value="tense">Tense</SelectItem>
-                <SelectItem value="dreamy">Dreamy</SelectItem>
-                <SelectItem value="energetic">Energetic</SelectItem>
-                <SelectItem value="melancholic">Melancholic</SelectItem>
+                {["tracking", "static", "handheld", "crane", "drone", "steadicam", "pov", "dolly"].map((s) => (
+                  <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -268,53 +349,50 @@ function SceneDirectorTab() {
           {director.isPending && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Loader2 className="w-12 h-12 animate-spin text-cyan-500" />
-              <p className="mt-4 text-sm">Directing your scene with keyframe generation...</p>
+              <p className="mt-4 text-sm">Creating keyframe sequence with camera directions...</p>
             </div>
           )}
 
           {director.data && director.data.status === "completed" && (
             <div className="space-y-4">
               <div className="border border-border/50 rounded-xl p-4 bg-background/30">
-                <h3 className="text-lg font-semibold text-foreground">{director.data.sceneTitle}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{director.data.overallDirection}</p>
-                <div className="flex gap-3 mt-2">
-                  <Badge variant="outline" className="text-xs capitalize"><Camera className="w-3 h-3 mr-1" />{director.data.cameraStyle}</Badge>
-                  <Badge variant="outline" className="text-xs capitalize">{director.data.mood}</Badge>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{director.data.sceneTitle}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{director.data.overallDirection}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleSave} disabled={saveProject.isPending}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> Save
+                  </Button>
                 </div>
               </div>
 
-              {/* Keyframe Timeline */}
-              <div className="relative">
-                <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-cyan-500/50 via-blue-500/50 to-transparent" />
-                <div className="space-y-4">
-                  {director.data.keyframes?.map((kf: any, i: number) => (
-                    <div key={i} className="relative pl-14">
-                      <div className="absolute left-4 top-4 w-4 h-4 rounded-full bg-cyan-500 border-2 border-background z-10" />
-                      <div className="border border-border/40 rounded-xl overflow-hidden bg-background/20">
-                        <div className="flex flex-col sm:flex-row">
-                          {kf.imageUrl && (
-                            <div className="sm:w-44 h-28 sm:h-auto flex-shrink-0">
-                              <img src={kf.imageUrl} alt={`Keyframe ${kf.frameNumber}`} className="w-full h-full object-cover" />
-                            </div>
-                          )}
-                          <div className="p-3 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">KF {kf.frameNumber}</Badge>
-                              <span className="text-xs text-muted-foreground font-mono">{kf.timestamp}</span>
-                            </div>
-                            <p className="text-sm text-foreground/90">{kf.composition}</p>
-                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
-                              <span>📷 {kf.cameraPosition}</span>
-                              <span>💡 {kf.lighting}</span>
-                              <span>🎬 {kf.movement}</span>
-                            </div>
-                            {kf.notes && <p className="text-xs text-muted-foreground/60 mt-1 italic">{kf.notes}</p>}
-                          </div>
+              <div className="space-y-3">
+                {director.data.keyframes?.map((kf: any, i: number) => (
+                  <div key={i} className="border border-border/40 rounded-xl overflow-hidden bg-background/20 hover:border-cyan-500/30 transition-colors">
+                    <div className="flex flex-col sm:flex-row">
+                      {kf.imageUrl && (
+                        <div className="sm:w-48 h-32 sm:h-auto flex-shrink-0">
+                          <img src={kf.imageUrl} alt={`Keyframe ${i + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="p-4 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">KF {kf.keyframeNumber}</Badge>
+                          <span className="text-xs text-muted-foreground">{kf.timestamp}</span>
+                        </div>
+                        <p className="text-sm text-foreground/90">{kf.visualDescription}</p>
+                        <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                          <span><Camera className="w-3 h-3 inline mr-1" />{kf.cameraPosition}</span>
+                          <span>•</span>
+                          <span>{kf.cameraMovement}</span>
+                          <span>•</span>
+                          <span>{kf.lighting}</span>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -322,7 +400,7 @@ function SceneDirectorTab() {
           {!director.data && !director.isPending && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground/50">
               <Camera className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-sm">Describe a scene and get AI-directed keyframes with camera instructions</p>
+              <p className="text-sm">Describe a scene and get AI-directed keyframes with camera work</p>
             </div>
           )}
         </div>
@@ -331,14 +409,17 @@ function SceneDirectorTab() {
   );
 }
 
-// ─── Script Writer Tab ────────────────────────────────────────────
+// ─── Script Writer Tab ───────────────────────────────────────────
 function ScriptWriterTab() {
   const [concept, setConcept] = useState("");
   const [duration, setDuration] = useState("60");
   const [format, setFormat] = useState("narrative");
   const [tone, setTone] = useState("professional");
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
 
   const script = trpc.video.generateScript.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleGenerate = () => {
     if (!concept.trim()) return;
@@ -350,6 +431,38 @@ function ScriptWriterTab() {
     });
   };
 
+  const handleSave = () => {
+    if (!script.data || script.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "script",
+      title: saveTitle || script.data.title || "Untitled Script",
+      description: script.data.logline || concept.slice(0, 200),
+      data: script.data,
+    }, {
+      onSuccess: () => {
+        toast.success("Script saved to My Projects");
+        setSaveDialogOpen(false);
+        setSaveTitle("");
+      },
+      onError: () => toast.error("Failed to save script"),
+    });
+  };
+
+  const handleExportPdf = () => {
+    if (!script.data || script.data.status !== "completed") return;
+    exportScriptPdf({
+      title: script.data.title,
+      logline: script.data.logline,
+      targetDuration: script.data.targetDuration,
+      format: script.data.format,
+      tone: script.data.tone,
+      productionBudget: script.data.productionBudget,
+      equipmentNeeded: script.data.equipmentNeeded,
+      scenes: script.data.scenes,
+    });
+    toast.success("PDF downloaded");
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -357,7 +470,7 @@ function ScriptWriterTab() {
           <div>
             <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Video Concept</label>
             <Textarea
-              placeholder="What's your video about? e.g., 'A product launch video for a new AI-powered design tool that helps creators work 10x faster'"
+              placeholder="What's your video about?"
               value={concept}
               onChange={(e) => setConcept(e.target.value)}
               className="min-h-[120px] bg-background/50 border-border/50"
@@ -429,8 +542,20 @@ function ScriptWriterTab() {
           {script.data && script.data.status === "completed" && (
             <div className="space-y-4">
               <div className="border border-border/50 rounded-xl p-4 bg-background/30">
-                <h3 className="text-lg font-semibold text-foreground">{script.data.title}</h3>
-                <p className="text-sm text-muted-foreground mt-1 italic">"{script.data.logline}"</p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{script.data.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1 italic">"{script.data.logline}"</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => { setSaveTitle(script.data?.title || ""); setSaveDialogOpen(true); }}>
+                      <Save className="w-3.5 h-3.5 mr-1" /> Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportPdf}>
+                      <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{script.data.targetDuration}s</Badge>
                   <Badge variant="outline" className="text-xs capitalize">{script.data.format}</Badge>
@@ -469,7 +594,7 @@ function ScriptWriterTab() {
                         </div>
                       )}
                       <div className="flex gap-4 text-xs text-muted-foreground/60">
-                        <span>🔊 {scene.soundDesign}</span>
+                        {scene.soundDesign && <span>🔊 {scene.soundDesign}</span>}
                         {scene.productionNotes && <span>📝 {scene.productionNotes}</span>}
                       </div>
                     </div>
@@ -502,6 +627,28 @@ function ScriptWriterTab() {
           )}
         </div>
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Script</DialogTitle>
+            <DialogDescription>Save this script to your projects for later editing and export.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={saveTitle}
+            onChange={(e) => setSaveTitle(e.target.value)}
+            placeholder="Project title"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saveProject.isPending}>
+              {saveProject.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -513,6 +660,7 @@ function SoundtrackTab() {
   const [mood, setMood] = useState("epic");
 
   const soundtrack = trpc.video.suggestSoundtrack.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleSuggest = () => {
     if (!concept.trim()) return;
@@ -523,6 +671,19 @@ function SoundtrackTab() {
     });
   };
 
+  const handleSave = () => {
+    if (!soundtrack.data || soundtrack.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "soundtrack",
+      title: `Soundtrack: ${soundtrack.data.primaryGenre || "Suggestion"}`,
+      description: concept.slice(0, 200),
+      data: soundtrack.data,
+    }, {
+      onSuccess: () => toast.success("Soundtrack suggestion saved to My Projects"),
+      onError: () => toast.error("Failed to save"),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -530,7 +691,7 @@ function SoundtrackTab() {
           <div>
             <label className="text-sm font-medium text-foreground/80 mb-1.5 block">Video Concept</label>
             <Textarea
-              placeholder="Describe your video for soundtrack suggestions... e.g., 'An epic drone flyover of mountain peaks at golden hour'"
+              placeholder="Describe your video for soundtrack suggestions..."
               value={concept}
               onChange={(e) => setConcept(e.target.value)}
               className="min-h-[100px] bg-background/50 border-border/50"
@@ -591,20 +752,25 @@ function SoundtrackTab() {
           {soundtrack.data && soundtrack.data.status === "completed" && (
             <div className="space-y-4">
               <div className="border border-border/50 rounded-xl p-5 bg-background/30">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">{soundtrack.data.primaryGenre}</h3>
-                    <div className="flex gap-2 mt-0.5">
-                      {soundtrack.data.subGenres?.map((g: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">{g}</Badge>
-                      ))}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                      <Music className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">{soundtrack.data.primaryGenre}</h3>
+                      <div className="flex gap-2 mt-0.5">
+                        {soundtrack.data.subGenres?.map((g: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{g}</Badge>
+                        ))}
+                      </div>
                     </div>
                   </div>
+                  <Button size="sm" variant="outline" onClick={handleSave} disabled={saveProject.isPending}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> Save
+                  </Button>
                 </div>
-                <p className="text-sm text-foreground/80">{soundtrack.data.description}</p>
+                <p className="text-sm text-foreground/80 mt-3">{soundtrack.data.description}</p>
                 <div className="flex gap-3 mt-3">
                   <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">🎵 {soundtrack.data.tempo}</Badge>
                   <Badge className="bg-emerald-500/20 text-emerald-300 text-xs capitalize">{soundtrack.data.mood} mood</Badge>
@@ -674,6 +840,250 @@ function SoundtrackTab() {
   );
 }
 
+// ─── My Projects Section ─────────────────────────────────────────
+function MyProjectsSection() {
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const utils = trpc.useUtils();
+
+  const { data, isLoading } = trpc.videoProject.list.useQuery(
+    typeFilter === "all" ? undefined : { type: typeFilter as any }
+  );
+
+  const deleteProject = trpc.videoProject.delete.useMutation({
+    onSuccess: () => {
+      utils.videoProject.list.invalidate();
+      toast.success("Project deleted");
+    },
+    onError: () => toast.error("Failed to delete project"),
+  });
+
+  const typeIcons: Record<string, React.ReactNode> = {
+    storyboard: <Clapperboard className="w-4 h-4" />,
+    script: <FileText className="w-4 h-4" />,
+    "scene-direction": <Camera className="w-4 h-4" />,
+    soundtrack: <Music className="w-4 h-4" />,
+  };
+
+  const typeColors: Record<string, string> = {
+    storyboard: "text-violet-400 bg-violet-500/10",
+    script: "text-amber-400 bg-amber-500/10",
+    "scene-direction": "text-cyan-400 bg-cyan-500/10",
+    soundtrack: "text-emerald-400 bg-emerald-500/10",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <FolderOpen className="w-5 h-5 text-violet-400" /> My Projects
+        </h3>
+        <div className="flex gap-1.5">
+          {[
+            { id: "all", label: "All" },
+            { id: "storyboard", label: "Storyboards" },
+            { id: "script", label: "Scripts" },
+            { id: "scene-direction", label: "Scenes" },
+            { id: "soundtrack", label: "Soundtracks" },
+          ].map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setTypeFilter(f.id)}
+              className={`px-3 py-1 text-xs rounded-full transition-all ${
+                typeFilter === f.id
+                  ? "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                  : "bg-background/30 text-muted-foreground border border-border/40 hover:border-violet-500/30"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+        </div>
+      )}
+
+      {data && data.projects.length === 0 && (
+        <div className="text-center py-12 border border-dashed border-border/40 rounded-xl">
+          <FolderOpen className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">No saved projects yet</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Generate a storyboard or script and save it here</p>
+        </div>
+      )}
+
+      {data && data.projects.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.projects.map((project: any) => (
+            <div
+              key={project.id}
+              className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-violet-500/30 transition-colors group"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${typeColors[project.type] || "bg-muted"}`}>
+                  {typeIcons[project.type]}
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400"
+                  onClick={() => deleteProject.mutate({ id: project.id })}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <h4 className="text-sm font-semibold text-foreground line-clamp-1">{project.title}</h4>
+              {project.description && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+              )}
+              <div className="flex items-center gap-2 mt-3">
+                <Badge variant="outline" className="text-xs capitalize">{project.type.replace("-", " ")}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(project.updatedAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data && data.total > 20 && (
+        <p className="text-xs text-center text-muted-foreground">Showing {data.projects.length} of {data.total} projects</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Template Browser Section ────────────────────────────────────
+function TemplateBrowserSection() {
+  const [, navigate] = useLocation();
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: templates, isLoading } = trpc.videoProject.templates.useQuery(
+    categoryFilter === "all" ? {} : { category: categoryFilter }
+  );
+
+  const filteredTemplates = useMemo(() => {
+    if (!templates) return [];
+    if (!searchQuery.trim()) return templates;
+    const q = searchQuery.toLowerCase();
+    return templates.filter(
+      (t: any) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
+    );
+  }, [templates, searchQuery]);
+
+  const categoryIcons: Record<string, React.ReactNode> = {
+    commercial: <Rocket className="w-3.5 h-3.5" />,
+    education: <GraduationCap className="w-3.5 h-3.5" />,
+    entertainment: <Music className="w-3.5 h-3.5" />,
+    social: <Smartphone className="w-3.5 h-3.5" />,
+    narrative: <Film className="w-3.5 h-3.5" />,
+    atmosphere: <Waves className="w-3.5 h-3.5" />,
+  };
+
+  const toolTypeMap: Record<string, string> = {
+    storyboard: "storyboard",
+    script: "script",
+    "scene-direction": "director",
+    soundtrack: "soundtrack",
+  };
+
+  const handleUseTemplate = (template: any) => {
+    // Navigate to the Video Studio and switch to the correct tab
+    // We'll use URL search params to pass template data
+    const tab = toolTypeMap[template.toolType] || "storyboard";
+    toast.success(`Template "${template.name}" loaded! Switch to the ${tab} tab to see it.`);
+    // Store template in sessionStorage for the tab to pick up
+    sessionStorage.setItem("videoTemplate", JSON.stringify(template));
+    navigate("/video-studio");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <LayoutTemplate className="w-5 h-5 text-amber-400" /> Template Library
+        </h3>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search templates..."
+              className="h-8 pl-8 w-48 text-xs bg-background/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 flex-wrap">
+        {[
+          { id: "all", label: "All" },
+          { id: "commercial", label: "Commercial" },
+          { id: "education", label: "Education" },
+          { id: "entertainment", label: "Entertainment" },
+          { id: "social", label: "Social" },
+          { id: "narrative", label: "Narrative" },
+          { id: "atmosphere", label: "Atmosphere" },
+        ].map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setCategoryFilter(cat.id)}
+            className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${
+              categoryFilter === cat.id
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+            }`}
+          >
+            {cat.id !== "all" && categoryIcons[cat.id]}
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+        </div>
+      )}
+
+      {filteredTemplates.length === 0 && !isLoading && (
+        <div className="text-center py-12 border border-dashed border-border/40 rounded-xl">
+          <LayoutTemplate className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">No templates match your search</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredTemplates.map((template: any) => (
+          <div
+            key={template.id}
+            className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-amber-500/30 transition-all group cursor-pointer"
+            onClick={() => handleUseTemplate(template)}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="text-2xl">{template.icon}</div>
+              <Badge variant="outline" className="text-xs capitalize">{template.category}</Badge>
+            </div>
+            <h4 className="text-sm font-semibold text-foreground">{template.name}</h4>
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{template.description}</p>
+            <div className="flex items-center justify-between mt-3">
+              <Badge variant="outline" className="text-xs capitalize">{template.toolType.replace("-", " ")}</Badge>
+              <span className="text-xs text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                Use Template <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Video Studio Page ───────────────────────────────────────
 export default function VideoStudio() {
   const { user } = useAuth();
@@ -722,12 +1132,12 @@ export default function VideoStudio() {
                 <Layers className="w-3 h-3 mr-1" /> All AI Tools
               </Badge>
             </Link>
-            <Link href="/tools/video-style-transfer">
+            <Link href="/video-studio/style-transfer">
               <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
                 <Palette className="w-3 h-3 mr-1" /> Video Style Transfer
               </Badge>
             </Link>
-            <Link href="/tools/video-upscaler">
+            <Link href="/video-studio/upscaler">
               <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
                 <Maximize className="w-3 h-3 mr-1" /> Video Upscaler
               </Badge>
@@ -750,12 +1160,20 @@ export default function VideoStudio() {
             <TabsTrigger value="soundtrack" className="gap-1.5 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-300">
               <Music className="w-4 h-4" /> Soundtrack
             </TabsTrigger>
+            <TabsTrigger value="projects" className="gap-1.5 data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-300">
+              <FolderOpen className="w-4 h-4" /> My Projects
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-1.5 data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-300">
+              <LayoutTemplate className="w-4 h-4" /> Templates
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="storyboard"><StoryboardTab /></TabsContent>
           <TabsContent value="director"><SceneDirectorTab /></TabsContent>
           <TabsContent value="script"><ScriptWriterTab /></TabsContent>
           <TabsContent value="soundtrack"><SoundtrackTab /></TabsContent>
+          <TabsContent value="projects"><MyProjectsSection /></TabsContent>
+          <TabsContent value="templates"><TemplateBrowserSection /></TabsContent>
         </Tabs>
       </div>
     </PageLayout>

@@ -313,3 +313,36 @@
 ### Testing
 - [x] Vitest tests for all 6 video endpoints (22 tests, all passing)
 - [x] Final verification and checkpoint (199 tests, all passing, 0 TS errors)
+
+## Phase 12 — Video Project Persistence, PDF Export & Template Library
+
+### Video Project Persistence
+- [x] Add videoProjects table to database schema (id, userId, type, title, data JSON, createdAt, updatedAt)
+- [x] Push database migration
+- [x] Backend: saveVideoProject endpoint (create/update)
+- [x] Backend: listVideoProjects endpoint (list user's saved projects)
+- [x] Backend: getVideoProject endpoint (load single project)
+- [x] Backend: deleteVideoProject endpoint
+- [x] Frontend: "Save Project" button on Storyboard and Script tool pages
+- [x] Frontend: "My Projects" section in Video Studio hub with project cards
+- [x] Frontend: Load saved project back into the tool page for editing
+
+### PDF Export
+- [x] Client-side PDF export using jsPDF (no server endpoint needed)
+- [x] PDF layout for storyboards: title, synopsis, scene cards with descriptions
+- [x] PDF layout for scripts: title, logline, scene breakdowns with camera directions and dialogue
+- [x] Frontend: "Download PDF" button on completed storyboard and script results
+
+### Template Library
+- [x] Define template data structure (id, name, category, description, prefilled inputs)
+- [x] Create 12+ pre-built templates across categories (product launch, tutorial, music video, documentary, social media, commercial, narrative, etc.)
+- [x] Backend: listTemplates endpoint (with category filter)
+- [x] Frontend: Template browser/gallery in Video Studio hub
+- [x] Frontend: "Use Template" flow that pre-fills tool page inputs
+- [x] Template cards with category badges, descriptions, and preview of prefilled values
+
+### Testing
+- [x] Vitest tests for video project CRUD endpoints (19 tests)
+- [x] Vitest tests for PDF export (client-side, covered by exportData endpoint test)
+- [x] Vitest tests for template listing endpoint
+- [x] Final verification and checkpoint (218 tests passing, 0 TS errors)

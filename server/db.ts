@@ -8,6 +8,7 @@ import {
   generationTags,
   galleryItems,
   moderationQueue,
+  videoProjects,
   type InsertGeneration,
   type InsertTag,
   type InsertGalleryItem,
@@ -698,4 +699,93 @@ export async function getGalleryStats() {
     totalGenerations: genCount[0]?.total ?? 0,
     totalViews: viewSum[0]?.total ?? 0,
   };
+}
+
+// ─── Video Project Helpers ──────────────────────────────────────────────────
+
+export async function createVideoProject(project: {
+  userId: number;
+  type: "storyboard" | "script" | "scene-direction" | "soundtrack";
+  title: string;
+  description?: string;
+  data: unknown;
+  thumbnailUrl?: string;
+  templateId?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(videoProjects).values(project);
+  const id = result[0].insertId;
+  return { id };
+}
+
+export async function updateVideoProject(
+  id: number,
+  userId: number,
+  updates: {
+    title?: string;
+    description?: string;
+    data?: unknown;
+    thumbnailUrl?: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(videoProjects)
+    .set(updates)
+    .where(and(eq(videoProjects.id, id), eq(videoProjects.userId, userId)));
+  return { success: true };
+}
+
+export async function getVideoProject(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(videoProjects)
+    .where(and(eq(videoProjects.id, id), eq(videoProjects.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listVideoProjects(
+  userId: number,
+  opts?: { type?: string; limit?: number; offset?: number }
+) {
+  const db = await getDb();
+  if (!db) return { projects: [], total: 0 };
+
+  const conditions = [eq(videoProjects.userId, userId)];
+  if (opts?.type) {
+    conditions.push(eq(videoProjects.type, opts.type as any));
+  }
+
+  const whereClause = and(...conditions);
+  const rows = await db
+    .select()
+    .from(videoProjects)
+    .where(whereClause)
+    .orderBy(desc(videoProjects.updatedAt))
+    .limit(opts?.limit ?? 20)
+    .offset(opts?.offset ?? 0);
+
+  const totalResult = await db
+    .select({ count: count() })
+    .from(videoProjects)
+    .where(whereClause);
+
+  return {
+    projects: rows,
+    total: totalResult[0]?.count ?? 0,
+  };
+}
+
+export async function deleteVideoProject(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .delete(videoProjects)
+    .where(and(eq(videoProjects.id, id), eq(videoProjects.userId, userId)));
+  return { success: true };
 }

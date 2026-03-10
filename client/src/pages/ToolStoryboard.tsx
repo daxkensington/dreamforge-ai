@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Download, LayoutGrid, Clapperboard, Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { exportStoryboardPdf } from "@/lib/pdfExport";
+import { Loader2, Download, LayoutGrid, Clapperboard, Sparkles, Save } from "lucide-react";
 
 const STYLES = [
   { id: "cinematic", label: "Cinematic" },
@@ -25,8 +29,11 @@ export default function ToolStoryboard() {
   const [aspectRatio, setAspectRatio] = useState<string>("16:9");
   const [sceneCount, setSceneCount] = useState<number>(4);
   const [generateImages, setGenerateImages] = useState(true);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
 
   const storyboard = trpc.video.generateStoryboard.useMutation();
+  const saveProject = trpc.videoProject.save.useMutation();
 
   const handleGenerate = () => {
     if (!concept.trim()) return;
@@ -37,6 +44,35 @@ export default function ToolStoryboard() {
       style: style as any,
       generateImages,
     });
+  };
+
+  const handleSave = () => {
+    if (!storyboard.data || storyboard.data.status !== "completed") return;
+    saveProject.mutate({
+      type: "storyboard",
+      title: saveTitle || storyboard.data.title || "Untitled Storyboard",
+      description: storyboard.data.synopsis || concept.slice(0, 200),
+      data: storyboard.data,
+    }, {
+      onSuccess: () => {
+        toast.success("Storyboard saved to My Projects");
+        setSaveDialogOpen(false);
+        setSaveTitle("");
+      },
+      onError: () => toast.error("Failed to save storyboard"),
+    });
+  };
+
+  const handleExportPdf = () => {
+    if (!storyboard.data || storyboard.data.status !== "completed") return;
+    exportStoryboardPdf({
+      title: storyboard.data.title,
+      synopsis: storyboard.data.synopsis,
+      totalDuration: storyboard.data.totalDuration,
+      style,
+      scenes: storyboard.data.scenes,
+    });
+    toast.success("PDF downloaded");
   };
 
   return (
@@ -156,12 +192,18 @@ export default function ToolStoryboard() {
         {/* Results */}
         {storyboard.data && storyboard.data.status === "completed" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="text-lg font-semibold">{storyboard.data.title || "Your Storyboard"}</h3>
                 <p className="text-sm text-muted-foreground">{storyboard.data.synopsis || `${storyboard.data.scenes.length} scenes generated`}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Button size="sm" variant="outline" onClick={() => { setSaveTitle(storyboard.data?.title || ""); setSaveDialogOpen(true); }}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> Save
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleExportPdf}>
+                  <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                </Button>
                 <Badge variant="outline" className="capitalize">{style}</Badge>
                 {storyboard.data.totalDuration > 0 && (
                   <Badge variant="outline">{storyboard.data.totalDuration}s total</Badge>
@@ -227,6 +269,28 @@ export default function ToolStoryboard() {
           </div>
         )}
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Storyboard</DialogTitle>
+            <DialogDescription>Save this storyboard to your projects for later editing and export.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={saveTitle}
+            onChange={(e) => setSaveTitle(e.target.value)}
+            placeholder="Project title"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saveProject.isPending}>
+              {saveProject.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ToolPageLayout>
   );
 }
