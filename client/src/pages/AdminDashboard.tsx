@@ -37,6 +37,10 @@ import {
   Eye,
   Activity,
   Zap,
+  Webhook,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 ChartJS.register(
@@ -107,6 +111,8 @@ export default function AdminDashboard() {
   const [analyticsPeriod, setAnalyticsPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [notifTitle, setNotifTitle] = useState("");
   const [notifMessage, setNotifMessage] = useState("");
+  const [webhookPage, setWebhookPage] = useState(1);
+  const [webhookStatusFilter, setWebhookStatusFilter] = useState<"processed" | "failed" | "ignored" | undefined>(undefined);
   const utils = trpc.useUtils();
 
   const { data: stats } = trpc.admin.getPlatformStats.useQuery(undefined, {
@@ -147,6 +153,11 @@ export default function AdminDashboard() {
     onSuccess: () => { toast.success("System notification sent to all users"); setNotifTitle(""); setNotifMessage(""); },
     onError: (err) => toast.error(err.message),
   });
+
+  const { data: webhookData, isLoading: webhooksLoading } = trpc.admin.getWebhookEvents.useQuery(
+    { page: webhookPage, limit: 20, status: webhookStatusFilter },
+    { enabled: !!user && user.role === "admin" }
+  );
 
   // Chart data for Generation Volume
   const genChartData = useMemo(() => {
@@ -334,6 +345,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Users</TabsTrigger>
             <TabsTrigger value="moderation"><Shield className="w-4 h-4 mr-2" />Moderation</TabsTrigger>
             <TabsTrigger value="broadcast"><Send className="w-4 h-4 mr-2" />Broadcast</TabsTrigger>
+            <TabsTrigger value="webhooks"><Webhook className="w-4 h-4 mr-2" />Webhooks</TabsTrigger>
           </TabsList>
 
           {/* Analytics Tab */}
@@ -671,6 +683,163 @@ export default function AdminDashboard() {
                   <Send className="w-4 h-4 mr-2" />
                   {sendNotif.isPending ? "Sending..." : "Send to All Users"}
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Webhooks Tab */}
+          <TabsContent value="webhooks">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Webhook className="w-5 h-5" />
+                      Stripe Webhook Events
+                    </CardTitle>
+                    <CardDescription>
+                      {webhookData?.total || 0} total events logged
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={!webhookStatusFilter ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { setWebhookStatusFilter(undefined); setWebhookPage(1); }}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={webhookStatusFilter === "processed" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { setWebhookStatusFilter("processed"); setWebhookPage(1); }}
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" /> Processed
+                    </Button>
+                    <Button
+                      variant={webhookStatusFilter === "failed" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { setWebhookStatusFilter("failed"); setWebhookPage(1); }}
+                    >
+                      <XCircle className="w-3 h-3 mr-1" /> Failed
+                    </Button>
+                    <Button
+                      variant={webhookStatusFilter === "ignored" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => { setWebhookStatusFilter("ignored"); setWebhookPage(1); }}
+                    >
+                      <AlertTriangle className="w-3 h-3 mr-1" /> Ignored
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => utils.admin.getWebhookEvents.invalidate()}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {webhooksLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-16 rounded-lg bg-muted/30 animate-pulse" />
+                    ))}
+                  </div>
+                ) : !webhookData?.events?.length ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Webhook className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>No webhook events recorded yet</p>
+                    <p className="text-sm mt-1">Events will appear here when Stripe sends webhooks</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {webhookData.events.map((event: any) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`p-1.5 rounded-md ${
+                            event.status === "processed"
+                              ? "bg-green-500/10 text-green-500"
+                              : event.status === "failed"
+                              ? "bg-red-500/10 text-red-500"
+                              : "bg-yellow-500/10 text-yellow-500"
+                          }`}>
+                            {event.status === "processed" ? (
+                              <CheckCircle className="w-4 h-4" />
+                            ) : event.status === "failed" ? (
+                              <XCircle className="w-4 h-4" />
+                            ) : (
+                              <AlertTriangle className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-mono font-medium truncate">
+                                {event.eventType}
+                              </span>
+                              <Badge
+                                variant={
+                                  event.status === "processed"
+                                    ? "default"
+                                    : event.status === "failed"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                                className="text-[10px]"
+                              >
+                                {event.status}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground font-mono truncate">
+                                {event.stripeEventId}
+                              </span>
+                              {event.error && (
+                                <span className="text-xs text-destructive truncate max-w-[200px]">
+                                  {event.error}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+                          {new Date(event.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Pagination */}
+                    {webhookData.total > 20 && (
+                      <div className="flex items-center justify-between pt-4">
+                        <span className="text-sm text-muted-foreground">
+                          Page {webhookPage} of {Math.ceil(webhookData.total / 20)}
+                        </span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={webhookPage <= 1}
+                            onClick={() => setWebhookPage((p) => p - 1)}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={webhookPage >= Math.ceil(webhookData.total / 20)}
+                            onClick={() => setWebhookPage((p) => p + 1)}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

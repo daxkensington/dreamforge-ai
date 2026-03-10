@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { Express, Request, Response } from "express";
 import { getDb } from "./db";
 import { createNotification } from "./routersPhase15";
-import { creditBalances, creditTransactions } from "../drizzle/schema";
+import { creditBalances, creditTransactions, webhookEvents } from "../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 
 // ─── Stripe Client ─────────────────────────────────────────────────────────
@@ -268,6 +268,24 @@ export function registerStripeWebhook(app: Express) {
         return res.json({ verified: true });
       }
 
+      // Log the webhook event
+      const logWebhookEvent = async (status: "processed" | "failed" | "ignored", summary: string, errorMsg?: string) => {
+        try {
+          const db = await getDb();
+          if (db) {
+            await db.insert(webhookEvents).values({
+              eventId: event.id,
+              eventType: event.type,
+              status,
+              summary,
+              errorMessage: errorMsg || null,
+            });
+          }
+        } catch (logErr) {
+          console.error("[Stripe Webhook] Failed to log event:", logErr);
+        }
+      };
+
       try {
         switch (event.type) {
           case "checkout.session.completed": {
@@ -308,9 +326,18 @@ export function registerStripeWebhook(app: Express) {
 
           default:
             console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+            await logWebhookEvent("ignored", `Unhandled event type: ${event.type}`);
+        }
+        // Log successful processing (for handled events)
+        if (event.type !== "payment_intent.succeeded" && event.type.startsWith("checkout.")) {
+          const session = event.data.object as any;
+          await logWebhookEvent("processed", `Checkout completed for user ${session.metadata?.user_id}, ${session.metadata?.credits} credits`);
+        } else if (event.type === "payment_intent.succeeded") {
+          await logWebhookEvent("processed", `Payment intent succeeded: ${(event.data.object as any).id}`);
         }
       } catch (err: any) {
         console.error("[Stripe Webhook] Error processing event:", err.message);
+        await logWebhookEvent("failed", `Error processing ${event.type}`, err.message);
         return res.status(500).json({ error: "Webhook processing error" });
       }
 

@@ -9,6 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Wand2,
   Menu,
@@ -26,13 +33,14 @@ import {
   Search,
   Palette,
   Key,
-  Code,
   Bell,
   Coins,
   BarChart3,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 const navLinks = [
   { href: "/tools", label: "AI Tools", icon: Wrench },
@@ -41,7 +49,6 @@ const navLinks = [
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/batch", label: "Batch", icon: Layers, auth: true },
   { href: "/characters", label: "Characters", icon: Users, auth: true },
-  { href: "/credits", label: "Credits", icon: Coins, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
 ];
 
@@ -49,6 +56,40 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const welcomeShown = useRef(false);
+
+  // Fetch credit balance for authenticated users
+  const { data: balanceData } = trpc.credits.getBalance.useQuery(undefined, {
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // refresh every 30s
+  });
+
+  // Fetch unread notification count
+  const { data: notifData } = trpc.notifications.list.useQuery(
+    { unreadOnly: true, limit: 1 },
+    {
+      enabled: isAuthenticated,
+      refetchInterval: 15000, // refresh every 15s
+    }
+  );
+
+  const unreadCount = notifData?.unreadCount || 0;
+  const creditBalance = balanceData?.balance ?? null;
+
+  // Show welcome toast for new users
+  useEffect(() => {
+    if (welcomeShown.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("welcome") === "true" && isAuthenticated) {
+      welcomeShown.current = true;
+      toast.success("Welcome to DreamForge!", {
+        description: "You've received 50 free credits to start creating. Explore our AI tools and bring your ideas to life!",
+        duration: 8000,
+      });
+      // Clean URL
+      window.history.replaceState({}, "", "/");
+    }
+  }, [isAuthenticated]);
 
   const isToolsActive = location.startsWith("/tools");
   const isVideoStudioActive = location.startsWith("/video-studio");
@@ -74,7 +115,16 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
-            const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : link.href === "/characters" ? isCharactersActive : location === link.href;
+            const isActive =
+              link.href === "/tools"
+                ? isToolsActive
+                : link.href === "/video-studio"
+                ? isVideoStudioActive
+                : link.href === "/batch"
+                ? isBatchActive
+                : link.href === "/characters"
+                ? isCharactersActive
+                : location === link.href;
             return (
               <Link
                 key={link.href}
@@ -90,18 +140,59 @@ export default function Navbar() {
               </Link>
             );
           })}
+
+          {/* Credit Balance Pill */}
+          {isAuthenticated && creditBalance !== null && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="/credits"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                      creditBalance <= 10
+                        ? "bg-destructive/10 text-destructive border border-destructive/20 animate-pulse"
+                        : creditBalance <= 30
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                    }`}
+                  >
+                    <Coins className="h-3.5 w-3.5" />
+                    {creditBalance.toLocaleString()}
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {creditBalance} credits remaining
+                    {creditBalance <= 10 && " — Running low! Buy more credits."}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          {/* Notification Bell with Badge */}
           {isAuthenticated && (
             <Link
               href="/notifications"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location === "/notifications"
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
               <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] font-bold flex items-center justify-center rounded-full"
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Badge>
+              )}
             </Link>
           )}
+
+          {/* Admin Link */}
           {isAuthenticated && user?.role === "admin" && (
             <Link
               href="/admin"
@@ -134,6 +225,14 @@ export default function Navbar() {
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium truncate">{user?.name || "Creator"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
+                  {creditBalance !== null && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Coins className="h-3 w-3 text-primary" />
+                      <span className="text-xs font-semibold text-primary">
+                        {creditBalance.toLocaleString()} credits
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -193,13 +292,18 @@ export default function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/credits" className="flex items-center gap-2 cursor-pointer">
                     <Coins className="h-4 w-4" />
-                    Credits
+                    Credits & Billing
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/notifications" className="flex items-center gap-2 cursor-pointer">
                     <Bell className="h-4 w-4" />
                     Notifications
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-[10px]">
+                        {unreadCount}
+                      </Badge>
+                    )}
                   </Link>
                 </DropdownMenuItem>
                 {user?.role === "admin" && (
@@ -244,9 +348,32 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl">
           <nav className="container py-4 flex flex-col gap-1">
+            {/* Mobile Credit Balance */}
+            {isAuthenticated && creditBalance !== null && (
+              <Link
+                href="/credits"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-between px-4 py-3 rounded-lg bg-primary/5 border border-primary/10 mb-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-primary">
+                    {creditBalance.toLocaleString()} credits
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">Tap to manage</span>
+              </Link>
+            )}
             {navLinks.map((link) => {
               if (link.auth && !isAuthenticated) return null;
-              const isActive = link.href === "/tools" ? isToolsActive : link.href === "/video-studio" ? isVideoStudioActive : link.href === "/batch" ? isBatchActive : location === link.href;
+              const isActive =
+                link.href === "/tools"
+                  ? isToolsActive
+                  : link.href === "/video-studio"
+                  ? isVideoStudioActive
+                  : link.href === "/batch"
+                  ? isBatchActive
+                  : location === link.href;
               return (
                 <Link
                   key={link.href}
@@ -263,18 +390,37 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            {isAuthenticated && user?.role === "admin" && (
+            {isAuthenticated && (
               <Link
-                href="/moderation"
+                href="/notifications"
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  location === "/moderation"
+                  location === "/notifications"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                <Bell className="h-4 w-4" />
+                Notifications
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-[10px]">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Link>
+            )}
+            {isAuthenticated && user?.role === "admin" && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  location === "/admin"
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 <Shield className="h-4 w-4" />
-                Moderation
+                Admin
               </Link>
             )}
           </nav>

@@ -570,3 +570,30 @@
 - [x] Test notification triggers fire correctly
 - [x] Verify admin charts render with mock data
 - [x] Final verification — all tests passing, 0 TS errors
+
+## Phase 17 — Navbar Credits, Webhook Logging, Onboarding Credits
+
+### Credit Balance in Navbar
+- [x] Backend: getMyBalance endpoint (returns current credit balance)
+- [x] Frontend: Credit balance badge in Navbar (coin icon + count)
+- [x] Auto-refresh balance after generation or purchase
+- [x] Link badge to /credits page
+
+### Webhook Event Logging
+- [x] Add webhookEvents table (id, eventId, eventType, payload summary, status, createdAt)
+- [x] Log all Stripe webhook events in the handler
+- [x] Backend: admin.listWebhookEvents endpoint with filters
+- [x] Frontend: Webhook log panel in admin dashboard (table with event type, status, timestamp)
+- [x] Filter by event type and date range
+
+### Onboarding Free Credits
+- [x] Auto-grant 50 starter credits on first user sign-up
+- [x] Backend: detect first login in OAuth callback and create credit balance
+- [x] Show welcome toast with credit info on first login
+- [x] Prevent duplicate grants on subsequent logins
+
+### Testing & Verification
+- [x] Test credit balance endpoint
+- [x] Test webhook event logging
+- [x] Test onboarding credit grant
+- [x] Final verification — all tests passing, 0 TS errors

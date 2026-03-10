@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { getOrCreateBalance } from "../stripe";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -28,6 +29,10 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      // Check if user already exists (for onboarding credits)
+      const existingUser = await db.getUserByOpenId(userInfo.openId);
+      const isNewUser = !existingUser;
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
@@ -35,6 +40,21 @@ export function registerOAuthRoutes(app: Express) {
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: new Date(),
       });
+
+      // Grant onboarding credits for new users
+      if (isNewUser) {
+        try {
+          const user = await db.getUserByOpenId(userInfo.openId);
+          if (user) {
+            // getOrCreateBalance auto-grants 50 starter credits
+            await getOrCreateBalance(user.id);
+            console.log(`[OAuth] Granted 50 onboarding credits to new user ${user.id} (${userInfo.name})`);
+          }
+        } catch (creditErr) {
+          console.error("[OAuth] Failed to grant onboarding credits:", creditErr);
+          // Don't block login if credit grant fails
+        }
+      }
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
@@ -44,7 +64,9 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.redirect(302, "/");
+      // Redirect with isNew flag so frontend can show welcome toast
+      const redirectUrl = isNewUser ? "/?welcome=true" : "/";
+      res.redirect(302, redirectUrl);
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

@@ -11,6 +11,7 @@ import {
   generations,
   galleryItems,
   moderationQueue,
+  webhookEvents,
 } from "../drizzle/schema";
 import { eq, sql, desc, and, like, count } from "drizzle-orm";
 import {
@@ -502,6 +503,46 @@ export const adminRouter = router({
         .orderBy(sql`DATE_FORMAT(${creditTransactions.createdAt}, ${dateFormat})`);
 
       return results;
+    }),
+
+  getWebhookEvents: adminProcedure
+    .input(
+      z.object({
+        page: z.number().min(1).optional(),
+        limit: z.number().min(1).max(100).optional(),
+        status: z.enum(["processed", "failed", "ignored"]).optional(),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { events: [], total: 0 };
+
+      const page = input?.page || 1;
+      const limit = input?.limit || 30;
+      const offset = (page - 1) * limit;
+
+      let conditions: any[] = [];
+      if (input?.status) {
+        conditions.push(eq(webhookEvents.status, input.status));
+      }
+
+      const items = await db
+        .select()
+        .from(webhookEvents)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(webhookEvents.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const [total] = await db
+        .select({ count: count() })
+        .from(webhookEvents)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      return {
+        events: items,
+        total: total?.count || 0,
+      };
     }),
 
   sendSystemNotification: adminProcedure

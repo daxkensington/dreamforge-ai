@@ -350,6 +350,20 @@ export const notificationPreferences = mysqlTable("notificationPreferences", {
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
+// ─── Webhook Events ──────────────────────────────────────────────────────
+export const webhookEvents = mysqlTable("webhookEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: varchar("eventId", { length: 256 }).notNull().unique(),
+  eventType: varchar("eventType", { length: 128 }).notNull(),
+  status: mysqlEnum("webhookStatus", ["processed", "failed", "ignored"]).default("processed").notNull(),
+  summary: text("summary"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type InsertWebhookEvent = typeof webhookEvents.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),
