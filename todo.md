@@ -723,3 +723,32 @@
 - [x] Test budget creation, checking, and alerts
 - [x] Test achievement unlock logic
 - [x] Final verification — 426 tests passing, 0 TS errors
+
+## Phase 22 — Auto-Check Achievements, Budget Emails, Achievement Sharing
+
+### Auto-Check Achievements After Generation
+- [x] Wire checkAndUnlock into the generation flow (after successful credit deduction)
+- [x] Auto-check achievements silently after each generation completes
+- [x] Return newly unlocked achievements in generation response
+- [x] Frontend: Show achievement unlock toast after generation completes
+
+### Budget Notification Emails
+- [x] Backend: sendBudgetAlert helper using notification system
+- [x] Trigger email when daily budget hits alert threshold (e.g., 80%)
+- [x] Trigger email when weekly budget hits alert threshold
+- [x] Trigger email when budget is fully exhausted (100%)
+- [x] Frontend: Budget email notification toggle in Budget settings
+- [x] Prevent duplicate alerts (track last alert sent per period)
+
+### Achievement Sharing to Social Media
+- [x] Backend: getAchievementShareLinks endpoint (generates share URLs per achievement)
+- [x] Generate custom share text per achievement with badge name and description
+- [x] Frontend: Share button on each unlocked achievement badge
+- [x] Share modal with Twitter, WhatsApp, Telegram, email options
+- [x] Copy-to-clipboard for achievement share message
+
+### Testing & Verification
+- [x] Test auto-check achievements in generation flow
+- [x] Test budget email alert logic
+- [x] Test achievement share link generation
+- [x] Final verification — 441 tests passing, 0 TS errors

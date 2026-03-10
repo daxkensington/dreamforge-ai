@@ -765,6 +765,9 @@ function CreditBudgetSection() {
         </CardContent>
       </Card>
 
+      {/* Budget Email Notifications */}
+      <BudgetEmailCard />
+
       {/* Budget Usage Display */}
       {usage?.enabled && (
         <Card>
@@ -821,6 +824,114 @@ function CreditBudgetSection() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ─── Budget Email Card ─────────────────────────────────────────────────────
+function BudgetEmailCard() {
+  const { data, isLoading } = trpc.budgetEmail.getSettings.useQuery();
+  const utils = trpc.useUtils();
+
+  const updateEmail = trpc.budgetEmail.updateEmailSetting.useMutation({
+    onSuccess: () => {
+      toast.success("Budget email setting updated!");
+      utils.budgetEmail.getSettings.invalidate();
+    },
+    onError: () => toast.error("Failed to update setting"),
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-cyan-500/5">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <Mail className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Budget Alert Notifications</CardTitle>
+              <CardDescription>Get notified when you approach your spending limits</CardDescription>
+            </div>
+          </div>
+          <Switch
+            checked={data?.budgetEmailEnabled ?? true}
+            onCheckedChange={(checked) => updateEmail.mutate({ budgetEmailEnabled: checked })}
+            disabled={updateEmail.isPending}
+          />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>When enabled, you'll receive in-app notifications when:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Your daily spending reaches the alert threshold</li>
+            <li>Your weekly spending reaches the alert threshold</li>
+            <li>Your daily or weekly budget is fully exhausted</li>
+          </ul>
+          <p className="text-xs mt-3 text-muted-foreground/70">
+            Alerts are sent at most once per day per budget period to avoid notification fatigue.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Achievement Share Button ──────────────────────────────────────────────
+function AchievementShareButton({ achievementType }: { achievementType: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading } = trpc.achievementShare.getShareLinks.useQuery(
+    { achievementType },
+    { enabled: open }
+  );
+
+  if (!open) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="absolute top-1 right-1 p-1 rounded-full bg-background/80 hover:bg-background border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Share achievement"
+      >
+        <Share2 className="w-3 h-3" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 bg-background/95 rounded-lg flex flex-col items-center justify-center gap-2 z-10 p-2">
+      <div className="text-xs font-medium mb-1">Share</div>
+      {isLoading ? (
+        <div className="text-xs text-muted-foreground">Loading...</div>
+      ) : data?.shareLinks ? (
+        <div className="flex gap-2">
+          <a href={data.shareLinks.twitter} target="_blank" rel="noopener noreferrer"
+            className="p-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 transition-colors" title="Twitter">
+            <Twitter className="w-3.5 h-3.5 text-blue-500" />
+          </a>
+          <a href={data.shareLinks.whatsapp} target="_blank" rel="noopener noreferrer"
+            className="p-1.5 rounded-full bg-green-500/10 hover:bg-green-500/20 transition-colors" title="WhatsApp">
+            <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+          </a>
+          <a href={data.shareLinks.telegram} target="_blank" rel="noopener noreferrer"
+            className="p-1.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors" title="Telegram">
+            <Send className="w-3.5 h-3.5 text-cyan-500" />
+          </a>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(data.shareLinks!.copyText);
+              toast.success("Copied to clipboard!");
+            }}
+            className="p-1.5 rounded-full bg-muted hover:bg-muted/80 transition-colors" title="Copy">
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : null}
+      <button onClick={() => setOpen(false)} className="text-[10px] text-muted-foreground hover:text-foreground">
+        Close
+      </button>
     </div>
   );
 }
@@ -915,7 +1026,8 @@ function AchievementSection() {
                     <TooltipProvider key={a.type}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="p-3 rounded-lg border border-border/50 bg-gradient-to-br from-background to-muted/30 text-center hover:shadow-md transition-all cursor-default">
+                          <div className="relative group p-3 rounded-lg border border-border/50 bg-gradient-to-br from-background to-muted/30 text-center hover:shadow-md transition-all cursor-default">
+                            <AchievementShareButton achievementType={a.type} />
                             <div
                               className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
                               style={{ backgroundColor: `${a.color}20` }}

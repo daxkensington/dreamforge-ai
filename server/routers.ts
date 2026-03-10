@@ -85,6 +85,13 @@ import {
   creditBudgetRouter,
   achievementRouter,
 } from "./routers/phase21";
+import {
+  achievementShareRouter,
+  budgetEmailRouter,
+  autoAchievementRouter,
+  autoCheckAchievements,
+  checkAndSendBudgetAlerts,
+} from "./routers/phase22";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -415,7 +422,12 @@ export const appRouter = router({
           // Notify on completion
           try { await createNotification(ctx.user.id, "generation", "Generation Complete", `Your ${input.mediaType} "${input.prompt.slice(0, 40)}..." is ready!`); } catch {}
 
-          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType };
+          // Auto-check achievements and budget alerts (fire-and-forget)
+          const achievementPromise = autoCheckAchievements(ctx.user.id).catch(() => []);
+          checkAndSendBudgetAlerts(ctx.user.id).catch(() => {});
+          const newAchievements = await achievementPromise;
+
+          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements };
         } catch (error: any) {
           await updateGeneration(genId, {
             status: "failed",
@@ -2341,6 +2353,11 @@ export const appRouter = router({
   socialShare: socialShareRouter,
   creditBudget: creditBudgetRouter,
   achievement: achievementRouter,
+
+  // Phase 22
+  achievementShare: achievementShareRouter,
+  budgetEmail: budgetEmailRouter,
+  autoAchievement: autoAchievementRouter,
 
   export: router({
     metadata: protectedProcedure

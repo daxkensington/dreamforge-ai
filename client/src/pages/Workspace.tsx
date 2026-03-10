@@ -120,9 +120,20 @@ export default function Workspace() {
   );
 
   const generateMutation = trpc.generation.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       if (data.status === "completed") {
         toast.success(`${data.mediaType === "video" ? "Video" : "Image"} generation completed!`);
+        // Show achievement unlock toasts
+        if (data.newAchievements && data.newAchievements.length > 0) {
+          data.newAchievements.forEach((a: any) => {
+            setTimeout(() => {
+              toast.success(`\uD83C\uDFC6 Achievement Unlocked: ${a.name}!`, {
+                description: a.description,
+                duration: 6000,
+              });
+            }, 1500);
+          });
+        }
       } else if (data.status === "failed") {
         toast.error(`Generation failed: ${data.error || "Unknown error"}`);
       }

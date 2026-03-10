@@ -393,6 +393,9 @@ export const creditBudgets = mysqlTable("creditBudgets", {
   weeklyLimit: int("weeklyLimit"), // null = no weekly limit
   alertThreshold: int("alertThreshold").default(80).notNull(), // percentage (0-100)
   enabled: boolean("enabled").default(false).notNull(),
+  budgetEmailEnabled: boolean("budgetEmailEnabled").default(true).notNull(),
+  lastDailyAlertAt: timestamp("lastDailyAlertAt"),
+  lastWeeklyAlertAt: timestamp("lastWeeklyAlertAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
