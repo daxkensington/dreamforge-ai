@@ -481,3 +481,60 @@
 - [x] Vitest tests for API key management
 - [x] Vitest tests for prompt assistant endpoints
 - [x] Final verification — all tests passing, 0 TS errors
+
+## Phase 15 — Stripe Credits, Email Notifications, Admin Dashboard
+
+### Stripe Credits System
+- [x] Set up Stripe integration via webdev_add_feature
+- [x] Add creditBalances table (userId, balance, lifetimeSpent)
+- [x] Add creditTransactions table (userId, amount, type, stripeSessionId, description, createdAt)
+- [x] Add creditPackages configuration (starter, pro, enterprise tiers)
+- [x] Backend: getBalance endpoint
+- [x] Backend: createCheckoutSession endpoint (Stripe Checkout)
+- [x] Backend: Stripe webhook handler for payment confirmation
+- [x] Backend: deductCredits helper (called on generation)
+- [x] Backend: getCreditHistory endpoint
+- [x] Frontend: Credits display in navbar (balance badge)
+- [x] Frontend: Credits purchase page with package cards
+- [x] Frontend: Credit usage history page
+- [x] Frontend: Insufficient credits modal on generation attempt
+- [x] Integrate credit deduction into existing generation endpoints
+
+### Email Notifications
+- [x] Add notifications table (userId, type, title, message, read, metadata, createdAt)
+- [x] Add notificationPreferences table (userId, type, enabled)
+- [x] Backend: createNotification helper
+- [x] Backend: listNotifications endpoint (with unread count)
+- [x] Backend: markAsRead / markAllRead endpoints
+- [x] Backend: getNotificationPreferences / updatePreferences endpoints
+- [x] Backend: Trigger notifications on collaboration edits
+- [x] Backend: Trigger notifications on generation completion
+- [x] Backend: Trigger notifications on gallery comments
+- [x] Frontend: Bell icon in navbar with unread count badge
+- [x] Frontend: Notification dropdown/panel with notification list
+- [x] Frontend: Notification preferences page
+- [x] Frontend: Mark as read on click, mark all read button
+
+### Admin Dashboard
+- [x] Backend: adminProcedure middleware (role check)
+- [x] Backend: getPlatformStats endpoint (total users, generations, revenue)
+- [x] Backend: listAllUsers endpoint with search/filter
+- [x] Backend: updateUserRole endpoint
+- [x] Backend: banUser / unbanUser endpoints
+- [x] Backend: listFlaggedContent endpoint
+- [x] Backend: removeContent endpoint
+- [x] Backend: getGenerationAnalytics endpoint (daily/weekly/monthly charts)
+- [x] Backend: getRevenueAnalytics endpoint
+- [x] Frontend: Admin layout with sidebar navigation
+- [x] Frontend: Admin overview dashboard with stat cards and charts
+- [x] Frontend: User management page with table, search, role editing
+- [x] Frontend: Content moderation page with flagged items
+- [x] Frontend: Analytics page with generation and revenue charts
+- [x] Frontend: Admin route protection (redirect non-admins)
+
+### Testing & Verification
+- [x] Vitest tests for credit balance and transaction endpoints
+- [x] Vitest tests for Stripe checkout session creation
+- [x] Vitest tests for notification CRUD endpoints
+- [x] Vitest tests for admin endpoints (stats, users, moderation)
+- [x] Final verification — all tests passing, 0 TS errors

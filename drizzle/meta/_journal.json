@@ -43,6 +43,13 @@
       "when": 1773106123944,
       "tag": "0005_unusual_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1773107134364,
+      "tag": "0006_steady_korg",
+      "breakpoints": true
     }
   ]
 }

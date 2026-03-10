@@ -43,6 +43,9 @@ import ApiKeys from "./pages/ApiKeys";
 import SearchGenerations from "./pages/SearchGenerations";
 import ModelComparison from "./pages/ModelComparison";
 import ApiDocs from "./pages/ApiDocs";
+import Credits from "./pages/Credits";
+import Notifications from "./pages/Notifications";
+import AdminDashboard from "./pages/AdminDashboard";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 function Router() {
@@ -84,6 +87,9 @@ function Router() {
       <Route path="/api-docs" component={ApiDocs} />
       <Route path="/search" component={SearchGenerations} />
       <Route path="/models" component={ModelComparison} />
+      <Route path="/credits" component={Credits} />
+      <Route path="/notifications" component={Notifications} />
+      <Route path="/admin" component={AdminDashboard} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />

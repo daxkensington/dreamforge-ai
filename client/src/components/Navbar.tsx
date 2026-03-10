@@ -27,6 +27,9 @@ import {
   Palette,
   Key,
   Code,
+  Bell,
+  Coins,
+  BarChart3,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -38,6 +41,7 @@ const navLinks = [
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/batch", label: "Batch", icon: Layers, auth: true },
   { href: "/characters", label: "Characters", icon: Users, auth: true },
+  { href: "/credits", label: "Credits", icon: Coins, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
 ];
 
@@ -86,17 +90,29 @@ export default function Navbar() {
               </Link>
             );
           })}
-          {isAuthenticated && user?.role === "admin" && (
+          {isAuthenticated && (
             <Link
-              href="/moderation"
+              href="/notifications"
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location === "/moderation"
+                location === "/notifications"
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
-              <Shield className="h-4 w-4" />
-              Moderation
+              <Bell className="h-4 w-4" />
+            </Link>
+          )}
+          {isAuthenticated && user?.role === "admin" && (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                location === "/admin"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Admin
             </Link>
           )}
         </nav>
@@ -174,6 +190,26 @@ export default function Navbar() {
                     API Keys
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/credits" className="flex items-center gap-2 cursor-pointer">
+                    <Coins className="h-4 w-4" />
+                    Credits
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/notifications" className="flex items-center gap-2 cursor-pointer">
+                    <Bell className="h-4 w-4" />
+                    Notifications
+                  </Link>
+                </DropdownMenuItem>
+                {user?.role === "admin" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
+                      <BarChart3 className="h-4 w-4" />
+                      Admin Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}

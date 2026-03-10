@@ -59,6 +59,11 @@ import {
   searchRouter,
   apiKeyRouter,
 } from "./routersExtended";
+import {
+  creditsRouter,
+  notificationsRouter,
+  adminRouter,
+} from "./routersPhase15";
 
 // ─── Video Templates ─────────────────────────────────────────────────────────
 interface VideoTemplate {
@@ -2206,6 +2211,11 @@ export const appRouter = router({
   brandKit: brandKitRouter,
   search: searchRouter,
   apiKey: apiKeyRouter,
+
+  // ─── Phase 15 Routers ─────────────────────────────────────────────────
+  credits: creditsRouter,
+  notifications: notificationsRouter,
+  admin: adminRouter,
 
   export: router({
     metadata: protectedProcedure

@@ -293,6 +293,63 @@ export const sceneKeyframes = mysqlTable("sceneKeyframes", {
 export type SceneKeyframe = typeof sceneKeyframes.$inferSelect;
 export type InsertSceneKeyframe = typeof sceneKeyframes.$inferInsert;
 
+// ─── Credit Balances ──────────────────────────────────────────────────────
+export const creditBalances = mysqlTable("creditBalances", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  balance: int("balance").default(50).notNull(), // free starter credits
+  lifetimeSpent: int("lifetimeSpent").default(0).notNull(),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CreditBalance = typeof creditBalances.$inferSelect;
+export type InsertCreditBalance = typeof creditBalances.$inferInsert;
+
+// ─── Credit Transactions ─────────────────────────────────────────────────
+export const creditTransactions = mysqlTable("creditTransactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  amount: int("amount").notNull(), // positive = purchase, negative = usage
+  type: mysqlEnum("txType", ["purchase", "usage", "bonus", "refund"]).notNull(),
+  description: varchar("description", { length: 512 }),
+  stripeSessionId: varchar("stripeSessionId", { length: 256 }),
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type InsertCreditTransaction = typeof creditTransactions.$inferInsert;
+
+// ─── Notifications ────────────────────────────────────────────────────────
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("notifType", ["collaboration", "generation", "comment", "system", "payment"]).notNull(),
+  title: varchar("title", { length: 256 }).notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").default(false).notNull(),
+  metadata: json("metadata"), // extra data (projectId, generationId, etc.)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+// ─── Notification Preferences ─────────────────────────────────────────────
+export const notificationPreferences = mysqlTable("notificationPreferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("prefType", ["collaboration", "generation", "comment", "system", "payment"]).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),
