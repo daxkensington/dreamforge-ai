@@ -1,4 +1,34 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// Mock credit deduction
+vi.mock('./stripe', () => ({
+  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99 }),
+  CREDIT_COSTS: {
+    'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
+    'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,
+    'object-remove': 1, 'color-grade': 1, 'sketch-to-image': 1, 'image-merge': 2,
+    'prompt-assist': 0, 'storyboard': 3, 'scene-director': 3, 'video-style-transfer': 3,
+    'video-upscaler': 3, 'soundtrack-suggest': 1, 'text-to-video-script': 2,
+  },
+  getOrCreateBalance: vi.fn().mockResolvedValue({ balance: 100 }),
+  getCreditHistory: vi.fn().mockResolvedValue([]),
+  addCredits: vi.fn().mockResolvedValue(undefined),
+  createCheckoutSession: vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/test' }),
+  CREDIT_PACKAGES: [],
+}));
+
+// Mock image generation
+vi.mock('./_core/imageGeneration', () => ({
+  generateImage: vi.fn().mockResolvedValue({ url: 'https://cdn.example.com/result.png' }),
+}));
+
+// Mock LLM
+vi.mock('./_core/llm', () => ({
+  invokeLLM: vi.fn().mockResolvedValue({
+    choices: [{ message: { content: '{}' } }],
+  }),
+}));
+
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 

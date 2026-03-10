@@ -63,7 +63,29 @@ import {
   creditsRouter,
   notificationsRouter,
   adminRouter,
+  createNotification,
 } from "./routersPhase15";
+import { deductCredits, CREDIT_COSTS } from "./stripe";
+
+// ─── Credit Deduction Helper ────────────────────────────────────────────────
+async function tryDeductCredits(userId: number, tool: string, description?: string) {
+  const cost = CREDIT_COSTS[tool] || 1;
+  if (cost === 0) return { success: true, balance: 0, needed: 0 };
+  try {
+    const result = await deductCredits(userId, cost, description || `Used ${tool}`);
+    if (!result.success) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
+      });
+    }
+    return result;
+  } catch (e: any) {
+    if (e instanceof TRPCError) throw e;
+    // If credit system is unavailable, allow generation to proceed
+    return { success: true, balance: 0, needed: 0 };
+  }
+}
 
 // ─── Video Templates ─────────────────────────────────────────────────────────
 interface VideoTemplate {
@@ -332,6 +354,10 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Deduct credits
+        const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
+        await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`);
+
         // Create generation record
         const genId = await createGeneration({
           userId: ctx.user.id,
@@ -365,6 +391,9 @@ export const appRouter = router({
             imageUrl: url ?? null,
             thumbnailUrl: url ?? null,
           });
+
+          // Notify on completion
+          try { await createNotification(ctx.user.id, "generation", "Generation Complete", `Your ${input.mediaType} "${input.prompt.slice(0, 40)}..." is ready!`); } catch {}
 
           return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType };
         } catch (error: any) {
@@ -464,6 +493,9 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Deduct credits for animation
+        await tryDeductCredits(ctx.user.id, "animate", `Animated image #${input.sourceGenerationId}`);
+
         // Verify source generation exists and belongs to user
         const sourceGen = await getGenerationById(input.sourceGenerationId);
         if (!sourceGen) {
@@ -574,6 +606,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Deduct credits for entire batch upfront
+        const totalCost = input.prompts.reduce((sum, p) => {
+          return sum + (CREDIT_COSTS[p.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1);
+        }, 0);
+        await tryDeductCredits(ctx.user.id, "text-to-image", `Batch generation (${input.prompts.length} items)`);
+
         const results: Array<{ id: number; status: string; prompt: string; error?: string; imageUrl?: string | null }> = [];
 
         for (const item of input.prompts) {
@@ -722,7 +760,8 @@ export const appRouter = router({
           enhanceDetails: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "super-resolution", "Image upscale");
         try {
           const scaleLabel = input.scaleFactor === "4x" ? "ultra high resolution 4K" : "high resolution 2K";
           const detailBoost = input.enhanceDetails ? ", enhanced fine details, sharpened textures, crisp edges" : "";
@@ -759,7 +798,8 @@ export const appRouter = router({
           intensity: z.number().min(0.1).max(1.0).default(0.7),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "style-transfer", `Style transfer: ${input.style}`);
         const styleDescriptions: Record<string, string> = {
           "oil-painting": "rich oil painting with visible brushstrokes, thick impasto texture, classical fine art",
           "watercolor": "delicate watercolor painting with soft washes, bleeding edges, translucent layers on textured paper",
@@ -797,7 +837,8 @@ export const appRouter = router({
           replacementPrompt: z.string().max(500).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "background-edit", "Background edit");
         try {
           let prompt: string;
           if (input.mode === "remove") {
@@ -837,7 +878,8 @@ export const appRouter = router({
           replacementPrompt: z.string().max(500).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "background-edit", "Batch background process");
         const results: Array<{ imageUrl: string; resultUrl: string | null; status: string; error?: string }> = [];
 
         for (const imageUrl of input.images) {
@@ -898,7 +940,8 @@ export const appRouter = router({
           additionalDetails: z.string().max(500).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "prompt-assist", "Build prompt");
         try {
           const structuredInput = [
             `Subject: ${input.subject}`,
@@ -941,7 +984,8 @@ export const appRouter = router({
           includeComplementary: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "prompt-assist", "Extract palette");
         try {
           const result = await invokeLLM({
             messages: [
@@ -1046,7 +1090,8 @@ export const appRouter = router({
           ]).default("moderate"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-image", "Generate variations");
         const variationDescriptions: Record<string, string[]> = {
           "subtle": [
             "slightly different color temperature, warmer tones",
@@ -1111,7 +1156,8 @@ export const appRouter = router({
           preserveStyle: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-image", "Inpaint");
         try {
           const styleNote = input.preserveStyle ? " Maintain the exact same artistic style, lighting, and color palette as the original." : "";
           const regionNote = input.regionDescription ? ` Focus the edit on: ${input.regionDescription}.` : "";
@@ -1136,7 +1182,8 @@ export const appRouter = router({
           preserveIdentity: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "face-enhance", "Enhance face");
         const levelDescriptions: Record<string, string> = {
           "light": "subtle enhancement with minor sharpening, gentle skin smoothing, and slight detail improvement",
           "moderate": "balanced enhancement with clear sharpening, skin texture improvement, eye detail enhancement, and lighting correction",
@@ -1168,7 +1215,8 @@ export const appRouter = router({
           fillDescription: z.string().max(500).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-image", "Outpaint");
         const directionPrompts: Record<string, string> = {
           "up": "Extend the top of this image upward, seamlessly continuing the scene above",
           "down": "Extend the bottom of this image downward, seamlessly continuing the scene below",
@@ -1203,7 +1251,8 @@ export const appRouter = router({
           fillMethod: z.enum(["auto", "blur", "pattern"]).default("auto"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "object-remove", "Erase object");
         const fillMethods: Record<string, string> = {
           "auto": "Fill the removed area with contextually appropriate content that blends seamlessly with the surrounding scene",
           "blur": "Fill the removed area with a smooth blurred version of the surrounding colors",
@@ -1230,7 +1279,8 @@ export const appRouter = router({
           fontSize: z.enum(["small", "medium", "large", "extra-large"]).default("large"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-image", "Text effects");
         const effectDescriptions: Record<string, string> = {
           "fire": "blazing fire and flames, burning embers, orange and red glow, smoke wisps",
           "water": "flowing water and liquid, ocean waves, blue translucent, water droplets, reflections",
@@ -1276,7 +1326,8 @@ export const appRouter = router({
           blendStrength: z.number().min(0.1).max(1.0).default(0.5),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "image-merge", "Blend images");
         const blendDescriptions: Record<string, string> = {
           "merge": "Seamlessly merge these two images into a single cohesive composition, blending elements from both naturally",
           "double-exposure": "Create a cinematic double-exposure effect combining these two images, with one image overlaid transparently on the other like a film photography technique",
@@ -1309,7 +1360,8 @@ export const appRouter = router({
           detailLevel: z.enum(["low", "medium", "high"]).default("medium"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "sketch-to-image", "Sketch to image");
         const styleDescriptions: Record<string, string> = {
           "realistic": "photorealistic rendering, lifelike details, natural lighting, high-resolution photography quality",
           "digital-art": "polished digital art, clean lines, vibrant colors, professional illustration quality",
@@ -1344,7 +1396,8 @@ export const appRouter = router({
           intensity: z.number().min(0.1).max(1.0).default(0.7),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "color-grade", "Color grade");
         const gradeDescriptions: Record<string, string> = {
           "cinematic": "cinematic color grading with rich contrast, teal shadows and warm highlights, Hollywood blockbuster look",
           "vintage": "vintage film look with faded colors, warm amber tones, slight grain, 1970s photography feel",
@@ -1377,7 +1430,8 @@ export const appRouter = router({
           detailLevel: z.enum(["brief", "standard", "detailed"]).default("standard"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "prompt-assist", "Analyze image");
         const detailInstructions: Record<string, string> = {
           "brief": "Write a concise 1-2 sentence prompt capturing the essential subject and style.",
           "standard": "Write a detailed prompt of 2-4 sentences covering subject, style, mood, lighting, composition, and key details.",
@@ -1449,7 +1503,8 @@ export const appRouter = router({
           generateImages: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "storyboard", "Generate storyboard");
         try {
           const storyboardResult = await invokeLLM({
             messages: [
@@ -1532,7 +1587,8 @@ export const appRouter = router({
           mood: z.enum(["epic", "intimate", "tense", "dreamy", "energetic", "melancholic"]).default("epic"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "scene-director", "Direct scene");
         try {
           const directorResult = await invokeLLM({
             messages: [
@@ -1610,7 +1666,8 @@ export const appRouter = router({
           preserveMotion: z.boolean().default(true),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "video-style-transfer", "Video style transfer");
         const styleDescriptions: Record<string, string> = {
           "anime": "Japanese anime style, cel-shaded, vibrant colors, clean lines, Studio Ghibli quality",
           "noir": "film noir style, high contrast black and white, dramatic shadows, 1940s detective film",
@@ -1644,7 +1701,8 @@ export const appRouter = router({
           denoiseLevel: z.enum(["none", "light", "heavy"]).default("light"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "video-upscaler", "Video upscale");
         const denoiseDesc: Record<string, string> = {
           "none": "",
           "light": " Apply light denoising to clean up minor artifacts.",
@@ -1672,7 +1730,8 @@ export const appRouter = router({
           mood: z.enum(["epic", "calm", "tense", "happy", "sad", "mysterious", "energetic", "romantic"]).default("epic"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "soundtrack-suggest", "Suggest soundtrack");
         try {
           const result = await invokeLLM({
             messages: [
@@ -1743,7 +1802,8 @@ export const appRouter = router({
           tone: z.enum(["professional", "casual", "dramatic", "humorous", "inspirational"]).default("professional"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-video-script", "Generate script");
         try {
           const result = await invokeLLM({
             messages: [
@@ -1854,6 +1914,21 @@ export const appRouter = router({
               data: input.data,
               thumbnailUrl: input.thumbnailUrl ?? undefined,
             });
+          }
+          // Notify project owner if editor is a collaborator
+          if (collabRole === "editor" && project === null) {
+            try {
+              const ownerProject = await getVideoProject(input.id, ownerId);
+              if (ownerProject) {
+                await createNotification(
+                  ownerId,
+                  "collaboration",
+                  "Project Edited",
+                  `A collaborator edited your project "${input.title}"`,
+                  { projectId: input.id }
+                );
+              }
+            } catch {}
           }
           return { id: input.id, action: "updated" as const };
         }
@@ -1994,6 +2069,16 @@ export const appRouter = router({
           invitedBy: shareToken.createdBy,
         });
         await incrementShareTokenUse(shareToken.id);
+        // Notify project owner that someone joined
+        try {
+          await createNotification(
+            shareToken.createdBy,
+            "collaboration",
+            "New Collaborator",
+            `Someone joined your project via share link as ${shareToken.permission}`,
+            { projectId: shareToken.projectId }
+          );
+        } catch {}
         return { projectId: shareToken.projectId, role: shareToken.permission, action };
       }),
 

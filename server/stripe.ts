@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { Express, Request, Response } from "express";
 import { getDb } from "./db";
+import { createNotification } from "./routersPhase15";
 import { creditBalances, creditTransactions } from "../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -286,6 +287,16 @@ export function registerStripeWebhook(app: Express) {
               console.log(
                 `[Stripe Webhook] Added ${credits} credits to user ${userId}`
               );
+              // Notify user about successful payment
+              try {
+                await createNotification(
+                  userId,
+                  "payment",
+                  "Payment Successful",
+                  `Your purchase of ${credits} credits has been confirmed. Happy creating!`,
+                  { credits, packageId, sessionId: session.id }
+                );
+              } catch {}
             }
             break;
           }

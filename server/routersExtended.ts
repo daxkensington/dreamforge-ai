@@ -12,7 +12,8 @@ import {
   createSceneKeyframe, listSceneKeyframes, updateSceneKeyframe, deleteSceneKeyframes,
   searchGenerations,
 } from "./dbExtended";
-import { getVideoProject } from "./db";
+import { getVideoProject, getGenerationById } from "./db";
+import { createNotification } from "./routersPhase15";
 import { createHash, randomBytes } from "crypto";
 
 // ─── P0: Video Generation (Scene Keyframes) ────────────────────────────────
@@ -128,7 +129,21 @@ export const socialRouter = router({
       content: z.string().min(1).max(1000),
     }))
     .mutation(async ({ ctx, input }) => {
-      return addComment(ctx.user.id, input.galleryItemId, input.content);
+      const result = await addComment(ctx.user.id, input.galleryItemId, input.content);
+      // Notify the gallery item owner about the comment
+      try {
+        const gen = await getGenerationById(input.galleryItemId);
+        if (gen && gen.userId !== ctx.user.id) {
+          await createNotification(
+            gen.userId,
+            "comment",
+            "New Comment",
+            `Someone commented on your creation: "${input.content.slice(0, 60)}..."`,
+            { galleryItemId: input.galleryItemId }
+          );
+        }
+      } catch {}
+      return result;
     }),
 
   getComments: publicProcedure
@@ -147,7 +162,20 @@ export const socialRouter = router({
     .input(z.object({ userId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.id === input.userId) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot follow yourself" });
-      return toggleFollow(ctx.user.id, input.userId);
+      const result = await toggleFollow(ctx.user.id, input.userId);
+      // Notify user when someone follows them
+      if (result.following) {
+        try {
+          await createNotification(
+            input.userId,
+            "system",
+            "New Follower",
+            `You have a new follower!`,
+            { followerId: ctx.user.id }
+          );
+        } catch {}
+      }
+      return result;
     }),
 
   getFollowStatus: protectedProcedure

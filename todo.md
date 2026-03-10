@@ -538,3 +538,35 @@
 - [x] Vitest tests for notification CRUD endpoints
 - [x] Vitest tests for admin endpoints (stats, users, moderation)
 - [x] Final verification — all tests passing, 0 TS errors
+
+## Phase 16 — Credit Integration, Notification Triggers, Admin Charts
+
+### Credit Deduction Integration
+- [x] Wire deductCredits into generation.create endpoint (image + video)
+- [x] Wire deductCredits into all tools endpoints (upscale, style-transfer, bg-remove, etc.)
+- [x] Wire deductCredits into video tool endpoints (storyboard, scene-director, etc.)
+- [x] Wire deductCredits into batch generation endpoint
+- [x] Add insufficient credits error handling with clear user messaging
+- [x] Frontend: Show credit cost before generation, deduct on success
+
+### Notification Triggers
+- [x] Trigger notification when collaborator edits a shared project
+- [x] Trigger notification when someone comments on a gallery item
+- [x] Trigger notification when Stripe payment succeeds (via webhook)
+- [x] Trigger notification when generation completes (long-running jobs)
+- [x] Trigger notification when someone follows the user
+
+### Admin Analytics Charts
+- [x] Install and configure Chart.js for React
+- [x] Build generation volume chart (line chart, daily/weekly/monthly)
+- [x] Build revenue trend chart (bar chart, daily/weekly/monthly)
+- [x] Build user growth chart
+- [x] Build tool usage breakdown chart (pie/doughnut)
+- [x] Add period selector (daily/weekly/monthly) for all charts
+- [x] Responsive chart layout for admin dashboard
+
+### Testing & Verification
+- [x] Test credit deduction in generation endpoints
+- [x] Test notification triggers fire correctly
+- [x] Verify admin charts render with mock data
+- [x] Final verification — all tests passing, 0 TS errors
