@@ -385,6 +385,33 @@ export const referrals = mysqlTable("referrals", {
 export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = typeof referrals.$inferInsert;
 
+// ─── Credit Budgets ──────────────────────────────────────────────────────
+export const creditBudgets = mysqlTable("creditBudgets", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  dailyLimit: int("dailyLimit"), // null = no daily limit
+  weeklyLimit: int("weeklyLimit"), // null = no weekly limit
+  alertThreshold: int("alertThreshold").default(80).notNull(), // percentage (0-100)
+  enabled: boolean("enabled").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CreditBudget = typeof creditBudgets.$inferSelect;
+export type InsertCreditBudget = typeof creditBudgets.$inferInsert;
+
+// ─── Achievements ────────────────────────────────────────────────────────
+export const achievements = mysqlTable("achievements", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  achievementType: varchar("achievementType", { length: 64 }).notNull(),
+  unlockedAt: timestamp("unlockedAt").defaultNow().notNull(),
+  metadata: json("metadata"), // extra data (count, generation id, etc.)
+});
+
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertAchievement = typeof achievements.$inferInsert;
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
   generations: many(generations),

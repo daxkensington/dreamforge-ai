@@ -80,6 +80,11 @@ import {
   creditExpirationRouter,
   emailDigestRouter,
 } from "./routers/phase20";
+import {
+  socialShareRouter,
+  creditBudgetRouter,
+  achievementRouter,
+} from "./routers/phase21";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -2331,6 +2336,11 @@ export const appRouter = router({
   leaderboard: leaderboardRouter,
   creditExpiration: creditExpirationRouter,
   emailDigest: emailDigestRouter,
+
+  // Phase 21
+  socialShare: socialShareRouter,
+  creditBudget: creditBudgetRouter,
+  achievement: achievementRouter,
 
   export: router({
     metadata: protectedProcedure

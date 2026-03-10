@@ -85,6 +85,13 @@
       "when": 1773114574076,
       "tag": "0011_gray_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1773121303662,
+      "tag": "0012_steep_titania",
+      "breakpoints": true
     }
   ]
 }

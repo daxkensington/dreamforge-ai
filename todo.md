@@ -690,3 +690,36 @@
 - [x] Test credit expiration logic and warnings
 - [x] Test email digest delivery
 - [x] Final verification — 405 tests passing, 0 TS errors
+
+## Phase 21 — Social Sharing, Credit Budgets, Achievement Badges
+
+### Social Media Sharing for Referrals
+- [x] Backend: generateShareLinks endpoint (Twitter, WhatsApp, Telegram, email)
+- [x] Frontend: Share buttons row on Referrals tab with branded icons
+- [x] Copy-to-clipboard for custom share message with referral link
+- [x] Pre-formatted share messages per platform with referral code embedded
+
+### Credit Usage Budget/Limits
+- [x] Add creditBudget table (userId, dailyLimit, weeklyLimit, alertThreshold, enabled)
+- [x] Backend: getBudget / updateBudget endpoints
+- [x] Backend: checkBudget helper called before credit deduction
+- [x] Backend: getBudgetUsage endpoint (current spend vs limit for day/week)
+- [x] Frontend: Budget settings card on Credits page
+- [x] Frontend: Budget progress bars on Budget tab
+- [x] Alert warnings when approaching budget limit (configurable threshold)
+- [x] Block generation when budget exceeded (checkBudget endpoint)
+
+### Achievement Badges
+- [x] Add achievements table (id, userId, achievementType, unlockedAt, metadata)
+- [x] Define achievement catalog (12 achievements across 5 categories)
+- [x] Backend: checkAndUnlock mutation (called from frontend)
+- [x] Backend: getAchievements endpoint (unlocked + locked with progress)
+- [x] Frontend: Achievements tab on Credits page
+- [x] Frontend: Achievement unlock toast notification
+- [x] Frontend: Achievement badge grid with locked/unlocked states and progress bars
+
+### Testing & Verification
+- [x] Test social share link generation
+- [x] Test budget creation, checking, and alerts
+- [x] Test achievement unlock logic
+- [x] Final verification — 426 tests passing, 0 TS errors

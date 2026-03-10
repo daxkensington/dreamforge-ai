@@ -57,6 +57,14 @@ import {
   Hash,
   AtSign,
   Globe,
+  Share2,
+  MessageCircle,
+  Twitter,
+  Lock,
+  Unlock,
+  Gauge,
+  ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -523,6 +531,464 @@ function ReferralSection() {
 }
 
 // ─── Tier Progress Section ─────────────────────────────────────────────────
+// ─── Social Share Section ────────────────────────────────────────────────────
+function SocialShareSection() {
+  const { data: shareData, isLoading } = trpc.socialShare.getShareLinks.useQuery();
+
+  if (isLoading || !shareData?.shareLinks) return null;
+
+  const { shareLinks } = shareData;
+
+  const handleShare = (platform: string) => {
+    let url = "";
+    switch (platform) {
+      case "twitter":
+        url = shareLinks.twitter;
+        break;
+      case "whatsapp":
+        url = shareLinks.whatsapp;
+        break;
+      case "telegram":
+        url = shareLinks.telegram;
+        break;
+      case "email":
+        url = shareLinks.email;
+        break;
+    }
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      toast.success(`Opening ${platform}...`);
+    }
+  };
+
+  const handleCopyMessage = () => {
+    navigator.clipboard.writeText(shareLinks.copyText);
+    toast.success("Share message copied to clipboard!");
+  };
+
+  return (
+    <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10">
+            <Share2 className="w-6 h-6 text-cyan-500" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">Share & Earn</CardTitle>
+            <CardDescription>Spread the word on social media</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Button
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-sky-500/10 hover:border-sky-500/30 hover:text-sky-500 transition-all"
+            onClick={() => handleShare("twitter")}
+          >
+            <div className="p-2 rounded-full bg-sky-500/10">
+              <Twitter className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-medium">Twitter</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-green-500/10 hover:border-green-500/30 hover:text-green-500 transition-all"
+            onClick={() => handleShare("whatsapp")}
+          >
+            <div className="p-2 rounded-full bg-green-500/10">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-medium">WhatsApp</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-blue-500/10 hover:border-blue-500/30 hover:text-blue-500 transition-all"
+            onClick={() => handleShare("telegram")}
+          >
+            <div className="p-2 rounded-full bg-blue-500/10">
+              <Send className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-medium">Telegram</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-orange-500/10 hover:border-orange-500/30 hover:text-orange-500 transition-all"
+            onClick={() => handleShare("email")}
+          >
+            <div className="p-2 rounded-full bg-orange-500/10">
+              <Mail className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-medium">Email</span>
+          </Button>
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            readOnly
+            value={shareLinks.copyText}
+            className="text-xs font-mono"
+          />
+          <Button variant="outline" size="icon" onClick={handleCopyMessage} title="Copy share message">
+            <Copy className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Credit Budget Section ──────────────────────────────────────────────────
+function CreditBudgetSection() {
+  const { data: budget, isLoading: budgetLoading } = trpc.creditBudget.getBudget.useQuery();
+  const { data: usage } = trpc.creditBudget.getBudgetUsage.useQuery();
+  const utils = trpc.useUtils();
+
+  const [enabled, setEnabled] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState<string>("");
+  const [weeklyLimit, setWeeklyLimit] = useState<string>("");
+  const [alertThreshold, setAlertThreshold] = useState(80);
+
+  useEffect(() => {
+    if (budget?.budget) {
+      setEnabled(budget.budget.enabled);
+      setDailyLimit(budget.budget.dailyLimit?.toString() || "");
+      setWeeklyLimit(budget.budget.weeklyLimit?.toString() || "");
+      setAlertThreshold(budget.budget.alertThreshold);
+    }
+  }, [budget]);
+
+  const updateBudget = trpc.creditBudget.updateBudget.useMutation({
+    onSuccess: () => {
+      toast.success("Budget settings saved!");
+      utils.creditBudget.getBudget.invalidate();
+      utils.creditBudget.getBudgetUsage.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to save budget"),
+  });
+
+  const handleSave = () => {
+    updateBudget.mutate({
+      dailyLimit: dailyLimit ? parseInt(dailyLimit) : null,
+      weeklyLimit: weeklyLimit ? parseInt(weeklyLimit) : null,
+      alertThreshold,
+      enabled,
+    });
+  };
+
+  if (budgetLoading) {
+    return <div className="h-48 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Gauge className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Spending Budget</CardTitle>
+                <CardDescription>Set daily and weekly credit limits</CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="budget-toggle" className="text-sm">Enabled</Label>
+              <Switch
+                id="budget-toggle"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Budget Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Daily Limit</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)}
+                  min={1}
+                  max={10000}
+                  disabled={!enabled}
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">credits/day</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Weekly Limit</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={weeklyLimit}
+                  onChange={(e) => setWeeklyLimit(e.target.value)}
+                  min={1}
+                  max={50000}
+                  disabled={!enabled}
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">credits/week</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Alert Threshold */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Alert at {alertThreshold}% usage</Label>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={alertThreshold}
+              onChange={(e) => setAlertThreshold(parseInt(e.target.value))}
+              className="w-full accent-amber-500"
+              disabled={!enabled}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>10%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <Button onClick={handleSave} disabled={updateBudget.isPending} className="w-full">
+            {updateBudget.isPending ? "Saving..." : "Save Budget Settings"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Budget Usage Display */}
+      {usage?.enabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Today's Usage</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {usage.daily.limit && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Daily: {usage.daily.spent} / {usage.daily.limit} credits</span>
+                  <span className={usage.daily.percentage >= 100 ? "text-destructive font-bold" : usage.daily.percentage >= 80 ? "text-amber-500" : "text-muted-foreground"}>
+                    {usage.daily.percentage}%
+                  </span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      usage.daily.percentage >= 100 ? "bg-destructive" : usage.daily.percentage >= 80 ? "bg-amber-500" : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(usage.daily.percentage, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {usage.weekly.limit && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Weekly: {usage.weekly.spent} / {usage.weekly.limit} credits</span>
+                  <span className={usage.weekly.percentage >= 100 ? "text-destructive font-bold" : usage.weekly.percentage >= 80 ? "text-amber-500" : "text-muted-foreground"}>
+                    {usage.weekly.percentage}%
+                  </span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      usage.weekly.percentage >= 100 ? "bg-destructive" : usage.weekly.percentage >= 80 ? "bg-amber-500" : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(usage.weekly.percentage, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {usage.alerts && usage.alerts.length > 0 && (
+              <div className="space-y-2">
+                {usage.alerts.map((alert, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-amber-500 bg-amber-500/10 p-2 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    {alert}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Achievement Section ────────────────────────────────────────────────────
+function AchievementSection() {
+  const { data, isLoading } = trpc.achievement.getAchievements.useQuery();
+  const utils = trpc.useUtils();
+
+  const checkAchievements = trpc.achievement.checkAndUnlock.useMutation({
+    onSuccess: (result) => {
+      if (result.newlyUnlocked.length > 0) {
+        result.newlyUnlocked.forEach((a) => {
+          toast.success(`Achievement Unlocked: ${a.name}!`, {
+            description: a.description,
+            duration: 5000,
+          });
+        });
+        utils.achievement.getAchievements.invalidate();
+      } else {
+        toast.info("No new achievements to unlock yet. Keep creating!");
+      }
+    },
+    onError: () => toast.error("Failed to check achievements"),
+  });
+
+  if (isLoading) {
+    return <div className="h-48 bg-muted/50 animate-pulse rounded-lg" />;
+  }
+
+  const iconMap: Record<string, any> = {
+    Sparkles, Zap, Flame, Crown, Trophy, Users, Heart: Gift, Globe, CreditCard, Image: Star, Settings, Star,
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Achievement Summary */}
+      <Card className="border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-purple-500/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-violet-500/10">
+                <Trophy className="w-6 h-6 text-violet-500" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Achievements</CardTitle>
+                <CardDescription>
+                  {data?.totalUnlocked || 0} of {data?.totalAchievements || 0} unlocked
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => checkAchievements.mutate()}
+              disabled={checkAchievements.isPending}
+            >
+              {checkAchievements.isPending ? "Checking..." : "Check Progress"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Progress Bar */}
+          <div className="space-y-2 mb-6">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Overall Progress</span>
+              <span className="font-medium">
+                {data?.totalUnlocked || 0}/{data?.totalAchievements || 0}
+              </span>
+            </div>
+            <div className="h-3 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
+                style={{
+                  width: `${data?.totalAchievements ? ((data.totalUnlocked / data.totalAchievements) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Unlocked Achievements */}
+          {data?.unlocked && data.unlocked.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Unlock className="w-4 h-4 text-emerald-500" />
+                Unlocked
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {data.unlocked.map((a) => {
+                  const IconComp = iconMap[a.icon] || Star;
+                  return (
+                    <TooltipProvider key={a.type}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-3 rounded-lg border border-border/50 bg-gradient-to-br from-background to-muted/30 text-center hover:shadow-md transition-all cursor-default">
+                            <div
+                              className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                              style={{ backgroundColor: `${a.color}20` }}
+                            >
+                              <IconComp className="w-5 h-5" style={{ color: a.color }} />
+                            </div>
+                            <div className="text-xs font-medium truncate">{a.name}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              {a.unlockedAt ? new Date(a.unlockedAt).toLocaleDateString() : ""}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">{a.name}</p>
+                          <p className="text-xs text-muted-foreground">{a.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Locked Achievements */}
+          {data?.locked && data.locked.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                Locked
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {data.locked.map((a) => {
+                  const IconComp = iconMap[a.icon] || Star;
+                  return (
+                    <TooltipProvider key={a.type}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-3 rounded-lg border border-border/30 bg-muted/20 text-center opacity-60 hover:opacity-80 transition-all cursor-default">
+                            <div className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center bg-muted/50">
+                              <IconComp className="w-5 h-5 text-muted-foreground" />
+                            </div>
+                            <div className="text-xs font-medium truncate text-muted-foreground">{a.name}</div>
+                            {/* Progress bar */}
+                            <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-muted-foreground/30"
+                                style={{ width: `${a.progress}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              {a.current}/{a.threshold}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">{a.name}</p>
+                          <p className="text-xs text-muted-foreground">{a.description}</p>
+                          <p className="text-xs mt-1">Progress: {a.current}/{a.threshold} ({a.progress}%)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function TierProgressSection() {
   const { data: tierData, isLoading } = trpc.tieredReferral.getTierProgress.useQuery();
 
@@ -1451,6 +1917,14 @@ export default function Credits() {
               <Mail className="w-4 h-4 mr-2" />
               Digest
             </TabsTrigger>
+            <TabsTrigger value="budget">
+              <Gauge className="w-4 h-4 mr-2" />
+              Budget
+            </TabsTrigger>
+            <TabsTrigger value="achievements">
+              <Trophy className="w-4 h-4 mr-2" />
+              Achievements
+            </TabsTrigger>
             <TabsTrigger value="pricing">
               <TrendingUp className="w-4 h-4 mr-2" />
               Credit Costs
@@ -1545,6 +2019,8 @@ export default function Credits() {
           <TabsContent value="referrals">
             <div className="space-y-6">
               <ReferralSection />
+              <SocialShareSection />
+              <TierProgressSection />
               <LeaderboardSection />
             </div>
           </TabsContent>
@@ -1619,6 +2095,16 @@ export default function Credits() {
               <DigestSettingsSection />
               <EmailDigestSection />
             </div>
+          </TabsContent>
+
+          {/* Budget Tab */}
+          <TabsContent value="budget">
+            <CreditBudgetSection />
+          </TabsContent>
+
+          {/* Achievements Tab */}
+          <TabsContent value="achievements">
+            <AchievementSection />
           </TabsContent>
 
           {/* Pricing Tab */}
