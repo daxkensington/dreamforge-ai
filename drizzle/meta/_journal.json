@@ -1,103 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1772255190767,
-      "tag": "0000_same_roulette",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1772255424914,
-      "tag": "0001_perpetual_blue_blade",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1772397059060,
-      "tag": "0002_yellow_chameleon",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1773103095880,
-      "tag": "0003_living_sasquatch",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1773104165314,
-      "tag": "0004_neat_obadiah_stane",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1773106123944,
-      "tag": "0005_unusual_silhouette",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1773107134364,
-      "tag": "0006_steady_korg",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1773110928438,
-      "tag": "0007_nostalgic_arachne",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1773111590687,
-      "tag": "0008_white_mindworm",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1773111649308,
-      "tag": "0009_workable_jamie_braddock",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "5",
-      "when": 1773112774463,
-      "tag": "0010_cuddly_warpath",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "5",
-      "when": 1773114574076,
-      "tag": "0011_gray_golden_guardian",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "5",
-      "when": 1773121303662,
-      "tag": "0012_steep_titania",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "5",
-      "when": 1773156311143,
-      "tag": "0013_low_shape",
+      "version": "7",
+      "when": 1774217000438,
+      "tag": "0000_old_stardust",
       "breakpoints": true
     }
   ]

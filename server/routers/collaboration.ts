@@ -108,9 +108,9 @@ export const collaborationRouter = router({
         userId: ctx.user.id,
         message: input.message,
         type: input.type,
-      });
+      }).returning({ id: projectChatMessages.id });
 
-      const msgId = result[0].insertId;
+      const msgId = result[0].id;
 
       // Also broadcast via WebSocket
       try {
@@ -354,8 +354,8 @@ export const collaborationRouter = router({
         userId: ctx.user.id,
         action: input.action,
         details: input.details,
-      });
+      }).returning({ id: projectActivityLog.id });
 
-      return { id: result[0].insertId };
+      return { id: result[0].id };
     }),
 });

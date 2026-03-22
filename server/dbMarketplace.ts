@@ -26,8 +26,8 @@ const MARKETPLACE_CATEGORIES = [
 export async function createListing(data: InsertMarketplaceListing) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(marketplaceListings).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(marketplaceListings).values(data).returning({ id: marketplaceListings.id });
+  return { id: result[0].id };
 }
 
 export async function updateListing(
@@ -165,9 +165,9 @@ export async function browseListings(options: {
     );
   }
   if (filterTags && filterTags.length > 0) {
-    // JSON_CONTAINS check for tags array
+    // JSONB containment check for tags array
     for (const tag of filterTags) {
-      conditions.push(sql`JSON_CONTAINS(${marketplaceListings.tags}, ${JSON.stringify(tag)}, '$')`);
+      conditions.push(sql`${marketplaceListings.tags}::jsonb @> ${JSON.stringify(tag)}::jsonb`);
     }
   }
 
@@ -280,7 +280,7 @@ export async function recordPurchase(data: {
     platformFee,
     sellerPayout,
     stripePaymentId: data.stripePaymentId || null,
-  });
+  }).returning({ id: marketplacePurchases.id });
 
   // Increment download count on the listing
   await db
@@ -306,7 +306,7 @@ export async function recordPurchase(data: {
       .where(eq(sellerProfiles.userId, listing[0].sellerId));
   }
 
-  return { id: result[0].insertId, platformFee, sellerPayout };
+  return { id: result[0].id, platformFee, sellerPayout };
 }
 
 export async function hasPurchased(buyerId: number, listingId: number): Promise<boolean> {
@@ -367,7 +367,7 @@ export async function submitReview(data: InsertMarketplaceReview) {
   if (!db) throw new Error("Database not available");
 
   // Insert the review
-  const result = await db.insert(marketplaceReviews).values(data);
+  const result = await db.insert(marketplaceReviews).values(data).returning({ id: marketplaceReviews.id });
 
   // Recalculate average rating for the listing
   const ratingResult = await db
@@ -388,7 +388,7 @@ export async function submitReview(data: InsertMarketplaceReview) {
       .where(eq(marketplaceListings.id, data.listingId));
   }
 
-  return { id: result[0].insertId };
+  return { id: result[0].id };
 }
 
 export async function hasReviewed(buyerId: number, listingId: number): Promise<boolean> {
@@ -529,7 +529,7 @@ export async function createPayout(sellerId: number, amount: number, stripeTrans
     amount,
     stripeTransferId: stripeTransferId || null,
     status: stripeTransferId ? "paid" : "pending",
-  });
+  }).returning({ id: sellerPayouts.id });
 
   // Deduct from payout balance
   await db
@@ -539,7 +539,7 @@ export async function createPayout(sellerId: number, amount: number, stripeTrans
     })
     .where(eq(sellerProfiles.id, sellerId));
 
-  return { id: result[0].insertId };
+  return { id: result[0].id };
 }
 
 // ─── Category Helpers ───────────────────────────────────────────────────────

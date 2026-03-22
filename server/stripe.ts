@@ -143,10 +143,11 @@ export async function deductCredits(
         eq(creditBalances.userId, userId),
         sql`${creditBalances.balance} >= ${amount}`
       )
-    );
+    )
+    .returning({ id: creditBalances.id });
 
-  // If no rows were updated, balance was insufficient (race condition protection)
-  if ((result as any)[0]?.affectedRows === 0) {
+  // If no rows were returned, balance was insufficient (race condition protection)
+  if (result.length === 0) {
     return { success: false, balance: balance.balance, needed: amount };
   }
 

@@ -110,8 +110,8 @@ export const audioRouter = router({
         status: "generating",
         projectId: input.projectId ?? null,
         metadata: input.options ?? {},
-      });
-      const audioId = inserted.insertId;
+      }).returning({ id: audioGenerations.id });
+      const audioId = inserted.id;
 
       // Generate in background (non-blocking)
       const request: AudioGenerationRequest = {

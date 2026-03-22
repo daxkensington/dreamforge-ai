@@ -1,31 +1,66 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
-  int,
-  json,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  serial,
   text,
   timestamp,
   varchar,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const digestFrequencyEnum = pgEnum("digestFrequency", ["weekly", "monthly"]);
+export const tagCategoryEnum = pgEnum("tagCategory", ["genre", "theme", "style", "subject", "technique"]);
+export const mediaTypeEnum = pgEnum("mediaType", ["image", "video"]);
+export const generationStatusEnum = pgEnum("generationStatus", ["pending", "generating", "completed", "failed"]);
+export const moderationStatusEnum = pgEnum("moderationStatus", ["pending", "approved", "rejected"]);
+export const videoProjectTypeEnum = pgEnum("videoProjectType", ["storyboard", "script", "scene-direction", "soundtrack"]);
+export const collabRoleEnum = pgEnum("collabRole", ["viewer", "editor"]);
+export const sharePermissionEnum = pgEnum("sharePermission", ["viewer", "editor"]);
+export const revisionSourceEnum = pgEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]);
+export const subStatusEnum = pgEnum("subStatus", ["active", "canceled", "past_due", "trialing", "incomplete"]);
+export const txTypeEnum = pgEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral"]);
+export const notifTypeEnum = pgEnum("notifType", ["collaboration", "generation", "comment", "system", "payment"]);
+export const prefTypeEnum = pgEnum("prefType", ["collaboration", "generation", "comment", "system", "payment"]);
+export const webhookStatusEnum = pgEnum("webhookStatus", ["processed", "failed", "ignored"]);
+export const referralStatusEnum = pgEnum("referralStatus", ["pending", "completed", "expired"]);
+export const listingTypeEnum = pgEnum("listingType", ["prompt", "preset", "workflow", "asset_pack", "lora"]);
+export const listingStatusEnum = pgEnum("listingStatus", ["draft", "published", "suspended"]);
+export const payoutStatusEnum = pgEnum("payoutStatus", ["pending", "paid", "failed"]);
+export const audioTypeEnum = pgEnum("audioType", ["sfx", "music", "voiceover", "ambient"]);
+export const audioStatusEnum = pgEnum("audioStatus", ["queued", "generating", "complete", "failed"]);
+export const presetCategoryEnum = pgEnum("presetCategory", ["cinematic", "electronic", "ambient", "nature", "urban", "dramatic"]);
+export const chatMsgTypeEnum = pgEnum("chatMsgType", ["text", "system", "action"]);
+export const activityActionEnum = pgEnum("activityAction", [
+  "clip_added",
+  "clip_deleted",
+  "clip_moved",
+  "settings_changed",
+  "member_joined",
+  "member_left",
+]);
+export const keyframeStatusEnum = pgEnum("keyframeStatus", ["pending", "generating", "completed", "failed"]);
 
 // ─── Users ───────────────────────────────────────────────────────────────────
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   bio: text("bio"),
   institution: varchar("institution", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   referralCode: varchar("referralCode", { length: 32 }).unique(),
   digestEnabled: boolean("digestEnabled").default(false).notNull(),
-  digestFrequency: mysqlEnum("digestFrequency", ["weekly", "monthly"]).default("weekly").notNull(),
+  digestFrequency: digestFrequencyEnum("digestFrequency").default("weekly").notNull(),
   lastDigestSentAt: timestamp("lastDigestSentAt"),
   emailDigestEnabled: boolean("emailDigestEnabled").default(false).notNull(),
 });
@@ -34,19 +69,11 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // ─── Tags ────────────────────────────────────────────────────────────────────
-export const tags = mysqlTable("tags", {
-  id: int("id").autoincrement().primaryKey(),
+export const tags = pgTable("tags", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 128 }).notNull().unique(),
   slug: varchar("slug", { length: 128 }).notNull().unique(),
-  category: mysqlEnum("category", [
-    "genre",
-    "theme",
-    "style",
-    "subject",
-    "technique",
-  ])
-    .default("theme")
-    .notNull(),
+  category: tagCategoryEnum("category").default("theme").notNull(),
   description: text("description"),
   color: varchar("color", { length: 7 }).default("#6366f1"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -56,113 +83,102 @@ export type Tag = typeof tags.$inferSelect;
 export type InsertTag = typeof tags.$inferInsert;
 
 // ─── Generations ─────────────────────────────────────────────────────────────
-export const generations = mysqlTable("generations", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const generations = pgTable("generations", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   prompt: text("prompt").notNull(),
   negativePrompt: text("negativePrompt"),
   modelVersion: varchar("modelVersion", { length: 128 })
     .default("built-in-v1")
     .notNull(),
-  mediaType: mysqlEnum("mediaType", ["image", "video"])
-    .default("image")
-    .notNull(),
-  width: int("width").default(512),
-  height: int("height").default(768),
-  duration: int("duration"), // seconds, for video
+  mediaType: mediaTypeEnum("mediaType").default("image").notNull(),
+  width: integer("width").default(512),
+  height: integer("height").default(768),
+  duration: integer("duration"), // seconds, for video
   imageUrl: text("imageUrl"),
   thumbnailUrl: text("thumbnailUrl"),
   fileKey: varchar("fileKey", { length: 512 }),
-  status: mysqlEnum("status", [
-    "pending",
-    "generating",
-    "completed",
-    "failed",
-  ])
-    .default("pending")
-    .notNull(),
+  status: generationStatusEnum("status").default("pending").notNull(),
   errorMessage: text("errorMessage"),
-  parentGenerationId: int("parentGenerationId"), // links animated video to source image
+  parentGenerationId: integer("parentGenerationId"), // links animated video to source image
   animationStyle: varchar("animationStyle", { length: 64 }), // motion style for animation
-  metadata: json("metadata"), // extra generation params
+  metadata: jsonb("metadata"), // extra generation params
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Generation = typeof generations.$inferSelect;
 export type InsertGeneration = typeof generations.$inferInsert;
 
 // ─── Generation Tags (join table) ────────────────────────────────────────────
-export const generationTags = mysqlTable("generationTags", {
-  id: int("id").autoincrement().primaryKey(),
-  generationId: int("generationId").notNull(),
-  tagId: int("tagId").notNull(),
+export const generationTags = pgTable("generationTags", {
+  id: serial("id").primaryKey(),
+  generationId: integer("generationId").notNull(),
+  tagId: integer("tagId").notNull(),
 });
 
 export type GenerationTag = typeof generationTags.$inferSelect;
 
 // ─── Gallery Items (approved generations) ────────────────────────────────────
-export const galleryItems = mysqlTable("galleryItems", {
-  id: int("id").autoincrement().primaryKey(),
-  generationId: int("generationId").notNull(),
-  userId: int("userId").notNull(),
+export const galleryItems = pgTable("galleryItems", {
+  id: serial("id").primaryKey(),
+  generationId: integer("generationId").notNull(),
+  userId: integer("userId").notNull(),
   title: varchar("title", { length: 256 }),
   description: text("description"),
   featured: boolean("featured").default(false),
-  viewCount: int("viewCount").default(0),
+  viewCount: integer("viewCount").default(0),
   approvedAt: timestamp("approvedAt"),
-  approvedBy: int("approvedBy"),
+  approvedBy: integer("approvedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type GalleryItem = typeof galleryItems.$inferSelect;
 export type InsertGalleryItem = typeof galleryItems.$inferInsert;
 
 // ─── Moderation Queue ────────────────────────────────────────────────────────
-export const moderationQueue = mysqlTable("moderationQueue", {
-  id: int("id").autoincrement().primaryKey(),
-  generationId: int("generationId").notNull(),
-  userId: int("userId").notNull(),
+export const moderationQueue = pgTable("moderationQueue", {
+  id: serial("id").primaryKey(),
+  generationId: integer("generationId").notNull(),
+  userId: integer("userId").notNull(),
   title: varchar("title", { length: 256 }),
   description: text("description"),
-  status: mysqlEnum("moderationStatus", ["pending", "approved", "rejected"])
-    .default("pending")
-    .notNull(),
-  reviewedBy: int("reviewedBy"),
+  status: moderationStatusEnum("moderationStatus").default("pending").notNull(),
+  reviewedBy: integer("reviewedBy"),
   reviewNote: text("reviewNote"),
   reviewedAt: timestamp("reviewedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type ModerationItem = typeof moderationQueue.$inferSelect;
 export type InsertModerationItem = typeof moderationQueue.$inferInsert;
 
 // ─── Video Projects ─────────────────────────────────────────────────────────
-export const videoProjects = mysqlTable("videoProjects", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  type: mysqlEnum("type", ["storyboard", "script", "scene-direction", "soundtrack"]).notNull(),
+export const videoProjects = pgTable("videoProjects", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  type: videoProjectTypeEnum("type").notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   description: text("description"),
-  data: json("data").notNull(), // full project data (storyboard scenes, script scenes, etc.)
+  data: jsonb("data").notNull(), // full project data (storyboard scenes, script scenes, etc.)
   thumbnailUrl: text("thumbnailUrl"),
   templateId: varchar("templateId", { length: 64 }), // if created from a template
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type VideoProject = typeof videoProjects.$inferSelect;
 export type InsertVideoProject = typeof videoProjects.$inferInsert;
 
 // ─── Project Collaborators ─────────────────────────────────────────────────
-export const projectCollaborators = mysqlTable("projectCollaborators", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
-  userId: int("userId").notNull(),
-  role: mysqlEnum("collabRole", ["viewer", "editor"]).default("viewer").notNull(),
-  invitedBy: int("invitedBy").notNull(),
+export const projectCollaborators = pgTable("projectCollaborators", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
+  userId: integer("userId").notNull(),
+  role: collabRoleEnum("collabRole").default("viewer").notNull(),
+  invitedBy: integer("invitedBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -170,15 +186,15 @@ export type ProjectCollaborator = typeof projectCollaborators.$inferSelect;
 export type InsertProjectCollaborator = typeof projectCollaborators.$inferInsert;
 
 // ─── Project Share Tokens ──────────────────────────────────────────────────
-export const projectShareTokens = mysqlTable("projectShareTokens", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
+export const projectShareTokens = pgTable("projectShareTokens", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
   token: varchar("token", { length: 64 }).notNull().unique(),
-  permission: mysqlEnum("sharePermission", ["viewer", "editor"]).default("viewer").notNull(),
-  createdBy: int("createdBy").notNull(),
+  permission: sharePermissionEnum("sharePermission").default("viewer").notNull(),
+  createdBy: integer("createdBy").notNull(),
   expiresAt: timestamp("expiresAt"),
-  maxUses: int("maxUses"),
-  useCount: int("useCount").default(0).notNull(),
+  maxUses: integer("maxUses"),
+  useCount: integer("useCount").default(0).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -187,14 +203,14 @@ export type ProjectShareToken = typeof projectShareTokens.$inferSelect;
 export type InsertProjectShareToken = typeof projectShareTokens.$inferInsert;
 
 // ─── Project Revisions ─────────────────────────────────────────────────────
-export const projectRevisions = mysqlTable("projectRevisions", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
-  userId: int("userId").notNull(),
-  version: int("version").notNull(),
-  data: json("data").notNull(),
+export const projectRevisions = pgTable("projectRevisions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
+  userId: integer("userId").notNull(),
+  version: integer("version").notNull(),
+  data: jsonb("data").notNull(),
   changeNote: text("changeNote"),
-  source: mysqlEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]).default("manual").notNull(),
+  source: revisionSourceEnum("revisionSource").default("manual").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -202,77 +218,77 @@ export type ProjectRevision = typeof projectRevisions.$inferSelect;
 export type InsertProjectRevision = typeof projectRevisions.$inferInsert;
 
 // ─── Gallery Likes ──────────────────────────────────────────────────────────
-export const galleryLikes = mysqlTable("galleryLikes", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  galleryItemId: int("galleryItemId").notNull(),
+export const galleryLikes = pgTable("galleryLikes", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  galleryItemId: integer("galleryItemId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type GalleryLike = typeof galleryLikes.$inferSelect;
 
 // ─── Gallery Comments ──────────────────────────────────────────────────────
-export const galleryComments = mysqlTable("galleryComments", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  galleryItemId: int("galleryItemId").notNull(),
+export const galleryComments = pgTable("galleryComments", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  galleryItemId: integer("galleryItemId").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type GalleryComment = typeof galleryComments.$inferSelect;
 
 // ─── User Follows ──────────────────────────────────────────────────────────
-export const userFollows = mysqlTable("userFollows", {
-  id: int("id").autoincrement().primaryKey(),
-  followerId: int("followerId").notNull(),
-  followingId: int("followingId").notNull(),
+export const userFollows = pgTable("userFollows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("followerId").notNull(),
+  followingId: integer("followingId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type UserFollow = typeof userFollows.$inferSelect;
 
 // ─── Characters (Consistency System) ───────────────────────────────────────
-export const characters = mysqlTable("characters", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const characters = pgTable("characters", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
-  referenceImages: json("referenceImages"), // array of image URLs
+  referenceImages: jsonb("referenceImages"), // array of image URLs
   styleNotes: text("styleNotes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Character = typeof characters.$inferSelect;
 export type InsertCharacter = typeof characters.$inferInsert;
 
 // ─── Brand Kits ────────────────────────────────────────────────────────────
-export const brandKits = mysqlTable("brandKits", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const brandKits = pgTable("brandKits", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
-  colorPalette: json("colorPalette"), // array of hex colors
+  colorPalette: jsonb("colorPalette"), // array of hex colors
   stylePrompt: text("stylePrompt"),
   typography: varchar("typography", { length: 256 }),
   logoUrl: text("logoUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type BrandKit = typeof brandKits.$inferSelect;
 export type InsertBrandKit = typeof brandKits.$inferInsert;
 
 // ─── API Keys ──────────────────────────────────────────────────────────────
-export const apiKeys = mysqlTable("apiKeys", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const apiKeys = pgTable("apiKeys", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
   keyHash: varchar("keyHash", { length: 128 }).notNull().unique(),
   keyPrefix: varchar("keyPrefix", { length: 12 }).notNull(), // first 8 chars for display
-  permissions: json("permissions"), // array of allowed scopes
-  rateLimit: int("rateLimit").default(100), // requests per hour
+  permissions: jsonb("permissions"), // array of allowed scopes
+  rateLimit: integer("rateLimit").default(100), // requests per hour
   lastUsedAt: timestamp("lastUsedAt"),
   expiresAt: timestamp("expiresAt"),
   active: boolean("active").default(true).notNull(),
@@ -283,83 +299,83 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertApiKey = typeof apiKeys.$inferInsert;
 
 // ─── Scene Keyframes (Video Generation) ────────────────────────────────────
-export const sceneKeyframes = mysqlTable("sceneKeyframes", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
-  sceneIndex: int("sceneIndex").notNull(),
+export const sceneKeyframes = pgTable("sceneKeyframes", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
+  sceneIndex: integer("sceneIndex").notNull(),
   prompt: text("prompt").notNull(),
   imageUrl: text("imageUrl"),
-  status: mysqlEnum("keyframeStatus", ["pending", "generating", "completed", "failed"]).default("pending").notNull(),
+  status: keyframeStatusEnum("keyframeStatus").default("pending").notNull(),
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type SceneKeyframe = typeof sceneKeyframes.$inferSelect;
 export type InsertSceneKeyframe = typeof sceneKeyframes.$inferInsert;
 
 // ─── Subscription Plans ──────────────────────────────────────────────────
-export const subscriptionPlans = mysqlTable("subscriptionPlans", {
-  id: int("id").autoincrement().primaryKey(),
+export const subscriptionPlans = pgTable("subscriptionPlans", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 64 }).notNull().unique(), // free/creator/pro/studio/enterprise
   displayName: varchar("displayName", { length: 128 }).notNull(),
-  price: int("price").default(0).notNull(), // cents (0/1200/3500/7500/0)
-  monthlyCredits: int("monthlyCredits").default(0).notNull(), // 1500/30000/150000/450000/0
-  features: json("features"), // JSON array of feature strings
+  price: integer("price").default(0).notNull(), // cents (0/1200/3500/7500/0)
+  monthlyCredits: integer("monthlyCredits").default(0).notNull(), // 1500/30000/150000/450000/0
+  features: jsonb("features"), // JSON array of feature strings
   stripeProductId: varchar("stripeProductId", { length: 128 }),
   stripePriceId: varchar("stripePriceId", { length: 128 }),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
 
 // ─── User Subscriptions ─────────────────────────────────────────────────
-export const userSubscriptions = mysqlTable("userSubscriptions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  planId: int("planId").notNull(),
+export const userSubscriptions = pgTable("userSubscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  planId: integer("planId").notNull(),
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
-  status: mysqlEnum("subStatus", ["active", "canceled", "past_due", "trialing", "incomplete"]).default("active").notNull(),
+  status: subStatusEnum("subStatus").default("active").notNull(),
   currentPeriodStart: timestamp("currentPeriodStart"),
   currentPeriodEnd: timestamp("currentPeriodEnd"),
   cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
 
 // ─── Credit Balances ──────────────────────────────────────────────────────
-export const creditBalances = mysqlTable("creditBalances", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
-  balance: int("balance").default(50).notNull(), // free starter credits
-  monthlyAllocation: int("monthlyAllocation").default(0).notNull(), // credits from subscription
-  bonusCredits: int("bonusCredits").default(0).notNull(), // extra purchased/reward credits
-  lifetimeSpent: int("lifetimeSpent").default(0).notNull(),
+export const creditBalances = pgTable("creditBalances", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
+  balance: integer("balance").default(50).notNull(), // free starter credits
+  monthlyAllocation: integer("monthlyAllocation").default(0).notNull(), // credits from subscription
+  bonusCredits: integer("bonusCredits").default(0).notNull(), // extra purchased/reward credits
+  lifetimeSpent: integer("lifetimeSpent").default(0).notNull(),
   lastResetAt: timestamp("lastResetAt"), // when monthly credits were last allocated
   stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type CreditBalance = typeof creditBalances.$inferSelect;
 export type InsertCreditBalance = typeof creditBalances.$inferInsert;
 
 // ─── Credit Transactions ─────────────────────────────────────────────────
-export const creditTransactions = mysqlTable("creditTransactions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  amount: int("amount").notNull(), // positive = purchase, negative = usage
-  type: mysqlEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral"]).notNull(),
+export const creditTransactions = pgTable("creditTransactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  amount: integer("amount").notNull(), // positive = purchase, negative = usage
+  type: txTypeEnum("txType").notNull(),
   description: varchar("description", { length: 512 }),
   stripeSessionId: varchar("stripeSessionId", { length: 256 }),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 256 }),
-  metadata: json("txMetadata"), // extra context (plan change, etc.)
+  metadata: jsonb("txMetadata"), // extra context (plan change, etc.)
   expiresAt: timestamp("expiresAt"), // null = never expires; set for bonus/signup credits
   expired: boolean("expired").default(false).notNull(), // true once credits have been deducted
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -369,14 +385,14 @@ export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type InsertCreditTransaction = typeof creditTransactions.$inferInsert;
 
 // ─── Notifications ────────────────────────────────────────────────────────
-export const notifications = mysqlTable("notifications", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  type: mysqlEnum("notifType", ["collaboration", "generation", "comment", "system", "payment"]).notNull(),
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  type: notifTypeEnum("notifType").notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   message: text("message").notNull(),
   read: boolean("read").default(false).notNull(),
-  metadata: json("metadata"), // extra data (projectId, generationId, etc.)
+  metadata: jsonb("metadata"), // extra data (projectId, generationId, etc.)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -384,24 +400,24 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
 // ─── Notification Preferences ─────────────────────────────────────────────
-export const notificationPreferences = mysqlTable("notificationPreferences", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  type: mysqlEnum("prefType", ["collaboration", "generation", "comment", "system", "payment"]).notNull(),
+export const notificationPreferences = pgTable("notificationPreferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  type: prefTypeEnum("prefType").notNull(),
   enabled: boolean("enabled").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
 // ─── Webhook Events ──────────────────────────────────────────────────────
-export const webhookEvents = mysqlTable("webhookEvents", {
-  id: int("id").autoincrement().primaryKey(),
+export const webhookEvents = pgTable("webhookEvents", {
+  id: serial("id").primaryKey(),
   eventId: varchar("eventId", { length: 256 }).notNull().unique(),
   eventType: varchar("eventType", { length: 128 }).notNull(),
-  status: mysqlEnum("webhookStatus", ["processed", "failed", "ignored"]).default("processed").notNull(),
+  status: webhookStatusEnum("webhookStatus").default("processed").notNull(),
   summary: text("summary"),
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -411,13 +427,13 @@ export type WebhookEvent = typeof webhookEvents.$inferSelect;
 export type InsertWebhookEvent = typeof webhookEvents.$inferInsert;
 
 // ─── Referrals ────────────────────────────────────────────────────────────
-export const referrals = mysqlTable("referrals", {
-  id: int("id").autoincrement().primaryKey(),
-  referrerId: int("referrerId").notNull(),
-  referredUserId: int("referredUserId"),
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: integer("referrerId").notNull(),
+  referredUserId: integer("referredUserId"),
   code: varchar("code", { length: 32 }).notNull().unique(),
-  status: mysqlEnum("status", ["pending", "completed", "expired"]).default("pending").notNull(),
-  creditsAwarded: int("creditsAwarded").default(0).notNull(),
+  status: referralStatusEnum("referralStatus").default("pending").notNull(),
+  creditsAwarded: integer("creditsAwarded").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
 });
@@ -425,66 +441,66 @@ export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = typeof referrals.$inferInsert;
 
 // ─── Credit Budgets ──────────────────────────────────────────────────────
-export const creditBudgets = mysqlTable("creditBudgets", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
-  dailyLimit: int("dailyLimit"), // null = no daily limit
-  weeklyLimit: int("weeklyLimit"), // null = no weekly limit
-  alertThreshold: int("alertThreshold").default(80).notNull(), // percentage (0-100)
+export const creditBudgets = pgTable("creditBudgets", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
+  dailyLimit: integer("dailyLimit"), // null = no daily limit
+  weeklyLimit: integer("weeklyLimit"), // null = no weekly limit
+  alertThreshold: integer("alertThreshold").default(80).notNull(), // percentage (0-100)
   enabled: boolean("enabled").default(false).notNull(),
   budgetEmailEnabled: boolean("budgetEmailEnabled").default(true).notNull(),
   lastDailyAlertAt: timestamp("lastDailyAlertAt"),
   lastWeeklyAlertAt: timestamp("lastWeeklyAlertAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type CreditBudget = typeof creditBudgets.$inferSelect;
 export type InsertCreditBudget = typeof creditBudgets.$inferInsert;
 
 // ─── Achievements ────────────────────────────────────────────────────────
-export const achievements = mysqlTable("achievements", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   achievementType: varchar("achievementType", { length: 64 }).notNull(),
   unlockedAt: timestamp("unlockedAt").defaultNow().notNull(),
-  metadata: json("metadata"), // extra data (count, generation id, etc.)
+  metadata: jsonb("metadata"), // extra data (count, generation id, etc.)
 });
 
 export type Achievement = typeof achievements.$inferSelect;
 export type InsertAchievement = typeof achievements.$inferInsert;
 
 // ─── Marketplace Listings ────────────────────────────────────────────────────
-export const marketplaceListings = mysqlTable("marketplaceListings", {
-  id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId").notNull(),
+export const marketplaceListings = pgTable("marketplaceListings", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("sellerId").notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   description: text("description"),
-  type: mysqlEnum("listingType", ["prompt", "preset", "workflow", "asset_pack", "lora"]).notNull(),
-  price: int("price").default(0).notNull(), // cents, 0 = free
-  previewImages: json("previewImages"), // JSON array of URLs
-  promptData: json("promptData"), // the actual content being sold
-  tags: json("listingTags"), // JSON array of strings
-  downloads: int("downloads").default(0).notNull(),
-  rating: int("rating").default(0).notNull(), // stored as rating * 100 for precision (e.g. 450 = 4.50)
-  ratingCount: int("ratingCount").default(0).notNull(),
-  status: mysqlEnum("listingStatus", ["draft", "published", "suspended"]).default("draft").notNull(),
+  type: listingTypeEnum("listingType").notNull(),
+  price: integer("price").default(0).notNull(), // cents, 0 = free
+  previewImages: jsonb("previewImages"), // JSON array of URLs
+  promptData: jsonb("promptData"), // the actual content being sold
+  tags: jsonb("listingTags"), // JSON array of strings
+  downloads: integer("downloads").default(0).notNull(),
+  rating: integer("rating").default(0).notNull(), // stored as rating * 100 for precision (e.g. 450 = 4.50)
+  ratingCount: integer("ratingCount").default(0).notNull(),
+  status: listingStatusEnum("listingStatus").default("draft").notNull(),
   isFeatured: boolean("isFeatured").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type InsertMarketplaceListing = typeof marketplaceListings.$inferInsert;
 
 // ─── Marketplace Purchases ──────────────────────────────────────────────────
-export const marketplacePurchases = mysqlTable("marketplacePurchases", {
-  id: int("id").autoincrement().primaryKey(),
-  buyerId: int("buyerId").notNull(),
-  listingId: int("listingId").notNull(),
-  price: int("price").notNull(), // cents paid
-  platformFee: int("platformFee").notNull(), // 20% platform fee in cents
-  sellerPayout: int("sellerPayout").notNull(), // 80% seller payout in cents
+export const marketplacePurchases = pgTable("marketplacePurchases", {
+  id: serial("id").primaryKey(),
+  buyerId: integer("buyerId").notNull(),
+  listingId: integer("listingId").notNull(),
+  price: integer("price").notNull(), // cents paid
+  platformFee: integer("platformFee").notNull(), // 20% platform fee in cents
+  sellerPayout: integer("sellerPayout").notNull(), // 80% seller payout in cents
   stripePaymentId: varchar("stripePaymentId", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -493,11 +509,11 @@ export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
 export type InsertMarketplacePurchase = typeof marketplacePurchases.$inferInsert;
 
 // ─── Marketplace Reviews ────────────────────────────────────────────────────
-export const marketplaceReviews = mysqlTable("marketplaceReviews", {
-  id: int("id").autoincrement().primaryKey(),
-  buyerId: int("buyerId").notNull(),
-  listingId: int("listingId").notNull(),
-  rating: int("reviewRating").notNull(), // 1-5
+export const marketplaceReviews = pgTable("marketplaceReviews", {
+  id: serial("id").primaryKey(),
+  buyerId: integer("buyerId").notNull(),
+  listingId: integer("listingId").notNull(),
+  rating: integer("reviewRating").notNull(), // 1-5
   comment: text("comment"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -506,16 +522,16 @@ export type MarketplaceReview = typeof marketplaceReviews.$inferSelect;
 export type InsertMarketplaceReview = typeof marketplaceReviews.$inferInsert;
 
 // ─── Seller Profiles ────────────────────────────────────────────────────────
-export const sellerProfiles = mysqlTable("sellerProfiles", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+export const sellerProfiles = pgTable("sellerProfiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
   displayName: varchar("displayName", { length: 128 }).notNull(),
   bio: text("bio"),
   avatarUrl: text("avatarUrl"),
   bannerUrl: text("bannerUrl"),
-  totalSales: int("totalSales").default(0).notNull(),
-  totalEarnings: int("totalEarnings").default(0).notNull(), // cents
-  payoutBalance: int("payoutBalance").default(0).notNull(), // cents available to withdraw
+  totalSales: integer("totalSales").default(0).notNull(),
+  totalEarnings: integer("totalEarnings").default(0).notNull(), // cents
+  payoutBalance: integer("payoutBalance").default(0).notNull(), // cents available to withdraw
   stripeConnectId: varchar("stripeConnectId", { length: 128 }),
   isVerified: boolean("isVerified").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -525,12 +541,12 @@ export type SellerProfile = typeof sellerProfiles.$inferSelect;
 export type InsertSellerProfile = typeof sellerProfiles.$inferInsert;
 
 // ─── Seller Payouts ─────────────────────────────────────────────────────────
-export const sellerPayouts = mysqlTable("sellerPayouts", {
-  id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId").notNull(),
-  amount: int("amount").notNull(), // cents
+export const sellerPayouts = pgTable("sellerPayouts", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("sellerId").notNull(),
+  amount: integer("amount").notNull(), // cents
   stripeTransferId: varchar("stripeTransferId", { length: 256 }),
-  status: mysqlEnum("payoutStatus", ["pending", "paid", "failed"]).default("pending").notNull(),
+  status: payoutStatusEnum("payoutStatus").default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -538,37 +554,63 @@ export type SellerPayout = typeof sellerPayouts.$inferSelect;
 export type InsertSellerPayout = typeof sellerPayouts.$inferInsert;
 
 // ─── Audio Generations ──────────────────────────────────────────────────────
-export const audioGenerations = mysqlTable("audioGenerations", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  type: mysqlEnum("audioType", ["sfx", "music", "voiceover", "ambient"]).notNull(),
+export const audioGenerations = pgTable("audioGenerations", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  type: audioTypeEnum("audioType").notNull(),
   prompt: text("prompt").notNull(),
-  duration: int("duration").notNull(), // seconds
+  duration: integer("duration").notNull(), // seconds
   model: varchar("model", { length: 128 }).default("musicgen").notNull(),
-  status: mysqlEnum("audioStatus", ["queued", "generating", "complete", "failed"]).default("queued").notNull(),
+  status: audioStatusEnum("audioStatus").default("queued").notNull(),
   audioUrl: text("audioUrl"),
   errorMessage: text("errorMessage"),
-  metadata: json("metadata"), // waveform data, bpm, key, etc.
-  projectId: int("projectId"), // optional link to videoProject
+  metadata: jsonb("metadata"), // waveform data, bpm, key, etc.
+  projectId: integer("projectId"), // optional link to videoProject
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type AudioGeneration = typeof audioGenerations.$inferSelect;
 export type InsertAudioGeneration = typeof audioGenerations.$inferInsert;
 
 // ─── Audio Presets ──────────────────────────────────────────────────────────
-export const audioPresets = mysqlTable("audioPresets", {
-  id: int("id").autoincrement().primaryKey(),
+export const audioPresets = pgTable("audioPresets", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 128 }).notNull(),
-  category: mysqlEnum("presetCategory", ["cinematic", "electronic", "ambient", "nature", "urban", "dramatic"]).notNull(),
-  settings: json("settings").notNull(), // preset config JSON
+  category: presetCategoryEnum("presetCategory").notNull(),
+  settings: jsonb("settings").notNull(), // preset config JSON
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type AudioPreset = typeof audioPresets.$inferSelect;
 export type InsertAudioPreset = typeof audioPresets.$inferInsert;
+
+// ─── Project Chat Messages ──────────────────────────────────────────────────
+export const projectChatMessages = pgTable("projectChatMessages", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
+  userId: integer("userId").notNull(),
+  message: text("message").notNull(),
+  type: chatMsgTypeEnum("chatMsgType").default("text").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProjectChatMessage = typeof projectChatMessages.$inferSelect;
+export type InsertProjectChatMessage = typeof projectChatMessages.$inferInsert;
+
+// ─── Project Activity Log ───────────────────────────────────────────────────
+export const projectActivityLog = pgTable("projectActivityLog", {
+  id: serial("id").primaryKey(),
+  projectId: integer("projectId").notNull(),
+  userId: integer("userId").notNull(),
+  action: activityActionEnum("activityAction").notNull(),
+  details: jsonb("activityDetails"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProjectActivityLogEntry = typeof projectActivityLog.$inferSelect;
+export type InsertProjectActivityLogEntry = typeof projectActivityLog.$inferInsert;
 
 // ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many }) => ({
@@ -684,39 +726,6 @@ export const sellerProfilesRelations = relations(sellerProfiles, ({ one, many })
 export const sellerPayoutsRelations = relations(sellerPayouts, ({ one }) => ({
   seller: one(sellerProfiles, { fields: [sellerPayouts.sellerId], references: [sellerProfiles.id] }),
 }));
-
-// ─── Project Chat Messages ──────────────────────────────────────────────────
-export const projectChatMessages = mysqlTable("projectChatMessages", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
-  userId: int("userId").notNull(),
-  message: text("message").notNull(),
-  type: mysqlEnum("chatMsgType", ["text", "system", "action"]).default("text").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type ProjectChatMessage = typeof projectChatMessages.$inferSelect;
-export type InsertProjectChatMessage = typeof projectChatMessages.$inferInsert;
-
-// ─── Project Activity Log ───────────────────────────────────────────────────
-export const projectActivityLog = mysqlTable("projectActivityLog", {
-  id: int("id").autoincrement().primaryKey(),
-  projectId: int("projectId").notNull(),
-  userId: int("userId").notNull(),
-  action: mysqlEnum("activityAction", [
-    "clip_added",
-    "clip_deleted",
-    "clip_moved",
-    "settings_changed",
-    "member_joined",
-    "member_left",
-  ]).notNull(),
-  details: json("activityDetails"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type ProjectActivityLogEntry = typeof projectActivityLog.$inferSelect;
-export type InsertProjectActivityLogEntry = typeof projectActivityLog.$inferInsert;
 
 // ─── Chat & Activity Relations ──────────────────────────────────────────────
 export const projectChatMessagesRelations = relations(projectChatMessages, ({ one }) => ({

@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, like, lte, or, sql, asc, count } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import {
   InsertUser,
   users,
@@ -24,7 +25,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const sql = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -68,7 +70,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({
+    target: users.openId,
+    set: updateSet,
+  });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -137,8 +142,8 @@ export async function seedDefaultTags() {
 export async function createGeneration(data: InsertGeneration) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(generations).values(data);
-  return result[0].insertId;
+  const result = await db.insert(generations).values(data).returning({ id: generations.id });
+  return result[0].id;
 }
 
 export async function updateGeneration(
@@ -373,8 +378,8 @@ export async function getGalleryItemById(id: number) {
 export async function createModerationItem(data: InsertModerationItem) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(moderationQueue).values(data);
-  return result[0].insertId;
+  const result = await db.insert(moderationQueue).values(data).returning({ id: moderationQueue.id });
+  return result[0].id;
 }
 
 export async function getModerationQueue(
@@ -577,7 +582,6 @@ export async function getUserUsageStats(userId: number) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const dateExpr = sql`DATE(${generations.createdAt})`;
   const dailyActivity = await db
     .select({
       date: sql<string>`DATE(${generations.createdAt})`.as("activity_date"),
@@ -717,8 +721,8 @@ export async function createVideoProject(project: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(videoProjects).values(project);
-  const id = result[0].insertId;
+  const result = await db.insert(videoProjects).values(project).returning({ id: videoProjects.id });
+  const id = result[0].id;
   return { id };
 }
 
@@ -805,8 +809,8 @@ export async function createShareToken(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(projectShareTokens).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(projectShareTokens).values(data).returning({ id: projectShareTokens.id });
+  return { id: result[0].id };
 }
 
 export async function getShareToken(token: string) {
@@ -876,8 +880,8 @@ export async function addCollaborator(data: {
       .where(eq(projectCollaborators.id, existing[0].id));
     return { id: existing[0].id, action: "updated" as const };
   }
-  const result = await db.insert(projectCollaborators).values(data);
-  return { id: result[0].insertId, action: "created" as const };
+  const result = await db.insert(projectCollaborators).values(data).returning({ id: projectCollaborators.id });
+  return { id: result[0].id, action: "created" as const };
 }
 
 export async function listCollaborators(projectId: number) {
@@ -968,8 +972,8 @@ export async function createRevision(data: {
   const result = await db.insert(projectRevisions).values({
     ...data,
     source: data.source ?? "manual",
-  });
-  return { id: result[0].insertId };
+  }).returning({ id: projectRevisions.id });
+  return { id: result[0].id };
 }
 
 export async function listRevisions(projectId: number, limit = 50) {

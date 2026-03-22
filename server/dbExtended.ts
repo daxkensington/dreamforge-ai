@@ -64,8 +64,8 @@ export async function getLikeCounts(galleryItemIds: number[]) {
 export async function addComment(userId: number, galleryItemId: number, content: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(galleryComments).values({ userId, galleryItemId, content });
-  return { id: result[0].insertId };
+  const result = await db.insert(galleryComments).values({ userId, galleryItemId, content }).returning({ id: galleryComments.id });
+  return { id: result[0].id };
 }
 
 export async function getComments(galleryItemId: number, limit = 50) {
@@ -160,8 +160,8 @@ export async function getFollowingFeed(userId: number, limit = 50) {
 export async function createCharacter(data: Omit<InsertCharacter, "id">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(characters).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(characters).values(data).returning({ id: characters.id });
+  return { id: result[0].id };
 }
 
 export async function listCharacters(userId: number) {
@@ -198,8 +198,8 @@ export async function deleteCharacter(id: number, userId: number) {
 export async function createBrandKit(data: Omit<InsertBrandKit, "id">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(brandKits).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(brandKits).values(data).returning({ id: brandKits.id });
+  return { id: result[0].id };
 }
 
 export async function listBrandKits(userId: number) {
@@ -236,8 +236,8 @@ export async function deleteBrandKit(id: number, userId: number) {
 export async function createApiKey(data: Omit<InsertApiKey, "id">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(apiKeys).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(apiKeys).values(data).returning({ id: apiKeys.id });
+  return { id: result[0].id };
 }
 
 export async function listApiKeys(userId: number) {
@@ -289,8 +289,8 @@ export async function deleteApiKey(id: number, userId: number) {
 export async function createSceneKeyframe(data: Omit<InsertSceneKeyframe, "id">) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(sceneKeyframes).values(data);
-  return { id: result[0].insertId };
+  const result = await db.insert(sceneKeyframes).values(data).returning({ id: sceneKeyframes.id });
+  return { id: result[0].id };
 }
 
 export async function listSceneKeyframes(projectId: number) {
