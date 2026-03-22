@@ -97,7 +97,7 @@ export default function Home() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         {/* Dark overlay — heavier at bottom */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
 
         <div className="container relative z-10 py-24 md:py-32 lg:py-40">
           <div className="max-w-5xl mx-auto text-center">
