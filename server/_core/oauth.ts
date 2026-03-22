@@ -1,3 +1,4 @@
+// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";

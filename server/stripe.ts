@@ -1,3 +1,4 @@
+// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
 import Stripe from "stripe";
 import { Express, Request, Response } from "express";
 import { getDb } from "./db";

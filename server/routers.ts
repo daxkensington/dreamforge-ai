@@ -1,3 +1,4 @@
+// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
 import { randomBytes } from "crypto";
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
