@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -92,6 +93,10 @@ import {
   autoCheckAchievements,
   checkAndSendBudgetAlerts,
 } from "./routers/phase22";
+import { pricingRouter } from "./routers/pricing";
+import { marketplaceRouter } from "./routers/marketplace";
+import { audioRouter } from "./routers/audio";
+import { collaborationRouter } from "./routers/collaboration";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -2061,7 +2066,7 @@ export const appRouter = router({
         // Verify ownership
         const project = await getVideoProject(input.projectId, ctx.user.id);
         if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
-        const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        const token = randomBytes(32).toString("hex");
         const expiresAt = input.expiresInHours
           ? new Date(Date.now() + input.expiresInHours * 60 * 60 * 1000)
           : undefined;
@@ -2358,6 +2363,18 @@ export const appRouter = router({
   achievementShare: achievementShareRouter,
   budgetEmail: budgetEmailRouter,
   autoAchievement: autoAchievementRouter,
+
+  // ─── Audio Generation ─────────────────────────────────────────────────
+  audio: audioRouter,
+
+  // ─── Pricing & Subscriptions ─────────────────────────────────────────
+  pricing: pricingRouter,
+
+  // ─── Creator Marketplace ──────────────────────────────────────────────
+  marketplace: marketplaceRouter,
+
+  // ─── Real-time Collaboration ─────────────────────────────────────────
+  collaboration: collaborationRouter,
 
   export: router({
     metadata: protectedProcedure

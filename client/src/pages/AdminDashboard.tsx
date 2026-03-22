@@ -105,7 +105,7 @@ const baseChartOptions = {
 };
 
 export default function AdminDashboard() {
-  const { user } = useAuth() as any;
+  const { user } = useAuth();
   const [userSearch, setUserSearch] = useState("");
   const [moderationFilter, setModerationFilter] = useState<"pending" | "approved" | "rejected">("pending");
   const [analyticsPeriod, setAnalyticsPeriod] = useState<"daily" | "weekly" | "monthly">("daily");

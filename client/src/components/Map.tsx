@@ -86,26 +86,41 @@ declare global {
   }
 }
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
+// TODO: The maps script URL (including API key) should be served by a backend
+// endpoint (e.g. GET /api/maps-config) so that API keys are never bundled into
+// the client JavaScript. For now we fetch the config at runtime.
+const MAPS_CONFIG_ENDPOINT = "/api/maps-config";
+
+async function fetchMapsScriptUrl(): Promise<string> {
+  const res = await fetch(MAPS_CONFIG_ENDPOINT);
+  if (!res.ok) {
+    throw new Error("Failed to fetch maps configuration from backend");
+  }
+  const config = await res.json();
+  return config.scriptUrl;
+}
 
 function loadMapScript() {
-  return new Promise(resolve => {
-    const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
-    };
-    script.onerror = () => {
-      console.error("Failed to load Google Maps script");
-    };
-    document.head.appendChild(script);
+  return new Promise(async (resolve, reject) => {
+    try {
+      const scriptUrl = await fetchMapsScriptUrl();
+      const script = document.createElement("script");
+      script.src = scriptUrl;
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.onload = () => {
+        resolve(null);
+        script.remove(); // Clean up immediately
+      };
+      script.onerror = () => {
+        console.error("Failed to load Google Maps script");
+        reject(new Error("Failed to load Google Maps script"));
+      };
+      document.head.appendChild(script);
+    } catch (err) {
+      console.error("Failed to fetch maps config:", err);
+      reject(err);
+    }
   });
 }
 

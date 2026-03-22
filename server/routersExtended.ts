@@ -84,6 +84,11 @@ export const videoGenRouter = router({
       const project = await getVideoProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
+      // Verify the keyframe belongs to this project
+      const keyframes = await listSceneKeyframes(input.projectId);
+      const keyframe = keyframes.find((kf) => kf.id === input.keyframeId);
+      if (!keyframe) throw new TRPCError({ code: "NOT_FOUND", message: "Keyframe not found in this project" });
+
       await updateSceneKeyframe(input.keyframeId, { status: "generating", prompt: input.prompt });
       
       // Generate in background

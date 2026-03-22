@@ -46,6 +46,7 @@ import ApiDocs from "./pages/ApiDocs";
 import Credits from "./pages/Credits";
 import Notifications from "./pages/Notifications";
 import AdminDashboard from "./pages/AdminDashboard";
+import TimelineEditor from "./pages/TimelineEditor";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 function Router() {
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/video-studio/script" component={ToolTextToVideoScript} />
       <Route path="/video-studio/project/:id" component={ProjectDetail} />
       <Route path="/video-studio/join/:token" component={JoinProject} />
+      <Route path="/timeline/:projectId" component={TimelineEditor} />
       <Route path="/characters" component={Characters} />
       <Route path="/brand-kits" component={BrandKits} />
       <Route path="/api-keys" component={ApiKeys} />

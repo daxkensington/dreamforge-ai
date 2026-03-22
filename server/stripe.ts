@@ -3,7 +3,13 @@ import { Express, Request, Response } from "express";
 import { getDb } from "./db";
 import { createNotification } from "./routersPhase15";
 import { creditBalances, creditTransactions, webhookEvents } from "../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import {
+  activateSubscription,
+  handleSubscriptionUpdated,
+  handleSubscriptionDeleted,
+  handleMonthlyReset,
+} from "./routers/pricing";
 
 // ─── Stripe Client ─────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -107,7 +113,9 @@ export async function getOrCreateBalance(userId: number) {
 export async function deductCredits(
   userId: number,
   amount: number,
-  description: string
+  description: string,
+  type: "usage" | "purchase" | "bonus" | "refund" | "subscription" | "reward" | "referral" = "usage",
+  metadata?: Record<string, any>
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -116,19 +124,31 @@ export async function deductCredits(
     return { success: false, balance: balance.balance, needed: amount };
   }
 
-  await db
+  // Atomic deduction — uses SQL expression so concurrent requests can't overdraw
+  const result = await db
     .update(creditBalances)
     .set({
-      balance: sql`${creditBalances.balance} - ${amount}`,
+      balance: sql`GREATEST(${creditBalances.balance} - ${amount}, 0)`,
       lifetimeSpent: sql`${creditBalances.lifetimeSpent} + ${amount}`,
     })
-    .where(eq(creditBalances.userId, userId));
+    .where(
+      and(
+        eq(creditBalances.userId, userId),
+        sql`${creditBalances.balance} >= ${amount}`
+      )
+    );
+
+  // If no rows were updated, balance was insufficient (race condition protection)
+  if ((result as any)[0]?.affectedRows === 0) {
+    return { success: false, balance: balance.balance, needed: amount };
+  }
 
   await db.insert(creditTransactions).values({
     userId,
     amount: -amount,
-    type: "usage",
+    type,
     description,
+    metadata: metadata || null,
   });
 
   return { success: true, balance: balance.balance - amount, needed: amount };
@@ -262,8 +282,12 @@ export function registerStripeWebhook(app: Express) {
         return res.status(400).json({ error: "Webhook signature verification failed" });
       }
 
-      // Handle test events
+      // Handle test events — only accept in non-production environments
       if (event.id.startsWith("evt_test_")) {
+        if (process.env.NODE_ENV === "production") {
+          console.warn("[Stripe Webhook] Rejecting test event in production:", event.id);
+          return res.status(403).json({ error: "Test events not allowed in production" });
+        }
         console.log("[Stripe Webhook] Test event detected, returning verification response");
         return res.json({ verified: true });
       }
@@ -321,6 +345,85 @@ export function registerStripeWebhook(app: Express) {
 
           case "payment_intent.succeeded": {
             console.log(`[Stripe Webhook] Payment succeeded: ${event.data.object.id}`);
+            await logWebhookEvent("processed", `Payment intent succeeded: ${event.data.object.id}`);
+            break;
+          }
+
+          // ─── Subscription Events ────────────────────────────────────
+          case "customer.subscription.created": {
+            const sub = event.data.object as Stripe.Subscription;
+            const userId = parseInt(sub.metadata?.user_id || "0");
+            const planId = parseInt(sub.metadata?.plan_id || "0");
+
+            if (userId && planId) {
+              await activateSubscription(
+                userId,
+                planId,
+                sub.id,
+                new Date((sub as any).current_period_start * 1000),
+                new Date((sub as any).current_period_end * 1000)
+              );
+              console.log(`[Stripe Webhook] Subscription created for user ${userId}, plan ${sub.metadata?.plan_name}`);
+              try {
+                await createNotification(
+                  userId,
+                  "payment",
+                  "Subscription Active",
+                  `Your ${sub.metadata?.plan_name || "new"} plan is now active. Credits have been allocated!`,
+                  { planId, subscriptionId: sub.id }
+                );
+              } catch {}
+              await logWebhookEvent("processed", `Subscription created for user ${userId}, plan ${planId}`);
+            }
+            break;
+          }
+
+          case "customer.subscription.updated": {
+            const sub = event.data.object as Stripe.Subscription;
+            const planName = sub.metadata?.plan_name || "";
+            await handleSubscriptionUpdated(
+              sub.id,
+              planName,
+              sub.status,
+              new Date((sub as any).current_period_start * 1000),
+              new Date((sub as any).current_period_end * 1000)
+            );
+            console.log(`[Stripe Webhook] Subscription updated: ${sub.id} → ${sub.status}`);
+            await logWebhookEvent("processed", `Subscription updated: ${sub.id}, status=${sub.status}, plan=${planName}`);
+            break;
+          }
+
+          case "customer.subscription.deleted": {
+            const sub = event.data.object as Stripe.Subscription;
+            await handleSubscriptionDeleted(sub.id);
+            const userId = parseInt(sub.metadata?.user_id || "0");
+            if (userId) {
+              try {
+                await createNotification(
+                  userId,
+                  "payment",
+                  "Subscription Canceled",
+                  "Your subscription has been canceled. You've been moved to the Free plan.",
+                  { subscriptionId: sub.id }
+                );
+              } catch {}
+            }
+            console.log(`[Stripe Webhook] Subscription deleted: ${sub.id}`);
+            await logWebhookEvent("processed", `Subscription deleted: ${sub.id}`);
+            break;
+          }
+
+          case "invoice.payment_succeeded": {
+            const invoice = event.data.object as any;
+            const subId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+            // Only handle renewal invoices (not the first one, which is handled by subscription.created)
+            if (subId && invoice.billing_reason === "subscription_cycle") {
+              await handleMonthlyReset(subId);
+              console.log(`[Stripe Webhook] Monthly credit reset for subscription ${subId}`);
+              await logWebhookEvent("processed", `Monthly credit reset for subscription ${subId}`);
+            } else {
+              await logWebhookEvent("processed", `Invoice payment succeeded: ${invoice.id}`);
+            }
             break;
           }
 
@@ -328,12 +431,10 @@ export function registerStripeWebhook(app: Express) {
             console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
             await logWebhookEvent("ignored", `Unhandled event type: ${event.type}`);
         }
-        // Log successful processing (for handled events)
-        if (event.type !== "payment_intent.succeeded" && event.type.startsWith("checkout.")) {
+        // Log successful processing for checkout events not already logged
+        if (event.type === "checkout.session.completed") {
           const session = event.data.object as any;
-          await logWebhookEvent("processed", `Checkout completed for user ${session.metadata?.user_id}, ${session.metadata?.credits} credits`);
-        } else if (event.type === "payment_intent.succeeded") {
-          await logWebhookEvent("processed", `Payment intent succeeded: ${(event.data.object as any).id}`);
+          await logWebhookEvent("processed", `Checkout completed for user ${session.metadata?.user_id}, ${session.metadata?.credits || 'subscription'}`);
         }
       } catch (err: any) {
         console.error("[Stripe Webhook] Error processing event:", err.message);
