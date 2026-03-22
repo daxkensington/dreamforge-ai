@@ -12,10 +12,16 @@ import {
   handleMonthlyReset,
 } from "./routers/pricing";
 
-// ─── Stripe Client ─────────────────────────────────────────────────────────
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia" as any,
-});
+// ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
+let _stripeClient: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (!_stripeClient) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+    _stripeClient = new Stripe(key, { apiVersion: "2025-02-24.acacia" as any });
+  }
+  return _stripeClient;
+}
 
 // ─── Credit Packages ────────────────────────────────────────────────────────
 export const CREDIT_PACKAGES = [
@@ -212,7 +218,7 @@ export async function createCheckoutSession(
   let customerId = balance.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripeClient().customers.create({
       email: userEmail,
       name: userName,
       metadata: { userId: userId.toString() },
@@ -224,7 +230,7 @@ export async function createCheckoutSession(
       .where(eq(creditBalances.userId, userId));
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripeClient().checkout.sessions.create({
     customer: customerId,
     client_reference_id: userId.toString(),
     customer_email: undefined, // already set on customer
@@ -273,7 +279,7 @@ export function registerStripeWebhook(app: Express) {
 
       let event: Stripe.Event;
       try {
-        event = stripe.webhooks.constructEvent(
+        event = getStripeClient().webhooks.constructEvent(
           req.body,
           sig,
           webhookSecret

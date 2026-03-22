@@ -26,9 +26,15 @@ import {
 } from "../dbMarketplace";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia" as any,
-});
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+    _stripe = new Stripe(key, { apiVersion: "2025-02-24.acacia" as any });
+  }
+  return _stripe;
+}
 
 // ─── Public Routes ──────────────────────────────────────────────────────────
 
@@ -120,7 +126,7 @@ const purchaseRoute = protectedProcedure
 
     // For paid listings with Stripe, create a checkout session
     if (input.paymentMethod === "stripe") {
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         client_reference_id: ctx.user.id.toString(),
         mode: "payment",
         line_items: [
@@ -337,7 +343,7 @@ const setupSellerAccountRoute = protectedProcedure
     // Create Stripe Connect account if not already set up
     if (!profile.stripeConnectId) {
       try {
-        const account = await stripe.accounts.create({
+        const account = await getStripe().accounts.create({
           type: "express",
           metadata: {
             user_id: ctx.user.id.toString(),
@@ -351,7 +357,7 @@ const setupSellerAccountRoute = protectedProcedure
         });
 
         // Generate onboarding link
-        const accountLink = await stripe.accountLinks.create({
+        const accountLink = await getStripe().accountLinks.create({
           account: account.id,
           refresh_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/seller/setup?refresh=true`,
           return_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/seller/dashboard?onboarded=true`,
@@ -397,7 +403,7 @@ const requestPayoutRoute = protectedProcedure
     }
 
     try {
-      const transfer = await stripe.transfers.create({
+      const transfer = await getStripe().transfers.create({
         amount: input.amount,
         currency: "usd",
         destination: profile.stripeConnectId,

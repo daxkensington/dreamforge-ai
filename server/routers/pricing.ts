@@ -13,10 +13,16 @@ import { getOrCreateBalance } from "../stripe";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
 import Stripe from "stripe";
 
-// ─── Stripe Client ─────────────────────────────────────────────────────────
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia" as any,
-});
+// ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe is not configured" });
+    _stripe = new Stripe(key, { apiVersion: "2025-02-24.acacia" as any });
+  }
+  return _stripe;
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -79,7 +85,7 @@ async function getStripeCustomerId(userId: number, email: string, name: string):
   const balance = await getOrCreateBalance(userId);
   if (balance.stripeCustomerId) return balance.stripeCustomerId;
 
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     name,
     metadata: { userId: userId.toString() },
@@ -147,12 +153,12 @@ export const pricingRouter = router({
       if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
       if (!plan.stripePriceId) {
         // Create Stripe product + price on the fly if not yet configured
-        const product = await stripe.products.create({
+        const product = await getStripe().products.create({
           name: `DreamForge ${plan.displayName} Plan`,
           description: `${plan.monthlyCredits.toLocaleString()} credits/month`,
           metadata: { planId: plan.id.toString(), planName: plan.name },
         });
-        const price = await stripe.prices.create({
+        const price = await getStripe().prices.create({
           product: product.id,
           unit_amount: plan.price,
           currency: "usd",
@@ -186,7 +192,7 @@ export const pricingRouter = router({
         });
       }
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
         mode: "subscription",
@@ -218,7 +224,7 @@ export const pricingRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "No active subscription found" });
     }
 
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+    await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
       cancel_at_period_end: true,
     });
 
@@ -254,7 +260,7 @@ export const pricingRouter = router({
 
       // Downgrade to free = cancel
       if (input.newPlanName === "free") {
-        await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+        await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
           cancel_at_period_end: true,
         });
         const db = await getDb();
@@ -275,14 +281,14 @@ export const pricingRouter = router({
       }
 
       // Get current Stripe subscription to find the item ID
-      const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+      const stripeSub = await getStripe().subscriptions.retrieve(sub.stripeSubscriptionId);
       const itemId = stripeSub.items.data[0]?.id;
       if (!itemId) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not find subscription item" });
       }
 
       // Update with proration
-      await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+      await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
         items: [{ id: itemId, price: newPlan.stripePriceId! }],
         proration_behavior: "create_prorations",
         metadata: {
@@ -376,7 +382,7 @@ export const pricingRouter = router({
         ctx.user.name || "User"
       );
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
         mode: "payment",
