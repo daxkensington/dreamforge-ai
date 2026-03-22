@@ -7,7 +7,7 @@
     "api/index.ts": {
       "maxDuration": 60,
       "includeFiles": "api/dist/**"
-    },
+    }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.ts" },
