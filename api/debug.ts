@@ -1,45 +1,37 @@
 export default async function handler(req: any, res: any) {
+  const results: Record<string, string> = {};
+  const fs = await import("fs");
+  const path = await import("path");
+
+  // Check what files exist
   try {
-    // Test basic imports one by one
-    const results: Record<string, string> = {};
+    const taskDir = "/var/task";
+    const apiDir = path.join(taskDir, "api");
+    results.taskDirExists = fs.existsSync(taskDir).toString();
+    results.apiDirExists = fs.existsSync(apiDir).toString();
 
-    try {
-      await import("express");
-      results.express = "ok";
-    } catch (e: any) {
-      results.express = e.message;
+    if (fs.existsSync(apiDir)) {
+      results.apiFiles = fs.readdirSync(apiDir).join(", ");
     }
 
-    try {
-      await import("../server/_core/env");
-      results.env = "ok";
-    } catch (e: any) {
-      results.env = e.message;
+    const distDir = path.join(apiDir, "dist");
+    results.distDirExists = fs.existsSync(distDir).toString();
+    if (fs.existsSync(distDir)) {
+      results.distFiles = fs.readdirSync(distDir).join(", ");
     }
-
-    try {
-      await import("../server/db");
-      results.db = "ok";
-    } catch (e: any) {
-      results.db = e.message;
-    }
-
-    try {
-      await import("../server/stripe");
-      results.stripe = "ok";
-    } catch (e: any) {
-      results.stripe = e.message;
-    }
-
-    try {
-      await import("../server/routers");
-      results.routers = "ok";
-    } catch (e: any) {
-      results.routers = e.message;
-    }
-
-    res.status(200).json({ results, env: { NODE_ENV: process.env.NODE_ENV, hasDbUrl: !!process.env.DATABASE_URL, hasJwt: !!process.env.JWT_SECRET } });
   } catch (e: any) {
-    res.status(500).json({ error: e.message, stack: e.stack });
+    results.fsError = e.message;
   }
+
+  // Try loading the bundled app
+  try {
+    const app = await import("./dist/index.js");
+    results.bundleLoad = "ok";
+    results.bundleType = typeof app.default;
+  } catch (e: any) {
+    results.bundleLoad = e.message;
+    results.bundleStack = (e.stack || "").split("\n").slice(0, 5).join(" | ");
+  }
+
+  res.status(200).json(results);
 }
