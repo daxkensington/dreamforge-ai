@@ -4,12 +4,12 @@
   "outputDirectory": "dist/public",
   "framework": null,
   "functions": {
-    "api/**/*.js": {
+    "api/**/*.ts": {
       "maxDuration": 60
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/dist/index.js" },
+    { "source": "/api/(.*)", "destination": "/api/index.ts" },
     { "source": "/((?!assets|favicon|__manus__).*)", "destination": "/index.html" }
   ],
   "headers": [
