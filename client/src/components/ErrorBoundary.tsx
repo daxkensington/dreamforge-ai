@@ -33,7 +33,7 @@ class ErrorBoundary extends Component<Props, State> {
 
             <h2 className="text-xl mb-4">Something went wrong.</h2>
 
-            {import.meta.env.DEV && this.state.error?.stack && (
+            {process.env.NODE_ENV === 'development' && this.state.error?.stack && (
               <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
                 <pre className="text-sm text-muted-foreground whitespace-break-spaces">
                   {this.state.error.stack}

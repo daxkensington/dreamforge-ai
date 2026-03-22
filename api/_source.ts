@@ -1,4 +1,4 @@
-// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
+// @ts-nocheck — Dead code: Old Vercel serverless Express wrapper, replaced by Next.js API routes
 import "dotenv/config";
 import express from "express";
 import cors from "cors";

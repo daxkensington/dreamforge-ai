@@ -1,4 +1,4 @@
-// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
+// @ts-nocheck — Dead code: Express cookie helpers, logout now handled by NextAuth signOut()
 import type { CookieOptions, Request } from "express";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);

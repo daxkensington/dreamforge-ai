@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: Express server entry point replaced by Next.js
 import "dotenv/config";
 import express from "express";
 import cors from "cors";

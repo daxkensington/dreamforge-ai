@@ -1,30 +1,17 @@
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-function optionalEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    console.warn(`Warning: environment variable ${name} is not set`);
-  }
-  return value ?? "";
-}
+// Lazy env access via getters — values are read at runtime, not at import/build time.
+// This prevents Next.js build from crashing when env vars aren't set during static analysis.
 
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: requireEnv("JWT_SECRET"),
-  databaseUrl: requireEnv("DATABASE_URL"),
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: optionalEnv("BUILT_IN_FORGE_API_URL"),
-  forgeApiKey: optionalEnv("BUILT_IN_FORGE_API_KEY"),
-  openaiApiKey: optionalEnv("OPENAI_API_KEY"),
-  stripeSecretKey: optionalEnv("STRIPE_SECRET_KEY"),
-  stabilityApiKey: optionalEnv("STABILITY_API_KEY"),
-  replicateApiToken: optionalEnv("REPLICATE_API_TOKEN"),
+  get appId() { return process.env.NEXT_PUBLIC_APP_ID ?? process.env.VITE_APP_ID ?? ""; },
+  get cookieSecret() { return process.env.JWT_SECRET ?? ""; },
+  get databaseUrl() { return process.env.DATABASE_URL ?? ""; },
+  get oAuthServerUrl() { return process.env.OAUTH_SERVER_URL ?? ""; },
+  get ownerOpenId() { return process.env.OWNER_OPEN_ID ?? ""; },
+  get isProduction() { return process.env.NODE_ENV === "production"; },
+  get forgeApiUrl() { return process.env.BUILT_IN_FORGE_API_URL ?? ""; },
+  get forgeApiKey() { return process.env.BUILT_IN_FORGE_API_KEY ?? ""; },
+  get openaiApiKey() { return process.env.OPENAI_API_KEY ?? ""; },
+  get stripeSecretKey() { return process.env.STRIPE_SECRET_KEY ?? ""; },
+  get stabilityApiKey() { return process.env.STABILITY_API_KEY ?? ""; },
+  get replicateApiToken() { return process.env.REPLICATE_API_TOKEN ?? ""; },
 };

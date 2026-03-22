@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: replaced by next.config.ts
 import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";

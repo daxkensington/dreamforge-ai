@@ -1,9 +1,9 @@
 // @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
 import { randomBytes } from "crypto";
-import { COOKIE_NAME } from "@shared/const";
+
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getSessionCookieOptions } from "./_core/cookies";
+
 import { generateImage } from "./_core/imageGeneration";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
@@ -310,9 +310,9 @@ export const appRouter = router({
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    logout: publicProcedure.mutation(() => {
+      // In Next.js, logout is handled client-side via NextAuth's signOut().
+      // This endpoint remains for backward compatibility but is a no-op.
       return { success: true } as const;
     }),
   }),

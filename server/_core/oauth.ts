@@ -1,4 +1,4 @@
-// @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
+// @ts-nocheck — Dead code: Express OAuth routes replaced by NextAuth
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";

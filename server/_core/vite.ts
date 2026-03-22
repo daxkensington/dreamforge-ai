@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: Vite dev server middleware replaced by Next.js
 import express, { type Express } from "express";
 import fs from "fs";
 import { type Server } from "http";

@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: routing now handled by Next.js App Router
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
