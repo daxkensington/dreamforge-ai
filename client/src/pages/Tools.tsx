@@ -204,7 +204,7 @@ export default function Tools() {
       <div className="min-h-[calc(100vh-4rem)]">
         {/* Hero Section */}
         <section className="relative py-20 overflow-hidden">
-          <div className="absolute inset-0 bg-grid opacity-40" />
+          <div className="absolute inset-0 bg-grid opacity-10" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
 
           <div className="container relative">
@@ -222,15 +222,15 @@ export default function Tools() {
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
                 <span className="gradient-text">AI Tools</span>
                 <br />
-                <span className="text-foreground/80">for Every Creative Need</span>
+                <span className="text-foreground">for Every Creative Need</span>
               </h1>
 
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+              <p className="text-lg text-foreground/70 max-w-2xl mx-auto mb-8">
                 15 professional-grade AI tools that transform your creative workflow.
                 Upscale, stylize, edit, blend, sketch, grade, and build — all in one place.
               </p>
 
-              <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center gap-6 text-sm text-foreground/60">
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-primary" />
                   <span>Instant Processing</span>
@@ -258,7 +258,7 @@ export default function Tools() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
-                <Card className="group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/30 transition-all duration-300 h-full">
+                <Card className="group relative overflow-hidden border-border/50 bg-white/5 backdrop-blur-sm hover:border-primary/30 transition-all duration-300 h-full">
                   {/* Glow effect on hover */}
                   <div className={`absolute inset-0 ${tool.bgGlow} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
 
@@ -276,7 +276,7 @@ export default function Tools() {
                       {tool.title}
                     </h3>
 
-                    <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+                    <p className="text-foreground/60 text-sm leading-relaxed mb-6">
                       {tool.description}
                     </p>
 

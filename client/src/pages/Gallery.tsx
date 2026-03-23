@@ -33,6 +33,15 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 24;
 
+const showcaseImages = [
+  { src: "/showcase/gallery-1.jpg", prompt: "Bioluminescent underwater cathedral with jellyfish stained glass" },
+  { src: "/showcase/gallery-2.jpg", prompt: "Cyberpunk samurai in neon rain, holographic katana" },
+  { src: "/showcase/gallery-3.jpg", prompt: "Enchanted forest library where trees are bookshelves" },
+  { src: "/showcase/gallery-4.jpg", prompt: "Crystalline phoenix emerging from a supernova" },
+  { src: "/showcase/gallery-5.jpg", prompt: "Android woman with clockwork face, art nouveau" },
+  { src: "/showcase/gallery-6.jpg", prompt: "Alien landscape with geometric monuments at sunset" },
+];
+
 type SortOption = "newest" | "oldest" | "most_viewed";
 
 export default function Gallery() {
@@ -179,6 +188,34 @@ export default function Gallery() {
               </Button>
             )}
             <DisclaimerBanner compact />
+          </div>
+        </div>
+
+        {/* Featured Showcase */}
+        <div className="mb-12">
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Featured Showcase — AI Art by DreamForge
+          </h2>
+          <p className="text-xs text-muted-foreground mb-4">Inspiration from our AI generation engine</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {showcaseImages.map((img) => (
+              <div key={img.src} className="group relative rounded-xl overflow-hidden aspect-[3/4]">
+                <img
+                  src={img.src}
+                  alt={img.prompt}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all duration-500 flex items-end">
+                  <div className="p-3 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                    <p className="text-xs text-white/90 font-medium leading-relaxed">
+                      &ldquo;{img.prompt}&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
