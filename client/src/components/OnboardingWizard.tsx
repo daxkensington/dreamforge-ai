@@ -20,6 +20,7 @@ const ONBOARDING_KEY = "dreamforge_onboarding_completed";
 
 export function useOnboarding() {
   const [completed, setCompleted] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
       return localStorage.getItem(ONBOARDING_KEY) === "true";
     } catch {
