@@ -424,7 +424,12 @@ export default function Home() {
 
           {/* Example results */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
-            {galleryImages.slice(0, 4).map((img, i) => (
+            {[
+              { src: "/showcase/gallery-5.jpg", prompt: "Android woman with clockwork face" },
+              { src: "/showcase/gallery-8.jpg", prompt: "Steampunk airship battle above London" },
+              { src: "/showcase/gallery-11.jpg", prompt: "Bioluminescent coral reef city" },
+              { src: "/showcase/gallery-6.jpg", prompt: "Alien landscape with geometric monuments" },
+            ].map((img, i) => (
               <motion.div
                 key={img.src}
                 initial="hidden"
