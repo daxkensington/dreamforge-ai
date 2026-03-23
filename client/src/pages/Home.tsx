@@ -238,20 +238,31 @@ export default function Home() {
         />
       )}
 
-      {/* ═══════ SECTION 1: HERO WITH ROTATING BACKGROUND ═══════ */}
+      {/* ═══════ SECTION 1: HERO WITH VIDEO BACKGROUND ═══════ */}
       <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        {/* Rotating background images */}
+        {/* Video background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/showcase/hero-forge.jpg"
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/video/hero-bg.mp4" type="video/mp4" />
+        </video>
+        {/* Fallback rotating images (behind video, shows on poster/load) */}
         {heroImages.map((src, i) => (
           <img
             key={src}
             src={src}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out"
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out -z-10"
             style={{ opacity: i === heroIdx ? 1 : 0 }}
           />
         ))}
         {/* Dark overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/85" />
 
         <div className="container relative z-10 py-24 md:py-32 lg:py-40">
           <div className="max-w-5xl mx-auto text-center">
