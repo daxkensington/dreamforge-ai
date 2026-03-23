@@ -82,12 +82,12 @@ const beforeAfterDemos = [
 ];
 
 const tools = [
-  { icon: Image, title: "Text-to-Image", desc: "Generate any scene from a text prompt", bg: "/showcase/gallery-1.jpg", href: "/workspace" },
-  { icon: Film, title: "AI Video", desc: "Create animated clips from descriptions", bg: "/showcase/gallery-2.jpg", href: "/workspace" },
-  { icon: Video, title: "Image-to-Video", desc: "Animate any image with cinematic motion", bg: "/showcase/gallery-3.jpg", href: "/workspace" },
-  { icon: Music, title: "Audio Generation", desc: "AI-powered soundscapes and music", bg: "/showcase/gallery-4.jpg", href: "/workspace" },
-  { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell AI-generated creations", bg: "/showcase/gallery-9.jpg", href: "/gallery" },
-  { icon: Users, title: "Community Gallery", desc: "Discover and share trending artwork", bg: "/showcase/gallery-10.jpg", href: "/gallery" },
+  { icon: Image, title: "Text-to-Image", desc: "Generate any scene from a text prompt", bg: "/showcase/home-tool-txtimg.jpg", href: "/workspace" },
+  { icon: Film, title: "AI Video", desc: "Create animated clips from descriptions", bg: "/showcase/home-tool-video.jpg", href: "/workspace" },
+  { icon: Video, title: "Image-to-Video", desc: "Animate any image with cinematic motion", bg: "/showcase/home-tool-img2vid.jpg", href: "/workspace" },
+  { icon: Music, title: "Audio Generation", desc: "AI-powered soundscapes and music", bg: "/showcase/home-tool-audio.jpg", href: "/workspace" },
+  { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell AI-generated creations", bg: "/showcase/home-tool-market.jpg", href: "/marketplace" },
+  { icon: Users, title: "Community Gallery", desc: "Discover and share trending artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
 ];
 
 const pricingPlans = [

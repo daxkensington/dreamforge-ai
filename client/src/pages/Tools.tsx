@@ -24,17 +24,17 @@ interface GridTool {
 
 const gridTools: GridTool[] = [
   { title: "Image Upscaler", desc: "Enhance resolution with AI upscaling", icon: Maximize, href: "/tools/upscaler", img: "/showcase/tool-upscale.jpg" },
-  { title: "Background Remove", desc: "Isolate subjects with clean edges", icon: Scissors, href: "/tools/background", img: "/showcase/demo-bg-after.jpg" },
-  { title: "Inpainting", desc: "Edit regions with natural language", icon: PenTool, href: "/tools/inpainting", img: "/showcase/gallery-7.jpg" },
-  { title: "Outpainting", desc: "Extend images beyond their borders", icon: Expand, href: "/tools/outpainting", img: "/showcase/gallery-6.jpg" },
-  { title: "Face Enhancer", desc: "AI-powered portrait retouching", icon: Smile, href: "/tools/face-enhancer", img: "/showcase/gallery-5.jpg" },
-  { title: "Color Grading", desc: "Cinematic film looks and presets", icon: SunMedium, href: "/tools/color-grading", img: "/showcase/gallery-8.jpg" },
-  { title: "Prompt Builder", desc: "Craft perfect prompts visually", icon: Wand2, href: "/tools/prompt-builder", img: "/showcase/gallery-11.jpg" },
-  { title: "Text Effects", desc: "Stunning stylized AI text art", icon: Type, href: "/tools/text-effects", img: "/showcase/gallery-12.jpg" },
-  { title: "Image Blender", desc: "Merge two images creatively", icon: Blend, href: "/tools/image-blender", img: "/showcase/gallery-9.jpg" },
-  { title: "Sketch to Image", desc: "Turn drawings into polished art", icon: PenLine, href: "/tools/sketch-to-image", img: "/showcase/gallery-3.jpg" },
-  { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/gallery-1.jpg" },
-  { title: "Object Eraser", desc: "Remove unwanted objects cleanly", icon: Eraser, href: "/tools/object-eraser", img: "/showcase/gallery-10.jpg" },
+  { title: "Background Remove", desc: "Isolate subjects with clean edges", icon: Scissors, href: "/tools/background", img: "/showcase/tool-bg-remove.jpg" },
+  { title: "Inpainting", desc: "Edit regions with natural language", icon: PenTool, href: "/tools/inpainting", img: "/showcase/tool-inpaint.jpg" },
+  { title: "Outpainting", desc: "Extend images beyond their borders", icon: Expand, href: "/tools/outpainting", img: "/showcase/tool-outpaint.jpg" },
+  { title: "Face Enhancer", desc: "AI-powered portrait retouching", icon: Smile, href: "/tools/face-enhancer", img: "/showcase/tool-face.jpg" },
+  { title: "Color Grading", desc: "Cinematic film looks and presets", icon: SunMedium, href: "/tools/color-grading", img: "/showcase/tool-colorgrade.jpg" },
+  { title: "Prompt Builder", desc: "Craft perfect prompts visually", icon: Wand2, href: "/tools/prompt-builder", img: "/showcase/tool-promptbuild.jpg" },
+  { title: "Text Effects", desc: "Stunning stylized AI text art", icon: Type, href: "/tools/text-effects", img: "/showcase/tool-texteffect.jpg" },
+  { title: "Image Blender", desc: "Merge two images creatively", icon: Blend, href: "/tools/image-blender", img: "/showcase/tool-blend.jpg" },
+  { title: "Sketch to Image", desc: "Turn drawings into polished art", icon: PenLine, href: "/tools/sketch-to-image", img: "/showcase/tool-sketch.jpg" },
+  { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/tool-palette.jpg" },
+  { title: "Object Eraser", desc: "Remove unwanted objects cleanly", icon: Eraser, href: "/tools/object-eraser", img: "/showcase/tool-eraser.jpg" },
 ];
 
 export default function Tools() {
