@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: old provider, replaced by Grok/OpenAI/Gemini
 /**
  * Forge provider adapter — wraps the existing imageGeneration.ts logic.
  */

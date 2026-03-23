@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: old provider, replaced by Grok/OpenAI/Gemini
 /**
  * Stability AI provider adapter — Stable Diffusion XL / Stable Video via REST API.
  */

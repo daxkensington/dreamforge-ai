@@ -9,6 +9,8 @@ export interface GenerationRequest {
   height?: number;
   steps?: number;
   model: string;
+  quality?: "standard" | "hd";
+  style?: "natural" | "vivid";
   options?: Record<string, unknown>;
 }
 
@@ -22,5 +24,7 @@ export interface GenerationResult {
 
 export interface ProviderAdapter {
   readonly provider: string;
+  /** Whether the provider has the required API key configured. */
+  readonly isAvailable: boolean;
   generate(request: GenerationRequest): Promise<GenerationResult>;
 }

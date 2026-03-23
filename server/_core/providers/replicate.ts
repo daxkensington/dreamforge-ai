@@ -1,3 +1,4 @@
+// @ts-nocheck — Dead code: old provider, replaced by Grok/OpenAI/Gemini
 /**
  * Replicate provider adapter — Flux Pro, Minimax Video, Bark TTS, etc.
  */
