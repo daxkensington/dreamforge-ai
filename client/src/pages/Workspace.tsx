@@ -573,7 +573,43 @@ export default function Workspace() {
           </div>
 
           {/* Right Panel - Generation History */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 space-y-4">
+            {/* Generation In Progress Banner */}
+            <AnimatePresence>
+              {generateMutation.isPending && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="rounded-xl border border-primary/30 bg-primary/5 backdrop-blur-sm p-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-12 w-12 shrink-0">
+                      <div className="absolute inset-0 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      <div className="absolute inset-2 rounded-full bg-primary/10 flex items-center justify-center">
+                        {mediaType === "video" ? (
+                          <Video className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        Generating {mediaType === "video" ? "Video" : "Image"}...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {prompt.slice(0, 80)}{prompt.length > 80 ? "..." : ""}
+                      </p>
+                      <div className="mt-2 h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-primary/60 to-primary rounded-full animate-pulse" style={{ width: "60%" }} />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <Card className="border-border/50 bg-card/50">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">

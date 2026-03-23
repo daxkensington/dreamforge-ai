@@ -198,7 +198,7 @@ export default function Gallery() {
             Featured Showcase — AI Art by DreamForge
           </h2>
           <p className="text-xs text-muted-foreground mb-4">Inspiration from our AI generation engine</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {showcaseImages.map((img) => (
               <div key={img.src} className="group relative rounded-xl overflow-hidden aspect-[3/4]">
                 <img
@@ -220,7 +220,7 @@ export default function Gallery() {
         </div>
 
         {/* Search Bar + Sort */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -231,33 +231,35 @@ export default function Gallery() {
               className="pl-10 h-11"
             />
           </div>
-          <Button onClick={handleSearch} className="h-11 px-6">
-            Search
-          </Button>
-          <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setPage(0); }}>
-            <SelectTrigger className="h-11 w-44">
-              <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="oldest">Oldest First</SelectItem>
-              <SelectItem value="most_viewed">Most Viewed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            className={`h-11 gap-2 bg-transparent ${showFilters ? "border-primary text-primary" : ""}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span className="hidden sm:inline">Filters</span>
-            {hasFilters && (
-              <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                {selectedTags.length + (search ? 1 : 0) + (modelVersion ? 1 : 0)}
-              </span>
-            )}
-          </Button>
+          <div className="flex gap-3">
+            <Button onClick={handleSearch} className="h-11 px-6">
+              Search
+            </Button>
+            <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setPage(0); }}>
+              <SelectTrigger className="h-11 w-36 sm:w-44">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="most_viewed">Most Viewed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              className={`h-11 gap-2 bg-transparent ${showFilters ? "border-primary text-primary" : ""}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {hasFilters && (
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                  {selectedTags.length + (search ? 1 : 0) + (modelVersion ? 1 : 0)}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Filters Panel */}
@@ -375,7 +377,7 @@ export default function Gallery() {
 
         {/* Gallery Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="space-y-3">
                 <Skeleton className="aspect-[3/4] rounded-xl" />
@@ -401,7 +403,7 @@ export default function Gallery() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <AnimatePresence mode="popLayout">
                 {items.map((item, i) => {
                   const isSelected = selectedItems.includes(item.id);

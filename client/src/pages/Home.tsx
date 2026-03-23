@@ -282,7 +282,7 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={1}
-              className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6 leading-[1.05]"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight mb-6 leading-[1.05]"
             >
               Create <span className="gradient-text">Beyond</span> Imagination
             </motion.h1>
@@ -396,18 +396,20 @@ export default function Home() {
             custom={3}
             className="max-w-3xl mx-auto mb-14"
           >
-            <div className="relative flex items-center gap-3 p-2 rounded-2xl bg-white/5 border border-purple-500/30 shadow-[0_0_30px_-5px_rgba(168,85,247,0.3)] backdrop-blur-sm">
-              <Search className="h-5 w-5 text-white/40 ml-4 shrink-0" />
-              <input
-                type="text"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                placeholder="A mystical dragon perched on a crystal mountain..."
-                className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-base py-3"
-              />
+            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-purple-500/30 shadow-[0_0_30px_-5px_rgba(168,85,247,0.3)] backdrop-blur-sm">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Search className="h-5 w-5 text-white/40 ml-2 sm:ml-4 shrink-0" />
+                <input
+                  type="text"
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                  placeholder="A mystical dragon perched on a crystal mountain..."
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm sm:text-base py-3 min-w-0"
+                />
+              </div>
               <Button
                 size="lg"
-                className="font-medium gap-2 px-6 h-12 text-base glow-primary shrink-0"
+                className="font-medium gap-2 px-6 h-12 text-base glow-primary shrink-0 w-full sm:w-auto"
                 onClick={handleGenerate}
               >
                 <Sparkles className="h-4 w-4" />
@@ -417,7 +419,7 @@ export default function Home() {
           </motion.div>
 
           {/* Example results */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
             {galleryImages.slice(0, 4).map((img, i) => (
               <motion.div
                 key={img.src}

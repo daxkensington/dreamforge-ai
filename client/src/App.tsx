@@ -48,6 +48,8 @@ import Credits from "./pages/Credits";
 import Notifications from "./pages/Notifications";
 import AdminDashboard from "./pages/AdminDashboard";
 import TimelineEditor from "./pages/TimelineEditor";
+import Marketplace from "./pages/Marketplace";
+import MarketplaceDetail from "./pages/MarketplaceDetail";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 function Router() {
@@ -93,6 +95,8 @@ function Router() {
       <Route path="/credits" component={Credits} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/marketplace" component={Marketplace} />
+      <Route path="/marketplace/:id" component={MarketplaceDetail} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/moderation" component={Moderation} />
       <Route path="/profile" component={Profile} />

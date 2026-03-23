@@ -11,14 +11,19 @@ import {
   ArrowRight,
   Star,
   Users,
-  Infinity,
   Shield,
   Headphones,
+  Gem,
+  Package,
+  Mail,
+  ChevronDown,
 } from "lucide-react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { CREDIT_PACKS } from "@shared/creditCosts";
 
+/* ── Animation variants ── */
 const fadeUp = {
   hidden: (i: number) => ({ opacity: 0, y: 24, transition: { duration: 0.5, delay: i * 0.1 } }),
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.1 } }),
@@ -31,6 +36,7 @@ const scaleIn = {
 
 type BillingPeriod = "monthly" | "yearly";
 
+/* ── Plan card data ── */
 const plans = [
   {
     name: "Free",
@@ -38,116 +44,128 @@ const plans = [
     description: "Get started with AI creation. Perfect for exploring and casual use.",
     monthlyPrice: 0,
     yearlyPrice: 0,
+    credits: "1,500",
     gradient: "from-slate-500 to-zinc-400",
     borderColor: "border-border/50",
     popular: false,
     cta: "Get Started Free",
     ctaVariant: "outline" as const,
-    features: {
-      "Image generations / month": "25",
-      "Video generations / month": "5",
-      "Image-to-Video animations": "3 / month",
-      "AI Tools access": "Basic (Prompt Builder only)",
-      "Max resolution": "512 × 768",
-      "Model versions": "Standard",
-      "Batch processing": false,
-      "Priority rendering": false,
-      "Gallery submissions": "5 / month",
-      "Private generations": false,
-      "API access": false,
-      "Priority support": false,
-    },
+  },
+  {
+    name: "Creator",
+    icon: Gem,
+    description: "For hobbyists and side projects who want HD quality and more credits.",
+    monthlyPrice: 12,
+    yearlyPrice: 115,
+    credits: "30,000",
+    gradient: "from-cyan-500 to-blue-400",
+    borderColor: "border-cyan-500/30",
+    popular: false,
+    cta: "Start Creating",
+    ctaVariant: "outline" as const,
   },
   {
     name: "Pro",
     icon: Zap,
-    description: "For serious creators who need more power and flexibility.",
-    monthlyPrice: 19,
-    yearlyPrice: 190,
+    description: "For serious creators who need Ultra HD, video, and batch processing.",
+    monthlyPrice: 35,
+    yearlyPrice: 336,
+    credits: "150,000",
     gradient: "from-violet-500 to-fuchsia-400",
     borderColor: "border-violet-500/50",
     popular: true,
-    cta: "Upgrade to Pro",
+    cta: "Go Pro",
     ctaVariant: "default" as const,
-    features: {
-      "Image generations / month": "500",
-      "Video generations / month": "100",
-      "Image-to-Video animations": "50 / month",
-      "AI Tools access": "All Tools (Upscaler, Style Transfer, Background, Prompt Builder)",
-      "Max resolution": "1024 × 1536",
-      "Model versions": "Standard + HD",
-      "Batch processing": "Up to 10 at once",
-      "Priority rendering": true,
-      "Gallery submissions": "Unlimited",
-      "Private generations": true,
-      "API access": false,
-      "Priority support": false,
-    },
   },
   {
-    name: "Enterprise",
+    name: "Studio",
     icon: Crown,
-    description: "Unlimited creation for teams and businesses. Custom everything.",
-    monthlyPrice: 79,
-    yearlyPrice: 790,
+    description: "For teams and businesses. Custom model training and collaboration.",
+    monthlyPrice: 75,
+    yearlyPrice: 720,
+    credits: "450,000",
     gradient: "from-amber-500 to-orange-400",
-    borderColor: "border-amber-500/50",
+    borderColor: "border-amber-500/30",
     popular: false,
     cta: "Contact Sales",
     ctaVariant: "outline" as const,
-    features: {
-      "Image generations / month": "Unlimited",
-      "Video generations / month": "Unlimited",
-      "Image-to-Video animations": "Unlimited",
-      "AI Tools access": "All Tools + Priority Queue",
-      "Max resolution": "2048 × 2048",
-      "Model versions": "All (Standard, HD, Ultra)",
-      "Batch processing": "Up to 50 at once",
-      "Priority rendering": true,
-      "Gallery submissions": "Unlimited",
-      "Private generations": true,
-      "API access": true,
-      "Priority support": true,
-    },
   },
 ];
 
+/* ── Feature comparison rows ── */
+const comparisonFeatures: { label: string; values: (string | boolean)[] }[] = [
+  { label: "Monthly credits", values: ["1,500", "30,000", "150,000", "450,000"] },
+  { label: "AI models", values: ["3 standard", "All models", "All models", "All + custom"] },
+  { label: "Max resolution", values: ["512 x 768", "1024 x 1536", "2048 x 2048", "2048 x 2048"] },
+  { label: "Video generation", values: [false, "Up to 10s", "Up to 30s", "Up to 30s"] },
+  { label: "Audio generation", values: [false, "SFX only", "SFX + Music + Voiceover", "Unlimited"] },
+  { label: "API access", values: [false, "100 req/hr", "500 req/hr", "2,000 req/hr"] },
+  { label: "Custom model training", values: [false, false, false, true] },
+  { label: "Team collaboration", values: [false, false, false, "5 seats"] },
+  { label: "Priority support", values: [false, false, true, true] },
+  { label: "Commercial license", values: [false, true, true, true] },
+  { label: "Batch generation", values: [false, false, "Up to 10", "Up to 50"] },
+  { label: "Brand kits", values: [false, "1", "5", "Unlimited"] },
+];
+
+/* ── FAQ data ── */
 const faqs = [
   {
     q: "Can I switch plans at any time?",
-    a: "Yes, you can upgrade or downgrade your plan at any time. When upgrading, you'll get immediate access to the new features. When downgrading, the change takes effect at the end of your billing period.",
+    a: "Yes, you can upgrade or downgrade your plan at any time. When upgrading, you get immediate access to the new features and a prorated credit top-up. When downgrading, the change takes effect at the end of your billing period.",
   },
   {
-    q: "What happens when I hit my generation limit?",
-    a: "You'll receive a notification when you're approaching your limit. Once reached, you can wait for the next billing cycle or upgrade to a higher plan for more generations.",
+    q: "What are credits and how do they work?",
+    a: "Credits are the universal currency for all AI operations on DreamForge. Different tasks cost different amounts — a basic image costs 5 credits, an HD image costs 10, and video generation starts at 50 credits. Your credits refresh each billing cycle.",
   },
   {
-    q: "Do unused generations roll over?",
-    a: "Unused generations do not roll over to the next month. Each billing cycle starts fresh with your plan's full allocation.",
+    q: "Do unused credits roll over?",
+    a: "Subscription credits do not roll over to the next month. However, credits purchased from Credit Packs never expire and are always available in your account.",
   },
   {
-    q: "Is there a free trial for Pro?",
-    a: "New users automatically start on the Free plan, which gives you a great way to try DreamForge. You can upgrade to Pro anytime to unlock the full creative suite.",
+    q: "Can I buy extra credits without upgrading?",
+    a: "Absolutely! Credit Packs are one-time purchases available to any plan, including Free. They're perfect for when you need a boost without committing to a higher tier.",
   },
   {
     q: "What payment methods do you accept?",
-    a: "We accept all major credit cards, debit cards, and PayPal. Enterprise customers can also pay via invoice.",
+    a: "We accept all major credit cards, debit cards, and PayPal. Enterprise customers can also pay via invoice with net-30 terms.",
+  },
+  {
+    q: "Is there a free trial for paid plans?",
+    a: "The Free plan itself is a great way to try DreamForge with 1,500 credits per month. No credit card required. When you're ready for more, upgrade instantly.",
+  },
+  {
+    q: "What's included in the commercial license?",
+    a: "Creator, Pro, and Studio plans include a commercial license that lets you use all AI-generated content for business purposes — marketing materials, client work, merchandise, and more.",
   },
   {
     q: "Can I cancel my subscription?",
-    a: "Absolutely. You can cancel your subscription at any time from your profile settings. You'll retain access to your plan's features until the end of the current billing period.",
+    a: "Yes, cancel anytime from your account settings. You'll keep access to your plan's features until the end of the current billing period. Your generated content remains yours forever.",
   },
 ];
 
+/* ── Credit pack helpers ── */
+function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+function packSavingsPercent(idx: number): string | null {
+  if (idx === 0) return null;
+  const basePer = CREDIT_PACKS[0].price / CREDIT_PACKS[0].credits;
+  const thisPer = CREDIT_PACKS[idx].price / CREDIT_PACKS[idx].credits;
+  const pct = Math.round((1 - thisPer / basePer) * 100);
+  return pct > 0 ? `Save ${pct}%` : null;
+}
+
+/* ══════════════════════════════════════════════════════ */
 export default function Pricing() {
   const { isAuthenticated } = useAuth();
   const [billing, setBilling] = useState<BillingPeriod>("monthly");
-
-  const featureKeys = Object.keys(plans[0].features);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
     <PageLayout>
-      {/* Hero */}
+      {/* ═══════ HERO ═══════ */}
       <section className="pt-24 pb-16 md:pt-32 md:pb-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-[120px]" />
@@ -183,7 +201,7 @@ export default function Pricing() {
             custom={2}
             className="text-lg text-muted-foreground max-w-xl mx-auto mb-10"
           >
-            Start free, upgrade when you need more. No hidden fees, no surprises.
+            Start free with 1,500 credits. Upgrade when you need more power. No hidden fees, cancel anytime.
           </motion.p>
 
           {/* Billing Toggle */}
@@ -212,24 +230,23 @@ export default function Pricing() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Yearly
+              Annual
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
-                SAVE 17%
+                SAVE 20%
               </span>
             </button>
           </motion.div>
         </div>
       </section>
 
-      {/* Plan Cards */}
+      {/* ═══════ PLAN CARDS ═══════ */}
       <section className="pb-24 relative">
         <div className="container">
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {plans.map((plan, i) => {
-              const price = billing === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
-              const perMonth = billing === "yearly" && plan.yearlyPrice > 0
-                ? Math.round(plan.yearlyPrice / 12)
-                : plan.monthlyPrice;
+              const monthlyPrice = plan.monthlyPrice;
+              const annualMonthly = plan.yearlyPrice > 0 ? Math.round(plan.yearlyPrice / 12) : 0;
+              const displayPrice = billing === "yearly" ? annualMonthly : monthlyPrice;
 
               return (
                 <motion.div
@@ -238,24 +255,27 @@ export default function Pricing() {
                   animate="visible"
                   variants={scaleIn}
                   custom={i}
-                  className={`relative rounded-2xl border ${plan.borderColor} bg-card/50 backdrop-blur-sm overflow-hidden ${
-                    plan.popular ? "ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/10" : ""
+                  className={`relative rounded-2xl border bg-card/50 backdrop-blur-sm overflow-hidden flex flex-col ${
+                    plan.popular
+                      ? "border-violet-500/50 ring-2 ring-violet-500/30 shadow-[0_0_40px_-10px_rgba(139,92,246,0.4)]"
+                      : plan.borderColor
                   }`}
                 >
+                  {/* Popular gradient top bar */}
                   {plan.popular && (
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 to-fuchsia-400" />
                   )}
 
-                  <div className="p-6">
+                  <div className="p-6 flex-1 flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${plan.gradient} shadow-lg`}>
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${plan.gradient} shadow-lg`}
+                        >
                           <plan.icon className="h-5 w-5 text-white" />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold">{plan.name}</h3>
-                        </div>
+                        <h3 className="text-lg font-bold">{plan.name}</h3>
                       </div>
                       {plan.popular && (
                         <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/20 uppercase tracking-wider">
@@ -264,106 +284,150 @@ export default function Pricing() {
                       )}
                     </div>
 
-                    <p className="text-sm text-muted-foreground mb-6 min-h-[40px]">
-                      {plan.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-6 min-h-[40px]">{plan.description}</p>
 
                     {/* Price */}
                     <div className="mb-6">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">
-                          ${price === 0 ? "0" : perMonth}
-                        </span>
-                        <span className="text-muted-foreground text-sm">/ month</span>
+                        <span className="text-4xl font-bold">${displayPrice}</span>
+                        {displayPrice > 0 && <span className="text-muted-foreground text-sm">/ month</span>}
                       </div>
-                      {billing === "yearly" && price > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          ${price} billed annually
-                        </p>
+                      {billing === "yearly" && plan.yearlyPrice > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">${plan.yearlyPrice} billed annually</p>
                       )}
-                      {price === 0 && (
-                        <p className="text-xs text-emerald-400 mt-1">Free forever</p>
-                      )}
+                      {displayPrice === 0 && <p className="text-xs text-emerald-400 mt-1">Free forever</p>}
                     </div>
 
-                    {/* CTA */}
-                    {plan.name === "Enterprise" ? (
-                      <Button
-                        variant={plan.ctaVariant}
-                        className="w-full gap-2 bg-transparent"
-                        onClick={() => {
-                          const { toast } = require("sonner");
-                          toast.info("Enterprise plans coming soon! Contact us for early access.");
-                        }}
-                      >
-                        {plan.cta}
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    ) : plan.name === "Pro" ? (
-                      <Button
-                        className="w-full gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white border-0"
-                        onClick={() => {
-                          const { toast } = require("sonner");
-                          toast.info("Pro plan coming soon! You'll be notified when it's available.");
-                        }}
-                      >
-                        {plan.cta}
-                        <Zap className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      isAuthenticated ? (
-                        <Button asChild variant={plan.ctaVariant} className="w-full gap-2 bg-transparent">
-                          <Link href="/workspace">
-                            Start Creating
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
+                    {/* Credits badge */}
+                    <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-lg bg-white/5 border border-white/5">
+                      <Zap className="h-4 w-4 text-amber-400" />
+                      <span className="text-sm font-semibold">{plan.credits}</span>
+                      <span className="text-xs text-muted-foreground">credits / month</span>
+                    </div>
+
+                    {/* CTA — pushed to bottom */}
+                    <div className="mt-auto">
+                      {plan.name === "Studio" ? (
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 bg-transparent"
+                          onClick={() => {
+                            window.location.href = "mailto:hello@dreamforge.ai?subject=Studio%20Plan%20Inquiry";
+                          }}
+                        >
+                          <Mail className="h-4 w-4" />
+                          {plan.cta}
                         </Button>
+                      ) : plan.popular ? (
+                        <Button
+                          className="w-full gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white border-0 shadow-lg shadow-violet-500/25"
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              window.location.href = getLoginUrl();
+                            }
+                          }}
+                        >
+                          {plan.cta}
+                          <Zap className="h-4 w-4" />
+                        </Button>
+                      ) : plan.name === "Free" ? (
+                        isAuthenticated ? (
+                          <Button asChild variant="outline" className="w-full gap-2 bg-transparent">
+                            <Link href="/workspace">
+                              Start Creating
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            className="w-full gap-2 bg-transparent"
+                            onClick={() => (window.location.href = getLoginUrl())}
+                          >
+                            {plan.cta}
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        )
                       ) : (
                         <Button
-                          variant={plan.ctaVariant}
+                          variant="outline"
                           className="w-full gap-2 bg-transparent"
-                          onClick={() => (window.location.href = getLoginUrl())}
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              window.location.href = getLoginUrl();
+                            }
+                          }}
                         >
                           {plan.cta}
                           <ArrowRight className="h-4 w-4" />
                         </Button>
-                      )
-                    )}
+                      )}
+                    </div>
                   </div>
 
-                  {/* Feature List */}
+                  {/* Feature checklist */}
                   <div className="border-t border-border/50 p-6">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                       What's included
                     </p>
                     <ul className="space-y-3">
-                      {featureKeys.map((key) => {
-                        const value = (plan.features as Record<string, string | boolean>)[key];
-                        const isIncluded = value !== false;
-                        return (
-                          <li key={key} className="flex items-start gap-3">
-                            {isIncluded ? (
-                              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
-                                <Check className="h-3 w-3 text-emerald-400" />
-                              </div>
-                            ) : (
-                              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted/30">
-                                <X className="h-3 w-3 text-muted-foreground/50" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <span className={`text-sm ${isIncluded ? "text-foreground" : "text-muted-foreground/50"}`}>
-                                {key}
-                              </span>
-                              {typeof value === "string" && (
-                                <span className="block text-xs text-muted-foreground mt-0.5">
-                                  {value}
-                                </span>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
+                      {(plan.name === "Free"
+                        ? [
+                            "1,500 credits / month",
+                            "Basic image generation",
+                            "3 standard AI models",
+                            "512 x 768 max resolution",
+                            "Community gallery access",
+                            "Standard queue priority",
+                          ]
+                        : plan.name === "Creator"
+                          ? [
+                              "30,000 credits / month",
+                              "HD image generation",
+                              "All AI models",
+                              "1024 x 1536 max resolution",
+                              "Video generation (up to 10s)",
+                              "SFX audio generation",
+                              "Priority queue",
+                              "1 brand kit",
+                              "API access (100 req/hr)",
+                              "Commercial license",
+                            ]
+                          : plan.name === "Pro"
+                            ? [
+                                "150,000 credits / month",
+                                "Ultra HD generation",
+                                "All AI models",
+                                "2048 x 2048 max resolution",
+                                "Video generation (up to 30s)",
+                                "Full audio suite",
+                                "Highest queue priority",
+                                "5 brand kits",
+                                "Batch generation (up to 10)",
+                                "API access (500 req/hr)",
+                                "Character consistency",
+                                "Priority support",
+                                "Commercial license",
+                              ]
+                            : [
+                                "450,000 credits / month",
+                                "Everything in Pro",
+                                "Unlimited brand kits",
+                                "Custom model fine-tuning",
+                                "Team collaboration (5 seats)",
+                                "Batch generation (up to 50)",
+                                "API access (2,000 req/hr)",
+                                "Dedicated support",
+                                "Commercial license",
+                              ]
+                      ).map((feat) => (
+                        <li key={feat} className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          </div>
+                          <span className="text-sm text-foreground">{feat}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </motion.div>
@@ -373,7 +437,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Feature Comparison Table */}
+      {/* ═══════ FEATURE COMPARISON TABLE ═══════ */}
       <section className="py-24 border-t border-border/50 bg-card/20">
         <div className="container">
           <div className="text-center mb-16">
@@ -385,7 +449,7 @@ export default function Pricing() {
               custom={0}
               className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
             >
-              Compare Plans
+              Compare Plans in Detail
             </motion.h2>
             <motion.p
               initial="hidden"
@@ -395,7 +459,7 @@ export default function Pricing() {
               custom={1}
               className="text-muted-foreground max-w-lg mx-auto"
             >
-              A detailed breakdown of what each plan offers.
+              A detailed breakdown of what each plan offers so you can pick the right one.
             </motion.p>
           </div>
 
@@ -405,40 +469,37 @@ export default function Pricing() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={2}
-            className="max-w-4xl mx-auto overflow-x-auto"
+            className="max-w-5xl mx-auto overflow-x-auto"
           >
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/50">
-                  <th className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/3">Feature</th>
+                  <th className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/4">Feature</th>
                   {plans.map((plan) => (
-                    <th key={plan.name} className="text-center py-4 px-4 font-semibold">
+                    <th key={plan.name} className="text-center py-4 px-3 font-semibold">
                       <div className="flex items-center justify-center gap-2">
                         <plan.icon className="h-4 w-4" />
-                        {plan.name}
+                        <span className={plan.popular ? "text-violet-400" : ""}>{plan.name}</span>
                       </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {featureKeys.map((key) => (
-                  <tr key={key} className="border-b border-border/30">
-                    <td className="py-3 pr-4 text-muted-foreground">{key}</td>
-                    {plans.map((plan) => {
-                      const value = (plan.features as Record<string, string | boolean>)[key];
-                      return (
-                        <td key={plan.name} className="py-3 px-4 text-center">
-                          {value === true ? (
-                            <Check className="h-4 w-4 text-emerald-400 mx-auto" />
-                          ) : value === false ? (
-                            <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
-                          ) : (
-                            <span className="text-xs">{value}</span>
-                          )}
-                        </td>
-                      );
-                    })}
+                {comparisonFeatures.map((row) => (
+                  <tr key={row.label} className="border-b border-border/30">
+                    <td className="py-3 pr-4 text-muted-foreground">{row.label}</td>
+                    {row.values.map((val, ci) => (
+                      <td key={ci} className="py-3 px-3 text-center">
+                        {val === true ? (
+                          <Check className="h-4 w-4 text-emerald-400 mx-auto" />
+                        ) : val === false ? (
+                          <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                        ) : (
+                          <span className="text-xs">{val}</span>
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -447,7 +508,158 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Trust Badges */}
+      {/* ═══════ CREDIT PACKS ═══════ */}
+      <section className="py-24 border-t border-border/50">
+        <div className="container">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
+            >
+              Need a{" "}
+              <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                Boost
+              </span>
+              ?
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-muted-foreground max-w-lg mx-auto"
+            >
+              One-time credit packs available on any plan. Purchased credits never expire.
+            </motion.p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            {CREDIT_PACKS.map((pack, i) => {
+              const savings = packSavingsPercent(i);
+              return (
+                <motion.div
+                  key={pack.id}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  variants={scaleIn}
+                  custom={i}
+                  className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 hover:border-amber-500/30 transition-all duration-300 group"
+                >
+                  {savings && (
+                    <span className="absolute -top-3 right-4 text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                      {savings}
+                    </span>
+                  )}
+
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-400 shadow-lg mb-4 group-hover:shadow-amber-500/20 transition-shadow">
+                    <Package className="h-6 w-6 text-white" />
+                  </div>
+
+                  <p className="text-2xl font-bold mb-1">{pack.credits.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mb-4">credits</p>
+
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-3xl font-bold">{formatPrice(pack.price)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{pack.perCredit} per credit</p>
+
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent hover:bg-amber-500/10 hover:border-amber-500/30"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        window.location.href = getLoginUrl();
+                      }
+                    }}
+                  >
+                    Buy Credits
+                  </Button>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ FAQ ═══════ */}
+      <section className="py-24 border-t border-border/50 bg-card/20">
+        <div className="container">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
+            >
+              Frequently Asked Questions
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-muted-foreground max-w-lg mx-auto"
+            >
+              Everything you need to know about our plans and pricing.
+            </motion.p>
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-3">
+            {faqs.map((faq, i) => {
+              const isOpen = openFaq === i;
+              return (
+                <motion.div
+                  key={i}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  variants={fadeUp}
+                  custom={i % 4}
+                  className="rounded-xl border border-border/50 bg-card/50 overflow-hidden"
+                >
+                  <button
+                    onClick={() => setOpenFaq(isOpen ? null : i)}
+                    className="flex items-center justify-between w-full cursor-pointer px-6 py-4 text-sm font-medium text-left hover:bg-accent/50 transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown
+                      className={`ml-4 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-6 pb-4">
+                          <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ TRUST BADGES ═══════ */}
       <section className="py-16 border-t border-border/50">
         <div className="container">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">
@@ -477,95 +689,66 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="py-24 border-t border-border/50 bg-card/20">
-        <div className="container">
-          <div className="text-center mb-16">
-            <motion.h2
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={0}
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
-            >
-              Frequently Asked Questions
-            </motion.h2>
-          </div>
-
-          <div className="max-w-2xl mx-auto space-y-4">
-            {faqs.map((faq, i) => (
-              <motion.details
-                key={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className="group rounded-xl border border-border/50 bg-card/50 overflow-hidden"
-              >
-                <summary className="flex items-center justify-between cursor-pointer px-6 py-4 text-sm font-medium hover:bg-accent/50 transition-colors list-none">
-                  {faq.q}
-                  <span className="ml-4 text-muted-foreground group-open:rotate-45 transition-transform text-lg">+</span>
-                </summary>
-                <div className="px-6 pb-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
-                </div>
-              </motion.details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
+      {/* ═══════ ENTERPRISE CTA ═══════ */}
       <section className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]" />
-        <div className="container relative text-center">
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-3xl md:text-4xl font-bold tracking-tight mb-6"
-          >
-            Start Creating Today
-          </motion.h2>
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-muted-foreground mb-8 max-w-md mx-auto"
-          >
-            Join thousands of creators using DreamForge to bring their ideas to life. No credit card required.
-          </motion.p>
+        <div className="container relative">
           <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
             variants={fadeUp}
-            custom={2}
+            custom={0}
+            className="max-w-3xl mx-auto text-center"
           >
-            {isAuthenticated ? (
-              <Button asChild size="lg" className="font-medium gap-2 px-10">
-                <Link href="/workspace">
-                  Open Studio
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-              </Button>
-            ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-amber-500/30 bg-amber-500/5 backdrop-blur-sm mb-8">
+              <Crown className="h-4 w-4 text-amber-400" />
+              <span className="text-sm font-medium text-amber-300">Enterprise</span>
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
+              Need More?{" "}
+              <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                Let's Talk.
+              </span>
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+              Custom credit allocations, unlimited team seats, SLA guarantees, dedicated support, and on-premise
+              deployment options for organizations of any size.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
                 size="lg"
-                className="font-medium gap-2 px-10"
-                onClick={() => (window.location.href = getLoginUrl())}
+                className="font-medium gap-2 px-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
+                onClick={() => {
+                  window.location.href = "mailto:hello@dreamforge.ai?subject=Enterprise%20Plan%20Inquiry";
+                }}
               >
-                Get Started Free
-                <ArrowRight className="h-5 w-5" />
+                <Mail className="h-5 w-5" />
+                Contact Sales
               </Button>
-            )}
+              {!isAuthenticated && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="font-medium gap-2 px-8 bg-transparent"
+                  onClick={() => (window.location.href = getLoginUrl())}
+                >
+                  Get Started Free
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              )}
+              {isAuthenticated && (
+                <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 bg-transparent">
+                  <Link href="/workspace">
+                    Open Studio
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                </Button>
+              )}
+            </div>
           </motion.div>
         </div>
       </section>

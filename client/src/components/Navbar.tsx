@@ -36,6 +36,7 @@ import {
   Bell,
   Coins,
   BarChart3,
+  ShoppingBag,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
@@ -46,6 +47,7 @@ const navLinks = [
   { href: "/tools", label: "AI Tools", icon: Wrench },
   { href: "/video-studio", label: "Video Studio", icon: Film, auth: true },
   { href: "/gallery", label: "Gallery", icon: Image },
+  { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/batch", label: "Batch", icon: Layers, auth: true },
   { href: "/characters", label: "Characters", icon: Users, auth: true },
