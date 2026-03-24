@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { Slider } from "@/components/ui/slider";
 import { Film, Upload, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const motionTypes = [
@@ -29,8 +30,10 @@ export default function ToolImageToVideo() {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("8");
   const [motionType, setMotionType] = useState("moderate");
+  const [motionIntensity, setMotionIntensity] = useState(0.5);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = trpc.video.imageToVideo.useMutation({
@@ -60,6 +63,14 @@ export default function ToolImageToVideo() {
   };
 
   const isProcessing = mutation.isPending;
+
+  useEffect(() => {
+    if (!isProcessing) { setProgress(0); return; }
+    const interval = setInterval(() => {
+      setProgress((prev) => (prev >= 95 ? 95 : prev + (95 / 120)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isProcessing]);
 
   return (
     <ToolPageLayout title="Image-to-Video" description="Animate still images into video clips with Veo 2" icon={Film} gradient="from-purple-500 to-violet-500">
@@ -96,6 +107,18 @@ export default function ToolImageToVideo() {
                   </div>
                 </div>
 
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Motion Intensity</Label>
+                    <span className="text-xs text-muted-foreground">{motionIntensity.toFixed(1)}</span>
+                  </div>
+                  <Slider value={[motionIntensity]} onValueChange={(v) => setMotionIntensity(v[0])} min={0.1} max={1.0} step={0.1} className="w-full" />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>Subtle</span>
+                    <span>Dramatic</span>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Duration</Label>
                   <Select value={duration} onValueChange={setDuration}>
@@ -110,7 +133,7 @@ export default function ToolImageToVideo() {
                 <div className="flex gap-3">
                   <Button onClick={() => { setVideoUrl(null); mutation.mutate({ imageUrl, prompt, duration: duration as any, motionType: motionType as any }); }}
                     disabled={!imageUrl || !prompt.trim() || isProcessing} className="flex-1" size="lg">
-                    {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Animating (~2 min)...</> : <><Sparkles className="h-4 w-4 mr-2" />Animate Image</>}
+                    {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Animating... {Math.round(progress)}%</> : <><Sparkles className="h-4 w-4 mr-2" />Animate Image</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setVideoUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
@@ -144,8 +167,13 @@ export default function ToolImageToVideo() {
                         <Loader2 className="h-16 w-16 animate-spin text-purple-400" />
                         <Film className="h-6 w-6 text-purple-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                       </div>
-                      <p className="text-foreground font-medium">Animating with Veo 2...</p>
-                      <p className="text-sm text-muted-foreground">This takes 1-3 minutes</p>
+                      <div className="text-center w-full px-12">
+                        <p className="text-foreground font-medium">Animating with Veo 2... {Math.round(progress)}%</p>
+                        <div className="w-full h-2 bg-muted rounded-full mt-3 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full transition-all duration-1000 ease-linear" style={{ width: `${progress}%` }} />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">This takes 1-3 minutes</p>
+                      </div>
                     </motion.div>
                   ) : videoUrl ? (
                     <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

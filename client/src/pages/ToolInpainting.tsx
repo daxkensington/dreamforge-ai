@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -16,6 +17,7 @@ import {
   RotateCcw,
   Sparkles,
   ArrowRight,
+  Lightbulb,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +28,7 @@ export default function ToolInpainting() {
   const [editPrompt, setEditPrompt] = useState("");
   const [regionDescription, setRegionDescription] = useState("");
   const [preserveStyle, setPreserveStyle] = useState(true);
+  const [inpaintStrength, setInpaintStrength] = useState(0.7);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,6 +120,15 @@ export default function ToolInpainting() {
                   </Button>
                 </div>
 
+                {/* Pro Tip Card */}
+                <div className="flex gap-2.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Lightbulb className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-amber-300">Pro Tip</p>
+                    <p className="text-[11px] text-amber-300/80 mt-0.5">For precise edits, describe the region you want to change. E.g., "the sky area" or "the person on the left".</p>
+                  </div>
+                </div>
+
                 {/* Edit Prompt */}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">What to Edit</Label>
@@ -149,6 +161,19 @@ export default function ToolInpainting() {
                     onChange={(e) => setRegionDescription(e.target.value)}
                     className="text-sm"
                   />
+                </div>
+
+                {/* Inpaint Strength */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Inpaint Strength</Label>
+                    <span className="text-xs text-muted-foreground">{inpaintStrength.toFixed(1)}</span>
+                  </div>
+                  <Slider value={[inpaintStrength]} onValueChange={(v) => setInpaintStrength(v[0])} min={0.1} max={1.0} step={0.1} className="w-full" />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>Subtle</span>
+                    <span>Complete</span>
+                  </div>
                 </div>
 
                 {/* Preserve Style */}

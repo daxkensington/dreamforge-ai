@@ -7,9 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Video, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { Video, Loader2, Download, Sparkles, RotateCcw, Camera } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const cameraPresets = [
+  { value: "static", label: "Static" },
+  { value: "pan-left", label: "Pan Left" },
+  { value: "pan-right", label: "Pan Right" },
+  { value: "zoom-in", label: "Zoom In" },
+  { value: "zoom-out", label: "Zoom Out" },
+  { value: "orbit", label: "Orbit" },
+  { value: "dolly-forward", label: "Dolly Forward" },
+  { value: "crane-up", label: "Crane Up" },
+];
 
 const videoStyles = [
   { value: "cinematic", label: "Cinematic", desc: "Film-quality visuals" },
@@ -27,7 +38,10 @@ export default function ToolTextToVideo() {
   const [duration, setDuration] = useState("8");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [style, setStyle] = useState("cinematic");
+  const [cameraMovement, setCameraMovement] = useState("static");
+  const [resolution, setResolution] = useState("1080p");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
   const mutation = trpc.video.textToVideo.useMutation({
     onSuccess: (data) => {
@@ -38,6 +52,14 @@ export default function ToolTextToVideo() {
   });
 
   const isProcessing = mutation.isPending;
+
+  useEffect(() => {
+    if (!isProcessing) { setProgress(0); return; }
+    const interval = setInterval(() => {
+      setProgress((prev) => (prev >= 95 ? 95 : prev + (95 / 120)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isProcessing]);
 
   return (
     <ToolPageLayout title="Text-to-Video" description="Generate video clips from text with Google Veo 2" icon={Video} gradient="from-cyan-500 to-blue-500">
@@ -59,6 +81,18 @@ export default function ToolTextToVideo() {
                         className={`p-2.5 rounded-xl border-2 transition-all text-left ${style === s.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
                         <span className="text-xs font-medium">{s.label}</span>
                         <p className="text-[10px] text-muted-foreground">{s.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-1.5"><Camera className="h-3.5 w-3.5" />Camera Movement</Label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {cameraPresets.map((c) => (
+                      <button key={c.value} onClick={() => setCameraMovement(c.value)}
+                        className={`px-2 py-1.5 rounded-lg border text-[10px] font-medium transition-all ${cameraMovement === c.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground"}`}>
+                        {c.label}
                       </button>
                     ))}
                   </div>
@@ -88,14 +122,25 @@ export default function ToolTextToVideo() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Resolution</Label>
+                  <Select value={resolution} onValueChange={setResolution}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="720p">720p (Fast)</SelectItem>
+                      <SelectItem value="1080p">1080p (Standard)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
                   <p className="text-xs text-cyan-300">Powered by Google Veo 2 — generation takes 1-3 minutes</p>
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setVideoUrl(null); mutation.mutate({ prompt, duration: duration as any, aspectRatio: aspectRatio as any, style: style as any }); }}
+                  <Button onClick={() => { setVideoUrl(null); const fullPrompt = cameraMovement !== "static" ? `Camera: ${cameraMovement} movement. ${prompt}` : prompt; mutation.mutate({ prompt: fullPrompt, duration: duration as any, aspectRatio: aspectRatio as any, style: style as any }); }}
                     disabled={!prompt.trim() || isProcessing} className="flex-1" size="lg">
-                    {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating (~2 min)...</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Video</>}
+                    {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating... {Math.round(progress)}%</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Video</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setPrompt(""); setVideoUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
@@ -119,16 +164,19 @@ export default function ToolTextToVideo() {
                         <Loader2 className="h-16 w-16 animate-spin text-cyan-400" />
                         <Video className="h-6 w-6 text-cyan-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                       </div>
-                      <div className="text-center">
-                        <p className="text-foreground font-medium">Generating video with Veo 2...</p>
-                        <p className="text-sm text-muted-foreground mt-1">This typically takes 1-3 minutes</p>
+                      <div className="text-center w-full px-12">
+                        <p className="text-foreground font-medium">Generating video with Veo 2... {Math.round(progress)}%</p>
+                        <div className="w-full h-2 bg-muted rounded-full mt-3 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000 ease-linear" style={{ width: `${progress}%` }} />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">This typically takes 1-3 minutes</p>
                       </div>
                     </motion.div>
                   ) : videoUrl ? (
                     <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <video controls autoPlay loop className="w-full" src={videoUrl} />
                       <div className="p-4 border-t border-border/50 flex items-center justify-between">
-                        <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">{duration}s · {style}</Badge>
+                        <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">{duration}s · {style} · {resolution}</Badge>
                         <Button variant="outline" size="sm" onClick={() => { const a = document.createElement("a"); a.href = videoUrl; a.download = "dreamforge-video.mp4"; a.click(); }}>
                           <Download className="h-4 w-4 mr-2" />Download
                         </Button>

@@ -7,9 +7,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Hexagon, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const iconTypes = [
+  { value: "wordmark", label: "Wordmark" },
+  { value: "lettermark", label: "Lettermark" },
+  { value: "icon-text", label: "Icon + Text" },
+  { value: "emblem", label: "Emblem" },
+  { value: "abstract", label: "Abstract Symbol" },
+];
 
 const logoStyles = [
   { value: "minimal", label: "Minimal", desc: "Clean & simple" },
@@ -31,6 +41,8 @@ export default function ToolLogoMaker() {
   const [colorScheme, setColorScheme] = useState("");
   const [industry, setIndustry] = useState("");
   const [iconDescription, setIconDescription] = useState("");
+  const [iconType, setIconType] = useState("icon-text");
+  const [generateVariations, setGenerateVariations] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
   const mutation = trpc.tools.logoMaker.useMutation({
@@ -44,13 +56,14 @@ export default function ToolLogoMaker() {
   const handleGenerate = () => {
     if (!brandName.trim()) { toast.error("Enter a brand name"); return; }
     setResultUrl(null);
+    const iconTypeLabel = iconTypes.find((t) => t.value === iconType)?.label || "Icon + Text";
     mutation.mutate({
       brandName,
       tagline: tagline || undefined,
       style: style as any,
       colorScheme: colorScheme || undefined,
       industry: industry || undefined,
-      iconDescription: iconDescription || undefined,
+      iconDescription: iconDescription ? `${iconTypeLabel} logo style. ${iconDescription}` : `${iconTypeLabel} logo style.`,
     });
   };
 
@@ -91,10 +104,33 @@ export default function ToolLogoMaker() {
                   <Label className="text-sm font-medium">Color Scheme</Label>
                   <Input placeholder="e.g., Blue & gold, Earth tones..." value={colorScheme} onChange={(e) => setColorScheme(e.target.value)} className="text-sm" />
                 </div>
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Icon Type</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {iconTypes.map((t) => (
+                      <button key={t.value} onClick={() => setIconType(t.value)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${iconType === t.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground"}`}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Icon Description</Label>
                   <Textarea placeholder="Describe a symbol/icon to include..." value={iconDescription} onChange={(e) => setIconDescription(e.target.value)} className="text-sm" rows={2} />
                 </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div>
+                    <Label className="text-sm font-medium">Generate 4 Variations</Label>
+                    <p className="text-xs text-muted-foreground">Create multiple interpretations</p>
+                  </div>
+                  <Switch checked={generateVariations} onCheckedChange={setGenerateVariations} />
+                </div>
+                {generateVariations && (
+                  <p className="text-xs text-violet-400 bg-violet-500/10 rounded-lg px-3 py-2 border border-violet-500/20">Will generate 4 different interpretations of your logo concept.</p>
+                )}
                 <div className="flex gap-3">
                   <Button onClick={handleGenerate} disabled={!brandName.trim() || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Logo</>}

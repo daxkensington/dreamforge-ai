@@ -27,6 +27,17 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 
+const QUICK_TEMPLATES = [
+  { label: "Cinematic Portrait", value: "A cinematic close-up portrait with dramatic lighting, shallow depth of field, film grain, and rich skin tones against a moody blurred background" },
+  { label: "Fantasy Landscape", value: "A breathtaking fantasy landscape with towering crystal mountains, floating islands, bioluminescent flora, and a sky with twin moons casting ethereal light over misty valleys" },
+  { label: "Product Shot", value: "A premium product photograph on a clean studio surface with soft gradient lighting, subtle reflections, and elegant minimalist composition" },
+  { label: "Abstract Art", value: "An abstract composition of flowing organic shapes, vibrant intersecting color fields, dynamic textures, and harmonious geometric patterns" },
+  { label: "Anime Character", value: "A detailed anime character illustration with expressive eyes, dynamic pose, flowing hair and clothing, vibrant colors, and a stylized atmospheric background" },
+  { label: "Interior Design", value: "A luxurious modern interior space with designer furniture, warm ambient lighting, natural materials, floor-to-ceiling windows, and curated art pieces" },
+  { label: "Food Photography", value: "A mouthwatering overhead food photograph with artful plating, fresh garnishes, natural window light, rustic wooden surface, and shallow depth of field" },
+  { label: "Logo Design", value: "A professional vector-style logo mark with clean lines, balanced proportions, memorable silhouette, and versatile design suitable for any medium" },
+];
+
 const STYLE_OPTIONS = [
   "Photorealistic", "Digital Art", "Oil Painting", "Watercolor", "Anime/Manga",
   "3D Render", "Pixel Art", "Concept Art", "Comic Book", "Minimalist",
@@ -135,6 +146,20 @@ export default function ToolPromptBuilder() {
                   rows={3}
                   className="text-sm"
                 />
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Quick Templates</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUICK_TEMPLATES.map((t) => (
+                      <button
+                        key={t.label}
+                        onClick={() => setSubject(t.value)}
+                        className="text-[10px] px-2.5 py-1 rounded-full border border-amber-500/30 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
