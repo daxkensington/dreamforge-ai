@@ -1,3 +1,4 @@
+import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import ToolPageLayout from "@/components/ToolPageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -135,34 +136,32 @@ export default function ToolPhotoRestore() {
                   </div>
                 ) : (
                   <div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-border/50">
+                    {isProcessing ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-20">
+                        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                        <p className="text-sm text-muted-foreground">AI is restoring your photo...</p>
+                      </div>
+                    ) : imagePreview && resultUrl ? (
+                      <BeforeAfterSlider
+                        before={imagePreview}
+                        after={resultUrl}
+                        beforeLabel="Original"
+                        afterLabel="Restored"
+                        height={450}
+                        accentColor="amber"
+                      />
+                    ) : (
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />}
                         </div>
-                      </div>
-                      <div className="p-4">
-                        <Badge className="mb-3 bg-amber-500/20 text-amber-400 border-amber-500/30">{resultUrl ? "Restored" : "Result"}</Badge>
-                        <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[200px] flex items-center justify-center">
-                          <AnimatePresence mode="wait">
-                            {isProcessing ? (
-                              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-amber-400" /><p className="text-sm text-muted-foreground">AI is restoring your photo...</p>
-                              </motion.div>
-                            ) : resultUrl ? (
-                              <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                                <img src={resultUrl} alt="Restored" className="w-full h-auto max-h-[300px] object-contain" />
-                              </motion.div>
-                            ) : (
-                              <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-2 py-12">
-                                <ArrowRight className="h-6 w-6 text-muted-foreground/50" /><p className="text-sm text-muted-foreground">Click "Restore Photo" to begin</p>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                        <div className="flex flex-col items-center gap-2 py-12">
+                          <ArrowRight className="h-6 w-6 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground">Click "Restore Photo" to begin</p>
                         </div>
                       </div>
-                    </div>
+                    )}
                     {resultUrl && (
                       <div className="p-4 border-t border-border/50 flex justify-end">
                         <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download Restored Photo</Button>

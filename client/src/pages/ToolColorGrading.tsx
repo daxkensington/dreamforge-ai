@@ -1,3 +1,4 @@
+import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import ToolPageLayout from "@/components/ToolPageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -164,33 +165,29 @@ export default function ToolColorGrading() {
                   </div>
                 ) : (
                   <div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-border/50">
+                    {isProcessing ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-20">
+                        <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                        <p className="text-sm text-muted-foreground">Applying color grade...</p>
+                      </div>
+                    ) : imagePreview && resultUrl ? (
+                      <BeforeAfterSlider
+                        before={imagePreview}
+                        after={resultUrl}
+                        beforeLabel="Original"
+                        afterLabel="Color Graded"
+                        height={450}
+                        accentColor="amber"
+                      />
+                    ) : (
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />}
                         </div>
+                        <p className="text-sm text-muted-foreground py-12 text-center">Result will appear here</p>
                       </div>
-                      <div className="p-4">
-                        <Badge className="mb-3 bg-orange-500/20 text-orange-400 border-orange-500/30">
-                          {resultUrl ? COLOR_GRADES.find(g => g.value === gradeStyle)?.label || "Graded" : "Result"}
-                        </Badge>
-                        <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[200px] flex items-center justify-center">
-                          <AnimatePresence mode="wait">
-                            {isProcessing ? (
-                              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
-                                <p className="text-sm text-muted-foreground">Applying color grade...</p>
-                              </motion.div>
-                            ) : resultUrl ? (
-                              <motion.img key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} src={resultUrl} alt="Graded" className="w-full h-auto max-h-[350px] object-contain" />
-                            ) : (
-                              <motion.p key="empty" className="text-sm text-muted-foreground py-12">Result will appear here</motion.p>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                     {resultUrl && (
                       <div className="p-4 border-t border-border/50 flex justify-end">
                         <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}>

@@ -1,3 +1,4 @@
+import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import ToolPageLayout from "@/components/ToolPageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -171,38 +172,32 @@ export default function ToolFaceEnhancer() {
                   </div>
                 ) : (
                   <div>
-                    {imagePreview && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-border/50">
-                        <div className="p-4">
-                          <Badge variant="secondary" className="mb-3">Original</Badge>
-                          <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                            <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />
-                          </div>
+                    {isProcessing ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-20">
+                        <Loader2 className="h-8 w-8 animate-spin text-rose-400" />
+                        <p className="text-sm text-muted-foreground">AI is enhancing the portrait...</p>
+                      </div>
+                    ) : imagePreview && resultUrl ? (
+                      <BeforeAfterSlider
+                        before={imagePreview}
+                        after={resultUrl}
+                        beforeLabel="Original"
+                        afterLabel="Enhanced"
+                        height={450}
+                        accentColor="green"
+                      />
+                    ) : imagePreview ? (
+                      <div className="p-4">
+                        <Badge variant="secondary" className="mb-3">Original</Badge>
+                        <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
+                          <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />
                         </div>
-                        <div className="p-4">
-                          <Badge className="mb-3 bg-rose-500/20 text-rose-400 border-rose-500/30">Enhanced</Badge>
-                          <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[200px] flex items-center justify-center">
-                            <AnimatePresence mode="wait">
-                              {isProcessing ? (
-                                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12">
-                                  <Loader2 className="h-8 w-8 animate-spin text-rose-400" />
-                                  <p className="text-sm text-muted-foreground">AI is enhancing the portrait...</p>
-                                </motion.div>
-                              ) : resultUrl ? (
-                                <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                                  <img src={resultUrl} alt="Enhanced" className="w-full h-auto max-h-[300px] object-contain" />
-                                </motion.div>
-                              ) : (
-                                <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-2 py-12">
-                                  <ArrowRight className="h-6 w-6 text-muted-foreground/50" />
-                                  <p className="text-sm text-muted-foreground">Click "Enhance Face" to improve</p>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
+                        <div className="flex flex-col items-center gap-2 py-12">
+                          <ArrowRight className="h-6 w-6 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground">Click "Enhance Face" to improve</p>
                         </div>
                       </div>
-                    )}
+                    ) : null}
                     {resultUrl && (
                       <div className="p-4 border-t border-border/50 flex justify-end">
                         <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}>
