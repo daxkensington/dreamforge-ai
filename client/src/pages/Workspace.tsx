@@ -101,6 +101,9 @@ export default function Workspace() {
   const [submitTitle, setSubmitTitle] = useState("");
   const [submitDesc, setSubmitDesc] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [seed, setSeed] = useState("");
+  const [styleRef, setStyleRef] = useState("");
+  const [aspectPreset, setAspectPreset] = useState("1:1");
   const [animateDialogOpen, setAnimateDialogOpen] = useState(false);
   const [animateGenId, setAnimateGenId] = useState<number | null>(null);
   const [animateDuration, setAnimateDuration] = useState(4);
@@ -464,6 +467,31 @@ export default function Workspace() {
                   />
                 </div>
 
+                {/* Aspect Ratio Presets */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Aspect Ratio</Label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[
+                      { label: "1:1", w: 1024, h: 1024, icon: "■" },
+                      { label: "4:3", w: 1024, h: 768, icon: "▬" },
+                      { label: "16:9", w: 1024, h: 576, icon: "▬▬" },
+                      { label: "3:4", w: 768, h: 1024, icon: "▮" },
+                      { label: "9:16", w: 576, h: 1024, icon: "▮▮" },
+                    ].map((ar) => (
+                      <button
+                        key={ar.label}
+                        onClick={() => { setAspectPreset(ar.label); setWidth(ar.w); setHeight(ar.h); }}
+                        className={`flex flex-col items-center gap-0.5 p-2 rounded-lg border text-[10px] font-medium transition-all ${
+                          aspectPreset === ar.label ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-border/50 text-muted-foreground hover:border-border"
+                        }`}
+                      >
+                        <span>{ar.icon}</span>
+                        <span>{ar.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Advanced Settings Toggle */}
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
@@ -483,6 +511,43 @@ export default function Workspace() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden space-y-4"
                     >
+                      {/* Seed Control */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          Seed
+                          <span className="text-[10px]">(leave empty for random)</span>
+                        </Label>
+                        <div className="flex gap-2 mt-1.5">
+                          <Input
+                            type="number"
+                            placeholder="Random"
+                            value={seed}
+                            onChange={(e) => setSeed(e.target.value)}
+                            className="text-sm font-mono"
+                          />
+                          <Button variant="outline" size="sm" onClick={() => setSeed(String(Math.floor(Math.random() * 2147483647)))}>
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Style Reference */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Style Reference Image URL</Label>
+                        <Input
+                          placeholder="Paste a style reference image URL..."
+                          value={styleRef}
+                          onChange={(e) => setStyleRef(e.target.value)}
+                          className="mt-1.5 text-sm"
+                        />
+                        {styleRef && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <img src={styleRef} alt="Style ref" className="h-12 w-12 rounded object-cover border border-border/50" />
+                            <span className="text-[10px] text-muted-foreground">Style will be applied to generation</span>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Dimensions */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -496,6 +561,7 @@ export default function Workspace() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="512">512px</SelectItem>
+                              <SelectItem value="576">576px</SelectItem>
                               <SelectItem value="768">768px</SelectItem>
                               <SelectItem value="1024">1024px</SelectItem>
                             </SelectContent>
@@ -512,6 +578,7 @@ export default function Workspace() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="512">512px</SelectItem>
+                              <SelectItem value="576">576px</SelectItem>
                               <SelectItem value="768">768px</SelectItem>
                               <SelectItem value="1024">1024px</SelectItem>
                             </SelectContent>
