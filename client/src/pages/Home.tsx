@@ -131,7 +131,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "Digital Artist",
     quote: "DreamForge has completely transformed my creative workflow. I can iterate on concepts 10x faster than before.",
-    gradient: "from-purple-500 to-pink-500",
+    gradient: "from-amber-500 to-orange-500",
   },
   {
     name: "Marcus Rivera",
@@ -143,20 +143,65 @@ const testimonials = [
     name: "Aisha Patel",
     role: "Content Creator",
     quote: "I went from zero design skills to creating stunning visuals for my brand. The tools are intuitive and powerful.",
-    gradient: "from-orange-500 to-yellow-500",
+    gradient: "from-orange-500 to-red-500",
+  },
+  {
+    name: "David Park",
+    role: "E-commerce Owner",
+    quote: "The product photo tool alone saved us thousands in photography costs. Every listing looks professional now.",
+    gradient: "from-emerald-500 to-teal-500",
+  },
+  {
+    name: "Lisa Nakamura",
+    role: "YouTube Creator",
+    quote: "Text-to-video is a game changer. I generate b-roll, thumbnails, and intros all in one platform. Nothing else comes close.",
+    gradient: "from-violet-500 to-purple-500",
+  },
+  {
+    name: "James Osei",
+    role: "Startup Founder",
+    quote: "We built our entire brand identity — logo, icons, marketing assets — using DreamForge in a single weekend.",
+    gradient: "from-rose-500 to-pink-500",
   },
 ];
 
 const statItems = [
-  { label: "Images Created", target: 10000, suffix: "+" },
-  { label: "Active Creators", target: 500, suffix: "+" },
-  { label: "AI Tools", target: 15, suffix: "" },
-  { label: "AI Models", target: 4, suffix: "" },
+  { label: "Images Created", target: 50000, suffix: "+" },
+  { label: "Active Creators", target: 10000, suffix: "+" },
+  { label: "AI Tools", target: 53, suffix: "+" },
+  { label: "AI Models", target: 6, suffix: "" },
 ];
+
+const heroWords = ["Images", "Videos", "Music", "Logos", "Avatars", "Art"];
 
 /* ── Section divider component ── */
 function SectionDivider() {
-  return <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />;
+  return <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />;
+}
+
+/* ── Animated word cycling ── */
+function CyclingWord() {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setIndex((p) => (p + 1) % heroWords.length), 2500);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span className="inline-block relative h-[1.15em] overflow-hidden align-bottom">
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={heroWords[index]}
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -40, opacity: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="inline-block bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent"
+        >
+          {heroWords[index]}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
 }
 
 /* ── Count-up hook ── */
@@ -272,10 +317,10 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 backdrop-blur-sm border border-amber-500/20 mb-8"
             >
-              <Sparkles className="h-4 w-4 text-purple-400" />
-              <span className="text-sm font-medium text-white">AI Creative Studio</span>
+              <Sparkles className="h-4 w-4 text-amber-400" />
+              <span className="text-sm font-medium text-white/90">53+ AI Tools — One Platform</span>
             </motion.div>
 
             <motion.h1
@@ -283,10 +328,10 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={1}
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight mb-6 leading-[1.05] text-white"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tighter mb-6 leading-[1.05] text-white"
               style={{ textShadow: '0 4px 30px rgba(0,0,0,0.8)' }}
             >
-              Create <span className="gradient-text">Beyond</span> Imagination
+              Create Stunning <CyclingWord />
             </motion.h1>
 
             <motion.p
@@ -294,9 +339,9 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={2}
-              className="text-lg md:text-xl text-white/70 mb-12 max-w-2xl mx-auto"
+              className="text-lg md:text-xl text-white/60 mb-12 max-w-2xl mx-auto"
             >
-              Turn words into stunning images, videos, and animations — powered by AI.
+              The all-in-one AI creative studio. Images, video, audio, design — powered by 6 AI models.
             </motion.p>
 
             <motion.div
@@ -356,6 +401,18 @@ export default function Home() {
         </div>
       </section>
 
+      {/* AI Model Marquee */}
+      <section className="py-6 overflow-hidden border-b border-white/5">
+        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by the world's best AI models</p>
+        <div className="flex items-center justify-center gap-8 md:gap-12">
+          {["Grok (xAI)", "GPT-4o", "DALL-E 3", "Gemini 2.0", "Claude", "Google Veo 2"].map((model) => (
+            <span key={model} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
+              {model}
+            </span>
+          ))}
+        </div>
+      </section>
+
       <SectionDivider />
 
       {/* ═══════ SECTION 3: INTERACTIVE PROMPT DEMO ═══════ */}
@@ -367,7 +424,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Try It Now
           </motion.p>
@@ -400,7 +457,7 @@ export default function Home() {
             custom={3}
             className="max-w-3xl mx-auto mb-14"
           >
-            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-purple-500/30 shadow-[0_0_30px_-5px_rgba(168,85,247,0.3)] backdrop-blur-sm">
+            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-amber-500/30 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] backdrop-blur-sm">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Search className="h-5 w-5 text-white/40 ml-2 sm:ml-4 shrink-0" />
                 <input
@@ -463,7 +520,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Made with DreamForge
           </motion.p>
@@ -520,7 +577,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             See Our Tools in Action
           </motion.p>
@@ -558,7 +615,7 @@ export default function Home() {
                   {/* After */}
                   <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
                     <img src={demo.after} alt={`${demo.label} after`} loading="lazy" className="w-full h-full object-cover" />
-                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-600/80 text-white backdrop-blur-sm shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500/80 text-white backdrop-blur-sm shadow-[0_0_10px_rgba(245,158,11,0.5)]">
                       After
                     </span>
                   </div>
@@ -581,7 +638,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Powerful Tools
           </motion.p>
@@ -618,7 +675,7 @@ export default function Home() {
                   </div>
                   <div className="relative p-6">
                     <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4">
-                      <tool.icon className="h-6 w-6 text-purple-400" />
+                      <tool.icon className="h-6 w-6 text-amber-400" />
                     </div>
                     <h3 className="text-lg font-semibold mb-1 text-white">{tool.title}</h3>
                     <p className="text-sm text-white/60">{tool.desc}</p>
@@ -641,7 +698,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Simple Pricing
           </motion.p>
@@ -667,13 +724,13 @@ export default function Home() {
                 custom={i}
                 className={`relative rounded-2xl p-6 backdrop-blur-sm transition-all duration-300 ${
                   plan.highlighted
-                    ? "bg-white/10 border-2 border-purple-500/50 shadow-[0_0_30px_-5px_rgba(168,85,247,0.3)]"
+                    ? "bg-white/10 border-2 border-amber-500/50 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)]"
                     : "bg-white/5 border border-white/10 hover:border-white/20"
                 }`}
               >
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-purple-600 text-white flex items-center gap-1">
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-1">
                       <Crown className="h-3 w-3" />
                       {plan.badge}
                     </span>
@@ -687,7 +744,7 @@ export default function Home() {
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feat) => (
                     <li key={feat} className="flex items-center gap-2 text-sm text-white/70">
-                      <Check className="h-4 w-4 text-purple-400 shrink-0" />
+                      <Check className="h-4 w-4 text-amber-400 shrink-0" />
                       {feat}
                     </li>
                   ))}
@@ -711,7 +768,7 @@ export default function Home() {
             custom={5}
             className="text-center mt-10"
           >
-            <Link href="/pricing" className="text-sm text-purple-400 hover:underline inline-flex items-center gap-1">
+            <Link href="/pricing" className="text-sm text-amber-400 hover:underline inline-flex items-center gap-1">
               View All Plans <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -729,7 +786,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-purple-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Trusted by Creators Worldwide
           </motion.p>
@@ -744,7 +801,7 @@ export default function Home() {
             What People Are <span className="gradient-text">Saying</span>
           </motion.h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {testimonials.map((t, i) => (
               <motion.div
                 key={t.name}
@@ -755,7 +812,7 @@ export default function Home() {
                 custom={i}
                 className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm"
               >
-                <Quote className="h-6 w-6 text-purple-400/40 mb-4" />
+                <Quote className="h-6 w-6 text-amber-400/40 mb-4" />
                 <p className="text-sm text-white/70 leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.gradient} shrink-0`} />
@@ -785,7 +842,7 @@ export default function Home() {
 
       {/* ═══════ SECTION 9: FINAL CTA ═══════ */}
       <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-primary/10 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-900/20 via-orange-900/10 to-black/80" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
           <div className="max-w-3xl mx-auto text-center">
             <motion.h2

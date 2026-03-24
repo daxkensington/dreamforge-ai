@@ -166,7 +166,7 @@
 
   /* Gradient text utility */
   .gradient-text {
-    background: linear-gradient(135deg, oklch(0.72 0.19 270), oklch(0.68 0.22 300), oklch(0.75 0.15 180));
+    background: linear-gradient(135deg, #f59e0b, #f97316, #ef4444);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
