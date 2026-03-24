@@ -111,6 +111,16 @@ export const CREDIT_COSTS: Record<string, number> = {
   "transparent-png": 1,
   "icon-gen": 1,
   "batch-prompts": 1,
+  "music-gen": 2,
+  "mockup": 1,
+  "social-resize": 1,
+  "depth-map": 1,
+  "character-sheet": 3,
+  "meme": 1,
+  "interior-design": 2,
+  "thumbnail": 1,
+  "collage": 2,
+  "film-grain": 1,
 };
 
 // ─── DB Helpers ─────────────────────────────────────────────────────────────

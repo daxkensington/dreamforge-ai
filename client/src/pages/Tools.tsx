@@ -7,6 +7,7 @@ import {
   Monitor, QrCode, MessageSquare, CircleUser, ShoppingBag,
   FileText, Mic, AudioLines, Waves, Copy, Layers,
   Film, Grid3X3, ScanLine, Sun, AppWindow, Paintbrush,
+  Music, Frame, Share2, Users, Laugh, Home, LayoutGrid,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -43,6 +44,8 @@ const imageTools: GridTool[] = [
   { title: "HDR Enhancer", desc: "Transform lighting & contrast", icon: Sun, href: "/tools/hdr-enhance", img: "/showcase/tool-hdr.jpg", badge: "New" },
   { title: "Transparent PNG", desc: "Clean background removal", icon: Layers, href: "/tools/transparent-png", img: "/showcase/tool-transparent.jpg", badge: "New" },
   { title: "Panorama", desc: "Extend to panoramic views", icon: ScanLine, href: "/tools/panorama", img: "/showcase/tool-panorama.jpg", badge: "New" },
+  { title: "Film & Grain", desc: "Vintage film effects", icon: Film, href: "/tools/film-grain", img: "/showcase/tool-filmgrain.jpg", badge: "New" },
+  { title: "Depth Map", desc: "3D depth from 2D images", icon: Layers, href: "/tools/depth-map", img: "/showcase/tool-depthmap.jpg", badge: "New" },
 ];
 
 // ─── Creative Generation Tools ───────────────────────────────────────────────
@@ -59,6 +62,12 @@ const creativeTools: GridTool[] = [
   { title: "Texture Generator", desc: "Seamless tileable textures", icon: Grid3X3, href: "/tools/texture", img: "/showcase/tool-texture.jpg", badge: "New" },
   { title: "Icon Generator", desc: "App icons & favicons", icon: AppWindow, href: "/tools/icon-gen", img: "/showcase/tool-icon.jpg", badge: "New" },
   { title: "AI Canvas", desc: "Draw & AI transforms live", icon: Paintbrush, href: "/tools/canvas", img: "/showcase/tool-canvas.jpg", badge: "New" },
+  { title: "Mockup Generator", desc: "Place designs on products", icon: Frame, href: "/tools/mockup", img: "/showcase/tool-mockup.jpg", badge: "New" },
+  { title: "Thumbnails", desc: "YouTube & social thumbnails", icon: Image, href: "/tools/thumbnail", img: "/showcase/tool-thumbnail.jpg", badge: "New" },
+  { title: "Character Sheets", desc: "Consistent character designs", icon: Users, href: "/tools/character-sheet", img: "/showcase/tool-charsheet.jpg", badge: "New" },
+  { title: "Meme Generator", desc: "AI-powered viral memes", icon: Laugh, href: "/tools/meme", img: "/showcase/tool-meme.jpg", badge: "New" },
+  { title: "Interior Design", desc: "AI room redesign", icon: Home, href: "/tools/interior-design", img: "/showcase/tool-interior.jpg", badge: "New" },
+  { title: "Collage Maker", desc: "AI-arranged photo collages", icon: LayoutGrid, href: "/tools/collage", img: "/showcase/tool-collage.jpg", badge: "New" },
 ];
 
 // ─── Video Generation Tools ──────────────────────────────────────────────────
@@ -70,6 +79,7 @@ const videoTools: GridTool[] = [
 // ─── Workflow Tools ──────────────────────────────────────────────────────────
 const workflowTools: GridTool[] = [
   { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg", badge: "New" },
+  { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg", badge: "New" },
 ];
 
 // ─── AI Utility Tools ────────────────────────────────────────────────────────
@@ -82,6 +92,7 @@ const utilityTools: GridTool[] = [
 
 // ─── Audio Tools ─────────────────────────────────────────────────────────────
 const audioTools: GridTool[] = [
+  { title: "AI Music Composer", desc: "Generate music compositions", icon: Music, href: "/tools/music-gen", img: "/showcase/tool-music.jpg", badge: "New" },
   { title: "Text-to-Speech", desc: "Natural AI voiceovers", icon: Mic, href: "/tools/text-to-speech", img: "/showcase/tool-tts.jpg", badge: "New" },
   { title: "Audio Enhancer", desc: "Professional audio cleanup", icon: AudioLines, href: "/tools/audio-enhance", img: "/showcase/tool-audio-enhance.jpg", badge: "New" },
   { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg", badge: "New" },

@@ -2254,6 +2254,369 @@ export const appRouter = router({
 
         return { results, total: input.prompts.length, completed: results.filter((r) => r.status === "completed").length };
       }),
+
+    // AI Music Generator — create music descriptions and compositions
+    musicGen: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(1000),
+          genre: z.enum(["ambient", "electronic", "cinematic", "lo-fi", "jazz", "classical", "rock", "hip-hop", "pop", "world", "custom"]).default("custom"),
+          mood: z.enum(["happy", "sad", "epic", "relaxed", "tense", "mysterious", "romantic", "energetic", "dark", "hopeful"]).default("relaxed"),
+          duration: z.enum(["15", "30", "60", "120"]).default("30"),
+          instruments: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "music-gen", "Music generation");
+        try {
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert music composer and producer. Given a description, genre, mood, and duration, create a detailed music composition specification. Output JSON with: title, bpm, key, timeSignature, sections (array of {name, bars, description, instruments, dynamics}), mixNotes, referenceTrack, moodProgression.`,
+              },
+              {
+                role: "user",
+                content: `Create a ${input.duration}-second ${input.genre} track. Mood: ${input.mood}. Description: ${input.description}.${input.instruments ? ` Instruments: ${input.instruments}.` : ""}`,
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "music_composition",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    bpm: { type: "number" },
+                    key: { type: "string" },
+                    timeSignature: { type: "string" },
+                    sections: { type: "array", items: { type: "object", properties: { name: { type: "string" }, bars: { type: "number" }, description: { type: "string" }, instruments: { type: "string" }, dynamics: { type: "string" } }, required: ["name", "bars", "description", "instruments", "dynamics"], additionalProperties: false } },
+                    mixNotes: { type: "string" },
+                    referenceTrack: { type: "string" },
+                    moodProgression: { type: "string" },
+                  },
+                  required: ["title", "bpm", "key", "timeSignature", "sections", "mixNotes", "referenceTrack", "moodProgression"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = result.choices[0]?.message?.content;
+          const composition = typeof content === "string" ? JSON.parse(content) : null;
+          if (!composition) throw new Error("Failed to generate composition");
+          return { ...composition, status: "completed" as const, genre: input.genre, mood: input.mood };
+        } catch (error: any) {
+          return { title: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Mockup Generator — place designs on product mockups
+    mockup: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          mockupType: z.enum(["tshirt", "phone-case", "laptop", "mug", "poster", "book-cover", "business-card", "billboard", "hoodie", "tote-bag"]).default("tshirt"),
+          color: z.string().max(100).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "mockup", "Mockup generation");
+        try {
+          const mockupDescriptions: Record<string, string> = {
+            "tshirt": "a premium quality t-shirt being worn by a model, professional product photography, lifestyle setting",
+            "phone-case": "a modern smartphone case displayed at an angle, showing the design clearly, clean studio backdrop",
+            "laptop": "a laptop screen displaying the design, modern workspace setting, professional photography",
+            "mug": "a ceramic coffee mug on a cozy table, steam rising, warm lighting, lifestyle photography",
+            "poster": "a framed poster on a stylish wall, modern interior, gallery-quality presentation",
+            "book-cover": "a hardcover book with the design as the cover, displayed on a wooden table, professional photography",
+            "business-card": "a stack of premium business cards with the design, elegant arrangement, macro photography",
+            "billboard": "a large billboard on a city street displaying the design, urban photography, dramatic perspective",
+            "hoodie": "a premium hoodie being worn casually, street photography style, lifestyle product shot",
+            "tote-bag": "a canvas tote bag with the design, carried by someone in a trendy setting, lifestyle photography",
+          };
+          const colorNote = input.color ? ` Product color: ${input.color}.` : "";
+          const { url } = await generateImage({
+            prompt: `Professional product mockup: ${mockupDescriptions[input.mockupType]}. The uploaded design/image is clearly visible on the product.${colorNote} Commercial quality product photography, realistic lighting and shadows.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, mockupType: input.mockupType };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Social Media Resizer — resize/adapt images for different platforms
+    socialResize: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          platform: z.enum(["instagram-post", "instagram-story", "facebook-cover", "twitter-header", "youtube-thumbnail", "linkedin-banner", "pinterest-pin", "tiktok"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "social-resize", "Social media resize");
+        try {
+          const platformSpecs: Record<string, { ratio: string; desc: string }> = {
+            "instagram-post": { ratio: "1:1", desc: "square Instagram post, 1080x1080" },
+            "instagram-story": { ratio: "9:16", desc: "vertical Instagram story, 1080x1920" },
+            "facebook-cover": { ratio: "2.7:1", desc: "wide Facebook cover photo, 820x312" },
+            "twitter-header": { ratio: "3:1", desc: "wide Twitter/X header, 1500x500" },
+            "youtube-thumbnail": { ratio: "16:9", desc: "YouTube thumbnail, 1280x720, eye-catching" },
+            "linkedin-banner": { ratio: "4:1", desc: "wide LinkedIn banner, 1584x396" },
+            "pinterest-pin": { ratio: "2:3", desc: "tall Pinterest pin, 1000x1500" },
+            "tiktok": { ratio: "9:16", desc: "vertical TikTok cover, 1080x1920" },
+          };
+          const spec = platformSpecs[input.platform];
+          const { url } = await generateImage({
+            prompt: `Adapt and resize this image for ${spec.desc} format. Maintain the key visual elements and composition, intelligently extending or cropping as needed for the ${spec.ratio} aspect ratio. The result should look professionally designed for ${input.platform}. Clean, polished output.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, platform: input.platform };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Depth Map Generator — extract 3D depth from 2D images
+    depthMap: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          style: z.enum(["grayscale", "colored", "normal-map"]).default("grayscale"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "depth-map", "Depth map generation");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "grayscale": "Convert this image into a precise depth map. White represents closest objects, black represents the farthest. Smooth gradients for depth transitions. Accurate depth estimation for all objects in the scene. Professional 3D-ready depth map, grayscale only.",
+            "colored": "Convert this image into a color-coded depth map. Use a rainbow/viridis color palette where warm colors (red/yellow) represent near objects and cool colors (blue/purple) represent far objects. Clear depth separation, professional visualization.",
+            "normal-map": "Convert this image into a normal map for 3D rendering. RGB channels representing surface normals — X=Red, Y=Green, Z=Blue. The characteristic purple-blue appearance of a standard normal map. Suitable for 3D game assets and PBR workflows.",
+          };
+          const { url } = await generateImage({
+            prompt: styleDescriptions[input.style],
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, style: input.style };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Character Sheet Generator — consistent character from multiple angles
+    characterSheet: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(1000),
+          style: z.enum(["anime", "realistic", "cartoon", "comic", "pixel-art", "3d-render", "fantasy", "sci-fi"]).default("anime"),
+          views: z.enum(["turnaround", "expressions", "poses", "full-sheet"]).default("turnaround"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "character-sheet", "Character sheet");
+        try {
+          const viewDescriptions: Record<string, string> = {
+            "turnaround": "character turnaround sheet showing front view, 3/4 view, side view, and back view, all consistent design, white background, reference sheet layout",
+            "expressions": "character expression sheet showing 6-8 different facial expressions (happy, sad, angry, surprised, neutral, thinking, laughing, determined), consistent character design, white background",
+            "poses": "character pose sheet showing 4-6 different action poses and stances, consistent character design, dynamic movement, white background",
+            "full-sheet": "comprehensive character reference sheet with front and back views, facial expressions, key poses, clothing details, color palette swatches, and design notes, professional character design document",
+          };
+          const { url } = await generateImage({
+            prompt: `Professional character design ${viewDescriptions[input.views]}. Character: ${input.description}. Art style: ${input.style}. Clean lines, consistent proportions across all views, suitable for animation or game production. High quality character design reference.`,
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Meme Generator — create memes with AI
+    meme: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(500),
+          style: z.enum(["classic", "modern", "surreal", "wholesome", "dark-humor", "reaction", "drake", "expanding-brain", "custom"]).default("modern"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "meme", "Meme generation");
+        try {
+          // First generate the meme text via LLM
+          const textResult = await invokeLLM({
+            messages: [
+              { role: "system", content: "You are a viral meme creator. Given a concept and style, generate meme text (top text and bottom text) that's genuinely funny. Keep it short, punchy, and shareable. Output JSON with: topText, bottomText, imageDescription (describe the ideal meme image)." },
+              { role: "user", content: `Create a ${input.style} meme about: ${input.concept}` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "meme",
+                strict: true,
+                schema: { type: "object", properties: { topText: { type: "string" }, bottomText: { type: "string" }, imageDescription: { type: "string" } }, required: ["topText", "bottomText", "imageDescription"], additionalProperties: false },
+              },
+            },
+          });
+          const memeContent = typeof textResult.choices[0]?.message?.content === "string" ? JSON.parse(textResult.choices[0].message.content) : null;
+          if (!memeContent) throw new Error("Failed to generate meme text");
+
+          const { url } = await generateImage({
+            prompt: `Meme image: ${memeContent.imageDescription}. Bold white text with black outline at the top reading "${memeContent.topText}" and at the bottom reading "${memeContent.bottomText}". Classic meme format, Impact font style, funny and shareable.`,
+          });
+
+          return { url, ...memeContent, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, topText: null, bottomText: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Interior Design — redesign rooms with AI
+    interiorDesign: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          style: z.enum(["modern", "minimalist", "scandinavian", "industrial", "bohemian", "mid-century", "japanese", "art-deco", "farmhouse", "luxury"]).default("modern"),
+          room: z.enum(["living-room", "bedroom", "kitchen", "bathroom", "office", "dining", "outdoor", "custom"]).default("living-room"),
+          keepLayout: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "interior-design", "Interior redesign");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "modern": "modern contemporary interior, clean lines, neutral palette, statement lighting, open feel",
+            "minimalist": "minimalist interior, extremely clean, few carefully chosen pieces, lots of white space, zen-like calm",
+            "scandinavian": "Scandinavian interior, light wood, white walls, cozy textiles, hygge atmosphere, functional beauty",
+            "industrial": "industrial loft interior, exposed brick, metal accents, raw materials, Edison bulbs, urban character",
+            "bohemian": "bohemian interior, rich textures, layered rugs, plants, eclectic art, warm earthy tones, collected feel",
+            "mid-century": "mid-century modern interior, iconic furniture pieces, organic shapes, teak wood, retro-modern fusion",
+            "japanese": "Japanese interior, tatami elements, shoji screens, natural wood, minimalist zen, wabi-sabi aesthetic",
+            "art-deco": "Art Deco interior, geometric patterns, gold accents, velvet, glamorous, 1920s elegance",
+            "farmhouse": "modern farmhouse interior, shiplap, rustic wood, neutral palette, cozy comfort, practical charm",
+            "luxury": "luxury interior, premium materials, marble, silk, designer furniture, five-star hotel quality",
+          };
+          const layoutNote = input.keepLayout ? "Maintain the exact room layout, dimensions, and window/door positions. Only change the furniture, decor, colors, and styling." : "Reimagine the entire space with new layout and design.";
+          const { url } = await generateImage({
+            prompt: `Redesign this ${input.room} in ${styleDescriptions[input.style]} style. ${layoutNote} Professional interior design rendering, photorealistic quality, magazine-worthy result. Beautiful staging, perfect lighting.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Thumbnail Maker — create eye-catching thumbnails
+    thumbnail: protectedProcedure
+      .input(
+        z.object({
+          title: z.string().min(1).max(200),
+          platform: z.enum(["youtube", "twitch", "podcast", "blog", "course", "social"]).default("youtube"),
+          style: z.enum(["bold", "minimal", "cinematic", "neon", "gradient", "collage"]).default("bold"),
+          imageUrl: z.string().url().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "thumbnail", "Thumbnail generation");
+        try {
+          const platformSpecs: Record<string, string> = {
+            "youtube": "YouTube thumbnail, 16:9, extremely eye-catching, high contrast, clickable",
+            "twitch": "Twitch stream thumbnail, gaming aesthetic, vibrant, exciting",
+            "podcast": "podcast cover art, professional, clean, legible at small sizes",
+            "blog": "blog post header image, editorial quality, engaging",
+            "course": "online course thumbnail, professional, trustworthy, educational",
+            "social": "social media post thumbnail, shareable, scroll-stopping",
+          };
+          const styleDescriptions: Record<string, string> = {
+            "bold": "bold large text, dramatic expressions, bright colors, high energy",
+            "minimal": "clean minimalist design, elegant typography, lots of whitespace",
+            "cinematic": "cinematic quality, film-like lighting, dramatic atmosphere",
+            "neon": "neon glow effects, dark background, electric colors, futuristic",
+            "gradient": "beautiful gradient backgrounds, modern typography, smooth colors",
+            "collage": "dynamic collage of elements, layered composition, visual storytelling",
+          };
+
+          const generateOptions: any = {
+            prompt: `Professional ${platformSpecs[input.platform]}. Style: ${styleDescriptions[input.style]}. Title text: "${input.title}" — the text must be large, legible, and attention-grabbing. High quality graphic design, 10x click-through rate improvement.`,
+          };
+          if (input.imageUrl) {
+            generateOptions.originalImages = [{ url: input.imageUrl, mimeType: "image/png" }];
+          }
+
+          const { url } = await generateImage(generateOptions);
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Collage Maker — create AI-arranged photo collages
+    collage: protectedProcedure
+      .input(
+        z.object({
+          imageUrls: z.array(z.string().url()).min(2).max(9),
+          layout: z.enum(["grid", "mosaic", "polaroid", "magazine", "scrapbook", "filmstrip"]).default("grid"),
+          theme: z.string().max(200).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "collage", "Collage creation");
+        try {
+          const layoutDescriptions: Record<string, string> = {
+            "grid": "clean grid collage layout with equal-sized cells, thin white borders between images",
+            "mosaic": "artistic mosaic layout with varied image sizes, dynamic asymmetric arrangement",
+            "polaroid": "scattered Polaroid photo style, each image in a white Polaroid frame, casual arrangement on a surface",
+            "magazine": "editorial magazine layout, sophisticated typography, professional graphic design feel",
+            "scrapbook": "creative scrapbook style with tape, stickers, decorative elements, fun and personal",
+            "filmstrip": "cinematic filmstrip layout, images arranged in a horizontal film strip with perforations",
+          };
+          const themeNote = input.theme ? ` Theme/title: ${input.theme}.` : "";
+
+          // Analyze the images with LLM, then create a collage prompt
+          const { url } = await generateImage({
+            prompt: `Create a beautiful ${layoutDescriptions[input.layout]} combining ${input.imageUrls.length} photos into one cohesive artwork.${themeNote} Professional quality, balanced composition, visually harmonious. The collage should tell a visual story.`,
+            originalImages: input.imageUrls.slice(0, 3).map(u => ({ url: u, mimeType: "image/png" })),
+          });
+
+          return { url, status: "completed" as const, layout: input.layout };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Film Grain & Effects — add cinematic effects
+    filmGrain: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          effect: z.enum(["35mm-grain", "vintage-kodak", "polaroid", "vhs", "infrared", "cross-process", "bleach-bypass", "lomo", "daguerreotype", "cyanotype"]).default("35mm-grain"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "film-grain", "Film effect");
+        try {
+          const effectDescriptions: Record<string, string> = {
+            "35mm-grain": "authentic 35mm film grain, natural film texture, slightly warm tones, classic analog photography feel",
+            "vintage-kodak": "Kodak Portra 400 film stock look, soft warm colors, creamy skin tones, slight halation, nostalgic 1990s feel",
+            "polaroid": "instant Polaroid photo effect, slightly faded, warm cast, characteristic white border, vintage instant camera aesthetic",
+            "vhs": "VHS tape effect, scan lines, tracking artifacts, color bleeding, chromatic aberration, retro 1980s video look",
+            "infrared": "infrared photography effect, false colors, bright white foliage, dark sky, dreamlike surreal atmosphere",
+            "cross-process": "cross-processed film effect, unexpected color shifts, high contrast, vivid greens and magentas, experimental",
+            "bleach-bypass": "bleach bypass film effect, desaturated, high contrast, silvery metallic look, gritty cinematic feel",
+            "lomo": "Lomography effect, heavy vignette, saturated colors, light leaks, soft focus at edges, lo-fi charming",
+            "daguerreotype": "daguerreotype antique photograph effect, silvery metallic surface, extreme vintage, 1840s photography aesthetic",
+            "cyanotype": "cyanotype print effect, prussian blue monochrome, botanical print aesthetic, alternative photographic process look",
+          };
+          const { url } = await generateImage({
+            prompt: `Apply ${effectDescriptions[input.effect]} to this image. Maintain the original subject and composition while transforming it with the photographic effect. Professional quality.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const, effect: input.effect };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({
