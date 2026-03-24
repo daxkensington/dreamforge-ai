@@ -2066,6 +2066,194 @@ export const appRouter = router({
           return { name: null, status: "failed" as const, error: error.message };
         }
       }),
+
+    // Texture/Pattern Generator — create seamless tileable textures
+    textureGen: protectedProcedure
+      .input(
+        z.object({
+          prompt: z.string().min(1).max(1000),
+          category: z.enum(["wood", "stone", "metal", "fabric", "organic", "sci-fi", "abstract", "brick", "concrete", "water", "custom"]).default("custom"),
+          style: z.enum(["photorealistic", "stylized", "hand-painted", "pixel-art", "pbr"]).default("photorealistic"),
+          tiling: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "texture-gen", "Texture generation");
+        try {
+          const tilingNote = input.tiling ? "Seamless tileable pattern that repeats perfectly in all directions with no visible seams." : "";
+          const categoryNote = input.category !== "custom" ? `${input.category} material texture.` : "";
+
+          const { url } = await generateImage({
+            prompt: `${input.prompt}. ${categoryNote} ${tilingNote} Style: ${input.style}. High resolution texture map suitable for 3D rendering and game development. Square format, consistent lighting, no objects or scenes — pure surface texture.`,
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Panorama Generator — extend images to panoramic views
+    panorama: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          direction: z.enum(["horizontal", "vertical", "360"]).default("horizontal"),
+          expansionFactor: z.enum(["2x", "3x", "4x"]).default("3x"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "panorama", "Panorama generation");
+        try {
+          const directionDescriptions: Record<string, string> = {
+            "horizontal": `Extend this image horizontally to create a wide panoramic view (${input.expansionFactor} wider). Seamlessly continue the scene, landscape, and atmosphere in both directions. Maintain consistent lighting, perspective, and style.`,
+            "vertical": `Extend this image vertically (${input.expansionFactor} taller). Continue the scene upward showing more sky/ceiling and downward showing more ground/floor. Seamless extension.`,
+            "360": "Extend this image into a full 360-degree panoramic view. Create a seamless wrap-around environment that could be used as a VR/360 panorama. Consistent lighting and perspective throughout.",
+          };
+
+          const { url } = await generateImage({
+            prompt: directionDescriptions[input.direction] + " Professional panoramic photography quality.",
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // HDR/Lighting Enhancer — enhance lighting, contrast, and dynamic range
+    hdrEnhance: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          effect: z.enum(["hdr", "golden-hour", "blue-hour", "dramatic", "soft-light", "backlit", "neon-night", "foggy", "harsh-sun", "studio"]).default("hdr"),
+          intensity: z.number().min(0.1).max(1.0).default(0.7),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "color-grade", "HDR enhancement");
+        try {
+          const effectDescriptions: Record<string, string> = {
+            "hdr": "Apply HDR (High Dynamic Range) enhancement — boost shadow details, highlight details, vivid colors, expanded tonal range, professional HDR photography",
+            "golden-hour": "Transform the lighting to warm golden hour — rich warm tones, long shadows, beautiful sun glow, magic hour photography",
+            "blue-hour": "Apply cool blue hour lighting — twilight atmosphere, deep blues, city lights beginning to glow, serene mood",
+            "dramatic": "Dramatic lighting enhancement — deep shadows, bright highlights, strong contrast, moody atmosphere, cinematic",
+            "soft-light": "Soft diffused lighting — gentle shadows, dreamy glow, even illumination, flattering portrait light",
+            "backlit": "Apply backlighting effect — rim light, silhouette edges, sun flare, ethereal glow behind subjects",
+            "neon-night": "Neon night scene lighting — vibrant neon reflections, wet streets, cyberpunk atmosphere, colorful night",
+            "foggy": "Add atmospheric fog/haze — diffused light, mysterious mood, depth layers, soft ethereal",
+            "harsh-sun": "Bright midday sun — strong shadows, vivid saturation, crisp highlights, summer feel",
+            "studio": "Professional studio lighting — controlled three-point lighting, clean shadows, commercial quality",
+          };
+
+          const intensityLabel = input.intensity > 0.7 ? "strongly" : input.intensity > 0.4 ? "moderately" : "subtly";
+
+          const { url } = await generateImage({
+            prompt: `${intensityLabel} ${effectDescriptions[input.effect]}. Preserve the original subject and composition while transforming the lighting. Professional quality.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Transparent PNG Maker — create transparent background images
+    transparentPng: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          mode: z.enum(["remove-bg", "extract-subject", "product-cutout"]).default("remove-bg"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "background-edit", "Transparent PNG");
+        try {
+          const modeDescriptions: Record<string, string> = {
+            "remove-bg": "Remove the background completely, leaving only the main subject on a pure transparent/white background. Perfectly clean edges, no artifacts.",
+            "extract-subject": "Extract the primary subject from this image with pixel-perfect edges. Clean cutout suitable for compositing. Transparent background.",
+            "product-cutout": "Create a clean product cutout with perfect edges, removing all background. Professional e-commerce quality, suitable for any background placement.",
+          };
+
+          const { url } = await generateImage({
+            prompt: modeDescriptions[input.mode] + " Professional quality cutout.",
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Icon Generator — create icons and favicons
+    iconGen: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(500),
+          style: z.enum(["flat", "3d", "outline", "filled", "glassmorphism", "gradient", "pixel", "hand-drawn", "ios", "material"]).default("flat"),
+          size: z.enum(["16", "32", "64", "128", "256", "512"]).default("512"),
+          colorScheme: z.string().max(200).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-image", "Icon generation");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "flat": "flat design icon, solid colors, no shadows, clean minimal shapes",
+            "3d": "3D rendered icon, glossy, subtle shadows and reflections, depth",
+            "outline": "thin outline icon, single stroke weight, minimal, clean lines",
+            "filled": "solid filled icon, bold shapes, high contrast, clear silhouette",
+            "glassmorphism": "glassmorphism icon, frosted glass effect, semi-transparent, blur backdrop",
+            "gradient": "gradient icon, smooth color transitions, vibrant, modern",
+            "pixel": "pixel art icon, retro 16-bit style, limited palette, crisp pixels",
+            "hand-drawn": "hand-drawn icon, sketch style, artisanal, slight imperfections",
+            "ios": "iOS-style app icon, rounded square, glossy, Apple design language",
+            "material": "Material Design icon, Google style, geometric, consistent proportions",
+          };
+
+          const colorNote = input.colorScheme ? ` Color scheme: ${input.colorScheme}.` : "";
+
+          const { url } = await generateImage({
+            prompt: `Icon design: ${input.description}. Style: ${styleDescriptions[input.style]}.${colorNote} Single centered icon on a clean background, ${input.size}x${input.size} pixel perfect. Suitable for app icon, favicon, or UI element. Professional graphic design.`,
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Batch Prompt Generator — generate multiple images from a list of prompts
+    batchPrompts: protectedProcedure
+      .input(
+        z.object({
+          prompts: z.array(z.string().min(1).max(1000)).min(1).max(20),
+          style: z.string().max(200).optional(),
+          quality: z.enum(["standard", "hd"]).default("standard"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Charge per image
+        for (let i = 0; i < input.prompts.length; i++) {
+          await tryDeductCredits(ctx.user.id, "text-to-image", `Batch image ${i + 1}/${input.prompts.length}`);
+        }
+        const results: Array<{ prompt: string; url: string | null; status: string; error?: string }> = [];
+
+        for (const prompt of input.prompts) {
+          try {
+            const enhancedPrompt = input.style ? `${prompt}. Style: ${input.style}. Professional quality.` : `${prompt}. Professional quality.`;
+            const { url } = await generateImage({ prompt: enhancedPrompt, quality: input.quality });
+            results.push({ prompt, url: url ?? null, status: "completed" });
+          } catch (error: any) {
+            results.push({ prompt, url: null, status: "failed", error: error.message });
+          }
+        }
+
+        return { results, total: input.prompts.length, completed: results.filter((r) => r.status === "completed").length };
+      }),
   }),
 
   video: router({
@@ -2443,6 +2631,184 @@ export const appRouter = router({
             productionBudget: "", equipmentNeeded: [],
             status: "failed" as const, error: error.message,
           };
+        }
+      }),
+
+    // Text-to-Video — generate actual video clips via Google Veo 2
+    textToVideo: protectedProcedure
+      .input(
+        z.object({
+          prompt: z.string().min(1).max(2000),
+          duration: z.enum(["4", "8"]).default("8"),
+          aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
+          style: z.enum(["cinematic", "anime", "documentary", "slow-motion", "timelapse", "drone", "handheld", "commercial"]).default("cinematic"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
+        try {
+          const geminiKey = process.env.GEMINI_API_KEY;
+          if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
+
+          const styleEnhancers: Record<string, string> = {
+            "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
+            "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
+            "documentary": "documentary style, natural lighting, handheld camera, realistic",
+            "slow-motion": "slow motion, 120fps, ultra smooth, dramatic moment captured in detail",
+            "timelapse": "timelapse, hours compressed into seconds, dynamic movement of time",
+            "drone": "aerial drone shot, sweeping bird's eye view, cinematic flyover",
+            "handheld": "handheld camera, raw authentic feel, slight shake, intimate perspective",
+            "commercial": "polished commercial production, perfect lighting, premium quality, advertising grade",
+          };
+
+          const enhancedPrompt = `${input.prompt}. ${styleEnhancers[input.style]}. High quality, professional production.`;
+
+          // Start async Veo 2 generation
+          const startResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                instances: [{ prompt: enhancedPrompt }],
+                parameters: {
+                  aspectRatio: input.aspectRatio,
+                  durationSeconds: parseInt(input.duration),
+                  sampleCount: 1,
+                },
+              }),
+            }
+          );
+
+          if (!startResponse.ok) {
+            const err = await startResponse.text();
+            throw new Error(`Veo 2 failed to start: ${err}`);
+          }
+
+          const operation = await startResponse.json();
+          const operationName = operation.name;
+          if (!operationName) throw new Error("No operation name returned from Veo 2");
+
+          // Poll for completion (up to 5 minutes)
+          let videoUrl: string | null = null;
+          for (let i = 0; i < 60; i++) {
+            await new Promise((r) => setTimeout(r, 5000));
+
+            const pollResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
+            );
+            const pollResult = await pollResponse.json();
+
+            if (pollResult.done) {
+              const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
+              if (videos && videos.length > 0) {
+                videoUrl = videos[0].video?.uri || videos[0].bytesBase64Encoded
+                  ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
+                  : null;
+              }
+              break;
+            }
+
+            if (pollResult.error) {
+              throw new Error(`Veo 2 error: ${pollResult.error.message || JSON.stringify(pollResult.error)}`);
+            }
+          }
+
+          if (!videoUrl) throw new Error("Video generation timed out or produced no output");
+
+          return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style };
+        } catch (error: any) {
+          return { videoUrl: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Image-to-Video — animate a still image into a video clip via Veo 2
+    imageToVideo: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          prompt: z.string().min(1).max(1000),
+          duration: z.enum(["4", "8"]).default("8"),
+          motionType: z.enum(["subtle", "moderate", "dynamic", "cinematic-zoom", "pan-left", "pan-right", "zoom-in", "zoom-out"]).default("moderate"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
+        try {
+          const geminiKey = process.env.GEMINI_API_KEY;
+          if (!geminiKey) throw new Error("Gemini API key not configured");
+
+          const motionDescriptions: Record<string, string> = {
+            "subtle": "very subtle gentle motion, slight parallax, breathing effect",
+            "moderate": "moderate natural motion, elements gently moving, ambient animation",
+            "dynamic": "dynamic movement, active motion, energetic camera work",
+            "cinematic-zoom": "slow cinematic zoom with dramatic reveal",
+            "pan-left": "smooth camera pan from right to left, revealing the scene",
+            "pan-right": "smooth camera pan from left to right, revealing the scene",
+            "zoom-in": "gradual zoom in towards the focal point, increasing intimacy",
+            "zoom-out": "gradual zoom out revealing the full scene, establishing shot",
+          };
+
+          // Fetch the image and convert to base64 for Veo 2
+          const imgResponse = await fetch(input.imageUrl);
+          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+          const imgBase64 = imgBuffer.toString("base64");
+          const mimeType = imgResponse.headers.get("content-type") || "image/jpeg";
+
+          const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
+
+          const startResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                instances: [{
+                  prompt: enhancedPrompt,
+                  image: { bytesBase64Encoded: imgBase64, mimeType },
+                }],
+                parameters: {
+                  durationSeconds: parseInt(input.duration),
+                  sampleCount: 1,
+                },
+              }),
+            }
+          );
+
+          if (!startResponse.ok) {
+            const err = await startResponse.text();
+            throw new Error(`Veo 2 image-to-video failed: ${err}`);
+          }
+
+          const operation = await startResponse.json();
+          const operationName = operation.name;
+          if (!operationName) throw new Error("No operation name returned");
+
+          let videoUrl: string | null = null;
+          for (let i = 0; i < 60; i++) {
+            await new Promise((r) => setTimeout(r, 5000));
+            const pollResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
+            );
+            const pollResult = await pollResponse.json();
+
+            if (pollResult.done) {
+              const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
+              if (videos && videos.length > 0) {
+                videoUrl = videos[0].video?.uri || (videos[0].bytesBase64Encoded
+                  ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
+                  : null);
+              }
+              break;
+            }
+            if (pollResult.error) throw new Error(`Veo 2 error: ${pollResult.error.message}`);
+          }
+
+          if (!videoUrl) throw new Error("Video generation timed out");
+
+          return { videoUrl, status: "completed" as const, duration: input.duration };
+        } catch (error: any) {
+          return { videoUrl: null, status: "failed" as const, error: error.message };
         }
       }),
   }),

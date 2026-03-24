@@ -107,6 +107,10 @@ export const CREDIT_COSTS: Record<string, number> = {
   "text-to-speech": 2,
   "audio-enhance": 1,
   "sound-effects": 2,
+  "hdr-enhance": 1,
+  "transparent-png": 1,
+  "icon-gen": 1,
+  "batch-prompts": 1,
 };
 
 // ─── DB Helpers ─────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   SunMedium, Pipette, Image, Video, ImagePlus, User, Hexagon,
   Monitor, QrCode, MessageSquare, CircleUser, ShoppingBag,
   FileText, Mic, AudioLines, Waves, Copy, Layers,
+  Film, Grid3X3, ScanLine, Sun, AppWindow, Paintbrush,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -39,6 +40,9 @@ const imageTools: GridTool[] = [
   { title: "Variations", desc: "Generate creative variations", icon: Copy, href: "/tools/variations", img: "/showcase/tool-variations.jpg" },
   { title: "NL Image Editor", desc: "Edit by describing changes", icon: MessageSquare, href: "/tools/nl-edit", img: "/showcase/tool-nl-edit.jpg", badge: "New" },
   { title: "Photo Restorer", desc: "Restore old & damaged photos", icon: ImagePlus, href: "/tools/photo-restore", img: "/showcase/tool-restore.jpg", badge: "New" },
+  { title: "HDR Enhancer", desc: "Transform lighting & contrast", icon: Sun, href: "/tools/hdr-enhance", img: "/showcase/tool-hdr.jpg", badge: "New" },
+  { title: "Transparent PNG", desc: "Clean background removal", icon: Layers, href: "/tools/transparent-png", img: "/showcase/tool-transparent.jpg", badge: "New" },
+  { title: "Panorama", desc: "Extend to panoramic views", icon: ScanLine, href: "/tools/panorama", img: "/showcase/tool-panorama.jpg", badge: "New" },
 ];
 
 // ─── Creative Generation Tools ───────────────────────────────────────────────
@@ -52,6 +56,20 @@ const creativeTools: GridTool[] = [
   { title: "Text Effects", desc: "Stunning stylized AI text art", icon: Type, href: "/tools/text-effects", img: "/showcase/tool-texteffect.jpg" },
   { title: "Sketch to Image", desc: "Turn drawings into art", icon: PenLine, href: "/tools/sketch-to-image", img: "/showcase/tool-sketch.jpg" },
   { title: "Vectorizer", desc: "Convert images to vector style", icon: PenTool, href: "/tools/vectorize", img: "/showcase/tool-vector.jpg", badge: "New" },
+  { title: "Texture Generator", desc: "Seamless tileable textures", icon: Grid3X3, href: "/tools/texture", img: "/showcase/tool-texture.jpg", badge: "New" },
+  { title: "Icon Generator", desc: "App icons & favicons", icon: AppWindow, href: "/tools/icon-gen", img: "/showcase/tool-icon.jpg", badge: "New" },
+  { title: "AI Canvas", desc: "Draw & AI transforms live", icon: Paintbrush, href: "/tools/canvas", img: "/showcase/tool-canvas.jpg", badge: "New" },
+];
+
+// ─── Video Generation Tools ──────────────────────────────────────────────────
+const videoTools: GridTool[] = [
+  { title: "Text-to-Video", desc: "Generate video from text prompts", icon: Video, href: "/tools/text-to-video", img: "/showcase/tool-t2v.jpg", badge: "New" },
+  { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg", badge: "New" },
+];
+
+// ─── Workflow Tools ──────────────────────────────────────────────────────────
+const workflowTools: GridTool[] = [
+  { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg", badge: "New" },
 ];
 
 // ─── AI Utility Tools ────────────────────────────────────────────────────────
@@ -69,7 +87,7 @@ const audioTools: GridTool[] = [
   { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg", badge: "New" },
 ];
 
-const allToolCount = imageTools.length + creativeTools.length + utilityTools.length + audioTools.length;
+const allToolCount = imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
 
 function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
   return (
@@ -246,6 +264,16 @@ export default function Tools() {
           </motion.div>
         </section>
 
+        {/* Video Generation */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-2 block">Video Generation</span>
+            <h2 className="text-3xl md:text-4xl font-bold">AI Video</h2>
+            <p className="text-foreground/50 mt-2">Generate and animate video clips with Google Veo 2</p>
+          </motion.div>
+          <ToolGrid tools={videoTools} />
+        </section>
+
         {/* Image Editing Tools */}
         <section className="container max-w-6xl pb-16">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
@@ -274,6 +302,16 @@ export default function Tools() {
             <p className="text-foreground/50 mt-2">Smart tools for prompts, captions, colors and analysis</p>
           </motion.div>
           <ToolGrid tools={utilityTools} delay={0.2} />
+        </section>
+
+        {/* Workflow Tools */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-orange-400 mb-2 block">Workflow</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Batch & Automation</h2>
+            <p className="text-foreground/50 mt-2">Scale your creative output with bulk processing</p>
+          </motion.div>
+          <ToolGrid tools={workflowTools} delay={0.25} />
         </section>
 
         {/* Audio Tools */}
