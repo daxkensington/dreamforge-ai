@@ -49,16 +49,28 @@ const navLinks = [
   { href: "/gallery", label: "Gallery", icon: Image },
   { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
-  { href: "/batch", label: "Batch", icon: Layers, auth: true },
-  { href: "/characters", label: "Characters", icon: Users, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
+];
+
+const dropdownOnlyLinks = [
+  { href: "/batch", label: "Batch Studio", icon: Layers, auth: true },
+  { href: "/characters", label: "Characters", icon: Users, auth: true },
 ];
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const welcomeShown = useRef(false);
+
+  // Scroll-aware navbar background
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    handleScroll(); // check initial state
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Fetch credit balance for authenticated users
   const { data: balanceData } = trpc.credits.getBalance.useQuery(undefined, {
@@ -171,15 +183,15 @@ export default function Navbar() {
   const isCharactersActive = location === "/characters";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+    <header className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${scrolled ? "bg-black/80 backdrop-blur-xl border-white/5" : "bg-transparent border-transparent"}`}>
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 group-hover:bg-primary/15 transition-colors">
-            <Wand2 className="h-5 w-5 text-primary" />
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 group-hover:from-amber-400 group-hover:to-orange-500 transition-all shadow-lg shadow-amber-500/20">
+            <Wand2 className="h-5 w-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent">
+            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
               DreamForge
             </span>
           </div>
@@ -194,10 +206,6 @@ export default function Navbar() {
                 ? isToolsActive
                 : link.href === "/video-studio"
                 ? isVideoStudioActive
-                : link.href === "/batch"
-                ? isBatchActive
-                : link.href === "/characters"
-                ? isCharactersActive
                 : location === link.href;
             return (
               <Link
@@ -205,7 +213,7 @@ export default function Navbar() {
                 href={link.href}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
@@ -250,7 +258,7 @@ export default function Navbar() {
               href="/notifications"
               className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location === "/notifications"
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
@@ -272,7 +280,7 @@ export default function Navbar() {
               href="/admin"
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location === "/admin"
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
@@ -402,7 +410,7 @@ export default function Navbar() {
             <Button
               onClick={() => (window.location.href = getLoginUrl())}
               size="sm"
-              className="font-medium"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold rounded-full px-6 border-0 shadow-lg shadow-amber-500/20"
             >
               Sign in
             </Button>
@@ -420,25 +428,25 @@ export default function Navbar() {
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl">
+        <div className="md:hidden border-t border-white/5 bg-black/95 backdrop-blur-xl">
           <nav className="container py-4 flex flex-col gap-1">
             {/* Mobile Credit Balance */}
             {isAuthenticated && creditBalance !== null && (
               <Link
                 href="/credits"
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-between px-4 py-3 rounded-lg bg-primary/5 border border-primary/10 mb-2"
+                className="flex items-center justify-between px-4 py-3 rounded-lg bg-amber-500/5 border border-amber-500/10 mb-2"
               >
                 <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-primary">
+                  <Coins className="h-4 w-4 text-amber-400" />
+                  <span className="text-sm font-semibold text-amber-400">
                     {creditBalance.toLocaleString()} credits
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">Tap to manage</span>
               </Link>
             )}
-            {navLinks.map((link) => {
+            {[...navLinks, ...dropdownOnlyLinks].map((link) => {
               if (link.auth && !isAuthenticated) return null;
               const isActive =
                 link.href === "/tools"
@@ -447,6 +455,8 @@ export default function Navbar() {
                   ? isVideoStudioActive
                   : link.href === "/batch"
                   ? isBatchActive
+                  : link.href === "/characters"
+                  ? isCharactersActive
                   : location === link.href;
               return (
                 <Link
@@ -455,8 +465,8 @@ export default function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
                 >
                   <link.icon className="h-4 w-4" />
@@ -470,8 +480,8 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   location === "/notifications"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >
                 <Bell className="h-4 w-4" />
@@ -489,8 +499,8 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   location === "/admin"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >
                 <Shield className="h-4 w-4" />
