@@ -94,6 +94,19 @@ export const CREDIT_COSTS: Record<string, number> = {
   "prompt-assist": 0,
   "ai-refine": 1,
   "model-compare": 3,
+  "photo-restore": 2,
+  "headshot": 2,
+  "logo-maker": 2,
+  "wallpaper": 1,
+  "qr-art": 2,
+  "vectorize": 1,
+  "nl-edit": 1,
+  "avatar": 2,
+  "product-photo": 2,
+  "image-caption": 0,
+  "text-to-speech": 2,
+  "audio-enhance": 1,
+  "sound-effects": 2,
 };
 
 // ─── DB Helpers ─────────────────────────────────────────────────────────────

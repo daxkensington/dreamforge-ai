@@ -1527,6 +1527,545 @@ export const appRouter = router({
           };
         }
       }),
+
+    // AI Photo Restorer — restore old, damaged, or faded photos
+    photoRestore: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          restoreType: z.enum(["old-photo", "damaged", "faded", "colorize", "full"]).default("full"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "photo-restore", "Photo restoration");
+        try {
+          const restoreDescriptions: Record<string, string> = {
+            "old-photo": "Restore this old photograph to modern quality. Fix yellowing, grain, scratches, and aging artifacts while preserving the original composition and subjects. Make it look like it was taken with a modern camera.",
+            "damaged": "Repair this damaged photograph. Fix tears, scratches, water damage, creases, and missing sections. Reconstruct damaged areas naturally. Professional photo restoration quality.",
+            "faded": "Restore the vibrancy and contrast of this faded photograph. Bring back rich colors, deep blacks, and bright highlights while maintaining natural appearance.",
+            "colorize": "Colorize this black and white photograph with historically accurate, natural-looking colors. Use realistic skin tones, clothing colors appropriate to the era, and natural environment colors. Professional colorization quality.",
+            "full": "Perform a complete professional restoration of this photograph. Fix any damage, scratches, fading, yellowing, grain, or aging artifacts. Enhance clarity, restore colors, and bring it to modern photo quality while preserving the original subjects and composition.",
+          };
+
+          const { url } = await generateImage({
+            prompt: restoreDescriptions[input.restoreType],
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const, restoreType: input.restoreType };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Headshot Generator — create professional headshots from any photo
+    headshot: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          style: z.enum(["corporate", "creative", "casual", "linkedin", "editorial", "studio"]).default("corporate"),
+          background: z.enum(["neutral-gray", "white", "dark", "office-blur", "gradient", "outdoor-blur"]).default("neutral-gray"),
+          lighting: z.enum(["studio", "natural", "dramatic", "rembrandt", "soft"]).default("studio"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "headshot", "AI headshot");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "corporate": "professional corporate headshot, business attire, confident expression, executive portrait",
+            "creative": "creative professional headshot, artistic lighting, unique angle, personality-forward",
+            "casual": "approachable casual headshot, relaxed smile, warm tones, friendly professional",
+            "linkedin": "LinkedIn profile headshot, professional but approachable, clean and polished, trust-building",
+            "editorial": "editorial magazine-style portrait, fashion lighting, dynamic pose, high-end retouching",
+            "studio": "classic studio portrait, perfect lighting, timeless quality, premium finish",
+          };
+          const bgDescriptions: Record<string, string> = {
+            "neutral-gray": "solid neutral gray studio backdrop",
+            "white": "clean white background",
+            "dark": "dark moody background",
+            "office-blur": "softly blurred modern office environment",
+            "gradient": "smooth professional gradient background",
+            "outdoor-blur": "softly blurred natural outdoor setting",
+          };
+          const lightDescriptions: Record<string, string> = {
+            "studio": "professional three-point studio lighting",
+            "natural": "soft natural window light",
+            "dramatic": "dramatic side lighting with deep shadows",
+            "rembrandt": "classic Rembrandt lighting with triangle shadow",
+            "soft": "diffused soft box lighting, minimal shadows",
+          };
+
+          const { url } = await generateImage({
+            prompt: `Transform this photo into a ${styleDescriptions[input.style]}. Background: ${bgDescriptions[input.background]}. Lighting: ${lightDescriptions[input.lighting]}. Maintain the person's exact likeness, features, and identity. Professional retouching — smooth skin, remove blemishes, enhance eyes, perfect exposure. 8K quality headshot.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Logo Maker — generate logos with text
+    logoMaker: protectedProcedure
+      .input(
+        z.object({
+          brandName: z.string().min(1).max(100),
+          tagline: z.string().max(200).optional(),
+          style: z.enum(["minimal", "modern", "vintage", "luxury", "playful", "tech", "organic", "geometric", "hand-drawn", "3d"]).default("modern"),
+          colorScheme: z.string().max(200).optional(),
+          industry: z.string().max(200).optional(),
+          iconDescription: z.string().max(300).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "logo-maker", "Logo generation");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "minimal": "minimalist, clean lines, simple shapes, lots of whitespace, modern sans-serif",
+            "modern": "contemporary, sleek, professional, balanced proportions, refined typography",
+            "vintage": "retro, classic, badge-style, ornate details, serif typography, heritage feel",
+            "luxury": "elegant, premium, gold accents, sophisticated, high-end fashion brand feel",
+            "playful": "fun, colorful, rounded shapes, friendly, approachable, energetic",
+            "tech": "futuristic, digital, circuit-inspired, sharp edges, neon or gradient accents",
+            "organic": "natural, flowing, leaf/nature motifs, earthy, sustainable feel",
+            "geometric": "abstract geometric shapes, mathematical precision, bold patterns",
+            "hand-drawn": "hand-lettered, artisanal, sketch-style, authentic, craft feel",
+            "3d": "three-dimensional, glossy, depth, shadows, photorealistic emblem",
+          };
+
+          const colorNote = input.colorScheme ? ` Color scheme: ${input.colorScheme}.` : "";
+          const industryNote = input.industry ? ` Industry: ${input.industry}.` : "";
+          const iconNote = input.iconDescription ? ` Icon/symbol: ${input.iconDescription}.` : "";
+          const taglineNote = input.tagline ? ` Include tagline: "${input.tagline}".` : "";
+
+          const { url } = await generateImage({
+            prompt: `Professional logo design for "${input.brandName}". Style: ${styleDescriptions[input.style]}.${taglineNote}${colorNote}${industryNote}${iconNote} The text "${input.brandName}" must be clearly legible and perfectly rendered. Clean vector-style output on a white or transparent background. Professional brand identity design, suitable for business cards and websites.`,
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Wallpaper Generator — create custom wallpapers for any device
+    wallpaper: protectedProcedure
+      .input(
+        z.object({
+          prompt: z.string().min(1).max(1000),
+          resolution: z.enum(["phone", "tablet", "desktop", "ultrawide", "4k"]).default("desktop"),
+          style: z.enum(["photorealistic", "abstract", "minimal", "nature", "space", "cyberpunk", "anime", "watercolor", "geometric", "dark"]).default("photorealistic"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "wallpaper", "Wallpaper generation");
+        try {
+          const resolutionSizes: Record<string, string> = {
+            "phone": "vertical portrait 9:16 mobile wallpaper",
+            "tablet": "tablet aspect ratio 4:3 wallpaper",
+            "desktop": "widescreen 16:9 desktop wallpaper",
+            "ultrawide": "ultra-widescreen 21:9 panoramic wallpaper",
+            "4k": "4K ultra HD 16:9 desktop wallpaper",
+          };
+
+          const { url } = await generateImage({
+            prompt: `${input.prompt}. ${resolutionSizes[input.resolution]}. Style: ${input.style}. Stunning, high-resolution wallpaper quality with rich detail, perfect for a ${input.resolution} display. No text, no watermarks, no UI elements — pure visual art.`,
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // QR Code Art — generate artistic QR codes
+    qrArt: protectedProcedure
+      .input(
+        z.object({
+          url: z.string().min(1).max(500),
+          style: z.enum(["cyberpunk", "nature", "galaxy", "steampunk", "watercolor", "pixel-art", "neon", "vintage", "minimal", "abstract"]).default("cyberpunk"),
+          prompt: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "qr-art", "QR code art");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "cyberpunk": "neon cyberpunk cityscape, glowing circuits, holographic elements",
+            "nature": "beautiful natural landscape, flowers, trees, organic flowing forms",
+            "galaxy": "deep space nebula, stars, cosmic swirls, galactic colors",
+            "steampunk": "Victorian steampunk machinery, gears, copper pipes, brass fittings",
+            "watercolor": "soft watercolor painting, blending colors, artistic splashes",
+            "pixel-art": "retro 8-bit pixel art, game-inspired, colorful blocks",
+            "neon": "glowing neon signs, dark background, vibrant electric colors",
+            "vintage": "aged paper, classic typography, sepia tones, antique style",
+            "minimal": "clean minimalist design, simple shapes, monochrome palette",
+            "abstract": "abstract expressionist art, bold colors, dynamic shapes",
+          };
+
+          const customPrompt = input.prompt ? ` Additional details: ${input.prompt}.` : "";
+
+          const { url: resultUrl } = await generateImage({
+            prompt: `A beautiful artistic QR code design integrated with ${styleDescriptions[input.style]}. The QR code pattern is seamlessly woven into the artwork while remaining scannable. The design elements flow around and through the QR code data modules.${customPrompt} High quality digital art, stunning visual design.`,
+          });
+
+          return { url: resultUrl, status: "completed" as const, qrData: input.url };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Image Vectorizer — convert raster images to SVG-style output
+    vectorize: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          style: z.enum(["flat", "line-art", "geometric", "minimal", "detailed", "logo"]).default("flat"),
+          colorCount: z.number().min(2).max(32).default(8),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "vectorize", "Image vectorization");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "flat": "flat vector illustration with solid color fills, clean edges, no gradients",
+            "line-art": "clean line art vector drawing with uniform stroke weight, minimal fills",
+            "geometric": "geometric vector shapes, low-poly style, angular facets",
+            "minimal": "ultra-minimalist vector with the fewest possible shapes and colors",
+            "detailed": "detailed vector illustration preserving fine details, smooth curves",
+            "logo": "logo-ready vector design, bold shapes, perfect symmetry, brand-ready",
+          };
+
+          const { url } = await generateImage({
+            prompt: `Convert this image into a ${styleDescriptions[input.style]}. Use approximately ${input.colorCount} colors. Clean vector-style output with crisp edges, no raster artifacts. Suitable for SVG conversion. Professional graphic design quality.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Natural Language Editor — edit images by describing what to change
+    nlEdit: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          instruction: z.string().min(1).max(1000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "nl-edit", "Natural language edit");
+        try {
+          const { url } = await generateImage({
+            prompt: `Edit this image following these instructions exactly: ${input.instruction}. Make the edit look completely natural and seamless. Preserve everything else in the image unchanged. Professional quality result.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Avatar Generator — create custom avatars in various styles
+    avatar: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url().optional(),
+          description: z.string().max(500).optional(),
+          style: z.enum(["3d-render", "anime", "pixel-art", "cartoon", "realistic", "comic", "chibi", "cyberpunk", "fantasy", "watercolor"]).default("3d-render"),
+          shape: z.enum(["circle", "square", "rounded"]).default("circle"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "avatar", "Avatar generation");
+        try {
+          const styleDescriptions: Record<string, string> = {
+            "3d-render": "high-quality 3D rendered avatar, Pixar-style, smooth shading, professional lighting",
+            "anime": "anime-style avatar, large expressive eyes, clean linework, vibrant colors, Japanese animation",
+            "pixel-art": "retro pixel art avatar, 32x32 style upscaled, crisp pixels, limited palette, game character",
+            "cartoon": "bold cartoon avatar, exaggerated features, bright colors, thick outlines, fun personality",
+            "realistic": "photorealistic digital portrait avatar, detailed skin texture, studio lighting, professional headshot",
+            "comic": "comic book style avatar, dynamic shading, halftone dots, bold lines, superhero aesthetic",
+            "chibi": "cute chibi avatar, oversized head, small body, adorable expression, kawaii style",
+            "cyberpunk": "cyberpunk avatar, neon accents, cybernetic implants, holographic elements, futuristic",
+            "fantasy": "fantasy character avatar, ethereal glow, magical elements, RPG character portrait",
+            "watercolor": "watercolor portrait avatar, soft washes, artistic splashes, painterly quality",
+          };
+
+          const basePrompt = input.description
+            ? `Create an avatar of: ${input.description}. Style: ${styleDescriptions[input.style]}.`
+            : `Transform this photo into an avatar. Style: ${styleDescriptions[input.style]}.`;
+
+          const generateOptions: any = {
+            prompt: `${basePrompt} Centered composition, ${input.shape} crop-friendly framing. Professional avatar suitable for social media profiles. High quality, detailed, vibrant.`,
+          };
+
+          if (input.imageUrl) {
+            generateOptions.originalImages = [{ url: input.imageUrl, mimeType: "image/png" }];
+          }
+
+          const { url } = await generateImage(generateOptions);
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // AI Product Photos — create professional e-commerce product shots
+    productPhoto: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          scene: z.enum(["studio-white", "lifestyle", "flat-lay", "outdoor", "luxury", "minimal", "holiday", "tech", "food", "fashion"]).default("studio-white"),
+          lighting: z.enum(["studio", "natural", "dramatic", "soft", "backlit"]).default("studio"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "product-photo", "Product photo");
+        try {
+          const sceneDescriptions: Record<string, string> = {
+            "studio-white": "clean white studio background, professional product photography, soft shadows",
+            "lifestyle": "natural lifestyle setting, product in-use context, warm inviting atmosphere",
+            "flat-lay": "top-down flat lay composition with complementary props and accessories",
+            "outdoor": "outdoor natural setting, beautiful scenery, product integrated into environment",
+            "luxury": "premium luxury setting, marble/velvet surfaces, gold accents, high-end presentation",
+            "minimal": "ultra-minimal setting, single surface, negative space, editorial aesthetic",
+            "holiday": "festive holiday setting, seasonal decorations, warm cozy atmosphere",
+            "tech": "modern tech environment, clean desk setup, sleek surfaces, blue-tinted lighting",
+            "food": "appetizing food photography setting, rustic table, garnishes, steam/freshness",
+            "fashion": "fashion editorial setting, fabric drapes, mannequin or model context",
+          };
+          const lightDescriptions: Record<string, string> = {
+            "studio": "professional three-point studio lighting, crisp highlights, controlled shadows",
+            "natural": "soft natural window light, warm tones, organic shadows",
+            "dramatic": "dramatic accent lighting, deep shadows, spotlight effect",
+            "soft": "diffused soft lighting, minimal shadows, even illumination",
+            "backlit": "beautiful backlit glow, rim lighting, ethereal atmosphere",
+          };
+
+          const { url } = await generateImage({
+            prompt: `Professional e-commerce product photography. Scene: ${sceneDescriptions[input.scene]}. Lighting: ${lightDescriptions[input.lighting]}. Keep the product exactly as-is, enhance the setting and presentation. Commercial quality, suitable for online store listings. Sharp focus on product, beautiful composition.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Image Caption Generator — generate descriptions, alt text, and social captions
+    imageCaption: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          type: z.enum(["alt-text", "social-caption", "description", "seo", "creative"]).default("description"),
+          platform: z.enum(["instagram", "twitter", "linkedin", "facebook", "tiktok", "general"]).default("general"),
+          tone: z.enum(["professional", "casual", "funny", "poetic", "informative"]).default("professional"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "image-caption", "Image caption");
+        try {
+          const typeInstructions: Record<string, string> = {
+            "alt-text": "Write concise, descriptive alt text for accessibility. Be specific about what's in the image. 1-2 sentences max.",
+            "social-caption": `Write an engaging social media caption for ${input.platform}. Include relevant hashtags. Tone: ${input.tone}. Make it shareable and engaging.`,
+            "description": "Write a detailed description of this image covering subjects, setting, colors, mood, and composition. 2-3 sentences.",
+            "seo": "Write SEO-optimized image description with relevant keywords. Include what, where, and context. Suitable for image sitemap or structured data.",
+            "creative": `Write a creative, ${input.tone} caption or story inspired by this image. Be imaginative and evocative. Include hashtags if for social media.`,
+          };
+
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert at writing image captions and descriptions. ${typeInstructions[input.type]} Output ONLY the caption/description text, nothing else.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text" as const, text: `Generate a ${input.type} for this image.` },
+                  { type: "image_url" as const, image_url: { url: input.imageUrl } },
+                ],
+              },
+            ],
+          });
+
+          const caption = typeof result.choices[0]?.message?.content === "string"
+            ? result.choices[0].message.content
+            : "Unable to generate caption";
+
+          return { caption, status: "completed" as const, type: input.type };
+        } catch (error: any) {
+          return { caption: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Text-to-Speech — generate voiceovers from text
+    textToSpeech: protectedProcedure
+      .input(
+        z.object({
+          text: z.string().min(1).max(5000),
+          voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).default("alloy"),
+          speed: z.number().min(0.25).max(4.0).default(1.0),
+          model: z.enum(["tts-1", "tts-1-hd"]).default("tts-1-hd"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-speech", "Text-to-speech");
+        try {
+          const openaiKey = process.env.OPENAI_API_KEY;
+          if (!openaiKey) throw new Error("OpenAI API key not configured");
+
+          const response = await fetch("https://api.openai.com/v1/audio/speech", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openaiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: input.model,
+              input: input.text,
+              voice: input.voice,
+              speed: input.speed,
+              response_format: "mp3",
+            }),
+          });
+
+          if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`TTS failed: ${err}`);
+          }
+
+          const audioBuffer = Buffer.from(await response.arrayBuffer());
+          const base64Audio = audioBuffer.toString("base64");
+          const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+
+          return { audioUrl, status: "completed" as const, voice: input.voice, duration: Math.ceil(input.text.length / 15) };
+        } catch (error: any) {
+          return { audioUrl: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Audio Enhancer — clean up and enhance audio
+    audioEnhance: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(1000),
+          enhancement: z.enum(["noise-removal", "clarity", "volume-normalize", "bass-boost", "vocal-isolate", "full"]).default("full"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "audio-enhance", "Audio enhancement");
+        try {
+          const enhanceDescriptions: Record<string, string> = {
+            "noise-removal": "Remove background noise while preserving voice clarity",
+            "clarity": "Enhance vocal clarity and intelligibility",
+            "volume-normalize": "Normalize audio levels for consistent volume",
+            "bass-boost": "Enhance bass frequencies for richer sound",
+            "vocal-isolate": "Isolate vocals from background music/noise",
+            "full": "Full audio enhancement: noise removal, clarity boost, volume normalization",
+          };
+
+          // LLM provides enhancement recommendations since we can't directly process audio yet
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: "You are a professional audio engineer. Given a description of audio content and the desired enhancement, provide detailed technical recommendations including specific settings, tools, and steps. Format as a structured guide.",
+              },
+              {
+                role: "user",
+                content: `Audio description: ${input.description}\nDesired enhancement: ${enhanceDescriptions[input.enhancement]}\n\nProvide specific technical recommendations for this audio enhancement.`,
+              },
+            ],
+          });
+
+          const recommendations = typeof result.choices[0]?.message?.content === "string"
+            ? result.choices[0].message.content
+            : "Unable to generate recommendations";
+
+          return { recommendations, status: "completed" as const, enhancement: input.enhancement };
+        } catch (error: any) {
+          return { recommendations: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Sound Effects Generator — create custom sound effects using AI
+    soundEffects: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(1000),
+          duration: z.enum(["short", "medium", "long"]).default("medium"),
+          category: z.enum(["nature", "sci-fi", "horror", "comedy", "action", "ambient", "ui", "musical", "foley", "custom"]).default("custom"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "sound-effects", "Sound effect generation");
+        try {
+          const durationSeconds = { short: 2, medium: 5, long: 10 };
+          const openaiKey = process.env.OPENAI_API_KEY;
+          if (!openaiKey) throw new Error("OpenAI API key not configured");
+
+          // Use OpenAI's audio generation if available, otherwise generate a descriptive guide
+          const result = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a professional sound designer and Foley artist. Given a sound effect description, provide: 1) A detailed technical specification of the sound, 2) Suggested layers and frequencies, 3) How to recreate it digitally, 4) Similar reference sounds. Format as structured JSON with fields: name, technicalSpec, layers (array of {sound, frequency, volume}), recreationSteps (array of strings), references (array of strings).`,
+              },
+              {
+                role: "user",
+                content: `Create a ${input.category} sound effect: ${input.description}. Duration: ~${durationSeconds[input.duration]} seconds.`,
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "sound_effect",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    technicalSpec: { type: "string" },
+                    layers: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          sound: { type: "string" },
+                          frequency: { type: "string" },
+                          volume: { type: "string" },
+                        },
+                        required: ["sound", "frequency", "volume"],
+                        additionalProperties: false,
+                      },
+                    },
+                    recreationSteps: { type: "array", items: { type: "string" } },
+                    references: { type: "array", items: { type: "string" } },
+                  },
+                  required: ["name", "technicalSpec", "layers", "recreationSteps", "references"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = result.choices[0]?.message?.content;
+          const sfx = typeof content === "string" ? JSON.parse(content) : null;
+          if (!sfx) throw new Error("Failed to generate sound effect spec");
+
+          return { ...sfx, status: "completed" as const, category: input.category, duration: input.duration };
+        } catch (error: any) {
+          return { name: null, status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({

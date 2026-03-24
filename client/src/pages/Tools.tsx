@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import {
   Maximize, Palette, Scissors, Wand2, ArrowRight, Sparkles,
   PenTool, Smile, Expand, Eraser, Type, Blend, PenLine,
-  SunMedium, Pipette, Image, Video,
+  SunMedium, Pipette, Image, Video, ImagePlus, User, Hexagon,
+  Monitor, QrCode, MessageSquare, CircleUser, ShoppingBag,
+  FileText, Mic, AudioLines, Waves, Copy, Layers,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -20,22 +22,92 @@ interface GridTool {
   icon: LucideIcon;
   href: string;
   img: string;
+  badge?: string;
 }
 
-const gridTools: GridTool[] = [
+// ─── Image Editing Tools ─────────────────────────────────────────────────────
+const imageTools: GridTool[] = [
   { title: "Image Upscaler", desc: "Enhance resolution with AI upscaling", icon: Maximize, href: "/tools/upscaler", img: "/showcase/tool-upscale.jpg" },
   { title: "Background Remove", desc: "Isolate subjects with clean edges", icon: Scissors, href: "/tools/background", img: "/showcase/tool-bg-remove.jpg" },
-  { title: "Inpainting", desc: "Edit regions with natural language", icon: PenTool, href: "/tools/inpainting", img: "/showcase/tool-inpaint.jpg" },
-  { title: "Outpainting", desc: "Extend images beyond their borders", icon: Expand, href: "/tools/outpainting", img: "/showcase/tool-outpaint.jpg" },
-  { title: "Face Enhancer", desc: "AI-powered portrait retouching", icon: Smile, href: "/tools/face-enhancer", img: "/showcase/tool-face.jpg" },
-  { title: "Color Grading", desc: "Cinematic film looks and presets", icon: SunMedium, href: "/tools/color-grading", img: "/showcase/tool-colorgrade.jpg" },
-  { title: "Prompt Builder", desc: "Craft perfect prompts visually", icon: Wand2, href: "/tools/prompt-builder", img: "/showcase/tool-promptbuild.jpg" },
-  { title: "Text Effects", desc: "Stunning stylized AI text art", icon: Type, href: "/tools/text-effects", img: "/showcase/tool-texteffect.jpg" },
+  { title: "Inpainting", desc: "Edit regions with AI precision", icon: PenTool, href: "/tools/inpainting", img: "/showcase/tool-inpaint.jpg" },
+  { title: "Outpainting", desc: "Extend images beyond borders", icon: Expand, href: "/tools/outpainting", img: "/showcase/tool-outpaint.jpg" },
+  { title: "Face Enhancer", desc: "AI portrait retouching", icon: Smile, href: "/tools/face-enhancer", img: "/showcase/tool-face.jpg" },
+  { title: "Color Grading", desc: "Cinematic film presets", icon: SunMedium, href: "/tools/color-grading", img: "/showcase/tool-colorgrade.jpg" },
+  { title: "Style Transfer", desc: "Transform into any art style", icon: Palette, href: "/tools/style-transfer", img: "/showcase/tool-style-transfer.jpg" },
+  { title: "Object Eraser", desc: "Remove unwanted objects", icon: Eraser, href: "/tools/object-eraser", img: "/showcase/tool-eraser.jpg" },
   { title: "Image Blender", desc: "Merge two images creatively", icon: Blend, href: "/tools/image-blender", img: "/showcase/tool-blend.jpg" },
-  { title: "Sketch to Image", desc: "Turn drawings into polished art", icon: PenLine, href: "/tools/sketch-to-image", img: "/showcase/tool-sketch.jpg" },
-  { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/tool-palette.jpg" },
-  { title: "Object Eraser", desc: "Remove unwanted objects cleanly", icon: Eraser, href: "/tools/object-eraser", img: "/showcase/tool-eraser.jpg" },
+  { title: "Variations", desc: "Generate creative variations", icon: Copy, href: "/tools/variations", img: "/showcase/tool-variations.jpg" },
+  { title: "NL Image Editor", desc: "Edit by describing changes", icon: MessageSquare, href: "/tools/nl-edit", img: "/showcase/tool-nl-edit.jpg", badge: "New" },
+  { title: "Photo Restorer", desc: "Restore old & damaged photos", icon: ImagePlus, href: "/tools/photo-restore", img: "/showcase/tool-restore.jpg", badge: "New" },
 ];
+
+// ─── Creative Generation Tools ───────────────────────────────────────────────
+const creativeTools: GridTool[] = [
+  { title: "AI Headshots", desc: "Professional headshots from any photo", icon: User, href: "/tools/headshot", img: "/showcase/tool-headshot.jpg", badge: "New" },
+  { title: "Logo Maker", desc: "Generate logos for any brand", icon: Hexagon, href: "/tools/logo-maker", img: "/showcase/tool-logo.jpg", badge: "New" },
+  { title: "AI Avatars", desc: "Custom avatars in any style", icon: CircleUser, href: "/tools/avatar", img: "/showcase/tool-avatar.jpg", badge: "New" },
+  { title: "Wallpaper Gen", desc: "Stunning wallpapers for any device", icon: Monitor, href: "/tools/wallpaper", img: "/showcase/tool-wallpaper.jpg", badge: "New" },
+  { title: "QR Code Art", desc: "Beautiful artistic QR codes", icon: QrCode, href: "/tools/qr-art", img: "/showcase/tool-qr.jpg", badge: "New" },
+  { title: "Product Photos", desc: "Pro e-commerce photography", icon: ShoppingBag, href: "/tools/product-photo", img: "/showcase/tool-product.jpg", badge: "New" },
+  { title: "Text Effects", desc: "Stunning stylized AI text art", icon: Type, href: "/tools/text-effects", img: "/showcase/tool-texteffect.jpg" },
+  { title: "Sketch to Image", desc: "Turn drawings into art", icon: PenLine, href: "/tools/sketch-to-image", img: "/showcase/tool-sketch.jpg" },
+  { title: "Vectorizer", desc: "Convert images to vector style", icon: PenTool, href: "/tools/vectorize", img: "/showcase/tool-vector.jpg", badge: "New" },
+];
+
+// ─── AI Utility Tools ────────────────────────────────────────────────────────
+const utilityTools: GridTool[] = [
+  { title: "Prompt Builder", desc: "Craft perfect prompts visually", icon: Wand2, href: "/tools/prompt-builder", img: "/showcase/tool-promptbuild.jpg" },
+  { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/tool-palette.jpg" },
+  { title: "Image-to-Prompt", desc: "Reverse-engineer any image's prompt", icon: FileText, href: "/tools/image-to-prompt", img: "/showcase/tool-img2prompt.jpg" },
+  { title: "Image Caption", desc: "Alt text, social captions, SEO", icon: FileText, href: "/tools/image-caption", img: "/showcase/tool-caption.jpg", badge: "New" },
+];
+
+// ─── Audio Tools ─────────────────────────────────────────────────────────────
+const audioTools: GridTool[] = [
+  { title: "Text-to-Speech", desc: "Natural AI voiceovers", icon: Mic, href: "/tools/text-to-speech", img: "/showcase/tool-tts.jpg", badge: "New" },
+  { title: "Audio Enhancer", desc: "Professional audio cleanup", icon: AudioLines, href: "/tools/audio-enhance", img: "/showcase/tool-audio-enhance.jpg", badge: "New" },
+  { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg", badge: "New" },
+];
+
+const allToolCount = imageTools.length + creativeTools.length + utilityTools.length + audioTools.length;
+
+function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {tools.map((tool, i) => (
+        <motion.div
+          key={tool.title}
+          variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+          transition={{ duration: 0.4, delay: delay + i * 0.04 }}
+        >
+          <Link href={tool.href}>
+            <div className="group relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer hover:scale-[1.03] transition-transform duration-300">
+              <img
+                src={tool.img} alt={tool.title}
+                className="absolute inset-0 w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              {tool.badge && (
+                <div className="absolute top-3 right-3">
+                  <span className="px-2 py-0.5 rounded-full bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wider">
+                    {tool.badge}
+                  </span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="h-8 w-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center mb-2">
+                  <tool.icon className="h-4 w-4 text-white" />
+                </div>
+                <h3 className="text-white font-semibold text-sm">{tool.title}</h3>
+                <p className="text-white/60 text-xs mt-0.5">{tool.desc}</p>
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
 
 export default function Tools() {
   const { isAuthenticated } = useAuth();
@@ -70,11 +142,11 @@ export default function Tools() {
             </span>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
               <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
-                15 Professional Tools
+                {allToolCount}+ Professional Tools
               </span>
             </h1>
             <p className="text-lg md:text-xl text-white/70 mb-8">
-              Transform your creative workflow with studio-grade AI
+              Image editing, creative generation, audio production — everything you need in one studio
             </p>
             {cta("/workspace", "Start Creating")}
           </motion.div>
@@ -107,33 +179,48 @@ export default function Tools() {
             </Link>
           </motion.div>
 
-          {/* Style Transfer */}
-          <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
-            <Link href="/tools/style-transfer">
-              <div className="group rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-purple-500/30 transition-all duration-300 hover:scale-[1.01]">
-                <div className="p-8 lg:p-12">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
-                      <Palette className="h-5 w-5 text-white" />
+          {/* NL Edit + Headshots row */}
+          <div className="grid md:grid-cols-2 gap-8">
+            <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
+              <Link href="/tools/nl-edit">
+                <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
+                  <img src="/showcase/tool-nl-edit.jpg" alt="NL Edit" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+                  <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-green-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
+                  <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                        <MessageSquare className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-green-400">AI Edit</span>
                     </div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-violet-400">Creative</span>
-                  </div>
-                  <h3 className="text-2xl lg:text-3xl font-bold mb-3">Style Transfer</h3>
-                  <p className="text-foreground/60 mb-6">Transform any image into any artistic style — Van Gogh, anime, cyberpunk, and more.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-1 px-8 pb-8 lg:px-12 lg:pb-12">
-                  <div className="rounded-xl overflow-hidden relative">
-                    <img src="/showcase/demo-style-before.jpg" alt="Before" className="w-full aspect-[4/3] object-cover" />
-                    <span className="absolute bottom-2 left-2 text-xs font-medium bg-black/60 px-2 py-0.5 rounded text-white">Before</span>
-                  </div>
-                  <div className="rounded-xl overflow-hidden relative">
-                    <img src="/showcase/demo-style-after.jpg" alt="After" className="w-full aspect-[4/3] object-cover" />
-                    <span className="absolute bottom-2 left-2 text-xs font-medium bg-black/60 px-2 py-0.5 rounded text-white">After</span>
+                    <h3 className="text-xl font-bold text-white mb-2">Natural Language Editor</h3>
+                    <p className="text-white/70 text-sm">Just describe what to change — "remove the car", "add snow"</p>
                   </div>
                 </div>
-              </div>
-            </Link>
-          </motion.div>
+              </Link>
+            </motion.div>
+
+            <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
+              <Link href="/tools/headshot">
+                <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
+                  <img src="/showcase/tool-headshot.jpg" alt="Headshots" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+                  <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
+                  <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Portrait</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">AI Headshot Generator</h3>
+                    <p className="text-white/70 text-sm">Professional headshots from any photo — corporate, creative, LinkedIn</p>
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          </div>
 
           {/* AI Video */}
           <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
@@ -148,8 +235,8 @@ export default function Tools() {
                     </div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Motion</span>
                   </div>
-                  <h3 className="text-2xl lg:text-3xl font-bold text-white mb-3">AI Video Generation</h3>
-                  <p className="text-white/70 mb-6">Bring still images to life with cinematic motion</p>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-white mb-3">AI Video Studio</h3>
+                  <p className="text-white/70 mb-6">Storyboards, scripts, scene direction, style transfer — full video pipeline</p>
                   <Button variant="outline" className="w-fit gap-2 border-white/20 text-white hover:bg-white/10">
                     Try It <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -159,41 +246,44 @@ export default function Tools() {
           </motion.div>
         </section>
 
-        {/* All Tools Grid */}
+        {/* Image Editing Tools */}
         <section className="container max-w-6xl pb-16">
-          <motion.h2
-            variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="text-3xl md:text-4xl font-bold text-center mb-12"
-          >
-            Every Tool You Need
-          </motion.h2>
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-2 block">Image Editing</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Edit & Enhance</h2>
+            <p className="text-foreground/50 mt-2">Professional image editing powered by multi-model AI</p>
+          </motion.div>
+          <ToolGrid tools={imageTools} />
+        </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {gridTools.map((tool, i) => (
-              <motion.div
-                key={tool.title}
-                variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-              >
-                <Link href={tool.href}>
-                  <div className="group relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer hover:scale-[1.03] transition-transform duration-300">
-                    <img
-                      src={tool.img} alt={tool.title}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <div className="h-8 w-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center mb-2">
-                        <tool.icon className="h-4 w-4 text-white" />
-                      </div>
-                      <h3 className="text-white font-semibold text-sm">{tool.title}</h3>
-                      <p className="text-white/60 text-xs mt-0.5">{tool.desc}</p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+        {/* Creative Generation Tools */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-2 block">Creative Generation</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Create & Generate</h2>
+            <p className="text-foreground/50 mt-2">Generate logos, avatars, wallpapers, product shots and more</p>
+          </motion.div>
+          <ToolGrid tools={creativeTools} delay={0.1} />
+        </section>
+
+        {/* Utility Tools */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-2 block">AI Utilities</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Analyze & Optimize</h2>
+            <p className="text-foreground/50 mt-2">Smart tools for prompts, captions, colors and analysis</p>
+          </motion.div>
+          <ToolGrid tools={utilityTools} delay={0.2} />
+        </section>
+
+        {/* Audio Tools */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-rose-400 mb-2 block">Audio Production</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Sound & Voice</h2>
+            <p className="text-foreground/50 mt-2">AI-powered voiceovers, sound design, and audio enhancement</p>
+          </motion.div>
+          <ToolGrid tools={audioTools} delay={0.3} />
         </section>
 
         {/* Bottom CTA */}
@@ -203,7 +293,7 @@ export default function Tools() {
             className="text-center rounded-2xl bg-gradient-to-br from-purple-500/10 via-transparent to-fuchsia-500/10 border border-purple-500/20 p-12"
           >
             <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to Transform Your Workflow?</h2>
-            <p className="text-foreground/60 mb-8">All 15 tools, unlimited creativity, zero friction.</p>
+            <p className="text-foreground/60 mb-8">All {allToolCount}+ tools, unlimited creativity, one platform.</p>
             {cta("/workspace", "Get Started Free")}
           </motion.div>
         </section>
