@@ -37,6 +37,7 @@ import {
   Coins,
   BarChart3,
   ShoppingBag,
+  Music,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
@@ -53,6 +54,8 @@ const navLinks = [
 ];
 
 const dropdownOnlyLinks = [
+  { href: "/tools/song-creator", label: "Song Creator", icon: Music, auth: true },
+  { href: "/tools/music-video", label: "Music Video", icon: Film, auth: true },
   { href: "/batch", label: "Batch Studio", icon: Layers, auth: true },
   { href: "/characters", label: "Characters", icon: Users, auth: true },
 ];

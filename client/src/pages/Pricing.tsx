@@ -550,7 +550,7 @@ export default function Pricing() {
               custom={1}
               className="text-muted-foreground max-w-lg mx-auto"
             >
-              Pro and Studio users get access to 4x upscaling, style transfer, and 53+ AI tools
+              Pro and Studio users get access to 4x upscaling, style transfer, and 58+ AI tools
             </motion.p>
           </div>
 

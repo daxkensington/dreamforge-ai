@@ -7,7 +7,7 @@ import {
   Monitor, QrCode, MessageSquare, CircleUser, ShoppingBag,
   FileText, Mic, AudioLines, Waves, Copy, Layers,
   Film, Grid3X3, ScanLine, Sun, AppWindow, Paintbrush,
-  Music, Frame, Share2, Users, Laugh, Home, LayoutGrid,
+  Music, Frame, Share2, Users, Laugh, Home, LayoutGrid, Smartphone,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -72,8 +72,11 @@ const creativeTools: GridTool[] = [
 
 // ─── Video Generation Tools ──────────────────────────────────────────────────
 const videoTools: GridTool[] = [
-  { title: "Text-to-Video", desc: "Generate video from text prompts", icon: Video, href: "/tools/text-to-video", img: "/showcase/tool-t2v.jpg", badge: "New" },
-  { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg", badge: "New" },
+  { title: "Text-to-Video", desc: "Generate video from text prompts", icon: Video, href: "/tools/text-to-video", img: "/showcase/tool-t2v.jpg" },
+  { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg" },
+  { title: "Music Video Studio", desc: "Create AI music videos from your photo", icon: Film, href: "/tools/music-video", img: "/showcase/tool-video.jpg", badge: "New" },
+  { title: "Social Templates", desc: "TikTok, Reels & Shorts templates", icon: Smartphone, href: "/tools/social-templates", img: "/showcase/tool-social.jpg", badge: "New" },
+  { title: "Viral Clip Maker", desc: "AI picks best moments for clips", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-thumbnail.jpg", badge: "New" },
 ];
 
 // ─── Workflow Tools ──────────────────────────────────────────────────────────
@@ -92,10 +95,11 @@ const utilityTools: GridTool[] = [
 
 // ─── Audio Tools ─────────────────────────────────────────────────────────────
 const audioTools: GridTool[] = [
-  { title: "AI Music Composer", desc: "Generate music compositions", icon: Music, href: "/tools/music-gen", img: "/showcase/tool-music.jpg", badge: "New" },
-  { title: "Text-to-Speech", desc: "Natural AI voiceovers", icon: Mic, href: "/tools/text-to-speech", img: "/showcase/tool-tts.jpg", badge: "New" },
-  { title: "Audio Enhancer", desc: "Professional audio cleanup", icon: AudioLines, href: "/tools/audio-enhance", img: "/showcase/tool-audio-enhance.jpg", badge: "New" },
-  { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg", badge: "New" },
+  { title: "AI Song Creator", desc: "Full songs with vocals from a concept", icon: Music, href: "/tools/song-creator", img: "/showcase/tool-music.jpg", badge: "Hot" },
+  { title: "AI Music Composer", desc: "Generate instrumentals & scores", icon: Music, href: "/tools/music-gen", img: "/showcase/tool-audio.jpg" },
+  { title: "Text-to-Speech", desc: "Natural AI voiceovers", icon: Mic, href: "/tools/text-to-speech", img: "/showcase/tool-tts.jpg" },
+  { title: "Audio Enhancer", desc: "Professional audio cleanup", icon: AudioLines, href: "/tools/audio-enhance", img: "/showcase/tool-audio-enhance.jpg" },
+  { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg" },
 ];
 
 const allToolCount = imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
