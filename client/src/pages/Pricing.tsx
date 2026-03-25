@@ -437,6 +437,158 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* ═══════ TIER SHOWCASE — What Each Plan Creates ═══════ */}
+      <section className="py-24 border-t border-border/50">
+        <div className="container">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
+            >
+              See What Each Tier{" "}
+              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                Creates
+              </span>
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-muted-foreground max-w-lg mx-auto"
+            >
+              Higher tiers unlock better models, higher resolution, and more creative tools
+            </motion.p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                tier: "Free",
+                gradient: "from-slate-500 to-zinc-400",
+                label: "Standard Quality",
+                images: ["/showcase/gallery-13.jpg", "/showcase/gallery-15.jpg"],
+              },
+              {
+                tier: "Creator",
+                gradient: "from-cyan-500 to-blue-400",
+                label: "HD Quality",
+                images: ["/showcase/gallery-14.jpg", "/showcase/tool-headshot.jpg", "/showcase/gallery-16.jpg"],
+              },
+              {
+                tier: "Pro",
+                gradient: "from-violet-500 to-fuchsia-400",
+                label: "Ultra HD + Video",
+                images: ["/showcase/gallery-17.jpg", "/showcase/tool-style-transfer.jpg", "/showcase/gallery-18.jpg"],
+              },
+              {
+                tier: "Studio",
+                gradient: "from-amber-500 to-orange-400",
+                label: "Custom Models",
+                images: ["/showcase/gallery-19.jpg", "/showcase/tool-charsheet.jpg", "/showcase/gallery-20.jpg"],
+              },
+            ].map((col, i) => (
+              <motion.div
+                key={col.tier}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={scaleIn}
+                custom={i}
+                className="space-y-3"
+              >
+                <div className="text-center mb-4">
+                  <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r ${col.gradient} text-white`}>
+                    {col.tier}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-2">{col.label}</p>
+                </div>
+                {col.images.map((img, j) => (
+                  <div key={j} className="rounded-xl overflow-hidden group">
+                    <img
+                      src={img}
+                      alt={`${col.tier} tier example`}
+                      className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ BEFORE/AFTER DEMO ═══════ */}
+      <section className="py-24 border-t border-border/50 bg-card/20">
+        <div className="container">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={0}
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
+            >
+              The{" "}
+              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                DreamForge
+              </span>{" "}
+              Difference
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={1}
+              className="text-muted-foreground max-w-lg mx-auto"
+            >
+              Pro and Studio users get access to 4x upscaling, style transfer, and 53+ AI tools
+            </motion.p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {[
+              { label: "4x AI Upscaler", before: "/showcase/demo-upscale-before.jpg", after: "/showcase/demo-upscale-after.jpg" },
+              { label: "Style Transfer", before: "/showcase/demo-style-before.jpg", after: "/showcase/demo-style-after.jpg" },
+              { label: "Background Replace", before: "/showcase/demo-bg-before.jpg", after: "/showcase/demo-bg-after.jpg" },
+            ].map((demo, i) => (
+              <motion.div
+                key={demo.label}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={scaleIn}
+                custom={i}
+                className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden"
+              >
+                <div className="grid grid-cols-2 gap-0.5 p-0.5">
+                  <div className="relative aspect-square overflow-hidden rounded-tl-xl">
+                    <img src={demo.before} alt="Before" className="w-full h-full object-cover" loading="lazy" />
+                    <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded bg-black/60 text-white/80">BEFORE</span>
+                  </div>
+                  <div className="relative aspect-square overflow-hidden rounded-tr-xl">
+                    <img src={demo.after} alt="After" className="w-full h-full object-cover" loading="lazy" />
+                    <span className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/80 text-black">AFTER</span>
+                  </div>
+                </div>
+                <div className="p-4 text-center">
+                  <p className="text-sm font-semibold">{demo.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Available on Creator, Pro & Studio</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ═══════ FEATURE COMPARISON TABLE ═══════ */}
       <section className="py-24 border-t border-border/50 bg-card/20">
         <div className="container">

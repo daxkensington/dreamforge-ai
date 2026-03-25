@@ -52,6 +52,8 @@ vi.mock("./db", async () => {
   return {
     ...actual,
     getDb: vi.fn().mockResolvedValue(null),
+    createGeneration: vi.fn().mockResolvedValue({ id: 1 }),
+    updateGeneration: vi.fn().mockResolvedValue(undefined),
     saveGeneration: vi.fn().mockResolvedValue({ id: 1 }),
     getGenerationById: vi.fn().mockResolvedValue({ id: 1, userId: 2, prompt: "test" }),
     getUserCollaboratorRole: vi.fn().mockResolvedValue(null),

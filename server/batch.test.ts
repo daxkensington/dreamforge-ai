@@ -29,6 +29,20 @@ vi.mock('./_core/llm', () => ({
   }),
 }));
 
+// Mock DB so createGeneration doesn't throw "Database not available"
+let genIdCounter = 1;
+vi.mock('./db', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    getDb: vi.fn().mockResolvedValue(null),
+    createGeneration: vi.fn().mockImplementation(async () => ({ id: genIdCounter++ })),
+    updateGeneration: vi.fn().mockResolvedValue(undefined),
+    getUserUsageStats: vi.fn().mockResolvedValue(null),
+    getUserActivityTimeline: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+  };
+});
+
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 

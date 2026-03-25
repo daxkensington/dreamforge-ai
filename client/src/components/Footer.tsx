@@ -1,5 +1,6 @@
-import { Wand2, Heart, Twitter, Github, MessageCircle, Mail, ExternalLink } from "lucide-react";
+import { Wand2, Heart, Twitter, Github, MessageCircle, Mail, ExternalLink, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import { useState } from "react";
 
 const footerLinks = {
   create: [
@@ -43,11 +44,47 @@ const socialLinks = [
 
 const aiModels = ["Grok", "GPT-4o", "DALL-E 3", "Gemini", "Claude", "Veo 2"];
 
+const galleryStrip = [
+  "/showcase/gallery-13.jpg", "/showcase/tool-avatar.jpg", "/showcase/gallery-14.jpg",
+  "/showcase/tool-logo.jpg", "/showcase/gallery-15.jpg", "/showcase/tool-interior.jpg",
+  "/showcase/gallery-16.jpg", "/showcase/tool-blend.jpg", "/showcase/gallery-17.jpg",
+  "/showcase/tool-headshot.jpg", "/showcase/gallery-18.jpg", "/showcase/tool-texture.jpg",
+];
+
 export default function Footer() {
+  const [email, setEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+
   return (
     <footer className="relative border-t border-white/5 bg-black">
       {/* Fire gradient accent line at top */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+
+      {/* Mini Gallery Strip */}
+      <div className="overflow-hidden py-6">
+        <div className="flex gap-3 animate-footer-marquee">
+          {[...galleryStrip, ...galleryStrip].map((img, i) => (
+            <div key={i} className="flex-shrink-0 h-20 w-28 rounded-lg overflow-hidden opacity-60 hover:opacity-100 transition-opacity duration-300">
+              <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+            </div>
+          ))}
+        </div>
+        <style>{`
+          @keyframes footer-marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+          .animate-footer-marquee {
+            animation: footer-marquee 50s linear infinite;
+          }
+          .animate-footer-marquee:hover {
+            animation-play-state: paused;
+          }
+        `}</style>
+      </div>
+
+      {/* Divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-8">
         {/* Main grid */}
@@ -92,6 +129,37 @@ export default function Footer() {
                   </span>
                 ))}
               </div>
+            </div>
+
+            {/* Newsletter */}
+            <div className="mt-6">
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Stay Updated</p>
+              {subscribed ? (
+                <p className="text-xs text-emerald-400">Thanks for subscribing!</p>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (email.trim()) setSubscribed(true);
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/40 transition-colors"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="h-9 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-black text-xs font-semibold hover:from-amber-600 hover:to-orange-600 transition-colors flex items-center gap-1"
+                  >
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 

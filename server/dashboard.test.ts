@@ -1,21 +1,60 @@
-import { describe, it, expect } from "vitest";
-import { appRouter } from "./routers";
-import { COOKIE_NAME } from "../shared/const";
-import type { TrpcContext } from "./_core/context";
+import { describe, it, expect, vi } from "vitest";
 
-type CookieCall = {
-  name: string;
-  options: Record<string, unknown>;
-};
+// Mock the DB functions that getUsageStats and getActivityTimeline depend on
+vi.mock('./db', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    getDb: vi.fn().mockResolvedValue(null),
+    getUserUsageStats: vi.fn().mockResolvedValue({
+      totalGenerations: 12,
+      completedGenerations: 10,
+      failedGenerations: 2,
+      images: 8,
+      videos: 3,
+      animations: 1,
+      modelUsage: [
+        { model: "grok", count: 6 },
+        { model: "dall-e-3", count: 4 },
+      ],
+      galleryItems: 5,
+      totalViews: 120,
+      dailyActivity: [
+        { date: "2026-03-20", count: 3 },
+        { date: "2026-03-21", count: 5 },
+      ],
+      monthlyUsage: { images: 8, videos: 3, animations: 1 },
+      quota: {
+        images: { used: 8, limit: 25 },
+        videos: { used: 3, limit: 5 },
+        animations: { used: 1, limit: 3 },
+        gallerySubmissions: { used: 2, limit: 5 },
+      },
+    }),
+    getUserActivityTimeline: vi.fn().mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          prompt: "Test prompt",
+          mediaType: "image",
+          modelVersion: "grok",
+          status: "completed",
+          createdAt: new Date(),
+        },
+      ],
+      total: 1,
+    }),
+  };
+});
+
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
 function createAuthContext(role: "user" | "admin" = "user"): {
   ctx: TrpcContext;
-  clearedCookies: CookieCall[];
 } {
-  const clearedCookies: CookieCall[] = [];
-
   const user: AuthenticatedUser = {
     id: 1,
     openId: "test-user-dashboard",
@@ -35,13 +74,11 @@ function createAuthContext(role: "user" | "admin" = "user"): {
       headers: {},
     } as TrpcContext["req"],
     res: {
-      clearCookie: (name: string, options: Record<string, unknown>) => {
-        clearedCookies.push({ name, options });
-      },
+      clearCookie: () => {},
     } as TrpcContext["res"],
   };
 
-  return { ctx, clearedCookies };
+  return { ctx };
 }
 
 function createPublicContext(): { ctx: TrpcContext } {
@@ -67,7 +104,6 @@ describe("user.getUsageStats", () => {
     const { ctx } = createAuthContext();
     const stats = await caller(ctx).user.getUsageStats();
 
-    // Verify the shape of the response
     expect(stats).toHaveProperty("totalGenerations");
     expect(stats).toHaveProperty("completedGenerations");
     expect(stats).toHaveProperty("failedGenerations");
@@ -130,7 +166,6 @@ describe("user.getUsageStats", () => {
     expect(stats.quota).toHaveProperty("animations");
     expect(stats.quota).toHaveProperty("gallerySubmissions");
 
-    // Each quota category should have used and limit
     for (const key of ["images", "videos", "animations", "gallerySubmissions"] as const) {
       expect(stats.quota[key]).toHaveProperty("used");
       expect(stats.quota[key]).toHaveProperty("limit");

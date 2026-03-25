@@ -36,6 +36,50 @@ const PAGE_SIZE = 24;
 type ListingType = "prompt" | "preset" | "workflow" | "asset_pack" | "lora";
 type SortOption = "popular" | "new" | "rating" | "price_low" | "price_high";
 
+// Trending showcase images (use gallery images NOT on homepage)
+const TRENDING_IMAGES = [
+  { src: "/showcase/gallery-13.jpg", prompt: "Ethereal spirit wolf in northern lights" },
+  { src: "/showcase/gallery-14.jpg", prompt: "Cybernetic butterfly garden at dusk" },
+  { src: "/showcase/gallery-15.jpg", prompt: "Ancient temple overgrown with crystals" },
+  { src: "/showcase/gallery-16.jpg", prompt: "Neon geisha in rain-soaked Tokyo alley" },
+  { src: "/showcase/gallery-17.jpg", prompt: "Floating islands with waterfalls into clouds" },
+  { src: "/showcase/gallery-18.jpg", prompt: "Mechanical dragon emerging from volcano" },
+  { src: "/showcase/gallery-19.jpg", prompt: "Underwater city with bioluminescent architecture" },
+  { src: "/showcase/gallery-20.jpg", prompt: "Cosmic tree of life in deep space nebula" },
+];
+
+// Creator spotlight data
+const CREATOR_SPOTLIGHTS = [
+  {
+    name: "PixelDreamer",
+    specialty: "Fantasy & Sci-Fi Prompts",
+    sales: "2,400+",
+    images: ["/showcase/tool-charsheet.jpg", "/showcase/tool-avatar.jpg", "/showcase/tool-style.jpg", "/showcase/tool-variations.jpg"],
+  },
+  {
+    name: "NeonForge",
+    specialty: "Cyberpunk Presets & Workflows",
+    sales: "1,800+",
+    images: ["/showcase/tool-colorgrade.jpg", "/showcase/tool-blend.jpg", "/showcase/tool-texteffect.jpg", "/showcase/tool-canvas.jpg"],
+  },
+  {
+    name: "ArtisanAI",
+    specialty: "Professional Asset Packs",
+    sales: "3,100+",
+    images: ["/showcase/tool-logo.jpg", "/showcase/tool-mockup.jpg", "/showcase/tool-product.jpg", "/showcase/tool-texture.jpg"],
+  },
+];
+
+// What you can sell categories with images
+const SELL_CATEGORIES = [
+  { type: "Prompts", desc: "Curated prompt collections that produce stunning results", image: "/showcase/tool-promptbuild.jpg", color: "#a78bfa" },
+  { type: "Presets", desc: "Style presets and color grades for consistent aesthetics", image: "/showcase/tool-colorgrade.jpg", color: "#60a5fa" },
+  { type: "Workflows", desc: "Multi-step generation workflows for complex outputs", image: "/showcase/tool-canvas.jpg", color: "#34d399" },
+  { type: "Asset Packs", desc: "Bundled textures, backgrounds, and design elements", image: "/showcase/tool-texture.jpg", color: "#f472b6" },
+  { type: "LoRAs", desc: "Fine-tuned model adapters for unique artistic styles", image: "/showcase/tool-style-transfer.jpg", color: "#fbbf24" },
+  { type: "Templates", desc: "Ready-to-use project templates for any creative need", image: "/showcase/tool-mockup.jpg", color: "#f97316" },
+];
+
 const TYPE_LABELS: Record<ListingType, string> = {
   prompt: "Prompts",
   preset: "Presets",
@@ -213,6 +257,57 @@ export default function Marketplace() {
             )}
           </div>
         </div>
+
+        {/* Trending Creations Strip */}
+        {!hasFilters && page === 0 && (
+          <div className="py-12 overflow-hidden border-b border-white/5">
+            <div className="container mb-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.4 }}
+                className="flex items-center gap-3"
+              >
+                <TrendingUp className="h-5 w-5 text-amber-400" />
+                <h2 className="text-lg font-semibold">Trending Creations</h2>
+                <span className="text-xs text-muted-foreground">See what the community is creating</span>
+              </motion.div>
+            </div>
+            <div className="relative">
+              <div className="flex gap-4 animate-marquee-slow">
+                {[...TRENDING_IMAGES, ...TRENDING_IMAGES].map((img, i) => (
+                  <div
+                    key={i}
+                    className="group relative flex-shrink-0 w-64 aspect-[4/3] rounded-xl overflow-hidden"
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.prompt}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                      <p className="text-xs text-white/90 line-clamp-2">{img.prompt}</p>
+                    </div>
+                    <div className="absolute inset-0 border border-white/0 group-hover:border-amber-500/40 rounded-xl transition-colors duration-300 group-hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.2)]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <style>{`
+              @keyframes marquee-slow {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+              }
+              .animate-marquee-slow {
+                animation: marquee-slow 40s linear infinite;
+              }
+              .animate-marquee-slow:hover {
+                animation-play-state: paused;
+              }
+            `}</style>
+          </div>
+        )}
 
         {/* Featured Section */}
         {featured && featured.length > 0 && !hasFilters && page === 0 && (
@@ -561,21 +656,153 @@ export default function Marketplace() {
           )}
         </div>
 
-        {/* Sell CTA (bottom) */}
-        {!user && (
-          <div className="container py-16">
-            <div className="rounded-2xl bg-gradient-to-r from-amber-900/10 via-orange-900/10 to-amber-900/10 border border-white/10 p-8 md:p-12 text-center">
-              <h2 className="text-2xl md:text-3xl font-bold mb-3">Start Selling Today</h2>
-              <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                Turn your AI creations into income. Join the DreamForge marketplace and reach thousands of creators.
-              </p>
-              <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
-                <Plus className="h-4 w-4" />
-                Get Started
-              </Button>
+        {/* Creator Spotlight */}
+        {!hasFilters && page === 0 && (
+          <div className="border-t border-white/5 py-16">
+            <div className="container">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="text-center mb-10"
+              >
+                <h2 className="text-2xl md:text-3xl font-bold mb-3">
+                  Top{" "}
+                  <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                    Creators
+                  </span>
+                </h2>
+                <p className="text-muted-foreground max-w-lg mx-auto">
+                  Meet the creators driving the marketplace with their stunning AI assets
+                </p>
+              </motion.div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {CREATOR_SPOTLIGHTS.map((creator, i) => (
+                  <motion.div
+                    key={creator.name}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1, duration: 0.5 }}
+                    className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-amber-500/20 transition-all duration-300"
+                  >
+                    {/* Creator image grid */}
+                    <div className="grid grid-cols-2 gap-1 p-1">
+                      {creator.images.map((img, j) => (
+                        <div key={j} className="aspect-square overflow-hidden rounded-lg">
+                          <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        </div>
+                      ))}
+                    </div>
+                    {/* Creator info */}
+                    <div className="p-5">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-black font-bold text-sm">
+                          {creator.name[0]}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-sm">{creator.name}</h3>
+                          <p className="text-xs text-muted-foreground">{creator.specialty}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                        <span className="text-xs text-muted-foreground">
+                          <Download className="inline h-3 w-3 mr-1" />{creator.sales} sales
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={5} size={10} />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </div>
         )}
+
+        {/* What You Can Sell */}
+        <div className="border-t border-white/5 py-16">
+          <div className="container">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="text-center mb-10"
+            >
+              <h2 className="text-2xl md:text-3xl font-bold mb-3">
+                What You Can{" "}
+                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                  Sell
+                </span>
+              </h2>
+              <p className="text-muted-foreground max-w-lg mx-auto">
+                Turn your AI expertise into income with six different asset types
+              </p>
+            </motion.div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {SELL_CATEGORIES.map((cat, i) => (
+                <motion.div
+                  key={cat.type}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                  className="group relative rounded-2xl overflow-hidden aspect-[3/2]"
+                >
+                  <img
+                    src={cat.image}
+                    alt={cat.type}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                  <div className="absolute inset-0 border border-white/0 group-hover:border-amber-500/30 rounded-2xl transition-colors duration-300" />
+                  <div className="relative h-full flex flex-col justify-end p-5">
+                    <div
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold w-fit mb-2"
+                      style={{ backgroundColor: cat.color + "25", color: cat.color }}
+                    >
+                      {cat.type}
+                    </div>
+                    <p className="text-sm text-white/80">{cat.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Sell CTA */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-center mt-12"
+            >
+              <div className="rounded-2xl bg-gradient-to-r from-amber-900/10 via-orange-900/10 to-amber-900/10 border border-white/10 p-8 md:p-12">
+                <h2 className="text-2xl md:text-3xl font-bold mb-3">Start Selling Today</h2>
+                <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                  Turn your AI creations into income. Join the DreamForge marketplace and reach thousands of creators.
+                </p>
+                {user ? (
+                  <Link href="/marketplace/sell">
+                    <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
+                      <Plus className="h-4 w-4" />
+                      List Your First Asset
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
+                    <Plus className="h-4 w-4" />
+                    Get Started
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </div>
       </div>
     </PageLayout>
   );
