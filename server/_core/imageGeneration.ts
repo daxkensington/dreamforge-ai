@@ -3,8 +3,10 @@
  *
  * Provider priority (auto mode):
  *   1. Grok (xAI) — grok-2-image / grok-imagine-image
- *   2. OpenAI — DALL-E 3
- *   3. Gemini — gemini-2.0-flash-preview-image-generation
+ *   2. Flux Pro (Replicate) — black-forest-labs/flux-1.1-pro
+ *   3. OpenAI — DALL-E 3
+ *   4. Stability AI — SD3
+ *   5. Gemini — gemini-2.0-flash-preview-image-generation
  *
  * When originalImages are provided, uses LLM vision to analyze the source
  * image(s) first, then enriches the prompt with that description before
@@ -20,7 +22,7 @@ import { ENV } from "./env";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "auto";
+  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd";
   style?: "natural" | "vivid";
@@ -176,6 +178,104 @@ async function generateWithGemini(prompt: string): Promise<Buffer> {
   throw new Error("Gemini returned no image data in response");
 }
 
+/**
+ * Generate image via Replicate — Flux Pro or Flux Schnell.
+ * Uses the predictions API with polling for completion.
+ */
+async function generateWithFlux(
+  prompt: string,
+  model: "flux-pro" | "flux-schnell" = "flux-pro",
+  width?: number,
+  height?: number,
+): Promise<Buffer> {
+  const modelMap: Record<string, string> = {
+    "flux-pro": "black-forest-labs/flux-1.1-pro",
+    "flux-schnell": "black-forest-labs/flux-schnell",
+  };
+
+  const input: Record<string, unknown> = { prompt };
+  if (width) input.width = width;
+  if (height) input.height = height;
+
+  const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ENV.replicateApiToken}`,
+      Prefer: "wait",
+    },
+    body: JSON.stringify({ model: modelMap[model], input }),
+  });
+
+  if (!createResponse.ok) {
+    const detail = await createResponse.text().catch(() => "");
+    throw new Error(`Flux ${model} failed (${createResponse.status}): ${detail}`);
+  }
+
+  const prediction = (await createResponse.json()) as any;
+
+  // If "Prefer: wait" worked, output is ready
+  let outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+
+  // Otherwise poll for result
+  if (!outputUrl && prediction.status !== "failed" && prediction.urls?.get) {
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const poll = await fetch(prediction.urls.get, {
+        headers: { Authorization: `Bearer ${ENV.replicateApiToken}` },
+      });
+      const data = (await poll.json()) as any;
+      if (data.status === "succeeded" && data.output) {
+        outputUrl = Array.isArray(data.output) ? data.output[0] : data.output;
+        break;
+      }
+      if (data.status === "failed") throw new Error(`Flux prediction failed: ${data.error}`);
+    }
+  }
+
+  if (!outputUrl) throw new Error("Flux returned no output");
+
+  const imageResp = await fetch(outputUrl);
+  if (!imageResp.ok) throw new Error(`Failed to download Flux image: ${imageResp.status}`);
+  return Buffer.from(await imageResp.arrayBuffer());
+}
+
+/**
+ * Generate image via Stability AI SD3.
+ */
+async function generateWithSD3(
+  prompt: string,
+  width?: number,
+  height?: number,
+): Promise<Buffer> {
+  const body: Record<string, unknown> = {
+    prompt,
+    output_format: "png",
+  };
+  if (width) body.width = width;
+  if (height) body.height = height;
+
+  const response = await fetch("https://api.stability.ai/v2beta/stable-image/generate/sd3", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ENV.stabilityApiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`SD3 failed (${response.status}): ${detail}`);
+  }
+
+  const result = (await response.json()) as any;
+  const b64 = result.image || result.artifacts?.[0]?.base64;
+  if (!b64) throw new Error("SD3 returned no image data");
+  return Buffer.from(b64, "base64");
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /** Map arbitrary size string to closest DALL-E 3 preset. */
@@ -290,12 +390,14 @@ export async function generateImage(
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini",
+  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3",
   prompt: string,
   size: string,
   quality: "standard" | "hd",
   style: "natural" | "vivid",
 ): Promise<Buffer> {
+  const [w, h] = size.split("x").map(Number);
+
   switch (model) {
     case "grok":
       if (!ENV.grokApiKey) throw new Error("Grok API key not configured");
@@ -306,13 +408,22 @@ async function generateWithExplicitModel(
     case "gemini":
       if (!ENV.geminiApiKey) throw new Error("Gemini API key not configured");
       return generateWithGemini(prompt);
+    case "flux-pro":
+      if (!ENV.replicateApiToken) throw new Error("Replicate API token not configured");
+      return generateWithFlux(prompt, "flux-pro", w, h);
+    case "flux-schnell":
+      if (!ENV.replicateApiToken) throw new Error("Replicate API token not configured");
+      return generateWithFlux(prompt, "flux-schnell", w, h);
+    case "sd3":
+      if (!ENV.stabilityApiKey) throw new Error("Stability API key not configured");
+      return generateWithSD3(prompt, w, h);
     default:
       throw new Error(`Unknown image model: ${model}`);
   }
 }
 
 /**
- * Try providers in priority order: Grok -> DALL-E -> Gemini.
+ * Try providers in priority order: Grok -> Flux Pro -> DALL-E -> SD3 -> Gemini.
  * Each provider failure logs a warning and falls through to the next.
  */
 async function generateWithFallback(
@@ -322,8 +433,9 @@ async function generateWithFallback(
   style: "natural" | "vivid",
 ): Promise<Buffer> {
   const errors: string[] = [];
+  const [w, h] = size.split("x").map(Number);
 
-  // 1. Try Grok
+  // 1. Try Grok (fastest, free tier)
   if (ENV.grokApiKey) {
     try {
       return await generateWithGrok(prompt, size);
@@ -334,7 +446,18 @@ async function generateWithFallback(
     }
   }
 
-  // 2. Try DALL-E
+  // 2. Try Flux Pro (highest quality)
+  if (ENV.replicateApiToken) {
+    try {
+      return await generateWithFlux(prompt, "flux-pro", w, h);
+    } catch (err: any) {
+      const msg = err.message || "Unknown error";
+      console.warn("[ImageGen] Flux Pro failed, trying next provider:", msg);
+      errors.push(`Flux Pro: ${msg}`);
+    }
+  }
+
+  // 3. Try DALL-E 3
   if (ENV.openaiApiKey) {
     try {
       return await generateWithDallE(prompt, size, quality, style);
@@ -345,7 +468,18 @@ async function generateWithFallback(
     }
   }
 
-  // 3. Try Gemini
+  // 4. Try SD3
+  if (ENV.stabilityApiKey) {
+    try {
+      return await generateWithSD3(prompt, w, h);
+    } catch (err: any) {
+      const msg = err.message || "Unknown error";
+      console.warn("[ImageGen] SD3 failed, trying next provider:", msg);
+      errors.push(`SD3: ${msg}`);
+    }
+  }
+
+  // 5. Try Gemini (free fallback)
   if (ENV.geminiApiKey) {
     try {
       return await generateWithGemini(prompt);
@@ -356,10 +490,9 @@ async function generateWithFallback(
     }
   }
 
-  // Nothing worked
   if (errors.length === 0) {
     throw new Error(
-      "No image generation API key configured. Set GROK_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.",
+      "No image generation API key configured. Set GROK_API_KEY, REPLICATE_API_TOKEN, OPENAI_API_KEY, STABILITY_API_KEY, or GEMINI_API_KEY.",
     );
   }
 

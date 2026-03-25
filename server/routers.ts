@@ -2997,7 +2997,7 @@ export const appRouter = router({
         }
       }),
 
-    // Text-to-Video — generate actual video clips via Google Veo 2
+    // Text-to-Video — generate actual video clips via Veo 3 or Minimax
     textToVideo: protectedProcedure
       .input(
         z.object({
@@ -3005,10 +3005,29 @@ export const appRouter = router({
           duration: z.enum(["4", "8"]).default("8"),
           aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
           style: z.enum(["cinematic", "anime", "documentary", "slow-motion", "timelapse", "drone", "handheld", "commercial"]).default("cinematic"),
+          model: z.enum(["veo-3", "minimax", "auto"]).default("auto"),
         })
       )
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
+
+        // Try Minimax via Replicate if selected or as fallback
+        if (input.model === "minimax" || (input.model === "auto" && !process.env.GEMINI_API_KEY && process.env.REPLICATE_API_TOKEN)) {
+          try {
+            const { ReplicateProvider } = await import("./_core/providers/replicate");
+            const provider = new ReplicateProvider();
+            const result = await provider.generate({
+              prompt: `${input.prompt}. Style: ${input.style}. High quality, professional production.`,
+              model: "minimax-video",
+              options: { prompt_optimizer: true },
+            });
+            return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
+          } catch (err: any) {
+            if (input.model === "minimax") throw err;
+            console.warn("[Video] Minimax failed, trying Veo 3:", err.message);
+          }
+        }
+
         try {
           const geminiKey = process.env.GEMINI_API_KEY;
           if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
@@ -3079,13 +3098,13 @@ export const appRouter = router({
 
           if (!videoUrl) throw new Error("Video generation timed out or produced no output");
 
-          return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style };
+          return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
         } catch (error: any) {
           return { videoUrl: null, status: "failed" as const, error: error.message };
         }
       }),
 
-    // Image-to-Video — animate a still image into a video clip via Veo 2
+    // Image-to-Video — animate a still image into a video clip via Veo 3
     imageToVideo: protectedProcedure
       .input(
         z.object({

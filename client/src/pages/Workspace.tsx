@@ -53,11 +53,17 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const MODEL_OPTIONS = [
-  { value: "built-in-v1", label: "Built-in Generator v1", desc: "Default image model", types: ["image"] },
-  { value: "stable-diffusion-xl", label: "Stable Diffusion XL", desc: "High-quality images", types: ["image"] },
-  { value: "stable-diffusion-3", label: "Stable Diffusion 3", desc: "Latest architecture", types: ["image"] },
-  { value: "animatediff-v2", label: "AnimateDiff v2", desc: "Video generation", types: ["video"] },
-  { value: "animatediff-lightning", label: "AnimateDiff Lightning", desc: "Fast video clips", types: ["video"] },
+  // Image models
+  { value: "auto", label: "Auto (Best Available)", desc: "Automatically picks the best model", types: ["image"], tier: "free", badge: "Recommended" },
+  { value: "grok", label: "Grok Image Gen", desc: "Fast generation via xAI", types: ["image"], tier: "free" },
+  { value: "flux-pro", label: "Flux 1.1 Pro", desc: "Highest quality, photorealistic", types: ["image"], tier: "creator", badge: "Premium" },
+  { value: "flux-schnell", label: "Flux Schnell", desc: "Fast, high-quality iteration", types: ["image"], tier: "free" },
+  { value: "dall-e-3", label: "DALL-E 3", desc: "Excellent prompt following by OpenAI", types: ["image"], tier: "creator" },
+  { value: "sd3", label: "Stable Diffusion 3", desc: "Great detail and text rendering", types: ["image"], tier: "creator" },
+  { value: "gemini", label: "Gemini Imagen", desc: "Google's image generation", types: ["image"], tier: "free" },
+  // Video models
+  { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "free", badge: "Best" },
+  { value: "minimax", label: "Minimax Video", desc: "High-quality short video clips", types: ["video"], tier: "creator" },
 ];
 
 const PRESET_PROMPTS = [
@@ -401,10 +407,20 @@ export default function Workspace() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredModels.map((m) => (
+                    {filteredModels.map((m: any) => (
                       <SelectItem key={m.value} value={m.value}>
                         <div className="flex items-center gap-2">
                           <span>{m.label}</span>
+                          {m.badge && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-semibold">
+                              {m.badge}
+                            </span>
+                          )}
+                          {m.tier === "creator" && !m.badge && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-semibold">
+                              Pro
+                            </span>
+                          )}
                           <span className="text-[10px] text-muted-foreground">— {m.desc}</span>
                         </div>
                       </SelectItem>
