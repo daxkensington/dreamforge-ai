@@ -11,7 +11,7 @@ import { ENV } from "./env";
 export interface AIModel {
   id: string;
   name: string;
-  provider: "grok" | "openai" | "gemini" | "anthropic" | "runpod" | "local";
+  provider: "grok" | "openai" | "gemini" | "anthropic" | "replicate" | "stability" | "runpod" | "local";
   type: "image" | "llm" | "video" | "audio";
   capabilities: string[];
   maxResolution: { width: number; height: number };
@@ -141,24 +141,144 @@ function claudeSonnet(): AIModel {
   };
 }
 
-// ─── RunPod / Self-Hosted (future) ─────────────────────────────────────────
+// ─── Replicate Models (Flux Pro, Video, Audio) ──────────────────────────────
 
-// Placeholder for RunPod models that can be added later.
-// Just add entries here and create a RunPodProvider adapter.
-//
-// function sdxlRunpod(): AIModel {
-//   return {
-//     id: "sdxl-runpod",
-//     name: "Stable Diffusion XL (RunPod)",
-//     provider: "runpod",
-//     type: "image",
-//     capabilities: ["text-to-image", "image-to-image"],
-//     maxResolution: { width: 1536, height: 1536 },
-//     creditCost: { base: 2, hd: 4 },
-//     isAvailable: !!ENV.runpodApiKey,
-//     tier: "creator",
-//   };
-// }
+function fluxPro(): AIModel {
+  return {
+    id: "flux-pro",
+    name: "Flux 1.1 Pro",
+    provider: "replicate",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1440, height: 1440 },
+    creditCost: { base: 3, hd: 5 },
+    isAvailable: !!ENV.replicateApiToken,
+    tier: "creator",
+    description: "Black Forest Labs Flux Pro — high-quality, photorealistic images with excellent prompt adherence.",
+    costInfo: "~$0.05/image",
+  };
+}
+
+function fluxSchnell(): AIModel {
+  return {
+    id: "flux-schnell",
+    name: "Flux Schnell",
+    provider: "replicate",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1024, height: 1024 },
+    creditCost: { base: 1 },
+    isAvailable: !!ENV.replicateApiToken,
+    tier: "free",
+    description: "Flux Schnell — fast, high-quality image generation. Great for rapid iteration.",
+    costInfo: "~$0.003/image",
+  };
+}
+
+function minimaxVideo(): AIModel {
+  return {
+    id: "minimax-video",
+    name: "Minimax Video",
+    provider: "replicate",
+    type: "video",
+    capabilities: ["text-to-video"],
+    maxResolution: { width: 1280, height: 720 },
+    creditCost: { base: 10 },
+    isAvailable: !!ENV.replicateApiToken,
+    tier: "creator",
+    description: "Minimax Video — high-quality short video generation from text prompts.",
+    costInfo: "~$0.10/video",
+  };
+}
+
+// ─── Stability AI Models (SD3, Stable Video) ────────────────────────────────
+
+function sd3Image(): AIModel {
+  return {
+    id: "sd3",
+    name: "Stable Diffusion 3",
+    provider: "stability",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 2, hd: 4 },
+    isAvailable: !!ENV.stabilityApiKey,
+    tier: "creator",
+    description: "Stability AI SD3 — excellent detail, composition, and text rendering.",
+    costInfo: "~$0.035/image",
+  };
+}
+
+function stableVideo(): AIModel {
+  return {
+    id: "stable-video",
+    name: "Stable Video Diffusion",
+    provider: "stability",
+    type: "video",
+    capabilities: ["image-to-video"],
+    maxResolution: { width: 1024, height: 576 },
+    creditCost: { base: 8 },
+    isAvailable: !!ENV.stabilityApiKey,
+    tier: "creator",
+    description: "Stability Stable Video — animate images into short video clips.",
+    costInfo: "~$0.20/video",
+  };
+}
+
+// ─── Google Veo 3 (Video) ───────────────────────────────────────────────────
+
+function veo3Video(): AIModel {
+  return {
+    id: "veo-3",
+    name: "Google Veo 3",
+    provider: "gemini",
+    type: "video",
+    capabilities: ["text-to-video", "image-to-video"],
+    maxResolution: { width: 1920, height: 1080 },
+    creditCost: { base: 5, hd: 10 },
+    isAvailable: !!ENV.geminiApiKey,
+    tier: "free",
+    description: "Google Veo 3 — state-of-the-art video generation with synchronized audio.",
+    costInfo: "Included with Gemini API",
+  };
+}
+
+// ─── Audio Models ───────────────────────────────────────────────────────────
+
+function musicGen(): AIModel {
+  return {
+    id: "musicgen",
+    name: "MusicGen",
+    provider: "replicate",
+    type: "audio",
+    capabilities: ["text-to-music"],
+    maxResolution: { width: 0, height: 0 },
+    creditCost: { base: 2 },
+    isAvailable: !!ENV.replicateApiToken,
+    tier: "creator",
+    description: "Meta MusicGen — generate original music from text descriptions.",
+    costInfo: "~$0.02/track",
+  };
+}
+
+function openaiTTS(): AIModel {
+  return {
+    id: "openai-tts",
+    name: "OpenAI TTS HD",
+    provider: "openai",
+    type: "audio",
+    capabilities: ["text-to-speech"],
+    maxResolution: { width: 0, height: 0 },
+    creditCost: { base: 2 },
+    isAvailable: !!ENV.openaiApiKey,
+    tier: "free",
+    description: "OpenAI TTS-1-HD — natural speech in 6 voices.",
+    costInfo: "~$0.03/min",
+  };
+}
+
+// ─── RunPod / Self-Hosted (future) ─────────────────────────────────────────
+// Add entries here and create a RunPodProvider adapter when ready.
 
 // ─── Registry ──────────────────────────────────────────────────────────────
 
@@ -169,6 +289,16 @@ function buildModelList(): AIModel[] {
     grokImage(),
     dalleModel(),
     geminiImage(),
+    fluxPro(),
+    fluxSchnell(),
+    sd3Image(),
+    // Video models
+    veo3Video(),
+    minimaxVideo(),
+    stableVideo(),
+    // Audio models
+    openaiTTS(),
+    musicGen(),
     // LLM models
     gpt4oMini(),
     grok3Mini(),
@@ -237,4 +367,14 @@ export function getAvailableImageModels(): AIModel[] {
 /** Get all available LLM models. */
 export function getAvailableLLMModels(): AIModel[] {
   return listModels({ type: "llm", availableOnly: true });
+}
+
+/** Get all available video models. */
+export function getAvailableVideoModels(): AIModel[] {
+  return listModels({ type: "video", availableOnly: true });
+}
+
+/** Get all available audio models. */
+export function getAvailableAudioModels(): AIModel[] {
+  return listModels({ type: "audio", availableOnly: true });
 }

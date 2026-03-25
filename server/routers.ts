@@ -3028,7 +3028,7 @@ export const appRouter = router({
 
           // Start async Veo 2 generation
           const startResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -3045,12 +3045,12 @@ export const appRouter = router({
 
           if (!startResponse.ok) {
             const err = await startResponse.text();
-            throw new Error(`Veo 2 failed to start: ${err}`);
+            throw new Error(`Veo 3 failed to start: ${err}`);
           }
 
           const operation = await startResponse.json();
           const operationName = operation.name;
-          if (!operationName) throw new Error("No operation name returned from Veo 2");
+          if (!operationName) throw new Error("No operation name returned from Veo 3");
 
           // Poll for completion (up to 5 minutes)
           let videoUrl: string | null = null;
@@ -3121,7 +3121,7 @@ export const appRouter = router({
           const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
 
           const startResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },

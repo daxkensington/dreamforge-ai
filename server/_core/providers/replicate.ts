@@ -1,9 +1,9 @@
-// @ts-nocheck — Dead code: old provider, replaced by Grok/OpenAI/Gemini
 /**
  * Replicate provider adapter — Flux Pro, Minimax Video, Bark TTS, etc.
+ * Auto-activates when REPLICATE_API_TOKEN is set.
  */
 
-import { storagePut } from "server/storage";
+import { storagePut } from "../../storage";
 import { ENV } from "../env";
 import type { GenerationRequest, GenerationResult, ProviderAdapter } from "./base";
 
@@ -11,13 +11,19 @@ const REPLICATE_API_BASE = "https://api.replicate.com/v1";
 
 /** Replicate model version identifiers for each supported model. */
 const MODEL_VERSIONS: Record<string, string> = {
-  "flux-pro": "black-forest-labs/flux-pro",
-  "minimax-video": "minimax/video-01",
+  "flux-pro": "black-forest-labs/flux-1.1-pro",
+  "flux-schnell": "black-forest-labs/flux-schnell",
+  "minimax-video": "minimax/video-01-live",
   "bark-tts": "suno-ai/bark",
+  "musicgen": "meta/musicgen",
 };
 
 export class ReplicateProvider implements ProviderAdapter {
   readonly provider = "replicate";
+
+  get isAvailable(): boolean {
+    return !!ENV.replicateApiToken;
+  }
 
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     if (!ENV.replicateApiToken) {

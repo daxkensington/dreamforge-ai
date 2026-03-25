@@ -1,9 +1,9 @@
-// @ts-nocheck — Dead code: old provider, replaced by Grok/OpenAI/Gemini
 /**
- * Stability AI provider adapter — Stable Diffusion XL / Stable Video via REST API.
+ * Stability AI provider adapter — SD3 images and Stable Video via REST API.
+ * Auto-activates when STABILITY_API_KEY is set.
  */
 
-import { storagePut } from "server/storage";
+import { storagePut } from "../../storage";
 import { ENV } from "../env";
 import type { GenerationRequest, GenerationResult, ProviderAdapter } from "./base";
 
@@ -11,6 +11,10 @@ const STABILITY_API_BASE = "https://api.stability.ai/v2beta";
 
 export class StabilityProvider implements ProviderAdapter {
   readonly provider = "stability";
+
+  get isAvailable(): boolean {
+    return !!ENV.stabilityApiKey;
+  }
 
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     if (!ENV.stabilityApiKey) {
