@@ -3685,6 +3685,123 @@ export const appRouter = router({
         }));
       }),
   }),
+
+  // ─── Song Creator ─────────────────────────────────────────────────────────
+  song: router({
+    generateLyrics: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(1000),
+          genre: z.enum(["pop", "rock", "hiphop", "rnb", "country", "electronic", "jazz", "indie", "latin", "classical", "lofi", "metal", "soul", "funk"]),
+          mood: z.enum(["happy", "sad", "energetic", "chill", "dark", "romantic", "empowering", "nostalgic", "dreamy", "aggressive"]),
+          songStructure: z.string().max(200).optional(),
+          language: z.string().max(50).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { generateLyrics } = await import("./_core/songGeneration");
+        return generateLyrics(input);
+      }),
+
+    generateSong: protectedProcedure
+      .input(
+        z.object({
+          lyrics: z.string().min(1).max(5000),
+          genre: z.string().min(1).max(100),
+          mood: z.string().min(1).max(100),
+          tempo: z.enum(["slow", "medium", "fast"]).optional(),
+          vocalStyle: z.enum(["male", "female", "duet", "choir"]).optional(),
+          instrumentStyle: z.string().max(500).optional(),
+          title: z.string().max(200).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
+        const { generateSong } = await import("./_core/songGeneration");
+        const result = await generateSong(input);
+        return { ...result, title: input.title || result.title };
+      }),
+
+    generateMusicVideo: protectedProcedure
+      .input(
+        z.object({
+          songUrl: z.string().min(1),
+          photoUrl: z.string().optional(),
+          concept: z.string().min(1).max(1000),
+          style: z.enum(["cinematic", "animated", "psychedelic", "performance", "lyric-video", "abstract", "retro"]).default("cinematic"),
+          aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("9:16"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "text-to-video", "Music video generation");
+
+        // Generate video scenes based on the concept + photo
+        const scenePrompt = input.photoUrl
+          ? `Music video scene: ${input.concept}. Style: ${input.style}. The subject from the reference photo should appear prominently. Cinematic, high production value, synced to music.`
+          : `Music video scene: ${input.concept}. Style: ${input.style}. Cinematic, high production value, visually stunning, synced to music.`;
+
+        // Use Veo 3 for video generation
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
+
+        const startResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              instances: [{ prompt: scenePrompt }],
+              parameters: {
+                aspectRatio: input.aspectRatio,
+                durationSeconds: 8,
+                sampleCount: 1,
+              },
+            }),
+          }
+        );
+
+        if (!startResponse.ok) {
+          const err = await startResponse.text();
+          throw new Error(`Video generation failed: ${err}`);
+        }
+
+        const operation = await startResponse.json();
+        const operationName = operation.name;
+        if (!operationName) throw new Error("No operation name returned");
+
+        // Poll for completion
+        let videoUrl: string | null = null;
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          const pollResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
+          );
+          const pollResult = await pollResponse.json();
+          if (pollResult.done) {
+            const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
+            if (videos && videos.length > 0) {
+              videoUrl = videos[0].video?.uri || (videos[0].bytesBase64Encoded
+                ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
+                : null);
+            }
+            break;
+          }
+          if (pollResult.error) {
+            throw new Error(`Video error: ${pollResult.error.message || JSON.stringify(pollResult.error)}`);
+          }
+        }
+
+        if (!videoUrl) throw new Error("Music video generation timed out");
+
+        return {
+          videoUrl,
+          songUrl: input.songUrl,
+          status: "completed" as const,
+          style: input.style,
+          aspectRatio: input.aspectRatio,
+        };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
