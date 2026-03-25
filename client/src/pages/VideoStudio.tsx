@@ -1178,12 +1178,12 @@ export default function VideoStudio() {
     return (
       <PageLayout>
         <div className="container max-w-4xl py-20 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-6">
-            <Video className="w-10 h-10 text-violet-400" />
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-6">
+            <Video className="w-10 h-10 text-amber-400" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">Video Studio</h1>
           <p className="text-muted-foreground mb-6">Sign in to access the full video creation suite</p>
-          <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600">
+          <Button asChild className="bg-gradient-to-r from-amber-500 to-orange-500 text-black">
             <a href={getLoginUrl()}>Sign In to Get Started</a>
           </Button>
         </div>
@@ -1193,43 +1193,63 @@ export default function VideoStudio() {
 
   return (
     <PageLayout>
-      <div className="container max-w-7xl py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
-              <Video className="w-5 h-5 text-violet-400" />
-            </div>
+      {/* Hero */}
+      <div className="relative overflow-hidden border-b border-white/5 mb-8">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="container max-w-7xl relative py-10 md:py-14">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Video Studio</h1>
-              <p className="text-sm text-muted-foreground">AI-powered video creation tools</p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-3">
+                <Film className="h-3 w-3" />
+                AI Video Production
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
+                Video{" "}
+                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                  Studio
+                </span>
+              </h1>
+              <p className="text-muted-foreground max-w-lg">
+                Storyboards, scripts, scene direction, soundtracks — everything you need to produce AI-powered video content.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {["/showcase/tool-t2v.jpg", "/showcase/tool-video.jpg", "/showcase/home-tool-video.jpg"].map((img, i) => (
+                <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
+                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Quick Links */}
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-6">
             <Link href="/workspace">
-              <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
                 <Wand2 className="w-3 h-3 mr-1" /> Image Studio
               </Badge>
             </Link>
             <Link href="/tools">
-              <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
                 <Layers className="w-3 h-3 mr-1" /> All AI Tools
               </Badge>
             </Link>
             <Link href="/video-studio/style-transfer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
                 <Palette className="w-3 h-3 mr-1" /> Video Style Transfer
               </Badge>
             </Link>
             <Link href="/video-studio/upscaler">
-              <Badge variant="outline" className="cursor-pointer hover:bg-violet-500/10 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
                 <Maximize className="w-3 h-3 mr-1" /> Video Upscaler
               </Badge>
             </Link>
           </div>
         </div>
+      </div>
+
+      <div className="container max-w-7xl py-8">
 
         {/* Main Tabs */}
         <Tabs defaultValue="storyboard" className="space-y-6">

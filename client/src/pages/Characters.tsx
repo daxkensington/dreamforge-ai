@@ -60,15 +60,46 @@ export default function Characters() {
   }
 
   return (
-    <div className="container py-8 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-2">
-        <Link href="/workspace"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
-        <div>
-          <h1 className="text-3xl font-bold">Character Library</h1>
-          <p className="text-muted-foreground">Create and manage consistent characters for your generations</p>
+    <div>
+      {/* Hero */}
+      <div className="relative overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/5 rounded-full blur-[100px]" />
+        <div className="container max-w-5xl relative py-10 md:py-14">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+              <Link href="/workspace">
+                <Button variant="ghost" size="sm" className="mb-3 gap-1.5 text-muted-foreground hover:text-foreground">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Studio
+                </Button>
+              </Link>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <User className="h-5 w-5 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold">
+                  Character{" "}
+                  <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                    Library
+                  </span>
+                </h1>
+              </div>
+              <p className="text-muted-foreground max-w-md">
+                Create consistent characters that maintain their look across all your AI generations.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {["/showcase/tool-charsheet.jpg", "/showcase/tool-avatar.jpg", "/showcase/tool-headshot.jpg"].map((img, i) => (
+                <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
+                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="container py-8 max-w-5xl mx-auto">
       <div className="flex justify-end mb-6">
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild>
@@ -184,6 +215,7 @@ export default function Characters() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

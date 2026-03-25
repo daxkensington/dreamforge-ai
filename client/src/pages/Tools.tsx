@@ -118,7 +118,7 @@ function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
               {tool.badge && (
                 <div className="absolute top-3 right-3">
-                  <span className="px-2 py-0.5 rounded-full bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wider">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-bold uppercase tracking-wider">
                     {tool.badge}
                   </span>
                 </div>
@@ -166,11 +166,11 @@ export default function Tools() {
             transition={{ duration: 0.7 }}
             className="relative text-center px-4 max-w-3xl"
           >
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-purple-400/30 bg-purple-500/10 text-purple-300 text-sm font-medium mb-6">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-300 text-sm font-medium mb-6">
               <Sparkles className="h-4 w-4" /> AI-Powered Creative Suite
             </span>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
                 {allToolCount}+ Professional Tools
               </span>
             </h1>
@@ -186,21 +186,21 @@ export default function Tools() {
           {/* Text-to-Image */}
           <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5 }}>
             <Link href="/workspace">
-              <div className="group grid md:grid-cols-2 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-purple-500/30 transition-all duration-300 hover:scale-[1.01]">
+              <div className="group grid md:grid-cols-2 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-amber-500/30 transition-all duration-300 hover:scale-[1.01]">
                 <div className="aspect-[16/10] md:aspect-auto overflow-hidden">
                   <img src="/showcase/gallery-2.jpg" alt="Text to Image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="flex flex-col justify-center p-8 lg:p-12">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                       <Image className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">Flagship</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">Flagship</span>
                   </div>
                   <h3 className="text-2xl lg:text-3xl font-bold mb-3">Text-to-Image Generation</h3>
                   <p className="text-foreground/60 mb-2">Generate any scene from a text prompt with photorealistic quality.</p>
                   <p className="text-foreground/50 text-sm mb-6">Choose from 3 AI models: Grok, DALL-E 3, Gemini</p>
-                  <Button variant="outline" className="w-fit gap-2 group-hover:border-purple-500/50">
+                  <Button variant="outline" className="w-fit gap-2 group-hover:border-amber-500/50">
                     Try It <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
@@ -298,7 +298,7 @@ export default function Tools() {
         {/* Creative Generation Tools */}
         <section className="container max-w-6xl pb-16">
           <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-2 block">Creative Generation</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2 block">Creative Generation</span>
             <h2 className="text-3xl md:text-4xl font-bold">Create & Generate</h2>
             <p className="text-foreground/50 mt-2">Generate logos, avatars, wallpapers, product shots and more</p>
           </motion.div>
@@ -339,7 +339,7 @@ export default function Tools() {
         <section className="container max-w-3xl pb-20">
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="text-center rounded-2xl bg-gradient-to-br from-purple-500/10 via-transparent to-fuchsia-500/10 border border-purple-500/20 p-12"
+            className="text-center rounded-2xl bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/10 border border-amber-500/20 p-12"
           >
             <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to Transform Your Workflow?</h2>
             <p className="text-foreground/60 mb-8">All {allToolCount}+ tools, unlimited creativity, one platform.</p>

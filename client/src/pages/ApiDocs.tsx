@@ -96,14 +96,48 @@ const endpoints = [
 
 export default function ApiDocs() {
   return (
-    <div className="container py-8 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
-        <div>
-          <h1 className="text-3xl font-bold">API Documentation</h1>
-          <p className="text-muted-foreground">Integrate DreamForge into your applications</p>
+    <div>
+      {/* Hero */}
+      <div className="relative overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="container max-w-5xl relative py-12 md:py-16">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="mb-4 gap-1.5 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </Button>
+          </Link>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+              <Code className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                API{" "}
+                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                  Documentation
+                </span>
+              </h1>
+            </div>
+          </div>
+          <p className="text-muted-foreground max-w-lg">
+            Integrate DreamForge's 53+ AI tools into your applications with our REST API. Generate images, videos, and more programmatically.
+          </p>
+          <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+              <Zap className="h-3 w-3 text-amber-400" /> REST API
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+              <Key className="h-3 w-3 text-amber-400" /> Bearer Auth
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+              <Shield className="h-3 w-3 text-amber-400" /> Rate Limited
+            </span>
+          </div>
         </div>
       </div>
+
+      <div className="container py-8 max-w-5xl mx-auto">
 
       {/* Quick Start */}
       <Card className="mb-8 border-primary/20 bg-primary/5">
@@ -211,6 +245,7 @@ export default function ApiDocs() {
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

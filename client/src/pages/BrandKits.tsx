@@ -57,10 +57,12 @@ export default function BrandKits() {
   if (!user) {
     return (
       <div className="container py-20 text-center">
-        <Palette className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-4">
+          <Palette className="w-8 h-8 text-amber-400" />
+        </div>
         <h1 className="text-3xl font-bold mb-4">Brand Kits</h1>
         <p className="text-muted-foreground mb-6">Create reusable style presets for consistent branding.</p>
-        <a href={getLoginUrl()}><Button size="lg">Sign In to Get Started</Button></a>
+        <a href={getLoginUrl()}><Button size="lg" className="bg-gradient-to-r from-amber-500 to-orange-500 text-black">Sign In to Get Started</Button></a>
       </div>
     );
   }
@@ -93,14 +95,46 @@ export default function BrandKits() {
   );
 
   return (
-    <div className="container py-8 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/workspace"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
-        <div>
-          <h1 className="text-3xl font-bold">Brand Kits</h1>
-          <p className="text-muted-foreground">Manage style presets and brand identities for consistent output</p>
+    <div>
+      {/* Hero */}
+      <div className="relative overflow-hidden border-b border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/5 rounded-full blur-[100px]" />
+        <div className="container max-w-5xl relative py-10 md:py-14">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+              <Link href="/workspace">
+                <Button variant="ghost" size="sm" className="mb-3 gap-1.5 text-muted-foreground hover:text-foreground">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Studio
+                </Button>
+              </Link>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                  <Palette className="h-5 w-5 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold">
+                  Brand{" "}
+                  <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                    Kits
+                  </span>
+                </h1>
+              </div>
+              <p className="text-muted-foreground max-w-md">
+                Create reusable style presets and brand identities for consistent, on-brand AI output.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {["/showcase/tool-colorgrade.jpg", "/showcase/tool-style-transfer.jpg", "/showcase/tool-palette.jpg"].map((img, i) => (
+                <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
+                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="container py-8 max-w-5xl mx-auto">
 
       <Tabs defaultValue="kits">
         <TabsList className="mb-6">
@@ -203,6 +237,7 @@ export default function BrandKits() {
           <KitForm onSubmit={() => editId && updateMut.mutate({ id: editId, name, stylePrompt, typography, colorPalette: colors })} submitLabel="Save Changes" isPending={updateMut.isPending} />
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
