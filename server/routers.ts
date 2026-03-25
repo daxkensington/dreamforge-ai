@@ -3699,6 +3699,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "prompt-assist", "AI lyrics generation");
         const { generateLyrics } = await import("./_core/songGeneration");
         return generateLyrics(input);
       }),
@@ -3719,7 +3720,7 @@ export const appRouter = router({
         await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
         const { generateSong } = await import("./_core/songGeneration");
         const result = await generateSong(input);
-        return { ...result, title: input.title || result.title };
+        return { ...result, title: input.title || "Untitled" };
       }),
 
     generateMusicVideo: protectedProcedure

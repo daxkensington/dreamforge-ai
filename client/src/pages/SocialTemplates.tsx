@@ -105,8 +105,6 @@ export default function SocialTemplates() {
   const { user } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [photoPreview, setPhotoPreview] = useState("");
   const [resultUrl, setResultUrl] = useState("");
 
   const template = TEMPLATES.find((t) => t.id === selectedTemplate);
@@ -122,17 +120,6 @@ export default function SocialTemplates() {
     },
     onError: (err) => toast.error(err.message),
   });
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoPreview(reader.result as string);
-      setPhotoUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleGenerate = () => {
     if (!template) return;
@@ -240,25 +227,6 @@ export default function SocialTemplates() {
                       <Badge className="bg-white/10 border-0 text-xs">{template?.aspect}</Badge>
                     </div>
                   </div>
-                </div>
-
-                {/* Photo upload */}
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Your Photo (Optional)</label>
-                  {photoPreview ? (
-                    <div className="flex items-center gap-3">
-                      <div className="h-20 w-20 rounded-xl overflow-hidden border border-white/10">
-                        <img src={photoPreview} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <Button variant="outline" size="sm" className="bg-transparent" onClick={() => { setPhotoUrl(""); setPhotoPreview(""); }}>Remove</Button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center gap-3 p-4 border border-dashed border-white/10 rounded-xl cursor-pointer hover:border-cyan-500/30 transition-colors">
-                      <Upload className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Upload photo to feature in the video</span>
-                      <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                    </label>
-                  )}
                 </div>
 
                 {/* Custom prompt */}

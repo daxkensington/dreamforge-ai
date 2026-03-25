@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -30,6 +30,11 @@ export default function ClipMaker() {
   const { user } = useAuth();
   const [videoUrl, setVideoUrl] = useState("");
   const [videoFile, setVideoFile] = useState<string>("");
+
+  // Cleanup blob URL on unmount or change
+  useEffect(() => {
+    return () => { if (videoUrl.startsWith("blob:")) URL.revokeObjectURL(videoUrl); };
+  }, [videoUrl]);
   const [description, setDescription] = useState("");
   const [clipStyle, setClipStyle] = useState("viral-hook");
   const [clipCount, setClipCount] = useState("3");
@@ -282,7 +287,7 @@ export default function ClipMaker() {
                     ))}
 
                     <div className="pt-3 flex gap-2">
-                      <Button variant="outline" className="flex-1 gap-2 bg-transparent text-xs">
+                      <Button variant="outline" className="flex-1 gap-2 bg-transparent text-xs" onClick={() => toast.info("Export coming soon!")}>
                         <Share2 className="h-3 w-3" /> Export All
                       </Button>
                       <Button

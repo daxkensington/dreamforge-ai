@@ -34,8 +34,7 @@ export default function MusicVideoStudio() {
   // Get song info from URL params (if coming from Song Creator)
   const [songUrl, setSongUrl] = useState("");
   const [songTitle, setSongTitle] = useState("");
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [photoPreview, setPhotoPreview] = useState("");
+  const [photoDataUrl, setPhotoDataUrl] = useState("");
   const [concept, setConcept] = useState("");
   const [style, setStyle] = useState("cinematic");
   const [aspectRatio, setAspectRatio] = useState("9:16");
@@ -53,8 +52,7 @@ export default function MusicVideoStudio() {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      setPhotoPreview(dataUrl);
-      setPhotoUrl(dataUrl);
+      setPhotoDataUrl(dataUrl);
     };
     reader.readAsDataURL(file);
   };
@@ -75,7 +73,7 @@ export default function MusicVideoStudio() {
     if (!songUrl || !concept.trim()) return;
     videoMutation.mutate({
       songUrl,
-      photoUrl: photoUrl || undefined,
+      photoUrl: photoDataUrl || undefined,
       concept,
       style: style as any,
       aspectRatio: aspectRatio as any,
@@ -187,12 +185,12 @@ export default function MusicVideoStudio() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {photoPreview ? (
+                {photoDataUrl ? (
                   <div className="space-y-3">
                     <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-white/10">
-                      <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
+                      <img src={photoDataUrl} alt="Your photo" className="w-full h-full object-cover" />
                     </div>
-                    <Button variant="outline" size="sm" className="bg-transparent" onClick={() => { setPhotoUrl(""); setPhotoPreview(""); }}>
+                    <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setPhotoDataUrl("")}>
                       Remove
                     </Button>
                   </div>
@@ -307,14 +305,14 @@ export default function MusicVideoStudio() {
                           <Download className="h-4 w-4" /> Download
                         </a>
                       </Button>
-                      <Button variant="outline" className="gap-2 bg-transparent">
+                      <Button variant="outline" className="gap-2 bg-transparent" onClick={() => toast.info("Share coming soon!")}>
                         <Share2 className="h-4 w-4" /> Share
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge className="bg-cyan-500/15 text-cyan-400 border-0">{style}</Badge>
                       <Badge className="bg-purple-500/15 text-purple-400 border-0">{aspectRatio}</Badge>
-                      {photoUrl && <Badge className="bg-blue-500/15 text-blue-400 border-0">Your Photo</Badge>}
+                      {photoDataUrl && <Badge className="bg-blue-500/15 text-blue-400 border-0">Your Photo</Badge>}
                     </div>
                   </div>
                 ) : videoMutation.isPending ? (

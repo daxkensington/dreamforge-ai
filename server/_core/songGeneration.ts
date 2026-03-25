@@ -39,8 +39,6 @@ export interface SongRequest {
 
 export interface SongResult {
   songUrl: string;
-  title: string;
-  duration: number;
   model: string;
   metadata: Record<string, unknown>;
 }
@@ -206,8 +204,6 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
 
   return {
     songUrl: url,
-    title: "",
-    duration: 0, // MiniMax doesn't return duration in prediction
     model: "minimax-music-2.5",
     metadata: {
       genre: request.genre,

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -69,7 +69,18 @@ export default function SongCreator() {
   // Result
   const [songUrl, setSongUrl] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioRef] = useState(() => typeof window !== "undefined" ? new Audio() : null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio();
+      audioRef.current.addEventListener("ended", () => setIsPlaying(false));
+    }
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
 
   const lyricsMutation = trpc.song.generateLyrics.useMutation({
     onSuccess: (data) => {
@@ -109,15 +120,14 @@ export default function SongCreator() {
   };
 
   const togglePlay = () => {
-    if (!audioRef || !songUrl) return;
+    if (!audioRef.current || !songUrl) return;
     if (isPlaying) {
-      audioRef.pause();
+      audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.src = songUrl;
-      audioRef.play();
+      audioRef.current.src = songUrl;
+      audioRef.current.play();
       setIsPlaying(true);
-      audioRef.onended = () => setIsPlaying(false);
     }
   };
 
@@ -408,8 +418,6 @@ export default function SongCreator() {
                 </div>
 
                 {/* Audio element for native controls fallback */}
-                <audio src={songUrl} controls className="w-full rounded-lg" />
-
                 {/* Actions */}
                 <div className="flex gap-3">
                   <Button variant="outline" className="bg-transparent gap-2" asChild>
