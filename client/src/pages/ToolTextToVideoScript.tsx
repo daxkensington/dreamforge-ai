@@ -253,8 +253,8 @@ export default function ToolTextToVideoScript() {
 
                   {scene.narration && (
                     <div className="flex items-start gap-2">
-                      <Volume2 className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <p className="text-xs text-amber-300/80 italic">"{scene.narration}"</p>
+                      <Volume2 className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-cyan-300/80 italic">"{scene.narration}"</p>
                     </div>
                   )}
 

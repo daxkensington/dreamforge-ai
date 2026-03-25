@@ -61,7 +61,7 @@ export default function ToolHdrEnhance() {
   const isProcessing = mutation.isPending;
 
   return (
-    <ToolPageLayout title="HDR & Lighting Enhancer" description="Transform lighting and enhance dynamic range" icon={Sun} gradient="from-yellow-500 to-orange-400">
+    <ToolPageLayout title="HDR & Lighting Enhancer" description="Transform lighting and enhance dynamic range" icon={Sun} gradient="from-cyan-500 to-blue-500">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

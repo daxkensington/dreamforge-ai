@@ -80,7 +80,7 @@ export default function ToolStoryboard() {
       title="AI Storyboard Generator"
       description="Turn your concept into a visual storyboard with AI-generated scene frames"
       icon={LayoutGrid}
-      gradient="from-amber-500 to-orange-600"
+      gradient="from-cyan-500 to-blue-600"
     >
       <div className="space-y-8">
         {/* Input Section */}
@@ -107,8 +107,8 @@ export default function ToolStoryboard() {
                     onClick={() => setStyle(s.id)}
                     className={`px-3 py-1.5 text-xs rounded-full transition-all ${
                       style === s.id
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-cyan-500/30"
                     }`}
                   >
                     {s.label}
@@ -126,8 +126,8 @@ export default function ToolStoryboard() {
                     onClick={() => setAspectRatio(ar)}
                     className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
                       aspectRatio === ar
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-cyan-500/30"
                     }`}
                   >
                     {ar}
@@ -145,8 +145,8 @@ export default function ToolStoryboard() {
                     onClick={() => setSceneCount(n)}
                     className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
                       sceneCount === n
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : "bg-background/30 text-muted-foreground border border-border/40 hover:border-cyan-500/30"
                     }`}
                   >
                     {n}
@@ -166,7 +166,7 @@ export default function ToolStoryboard() {
             <Button
               onClick={handleGenerate}
               disabled={!concept.trim() || storyboard.isPending}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700"
             >
               {storyboard.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating Storyboard...</>
@@ -181,8 +181,8 @@ export default function ToolStoryboard() {
         {storyboard.isPending && (
           <div className="flex flex-col items-center py-16">
             <div className="relative">
-              <Loader2 className="w-16 h-16 animate-spin text-amber-500" />
-              <Clapperboard className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-amber-300" />
+              <Loader2 className="w-16 h-16 animate-spin text-cyan-500" />
+              <Clapperboard className="w-6 h-6 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyan-300" />
             </div>
             <p className="mt-4 text-sm text-muted-foreground">Creating your storyboard with {sceneCount} scenes...</p>
             <p className="text-xs text-muted-foreground/60 mt-1">This may take a moment{generateImages ? " (generating images for each scene)" : ""}</p>
@@ -215,7 +215,7 @@ export default function ToolStoryboard() {
               {storyboard.data.scenes.map((scene: any, i: number) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-border/40 bg-card/50 overflow-hidden group hover:border-amber-500/30 transition-colors"
+                  className="rounded-xl border border-border/40 bg-card/50 overflow-hidden group hover:border-cyan-500/30 transition-colors"
                 >
                   {scene.imageUrl ? (
                     <div className="relative aspect-video bg-black/20">
@@ -241,7 +241,7 @@ export default function ToolStoryboard() {
                   <div className="p-3 space-y-1">
                     <p className="text-sm font-medium text-foreground/90 line-clamp-2">{scene.visualDescription}</p>
                     {scene.cameraAngle && (
-                      <p className="text-xs text-amber-400/70">📷 {scene.cameraAngle}</p>
+                      <p className="text-xs text-cyan-400/70">📷 {scene.cameraAngle}</p>
                     )}
                     {scene.cameraMovement && (
                       <p className="text-xs text-muted-foreground">🎬 {scene.cameraMovement}</p>

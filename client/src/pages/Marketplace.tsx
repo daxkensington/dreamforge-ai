@@ -169,8 +169,8 @@ export default function Marketplace() {
       <div className="min-h-screen">
         {/* Hero Section */}
         <div className="relative overflow-hidden border-b border-white/5">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-900/20 via-transparent to-orange-900/10" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/5 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/5 via-transparent to-transparent" />
           <div className="container relative py-16 md:py-24">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -178,13 +178,13 @@ export default function Marketplace() {
               transition={{ duration: 0.5 }}
               className="text-center max-w-3xl mx-auto"
             >
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm mb-6">
                 <Store className="h-4 w-4" />
                 Creator Marketplace
               </div>
               <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
                 Buy and sell{" "}
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                   AI-generated assets
                 </span>
               </h1>
@@ -194,7 +194,7 @@ export default function Marketplace() {
               <h2 className="text-white/50 text-sm mt-2 mb-6">Join thousands of creators buying and selling AI assets</h2>
               {user && (
                 <Link href="/marketplace/sell">
-                  <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
+                  <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/20">
                     <Plus className="h-4 w-4" />
                     Sell Your Creations
                   </Button>
@@ -219,7 +219,7 @@ export default function Marketplace() {
                   key={stat.label}
                   className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 text-center"
                 >
-                  <div className="text-lg font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                  <div className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
                     {stat.value}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
@@ -244,7 +244,7 @@ export default function Marketplace() {
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm ${
                       type === cat.type
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-black font-semibold shadow-md"
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold shadow-md"
                         : "bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -268,7 +268,7 @@ export default function Marketplace() {
                 transition={{ delay: 0.25, duration: 0.4 }}
                 className="flex items-center gap-3"
               >
-                <TrendingUp className="h-5 w-5 text-amber-400" />
+                <TrendingUp className="h-5 w-5 text-cyan-400" />
                 <h2 className="text-lg font-semibold">Trending Creations</h2>
                 <span className="text-xs text-muted-foreground">See what the community is creating</span>
               </motion.div>
@@ -289,7 +289,7 @@ export default function Marketplace() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
                       <p className="text-xs text-white/90 line-clamp-2">{img.prompt}</p>
                     </div>
-                    <div className="absolute inset-0 border border-white/0 group-hover:border-amber-500/40 rounded-xl transition-colors duration-300 group-hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.2)]" />
+                    <div className="absolute inset-0 border border-white/0 group-hover:border-cyan-500/40 rounded-xl transition-colors duration-300 group-hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.2)]" />
                   </div>
                 ))}
               </div>
@@ -313,9 +313,9 @@ export default function Marketplace() {
         {featured && featured.length > 0 && !hasFilters && page === 0 && (
           <div className="container py-10">
             <div className="flex items-center gap-3 mb-6">
-              <TrendingUp className="h-5 w-5 text-amber-400" />
+              <TrendingUp className="h-5 w-5 text-cyan-400" />
               <h2 className="text-lg font-semibold">Featured Listings</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-black uppercase tracking-wider">Hot</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white uppercase tracking-wider">Hot</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {featured.slice(0, 3).map((item: any, i: number) => (
@@ -326,7 +326,7 @@ export default function Marketplace() {
                   transition={{ delay: i * 0.1, duration: 0.4 }}
                 >
                   <Link href={`/marketplace/${item.id}`}>
-                    <div className="group rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-amber-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.15)]">
+                    <div className="group rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.15)]">
                       <div className="aspect-video bg-muted/20 relative overflow-hidden">
                         {item.previewImages?.[0] ? (
                           <img
@@ -335,18 +335,18 @@ export default function Marketplace() {
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/5 to-orange-900/10">
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-500/5 to-purple-900/10">
                             <Package className="h-10 w-10 text-muted-foreground/30" />
                           </div>
                         )}
                         <div className="absolute top-2 right-2">
-                          <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-black border-0 text-xs font-semibold shadow-sm">Featured</Badge>
+                          <Badge className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-0 text-xs font-semibold shadow-sm">Featured</Badge>
                         </div>
                       </div>
                       <div className="p-4 space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="text-sm font-medium line-clamp-1">{item.title}</h3>
-                          <span className="text-sm font-semibold text-amber-400 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-cyan-400 whitespace-nowrap">
                             {formatPrice(item.price)}
                           </span>
                         </div>
@@ -373,14 +373,14 @@ export default function Marketplace() {
         <div className="container py-8">
           {/* Search Bar + Sort */}
           <div className="flex gap-3 mb-6">
-            <div className="relative flex-1 border-amber-500/30 rounded-md focus-within:shadow-[0_0_20px_-5px_rgba(245,158,11,0.3)] transition-shadow">
+            <div className="relative flex-1 border-cyan-500/30 rounded-md focus-within:shadow-[0_0_20px_-5px_rgba(245,158,11,0.3)] transition-shadow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="Search prompts, presets, workflows..."
-                className="pl-10 h-11 border-amber-500/30"
+                className="pl-10 h-11 border-cyan-500/30"
               />
             </div>
             <Button onClick={handleSearch} className="h-11 px-6">
@@ -567,7 +567,7 @@ export default function Marketplace() {
                       transition={{ delay: i * 0.03, duration: 0.3 }}
                     >
                       <Link href={`/marketplace/${item.id}`}>
-                        <div className="group rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-amber-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.15)]">
+                        <div className="group rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.15)]">
                           <div className="aspect-video bg-muted/20 relative overflow-hidden">
                             {item.previewImages?.[0] ? (
                               <img
@@ -577,7 +577,7 @@ export default function Marketplace() {
                                 loading="lazy"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/5 to-orange-900/10">
+                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-cyan-500/5 to-purple-900/10">
                                 <Package className="h-8 w-8 text-muted-foreground/30" />
                               </div>
                             )}
@@ -669,7 +669,7 @@ export default function Marketplace() {
               >
                 <h2 className="text-2xl md:text-3xl font-bold mb-3">
                   Top{" "}
-                  <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                     Creators
                   </span>
                 </h2>
@@ -685,7 +685,7 @@ export default function Marketplace() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.1, duration: 0.5 }}
-                    className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-amber-500/20 transition-all duration-300"
+                    className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-cyan-500/20 transition-all duration-300"
                   >
                     {/* Creator image grid */}
                     <div className="grid grid-cols-2 gap-1 p-1">
@@ -698,7 +698,7 @@ export default function Marketplace() {
                     {/* Creator info */}
                     <div className="p-5">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-black font-bold text-sm">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black font-bold text-sm">
                           {creator.name[0]}
                         </div>
                         <div>
@@ -734,7 +734,7 @@ export default function Marketplace() {
             >
               <h2 className="text-2xl md:text-3xl font-bold mb-3">
                 What You Can{" "}
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                   Sell
                 </span>
               </h2>
@@ -759,7 +759,7 @@ export default function Marketplace() {
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-                  <div className="absolute inset-0 border border-white/0 group-hover:border-amber-500/30 rounded-2xl transition-colors duration-300" />
+                  <div className="absolute inset-0 border border-white/0 group-hover:border-cyan-500/30 rounded-2xl transition-colors duration-300" />
                   <div className="relative h-full flex flex-col justify-end p-5">
                     <div
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold w-fit mb-2"
@@ -781,20 +781,20 @@ export default function Marketplace() {
               transition={{ delay: 0.3, duration: 0.5 }}
               className="text-center mt-12"
             >
-              <div className="rounded-2xl bg-gradient-to-r from-amber-900/10 via-orange-900/10 to-amber-900/10 border border-white/10 p-8 md:p-12">
+              <div className="rounded-2xl bg-gradient-to-r from-blue-900/10 via-purple-900/10 to-blue-900/10 border border-white/10 p-8 md:p-12">
                 <h2 className="text-2xl md:text-3xl font-bold mb-3">Start Selling Today</h2>
                 <p className="text-muted-foreground max-w-md mx-auto mb-6">
                   Turn your AI creations into income. Join the DreamForge marketplace and reach thousands of creators.
                 </p>
                 {user ? (
                   <Link href="/marketplace/sell">
-                    <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
+                    <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/20">
                       <Plus className="h-4 w-4" />
                       List Your First Asset
                     </Button>
                   </Link>
                 ) : (
-                  <Button size="lg" className="gap-2 shadow-lg shadow-amber-500/20">
+                  <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/20">
                     <Plus className="h-4 w-4" />
                     Get Started
                   </Button>

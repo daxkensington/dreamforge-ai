@@ -35,7 +35,7 @@ export default function ToolAudioEnhance() {
   const isProcessing = mutation.isPending;
 
   return (
-    <ToolPageLayout title="Audio Enhancer" description="AI-powered audio enhancement recommendations" icon={AudioLines} gradient="from-yellow-500 to-amber-400">
+    <ToolPageLayout title="Audio Enhancer" description="AI-powered audio enhancement recommendations" icon={AudioLines} gradient="from-yellow-500 to-cyan-400">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

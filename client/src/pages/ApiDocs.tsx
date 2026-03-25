@@ -99,8 +99,8 @@ export default function ApiDocs() {
     <div>
       {/* Hero */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/15 via-transparent to-purple-900/10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-cyan-500/5 rounded-full blur-[120px]" />
         <div className="container max-w-5xl relative py-12 md:py-16">
           <Link href="/">
             <Button variant="ghost" size="sm" className="mb-4 gap-1.5 text-muted-foreground hover:text-foreground">
@@ -108,13 +108,13 @@ export default function ApiDocs() {
             </Button>
           </Link>
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
               <Code className="h-5 w-5 text-white" />
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-bold">
                 API{" "}
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                   Documentation
                 </span>
               </h1>
@@ -125,13 +125,13 @@ export default function ApiDocs() {
           </p>
           <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
-              <Zap className="h-3 w-3 text-amber-400" /> REST API
+              <Zap className="h-3 w-3 text-cyan-400" /> REST API
             </span>
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
-              <Key className="h-3 w-3 text-amber-400" /> Bearer Auth
+              <Key className="h-3 w-3 text-cyan-400" /> Bearer Auth
             </span>
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
-              <Shield className="h-3 w-3 text-amber-400" /> Rate Limited
+              <Shield className="h-3 w-3 text-cyan-400" /> Rate Limited
             </span>
           </div>
         </div>

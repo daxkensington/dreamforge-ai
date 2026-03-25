@@ -126,7 +126,7 @@ export default function ToolPromptBuilder() {
       title="Smart Prompt Builder"
       description="Craft the perfect AI generation prompt with visual controls"
       icon={Wand2}
-      gradient="from-amber-500 to-orange-400"
+      gradient="from-cyan-500 to-purple-500"
     >
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -153,7 +153,7 @@ export default function ToolPromptBuilder() {
                       <button
                         key={t.label}
                         onClick={() => setSubject(t.value)}
-                        className="text-[10px] px-2.5 py-1 rounded-full border border-amber-500/30 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                        className="text-[10px] px-2.5 py-1 rounded-full border border-cyan-500/30 text-cyan-400/80 hover:border-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
                       >
                         {t.label}
                       </button>
@@ -319,8 +319,8 @@ export default function ToolPromptBuilder() {
                       className="flex flex-col items-center justify-center py-20"
                     >
                       <div className="relative">
-                        <Loader2 className="h-10 w-10 animate-spin text-amber-400" />
-                        <Sparkles className="h-4 w-4 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
+                        <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
+                        <Sparkles className="h-4 w-4 text-cyan-400 absolute -top-1 -right-1 animate-pulse" />
                       </div>
                       <p className="text-sm text-muted-foreground mt-4">AI is crafting your prompt...</p>
                     </motion.div>
@@ -367,8 +367,8 @@ export default function ToolPromptBuilder() {
                       animate={{ opacity: 1 }}
                       className="flex flex-col items-center justify-center py-20 text-center"
                     >
-                      <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                        <Wand2 className="h-8 w-8 text-amber-400" />
+                      <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                        <Wand2 className="h-8 w-8 text-cyan-400" />
                       </div>
                       <h3 className="text-lg font-medium mb-2">Your Prompt Will Appear Here</h3>
                       <p className="text-sm text-muted-foreground max-w-xs">

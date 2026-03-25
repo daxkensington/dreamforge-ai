@@ -189,8 +189,8 @@ export default function ToolSoundtrackSuggester() {
 
             {/* Licensing Notes */}
             {suggest.data.licensingNotes && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                <p className="text-xs text-amber-300/80">📋 {suggest.data.licensingNotes}</p>
+              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                <p className="text-xs text-cyan-300/80">📋 {suggest.data.licensingNotes}</p>
               </div>
             )}
           </div>

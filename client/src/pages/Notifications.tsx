@@ -33,7 +33,7 @@ const typeColors: Record<string, string> = {
   collaboration: "bg-blue-500/10 text-blue-500",
   generation: "bg-purple-500/10 text-purple-500",
   comment: "bg-green-500/10 text-green-500",
-  system: "bg-orange-500/10 text-orange-500",
+  system: "bg-blue-500/10 text-blue-500",
   payment: "bg-emerald-500/10 text-emerald-500",
 };
 

@@ -84,8 +84,8 @@ const plans = [
     monthlyPrice: 75,
     yearlyPrice: 720,
     credits: "450,000",
-    gradient: "from-amber-500 to-orange-400",
-    borderColor: "border-amber-500/30",
+    gradient: "from-cyan-500 to-purple-500",
+    borderColor: "border-cyan-500/30",
     popular: false,
     cta: "Contact Sales",
     ctaVariant: "outline" as const,
@@ -177,7 +177,7 @@ export default function Pricing() {
             custom={0}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border/50 bg-card/50 backdrop-blur-sm mb-8"
           >
-            <Star className="h-4 w-4 text-amber-400" />
+            <Star className="h-4 w-4 text-cyan-400" />
             <span className="text-sm font-medium text-muted-foreground">Simple, transparent pricing</span>
           </motion.div>
 
@@ -300,7 +300,7 @@ export default function Pricing() {
 
                     {/* Credits badge */}
                     <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-lg bg-white/5 border border-white/5">
-                      <Zap className="h-4 w-4 text-amber-400" />
+                      <Zap className="h-4 w-4 text-cyan-400" />
                       <span className="text-sm font-semibold">{plan.credits}</span>
                       <span className="text-xs text-muted-foreground">credits / month</span>
                     </div>
@@ -450,7 +450,7 @@ export default function Pricing() {
               className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
             >
               See What Each Tier{" "}
-              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                 Creates
               </span>
             </motion.h2>
@@ -488,7 +488,7 @@ export default function Pricing() {
               },
               {
                 tier: "Studio",
-                gradient: "from-amber-500 to-orange-400",
+                gradient: "from-cyan-500 to-purple-500",
                 label: "Custom Models",
                 images: ["/showcase/gallery-19.jpg", "/showcase/tool-charsheet.jpg", "/showcase/gallery-20.jpg"],
               },
@@ -537,7 +537,7 @@ export default function Pricing() {
               className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
             >
               The{" "}
-              <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                 DreamForge
               </span>{" "}
               Difference
@@ -576,7 +576,7 @@ export default function Pricing() {
                   </div>
                   <div className="relative aspect-square overflow-hidden rounded-tr-xl">
                     <img src={demo.after} alt="After" className="w-full h-full object-cover" loading="lazy" />
-                    <span className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/80 text-black">AFTER</span>
+                    <span className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/80 text-black">AFTER</span>
                   </div>
                 </div>
                 <div className="p-4 text-center">
@@ -673,7 +673,7 @@ export default function Pricing() {
               className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
             >
               Need a{" "}
-              <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
                 Boost
               </span>
               ?
@@ -701,7 +701,7 @@ export default function Pricing() {
                   viewport={{ once: true }}
                   variants={scaleIn}
                   custom={i}
-                  className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 hover:border-amber-500/30 transition-all duration-300 group"
+                  className="relative rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 hover:border-cyan-500/30 transition-all duration-300 group"
                 >
                   {savings && (
                     <span className="absolute -top-3 right-4 text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
@@ -709,7 +709,7 @@ export default function Pricing() {
                     </span>
                   )}
 
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-400 shadow-lg mb-4 group-hover:shadow-amber-500/20 transition-shadow">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 shadow-lg mb-4 group-hover:shadow-cyan-500/20 transition-shadow">
                     <Package className="h-6 w-6 text-white" />
                   </div>
 
@@ -723,7 +723,7 @@ export default function Pricing() {
 
                   <Button
                     variant="outline"
-                    className="w-full bg-transparent hover:bg-amber-500/10 hover:border-amber-500/30"
+                    className="w-full bg-transparent hover:bg-cyan-500/10 hover:border-cyan-500/30"
                     onClick={() => {
                       if (!isAuthenticated) {
                         window.location.href = getLoginUrl();
@@ -854,14 +854,14 @@ export default function Pricing() {
             custom={0}
             className="max-w-3xl mx-auto text-center"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-amber-500/30 bg-amber-500/5 backdrop-blur-sm mb-8">
-              <Crown className="h-4 w-4 text-amber-400" />
-              <span className="text-sm font-medium text-amber-300">Enterprise</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-500/30 bg-cyan-500/5 backdrop-blur-sm mb-8">
+              <Crown className="h-4 w-4 text-cyan-400" />
+              <span className="text-sm font-medium text-cyan-300">Enterprise</span>
             </div>
 
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
               Need More?{" "}
-              <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
                 Let's Talk.
               </span>
             </h2>
@@ -873,7 +873,7 @@ export default function Pricing() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
                 size="lg"
-                className="font-medium gap-2 px-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
+                className="font-medium gap-2 px-8 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
                 onClick={() => {
                   window.location.href = "mailto:hello@dreamforge.ai?subject=Enterprise%20Plan%20Inquiry";
                 }}

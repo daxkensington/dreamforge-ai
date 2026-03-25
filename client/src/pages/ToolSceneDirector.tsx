@@ -16,11 +16,11 @@ const CAMERA_STYLES = [
 ] as const;
 
 const MOODS = [
-  { id: "epic", label: "Epic", color: "from-amber-500 to-red-500" },
+  { id: "epic", label: "Epic", color: "from-cyan-500 to-red-500" },
   { id: "intimate", label: "Intimate", color: "from-rose-400 to-pink-500" },
-  { id: "tense", label: "Tense", color: "from-red-600 to-orange-600" },
+  { id: "tense", label: "Tense", color: "from-red-600 to-blue-600" },
   { id: "dreamy", label: "Dreamy", color: "from-violet-400 to-purple-500" },
-  { id: "energetic", label: "Energetic", color: "from-yellow-400 to-orange-500" },
+  { id: "energetic", label: "Energetic", color: "from-yellow-400 to-blue-500" },
   { id: "melancholic", label: "Melancholic", color: "from-blue-500 to-indigo-600" },
 ] as const;
 

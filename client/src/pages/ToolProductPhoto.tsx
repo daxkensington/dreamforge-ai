@@ -70,7 +70,7 @@ export default function ToolProductPhoto() {
   const isProcessing = mutation.isPending;
 
   return (
-    <ToolPageLayout title="AI Product Photos" description="Create professional e-commerce product photography" icon={ShoppingBag} gradient="from-orange-500 to-red-400">
+    <ToolPageLayout title="AI Product Photos" description="Create professional e-commerce product photography" icon={ShoppingBag} gradient="from-blue-500 to-red-400">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -117,7 +117,7 @@ export default function ToolProductPhoto() {
               <CardContent className="p-0">
                 {!imagePreview && !resultUrl ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4"><ShoppingBag className="h-8 w-8 text-orange-400" /></div>
+                    <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4"><ShoppingBag className="h-8 w-8 text-blue-400" /></div>
                     <h3 className="text-lg font-medium mb-2">Upload Your Product</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">Transform any product photo into professional e-commerce imagery.</p>
                   </div>
@@ -131,12 +131,12 @@ export default function ToolProductPhoto() {
                         </div>
                       </div>
                       <div className="p-4">
-                        <Badge className="mb-3 bg-orange-500/20 text-orange-400 border-orange-500/30">{resultUrl ? "Product Shot" : "Result"}</Badge>
+                        <Badge className="mb-3 bg-blue-500/20 text-blue-400 border-cyan-500/30">{resultUrl ? "Product Shot" : "Result"}</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[200px] flex items-center justify-center">
                           <AnimatePresence mode="wait">
                             {isProcessing ? (
                               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-orange-400" /><p className="text-sm text-muted-foreground">Creating product shot...</p>
+                                <Loader2 className="h-8 w-8 animate-spin text-blue-400" /><p className="text-sm text-muted-foreground">Creating product shot...</p>
                               </motion.div>
                             ) : resultUrl ? (
                               <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>

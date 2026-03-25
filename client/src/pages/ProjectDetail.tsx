@@ -218,7 +218,7 @@ function ShareDialog({
                   <div className="flex items-center gap-2 min-w-0">
                     <Badge
                       variant="outline"
-                      className={`text-xs ${t.permission === "editor" ? "text-amber-400 border-amber-500/40" : "text-blue-400 border-blue-500/40"}`}
+                      className={`text-xs ${t.permission === "editor" ? "text-cyan-400 border-cyan-500/40" : "text-blue-400 border-blue-500/40"}`}
                     >
                       {t.permission === "editor" ? (
                         <Edit3 className="w-3 h-3 mr-1" />
@@ -296,7 +296,7 @@ function ShareDialog({
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className={`text-xs ${c.role === "editor" ? "text-amber-400" : "text-blue-400"}`}
+                      className={`text-xs ${c.role === "editor" ? "text-cyan-400" : "text-blue-400"}`}
                     >
                       {c.role}
                     </Badge>
@@ -363,7 +363,7 @@ function VersionHistoryPanel({
   const sourceColors: Record<string, string> = {
     manual: "text-blue-400 bg-blue-500/10 border-blue-500/30",
     "ai-refinement": "text-purple-400 bg-purple-500/10 border-purple-500/30",
-    revert: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    revert: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30",
     template: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
   };
 
@@ -617,7 +617,7 @@ function AIRefinementPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-amber-400" />
+        <Sparkles className="w-4 h-4 text-cyan-400" />
         <h3 className="text-sm font-semibold text-foreground">
           AI Refinement
         </h3>
@@ -648,8 +648,8 @@ function AIRefinementPanel({
                   onClick={() => toggleFocus(area)}
                   className={`px-2.5 py-1 text-xs rounded-full transition-all ${
                     focusAreas.includes(area)
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                      : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                      : "bg-background/30 text-muted-foreground border border-border/40 hover:border-cyan-500/30"
                   }`}
                 >
                   {area}
@@ -667,7 +667,7 @@ function AIRefinementPanel({
               })
             }
             disabled={feedback.trim().length < 5 || refine.isPending}
-            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
+            className="w-full bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800"
           >
             {refine.isPending ? (
               <>
@@ -724,10 +724,10 @@ function AIRefinementPanel({
                   </pre>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-amber-400 mb-1">
+                  <p className="text-xs font-medium text-cyan-400 mb-1">
                     Refined
                   </p>
-                  <pre className="text-[10px] text-amber-300/80 bg-amber-500/5 rounded-lg p-3 max-h-80 overflow-auto font-mono border border-amber-500/20">
+                  <pre className="text-[10px] text-cyan-300/80 bg-cyan-500/5 rounded-lg p-3 max-h-80 overflow-auto font-mono border border-cyan-500/20">
                     {JSON.stringify(refine.data.refinedData, null, 2).slice(
                       0,
                       3000
@@ -798,7 +798,7 @@ function ProjectContentViewer({
   const data = project.data as any;
   const typeIcons: Record<string, React.ReactNode> = {
     storyboard: <Clapperboard className="w-5 h-5 text-violet-400" />,
-    script: <FileText className="w-5 h-5 text-amber-400" />,
+    script: <FileText className="w-5 h-5 text-cyan-400" />,
     "scene-direction": <Camera className="w-5 h-5 text-cyan-400" />,
     soundtrack: <Music className="w-5 h-5 text-emerald-400" />,
   };
@@ -904,17 +904,17 @@ function ProjectContentViewer({
       {project.type === "script" && data?.scenes && (
         <div className="space-y-3">
           {data.logline && (
-            <p className="text-sm text-muted-foreground italic border-l-2 border-amber-500/40 pl-3">
+            <p className="text-sm text-muted-foreground italic border-l-2 border-cyan-500/40 pl-3">
               "{data.logline}"
             </p>
           )}
           {data.scenes.map((scene: any, i: number) => (
             <div
               key={i}
-              className="border border-border/40 rounded-xl p-4 bg-background/20 hover:border-amber-500/30 transition-colors"
+              className="border border-border/40 rounded-xl p-4 bg-background/20 hover:border-cyan-500/30 transition-colors"
             >
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-amber-500/20 text-amber-300 text-xs">
+                <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">
                   Scene {scene.sceneNumber}
                 </Badge>
                 <span className="text-xs text-muted-foreground font-mono">
@@ -1122,7 +1122,7 @@ export default function ProjectDetail() {
     return (
       <PageLayout>
         <div className="container max-w-4xl py-20 text-center">
-          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-amber-400" />
+          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-cyan-400" />
           <h1 className="text-2xl font-bold text-foreground mb-3">
             Project Not Found
           </h1>
@@ -1161,7 +1161,7 @@ export default function ProjectDetail() {
                 {accessRole && accessRole !== "owner" && (
                   <Badge
                     variant="outline"
-                    className={`text-xs ${accessRole === "editor" ? "text-amber-400 border-amber-500/40" : "text-blue-400 border-blue-500/40"}`}
+                    className={`text-xs ${accessRole === "editor" ? "text-cyan-400 border-cyan-500/40" : "text-blue-400 border-blue-500/40"}`}
                   >
                     <Shield className="w-3 h-3 mr-1" /> {accessRole}
                   </Badge>

@@ -103,7 +103,7 @@ export default function JoinProject() {
 
         {acceptLink.isError && (
           <>
-            <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+            <AlertTriangle className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
             <h1 className="text-xl font-bold text-foreground mb-2">
               Unable to Join
             </h1>

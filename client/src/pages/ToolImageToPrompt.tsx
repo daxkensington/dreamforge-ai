@@ -110,7 +110,7 @@ export default function ToolImageToPrompt() {
       title="Image to Prompt"
       description="Reverse-engineer any image into a detailed generation prompt"
       icon={ScanSearch}
-      gradient="from-amber-500 to-yellow-400"
+      gradient="from-cyan-500 to-yellow-400"
     >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -161,8 +161,8 @@ export default function ToolImageToPrompt() {
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <Card className="border-border/50">
                     <CardContent className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                      <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                        <ScanSearch className="h-8 w-8 text-amber-400" />
+                      <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                        <ScanSearch className="h-8 w-8 text-cyan-400" />
                       </div>
                       <h3 className="text-lg font-medium mb-2">No Analysis Yet</h3>
                       <p className="text-sm text-muted-foreground max-w-xs">Upload any image and AI will reverse-engineer a detailed prompt you can use to recreate or remix it.</p>
@@ -173,7 +173,7 @@ export default function ToolImageToPrompt() {
                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <Card className="border-border/50">
                     <CardContent className="flex flex-col items-center justify-center h-[500px] p-8">
-                      <Loader2 className="h-10 w-10 animate-spin text-amber-400 mb-4" />
+                      <Loader2 className="h-10 w-10 animate-spin text-cyan-400 mb-4" />
                       <p className="text-muted-foreground">AI is analyzing your image...</p>
                     </CardContent>
                   </Card>
@@ -181,18 +181,18 @@ export default function ToolImageToPrompt() {
               ) : result ? (
                 <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                   {/* Generated Prompt */}
-                  <Card className="border-border/50 border-amber-500/20">
+                  <Card className="border-border/50 border-cyan-500/20">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="font-semibold flex items-center gap-2">
-                          <Wand2 className="h-4 w-4 text-amber-400" /> Generated Prompt
+                          <Wand2 className="h-4 w-4 text-cyan-400" /> Generated Prompt
                         </h3>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="sm" onClick={() => copyText(result.prompt, "prompt")}>
                             {copiedField === "prompt" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
                             Copy
                           </Button>
-                          <Button size="sm" onClick={useInStudio} className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30">
+                          <Button size="sm" onClick={useInStudio} className="bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30">
                             <ArrowRight className="h-3 w-3 mr-1" /> Use in Studio
                           </Button>
                         </div>

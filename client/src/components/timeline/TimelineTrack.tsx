@@ -33,7 +33,7 @@ const TRACK_ICONS: Record<string, React.ElementType> = {
 const TRACK_ACCENT: Record<string, string> = {
   video: "border-l-violet-500",
   audio: "border-l-cyan-500",
-  text: "border-l-amber-500",
+  text: "border-l-cyan-500",
 };
 
 export default function TimelineTrack({
@@ -100,7 +100,7 @@ export default function TimelineTrack({
               <button
                 onClick={() => onUpdateTrack(track.id, { isLocked: !track.isLocked })}
                 className={`h-6 w-6 flex items-center justify-center rounded transition-colors
-                  ${track.isLocked ? "bg-orange-500/20 text-orange-400" : "hover:bg-white/10 text-muted-foreground"}`}
+                  ${track.isLocked ? "bg-blue-500/20 text-blue-400" : "hover:bg-white/10 text-muted-foreground"}`}
               >
                 {track.isLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
               </button>

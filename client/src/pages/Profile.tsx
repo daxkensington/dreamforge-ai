@@ -52,7 +52,7 @@ function QuotaBar({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
-        <span className={`font-mono text-xs ${isNearLimit ? "text-amber-400" : "text-foreground"}`}>
+        <span className={`font-mono text-xs ${isNearLimit ? "text-cyan-400" : "text-foreground"}`}>
           {used} / {limit}
         </span>
       </div>
@@ -140,7 +140,7 @@ function ModelUsageBars({ data }: { data: { model: string; count: number }[] }) 
     "bg-fuchsia-500",
     "bg-blue-500",
     "bg-emerald-500",
-    "bg-amber-500",
+    "bg-cyan-500",
   ];
 
   return (
@@ -268,8 +268,8 @@ export default function Profile() {
           label: "Animations",
           value: usageStats.animations,
           icon: Zap,
-          color: "text-amber-500",
-          bg: "bg-amber-500/10",
+          color: "text-cyan-500",
+          bg: "bg-cyan-500/10",
         },
         {
           label: "Gallery Views",
@@ -386,7 +386,7 @@ export default function Profile() {
                   <Card className="border-border/50 bg-card/50">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-amber-500" />
+                        <Zap className="h-4 w-4 text-cyan-500" />
                         Monthly Quota
                         <Badge variant="outline" className="bg-transparent text-[10px] ml-auto">
                           Free Plan
@@ -418,7 +418,7 @@ export default function Profile() {
                             label="Animations"
                             used={usageStats.quota.animations.used}
                             limit={usageStats.quota.animations.limit}
-                            color="bg-amber-500"
+                            color="bg-cyan-500"
                           />
                           <QuotaBar
                             label="Gallery Submissions"
@@ -562,7 +562,7 @@ export default function Profile() {
                                     {gen.mediaType}
                                   </Badge>
                                   {gen.parentGenerationId && (
-                                    <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] h-4 px-1.5">
+                                    <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 text-[9px] h-4 px-1.5">
                                       Animated
                                     </Badge>
                                   )}

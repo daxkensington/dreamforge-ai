@@ -147,7 +147,7 @@ function StoryboardTab() {
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <div className="relative">
                 <Loader2 className="w-12 h-12 animate-spin text-violet-500" />
-                <Sparkles className="w-5 h-5 absolute -top-1 -right-1 text-amber-400 animate-pulse" />
+                <Sparkles className="w-5 h-5 absolute -top-1 -right-1 text-cyan-400 animate-pulse" />
               </div>
               <p className="mt-4 text-sm">Creating your storyboard with AI-generated scene images...</p>
               <p className="text-xs text-muted-foreground/60 mt-1">This may take a minute for {sceneCount} scenes</p>
@@ -521,7 +521,7 @@ function ScriptWriterTab() {
           <Button
             onClick={handleGenerate}
             disabled={!concept.trim() || script.isPending}
-            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
+            className="w-full bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800"
           >
             {script.isPending ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Writing Script...</>
@@ -534,7 +534,7 @@ function ScriptWriterTab() {
         <div className="lg:col-span-2">
           {script.isPending && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Loader2 className="w-12 h-12 animate-spin text-amber-500" />
+              <Loader2 className="w-12 h-12 animate-spin text-cyan-500" />
               <p className="mt-4 text-sm">Writing your video script...</p>
             </div>
           )}
@@ -566,9 +566,9 @@ function ScriptWriterTab() {
 
               <div className="space-y-3">
                 {script.data.scenes?.map((scene: any, i: number) => (
-                  <div key={i} className="border border-border/40 rounded-xl p-4 bg-background/20 hover:border-amber-500/30 transition-colors">
+                  <div key={i} className="border border-border/40 rounded-xl p-4 bg-background/20 hover:border-cyan-500/30 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge className="bg-amber-500/20 text-amber-300 text-xs">Scene {scene.sceneNumber}</Badge>
+                      <Badge className="bg-cyan-500/20 text-cyan-300 text-xs">Scene {scene.sceneNumber}</Badge>
                       <span className="text-xs text-muted-foreground font-mono">{scene.startTime} — {scene.endTime}</span>
                       <Badge variant="outline" className="text-xs">{scene.location}</Badge>
                     </div>
@@ -872,7 +872,7 @@ function MyProjectsSection() {
 
   const typeColors: Record<string, string> = {
     storyboard: "text-violet-400 bg-violet-500/10",
-    script: "text-amber-400 bg-amber-500/10",
+    script: "text-cyan-400 bg-cyan-500/10",
     "scene-direction": "text-cyan-400 bg-cyan-500/10",
     soundtrack: "text-emerald-400 bg-emerald-500/10",
   };
@@ -1018,7 +1018,7 @@ function MyProjectsSection() {
                       {typeIcons[sp.projectType]}
                     </div>
                     <Badge variant="outline" className={`text-xs ${
-                      sp.role === "editor" ? "text-amber-400 border-amber-500/40" : "text-blue-400 border-blue-500/40"
+                      sp.role === "editor" ? "text-cyan-400 border-cyan-500/40" : "text-blue-400 border-blue-500/40"
                     }`}>
                       {sp.role}
                     </Badge>
@@ -1091,7 +1091,7 @@ function TemplateBrowserSection() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <LayoutTemplate className="w-5 h-5 text-amber-400" /> Template Library
+          <LayoutTemplate className="w-5 h-5 text-cyan-400" /> Template Library
         </h3>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -1121,8 +1121,8 @@ function TemplateBrowserSection() {
             onClick={() => setCategoryFilter(cat.id)}
             className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${
               categoryFilter === cat.id
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                : "bg-background/30 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                : "bg-background/30 text-muted-foreground border border-border/40 hover:border-cyan-500/30"
             }`}
           >
             {cat.id !== "all" && categoryIcons[cat.id]}
@@ -1133,7 +1133,7 @@ function TemplateBrowserSection() {
 
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+          <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
         </div>
       )}
 
@@ -1148,7 +1148,7 @@ function TemplateBrowserSection() {
         {filteredTemplates.map((template: any) => (
           <div
             key={template.id}
-            className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-amber-500/30 transition-all group cursor-pointer"
+            className="border border-border/40 rounded-xl bg-card/50 p-4 hover:border-cyan-500/30 transition-all group cursor-pointer"
             onClick={() => handleUseTemplate(template)}
           >
             <div className="flex items-start justify-between mb-3">
@@ -1178,12 +1178,12 @@ export default function VideoStudio() {
     return (
       <PageLayout>
         <div className="container max-w-4xl py-20 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-6">
-            <Video className="w-10 h-10 text-amber-400" />
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mx-auto mb-6">
+            <Video className="w-10 h-10 text-cyan-400" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">Video Studio</h1>
           <p className="text-muted-foreground mb-6">Sign in to access the full video creation suite</p>
-          <Button asChild className="bg-gradient-to-r from-amber-500 to-orange-500 text-black">
+          <Button asChild className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
             <a href={getLoginUrl()}>Sign In to Get Started</a>
           </Button>
         </div>
@@ -1195,18 +1195,18 @@ export default function VideoStudio() {
     <PageLayout>
       {/* Hero */}
       <div className="relative overflow-hidden border-b border-white/5 mb-8">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/15 via-transparent to-purple-900/10" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-[120px]" />
         <div className="container max-w-7xl relative py-10 md:py-14">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-3">
                 <Film className="h-3 w-3" />
                 AI Video Production
               </div>
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
                 Video{" "}
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                   Studio
                 </span>
               </h1>
@@ -1226,22 +1226,22 @@ export default function VideoStudio() {
           {/* Quick Links */}
           <div className="flex flex-wrap gap-2 mt-6">
             <Link href="/workspace">
-              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
                 <Wand2 className="w-3 h-3 mr-1" /> Image Studio
               </Badge>
             </Link>
             <Link href="/tools">
-              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
                 <Layers className="w-3 h-3 mr-1" /> All AI Tools
               </Badge>
             </Link>
             <Link href="/video-studio/style-transfer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
                 <Palette className="w-3 h-3 mr-1" /> Video Style Transfer
               </Badge>
             </Link>
             <Link href="/video-studio/upscaler">
-              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors">
+              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
                 <Maximize className="w-3 h-3 mr-1" /> Video Upscaler
               </Badge>
             </Link>
@@ -1260,7 +1260,7 @@ export default function VideoStudio() {
             <TabsTrigger value="director" className="gap-1.5 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">
               <Camera className="w-4 h-4" /> Scene Director
             </TabsTrigger>
-            <TabsTrigger value="script" className="gap-1.5 data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-300">
+            <TabsTrigger value="script" className="gap-1.5 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">
               <FileText className="w-4 h-4" /> Script Writer
             </TabsTrigger>
             <TabsTrigger value="soundtrack" className="gap-1.5 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-300">
@@ -1269,7 +1269,7 @@ export default function VideoStudio() {
             <TabsTrigger value="projects" className="gap-1.5 data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-300">
               <FolderOpen className="w-4 h-4" /> My Projects
             </TabsTrigger>
-            <TabsTrigger value="templates" className="gap-1.5 data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-300">
+            <TabsTrigger value="templates" className="gap-1.5 data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">
               <LayoutTemplate className="w-4 h-4" /> Templates
             </TabsTrigger>
           </TabsList>

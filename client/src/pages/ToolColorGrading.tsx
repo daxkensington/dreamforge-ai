@@ -94,7 +94,7 @@ export default function ToolColorGrading() {
       title="AI Color Grading"
       description="Apply cinematic color grades and film looks to your images"
       icon={SunMedium}
-      gradient="from-orange-500 to-amber-400"
+      gradient="from-blue-500 to-cyan-400"
     >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -157,8 +157,8 @@ export default function ToolColorGrading() {
               <CardContent className="p-0">
                 {!imagePreview && !resultUrl ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
-                      <SunMedium className="h-8 w-8 text-orange-400" />
+                    <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4">
+                      <SunMedium className="h-8 w-8 text-blue-400" />
                     </div>
                     <h3 className="text-lg font-medium mb-2">No Image Selected</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">Upload an image and choose a cinematic color grade to transform its mood.</p>
@@ -167,7 +167,7 @@ export default function ToolColorGrading() {
                   <div>
                     {isProcessing ? (
                       <div className="flex flex-col items-center justify-center gap-3 py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
                         <p className="text-sm text-muted-foreground">Applying color grade...</p>
                       </div>
                     ) : imagePreview && resultUrl ? (

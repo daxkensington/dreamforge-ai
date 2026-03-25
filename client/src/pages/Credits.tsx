@@ -463,7 +463,7 @@ function ReferralSection() {
                       className={`p-2 rounded-lg ${
                         ref.status === "completed"
                           ? "bg-emerald-500/10"
-                          : "bg-amber-500/10"
+                          : "bg-cyan-500/10"
                       }`}
                     >
                       <Users
@@ -613,10 +613,10 @@ function SocialShareSection() {
           </Button>
           <Button
             variant="outline"
-            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-orange-500/10 hover:border-orange-500/30 hover:text-orange-500 transition-all"
+            className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-blue-500/10 hover:border-orange-500/30 hover:text-orange-500 transition-all"
             onClick={() => handleShare("email")}
           >
-            <div className="p-2 rounded-full bg-orange-500/10">
+            <div className="p-2 rounded-full bg-blue-500/10">
               <Mail className="w-5 h-5" />
             </div>
             <span className="text-xs font-medium">Email</span>
@@ -682,11 +682,11 @@ function CreditBudgetSection() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+      <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10">
+              <div className="p-2 rounded-lg bg-cyan-500/10">
                 <Gauge className="w-6 h-6 text-amber-500" />
               </div>
               <div>
@@ -786,7 +786,7 @@ function CreditBudgetSection() {
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      usage.daily.percentage >= 100 ? "bg-destructive" : usage.daily.percentage >= 80 ? "bg-amber-500" : "bg-primary"
+                      usage.daily.percentage >= 100 ? "bg-destructive" : usage.daily.percentage >= 80 ? "bg-cyan-500" : "bg-primary"
                     }`}
                     style={{ width: `${Math.min(usage.daily.percentage, 100)}%` }}
                   />
@@ -804,7 +804,7 @@ function CreditBudgetSection() {
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      usage.weekly.percentage >= 100 ? "bg-destructive" : usage.weekly.percentage >= 80 ? "bg-amber-500" : "bg-primary"
+                      usage.weekly.percentage >= 100 ? "bg-destructive" : usage.weekly.percentage >= 80 ? "bg-cyan-500" : "bg-primary"
                     }`}
                     style={{ width: `${Math.min(usage.weekly.percentage, 100)}%` }}
                   />
@@ -814,7 +814,7 @@ function CreditBudgetSection() {
             {usage.alerts && usage.alerts.length > 0 && (
               <div className="space-y-2">
                 {usage.alerts.map((alert, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-amber-500 bg-amber-500/10 p-2 rounded-lg">
+                  <div key={i} className="flex items-center gap-2 text-sm text-amber-500 bg-cyan-500/10 p-2 rounded-lg">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     {alert}
                   </div>
@@ -1113,10 +1113,10 @@ function TierProgressSection() {
   const { totalReferrals, currentTier, nextTier, tiers, tierBonusesEarned } = tierData;
 
   return (
-    <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+    <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-500/10">
+          <div className="p-2 rounded-lg bg-cyan-500/10">
             <Trophy className="w-6 h-6 text-amber-500" />
           </div>
           <div>
@@ -1245,7 +1245,7 @@ function LeaderboardSection() {
   }
 
   const rankIcons = [Crown, Medal, Award];
-  const rankColors = ["text-amber-400", "text-gray-400", "text-amber-600"];
+  const rankColors = ["text-cyan-400", "text-gray-400", "text-amber-600"];
 
   return (
     <Card className="border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5">
@@ -1346,10 +1346,10 @@ function CreditExpirationSection() {
   if (!expirationSummary?.hasExpiringCredits) return null;
 
   return (
-    <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-red-500/5">
+    <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-red-500/5">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-orange-500/10">
+          <div className="p-2 rounded-lg bg-blue-500/10">
             <Timer className="w-6 h-6 text-orange-500" />
           </div>
           <div>
@@ -1366,10 +1366,10 @@ function CreditExpirationSection() {
             {expiringCredits.expiringCredits.map((credit) => (
               <div
                 key={credit.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-orange-500/10"
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-blue-500/10"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-orange-500/10">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
                     <AlertTriangle className="w-4 h-4 text-orange-500" />
                   </div>
                   <div>
@@ -1381,7 +1381,7 @@ function CreditExpirationSection() {
                     </div>
                   </div>
                 </div>
-                <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                <Badge variant="outline" className="border-orange-500/30 text-blue-400">
                   {credit.amount} credits
                 </Badge>
               </div>
@@ -2167,7 +2167,7 @@ export default function Credits() {
                             className={`p-2 rounded-lg ${
                               tx.amount > 0
                                 ? "bg-green-500/10"
-                                : "bg-orange-500/10"
+                                : "bg-blue-500/10"
                             }`}
                           >
                             {tx.amount > 0 ? (

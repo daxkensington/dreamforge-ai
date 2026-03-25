@@ -10,10 +10,10 @@ const VIDEO_STYLES = [
   { id: "anime", label: "Anime", desc: "Japanese cel-shaded animation", color: "from-pink-500 to-rose-500" },
   { id: "noir", label: "Film Noir", desc: "High contrast B&W shadows", color: "from-gray-500 to-zinc-700" },
   { id: "watercolor", label: "Watercolor", desc: "Soft flowing paint washes", color: "from-sky-400 to-cyan-500" },
-  { id: "oil-painting", label: "Oil Painting", desc: "Classical brushstroke textures", color: "from-amber-500 to-orange-600" },
+  { id: "oil-painting", label: "Oil Painting", desc: "Classical brushstroke textures", color: "from-cyan-500 to-blue-600" },
   { id: "pixel-art", label: "Pixel Art", desc: "Retro 16-bit gaming aesthetic", color: "from-green-500 to-emerald-600" },
   { id: "comic-book", label: "Comic Book", desc: "Bold outlines and halftone", color: "from-yellow-500 to-red-500" },
-  { id: "claymation", label: "Claymation", desc: "Stop-motion clay texture", color: "from-orange-400 to-amber-500" },
+  { id: "claymation", label: "Claymation", desc: "Stop-motion clay texture", color: "from-orange-400 to-cyan-500" },
   { id: "retro-vhs", label: "Retro VHS", desc: "1980s scan lines and glitch", color: "from-purple-500 to-fuchsia-600" },
 ] as const;
 

@@ -289,21 +289,21 @@ export default function Workspace() {
     <PageLayout>
       {/* Hero Banner */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/20 via-transparent to-orange-900/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/10" />
         <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/5 rounded-full blur-[100px]" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
         </div>
         <div className="container relative py-10 md:py-14">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-3">
                 <Wand2 className="h-3 w-3" />
                 AI Creative Studio
               </div>
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
                 Create{" "}
-                <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                   Something Amazing
                 </span>
               </h1>
@@ -505,7 +505,7 @@ export default function Workspace() {
                         key={ar.label}
                         onClick={() => { setAspectPreset(ar.label); setWidth(ar.w); setHeight(ar.h); }}
                         className={`flex flex-col items-center gap-0.5 p-2 rounded-lg border text-[10px] font-medium transition-all ${
-                          aspectPreset === ar.label ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-border/50 text-muted-foreground hover:border-border"
+                          aspectPreset === ar.label ? "border-cyan-500 bg-cyan-500/10 text-cyan-400" : "border-border/50 text-muted-foreground hover:border-border"
                         }`}
                       >
                         <span>{ar.icon}</span>

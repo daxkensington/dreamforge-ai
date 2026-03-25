@@ -131,7 +131,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "Digital Artist",
     quote: "DreamForge has completely transformed my creative workflow. I can iterate on concepts 10x faster than before.",
-    gradient: "from-amber-500 to-orange-500",
+    gradient: "from-cyan-500 to-blue-600",
   },
   {
     name: "Marcus Rivera",
@@ -143,7 +143,7 @@ const testimonials = [
     name: "Aisha Patel",
     role: "Content Creator",
     quote: "I went from zero design skills to creating stunning visuals for my brand. The tools are intuitive and powerful.",
-    gradient: "from-orange-500 to-red-500",
+    gradient: "from-blue-500 to-red-500",
   },
   {
     name: "David Park",
@@ -176,7 +176,7 @@ const heroWords = ["Images", "Videos", "Music", "Logos", "Avatars", "Art"];
 
 /* ── Section divider component ── */
 function SectionDivider() {
-  return <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />;
+  return <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />;
 }
 
 /* ── Animated word cycling ── */
@@ -195,7 +195,7 @@ function CyclingWord() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -40, opacity: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-block bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent"
+          className="inline-block bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent"
         >
           {heroWords[index]}
         </motion.span>
@@ -317,9 +317,9 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 backdrop-blur-sm border border-amber-500/20 mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
             >
-              <Sparkles className="h-4 w-4 text-amber-400" />
+              <Sparkles className="h-4 w-4 text-cyan-400" />
               <span className="text-sm font-medium text-white/90">53+ AI Tools — One Platform</span>
             </motion.div>
 
@@ -424,7 +424,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Try It Now
           </motion.p>
@@ -457,7 +457,7 @@ export default function Home() {
             custom={3}
             className="max-w-3xl mx-auto mb-14"
           >
-            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-amber-500/30 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] backdrop-blur-sm">
+            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-cyan-500/30 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] backdrop-blur-sm">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Search className="h-5 w-5 text-white/40 ml-2 sm:ml-4 shrink-0" />
                 <input
@@ -520,7 +520,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Made with DreamForge
           </motion.p>
@@ -577,7 +577,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             See Our Tools in Action
           </motion.p>
@@ -615,7 +615,7 @@ export default function Home() {
                   {/* After */}
                   <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
                     <img src={demo.after} alt={`${demo.label} after`} loading="lazy" className="w-full h-full object-cover" />
-                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500/80 text-white backdrop-blur-sm shadow-[0_0_10px_rgba(245,158,11,0.5)]">
+                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-500/80 text-white backdrop-blur-sm shadow-[0_0_10px_rgba(245,158,11,0.5)]">
                       After
                     </span>
                   </div>
@@ -638,7 +638,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Powerful Tools
           </motion.p>
@@ -675,7 +675,7 @@ export default function Home() {
                   </div>
                   <div className="relative p-6">
                     <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4">
-                      <tool.icon className="h-6 w-6 text-amber-400" />
+                      <tool.icon className="h-6 w-6 text-cyan-400" />
                     </div>
                     <h3 className="text-lg font-semibold mb-1 text-white">{tool.title}</h3>
                     <p className="text-sm text-white/60">{tool.desc}</p>
@@ -698,7 +698,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Simple Pricing
           </motion.p>
@@ -724,13 +724,13 @@ export default function Home() {
                 custom={i}
                 className={`relative rounded-2xl p-6 backdrop-blur-sm transition-all duration-300 ${
                   plan.highlighted
-                    ? "bg-white/10 border-2 border-amber-500/50 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)]"
+                    ? "bg-white/10 border-2 border-cyan-500/50 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)]"
                     : "bg-white/5 border border-white/10 hover:border-white/20"
                 }`}
               >
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-1">
+                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white flex items-center gap-1">
                       <Crown className="h-3 w-3" />
                       {plan.badge}
                     </span>
@@ -744,7 +744,7 @@ export default function Home() {
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feat) => (
                     <li key={feat} className="flex items-center gap-2 text-sm text-white/70">
-                      <Check className="h-4 w-4 text-amber-400 shrink-0" />
+                      <Check className="h-4 w-4 text-cyan-400 shrink-0" />
                       {feat}
                     </li>
                   ))}
@@ -768,7 +768,7 @@ export default function Home() {
             custom={5}
             className="text-center mt-10"
           >
-            <Link href="/pricing" className="text-sm text-amber-400 hover:underline inline-flex items-center gap-1">
+            <Link href="/pricing" className="text-sm text-cyan-400 hover:underline inline-flex items-center gap-1">
               View All Plans <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -786,7 +786,7 @@ export default function Home() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={0}
-            className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-[0.2em] text-center"
+            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
             Trusted by Creators Worldwide
           </motion.p>
@@ -812,7 +812,7 @@ export default function Home() {
                 custom={i}
                 className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm"
               >
-                <Quote className="h-6 w-6 text-amber-400/40 mb-4" />
+                <Quote className="h-6 w-6 text-cyan-400/40 mb-4" />
                 <p className="text-sm text-white/70 leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.gradient} shrink-0`} />
@@ -842,7 +842,7 @@ export default function Home() {
 
       {/* ═══════ SECTION 9: FINAL CTA ═══════ */}
       <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-amber-900/20 via-orange-900/10 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 via-purple-900/10 to-black/80" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
           <div className="max-w-3xl mx-auto text-center">
             <motion.h2

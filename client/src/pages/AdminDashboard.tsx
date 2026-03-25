@@ -327,7 +327,7 @@ export default function AdminDashboard() {
           <Card className="border-l-4 border-l-orange-500">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
+                <div className="p-2 rounded-lg bg-blue-500/10">
                   <Eye className="w-5 h-5 text-orange-500" />
                 </div>
                 <div>

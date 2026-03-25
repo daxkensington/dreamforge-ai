@@ -54,7 +54,7 @@ const stylePresets = [
   { id: "fantasy", label: "Fantasy", emoji: "🐉", color: "from-violet-500 to-purple-400" },
   { id: "scifi", label: "Sci-Fi", emoji: "🚀", color: "from-cyan-500 to-blue-400" },
   { id: "nature", label: "Nature", emoji: "🌿", color: "from-emerald-500 to-green-400" },
-  { id: "portrait", label: "Portrait", emoji: "👤", color: "from-amber-500 to-orange-400" },
+  { id: "portrait", label: "Portrait", emoji: "👤", color: "from-cyan-500 to-purple-500" },
   { id: "abstract", label: "Abstract", emoji: "🎨", color: "from-pink-500 to-rose-400" },
   { id: "anime", label: "Anime", emoji: "✨", color: "from-fuchsia-500 to-pink-400" },
 ];
@@ -178,7 +178,7 @@ export default function OnboardingWizard({ onComplete, onDismiss }: OnboardingWi
                         <span>Text to Video</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Palette className="h-4 w-4 text-amber-400" />
+                        <Palette className="h-4 w-4 text-cyan-400" />
                         <span>AI Tools</span>
                       </div>
                     </div>
@@ -281,7 +281,7 @@ export default function OnboardingWizard({ onComplete, onDismiss }: OnboardingWi
                     )}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
-                        <Zap className="h-3.5 w-3.5 text-amber-400" />
+                        <Zap className="h-3.5 w-3.5 text-cyan-400" />
                         <span>Generates in ~10 seconds</span>
                       </div>
                       <div className="flex items-center gap-1.5">

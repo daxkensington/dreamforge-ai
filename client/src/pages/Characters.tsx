@@ -63,8 +63,8 @@ export default function Characters() {
     <div>
       {/* Hero */}
       <div className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-900/15 via-transparent to-orange-900/10" />
-        <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/5 rounded-full blur-[100px]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/15 via-transparent to-purple-900/10" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/5 rounded-full blur-[100px]" />
         <div className="container max-w-5xl relative py-10 md:py-14">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
@@ -74,12 +74,12 @@ export default function Characters() {
                 </Button>
               </Link>
               <div className="flex items-center gap-3 mb-2">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                   <User className="h-5 w-5 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold">
                   Character{" "}
-                  <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                     Library
                   </span>
                 </h1>

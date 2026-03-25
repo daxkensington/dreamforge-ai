@@ -84,7 +84,7 @@ export default function ToolPhotoRestore() {
   const isProcessing = mutation.isPending;
 
   return (
-    <ToolPageLayout title="AI Photo Restorer" description="Restore old, damaged, and faded photos with AI" icon={ImagePlus} gradient="from-amber-500 to-orange-400">
+    <ToolPageLayout title="AI Photo Restorer" description="Restore old, damaged, and faded photos with AI" icon={ImagePlus} gradient="from-cyan-500 to-purple-500">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -130,7 +130,7 @@ export default function ToolPhotoRestore() {
               <CardContent className="p-0">
                 {!imagePreview && !resultUrl ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4"><ImagePlus className="h-8 w-8 text-amber-400" /></div>
+                    <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4"><ImagePlus className="h-8 w-8 text-cyan-400" /></div>
                     <h3 className="text-lg font-medium mb-2">No Image Selected</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">Upload an old or damaged photo to restore it with AI.</p>
                   </div>
@@ -138,7 +138,7 @@ export default function ToolPhotoRestore() {
                   <div>
                     {isProcessing ? (
                       <div className="flex flex-col items-center justify-center gap-3 py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
                         <p className="text-sm text-muted-foreground">AI is restoring your photo...</p>
                       </div>
                     ) : imagePreview && resultUrl ? (

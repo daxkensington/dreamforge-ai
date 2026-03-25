@@ -20,7 +20,7 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const STYLES = [
-  { value: "oil-painting" as const, label: "Oil Painting", emoji: "🎨", color: "from-amber-600 to-orange-500" },
+  { value: "oil-painting" as const, label: "Oil Painting", emoji: "🎨", color: "from-amber-600 to-blue-500" },
   { value: "watercolor" as const, label: "Watercolor", emoji: "💧", color: "from-sky-400 to-blue-500" },
   { value: "pencil-sketch" as const, label: "Pencil Sketch", emoji: "✏️", color: "from-gray-400 to-gray-600" },
   { value: "anime" as const, label: "Anime", emoji: "🌸", color: "from-pink-400 to-rose-500" },

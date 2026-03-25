@@ -187,11 +187,11 @@ export default function Navbar() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 group-hover:from-amber-400 group-hover:to-orange-500 transition-all shadow-lg shadow-amber-500/20">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 group-hover:from-cyan-400 group-hover:to-blue-500 transition-all shadow-lg shadow-cyan-500/20">
             <Wand2 className="h-5 w-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 bg-clip-text text-transparent">
+            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
               DreamForge
             </span>
           </div>
@@ -213,7 +213,7 @@ export default function Navbar() {
                 href={link.href}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
+                    ? "bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
@@ -234,7 +234,7 @@ export default function Navbar() {
                       creditBalance <= 10
                         ? "bg-destructive/10 text-destructive border border-destructive/20 animate-pulse"
                         : creditBalance <= 30
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                        ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20"
                         : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                     }`}
                   >
@@ -258,7 +258,7 @@ export default function Navbar() {
               href="/notifications"
               className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location === "/notifications"
-                  ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
+                  ? "bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
@@ -280,7 +280,7 @@ export default function Navbar() {
               href="/admin"
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location === "/admin"
-                  ? "bg-amber-500/10 text-amber-400 border-b-2 border-amber-500"
+                  ? "bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
@@ -410,7 +410,7 @@ export default function Navbar() {
             <Button
               onClick={() => (window.location.href = getLoginUrl())}
               size="sm"
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold rounded-full px-6 border-0 shadow-lg shadow-amber-500/20"
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-full px-6 border-0 shadow-lg shadow-cyan-500/20"
             >
               Sign in
             </Button>
@@ -435,11 +435,11 @@ export default function Navbar() {
               <Link
                 href="/credits"
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-between px-4 py-3 rounded-lg bg-amber-500/5 border border-amber-500/10 mb-2"
+                className="flex items-center justify-between px-4 py-3 rounded-lg bg-cyan-500/5 border border-cyan-500/10 mb-2"
               >
                 <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-amber-400" />
-                  <span className="text-sm font-semibold text-amber-400">
+                  <Coins className="h-4 w-4 text-cyan-400" />
+                  <span className="text-sm font-semibold text-cyan-400">
                     {creditBalance.toLocaleString()} credits
                   </span>
                 </div>
@@ -465,7 +465,7 @@ export default function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                      ? "bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   }`}
                 >
@@ -480,7 +480,7 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   location === "/notifications"
-                    ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                    ? "bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >
@@ -499,7 +499,7 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   location === "/admin"
-                    ? "bg-amber-500/10 text-amber-400 border-l-2 border-amber-500"
+                    ? "bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >

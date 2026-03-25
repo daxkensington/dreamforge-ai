@@ -62,7 +62,7 @@ export default function ToolMockup() {
   const activeType = mockupTypes.find((t) => t.value === mockupType);
 
   return (
-    <ToolPageLayout title="Product Mockup Generator" description="Place your designs on realistic product mockups" icon={Frame} gradient="from-amber-500 to-yellow-400">
+    <ToolPageLayout title="Product Mockup Generator" description="Place your designs on realistic product mockups" icon={Frame} gradient="from-cyan-500 to-yellow-400">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -111,7 +111,7 @@ export default function ToolMockup() {
               <CardContent className="p-0">
                 {!imagePreview && !resultUrl ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4"><Frame className="h-8 w-8 text-amber-400" /></div>
+                    <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4"><Frame className="h-8 w-8 text-cyan-400" /></div>
                     <h3 className="text-lg font-medium mb-2">Upload Your Design</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">Upload a logo or design and place it on realistic product mockups instantly.</p>
                   </div>
@@ -125,12 +125,12 @@ export default function ToolMockup() {
                         </div>
                       </div>
                       <div className="p-4">
-                        <Badge className="mb-3 bg-amber-500/20 text-amber-400 border-amber-500/30">{resultUrl ? activeType?.label || "Mockup" : "Result"}</Badge>
+                        <Badge className="mb-3 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">{resultUrl ? activeType?.label || "Mockup" : "Result"}</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[200px] flex items-center justify-center">
                           <AnimatePresence mode="wait">
                             {isProcessing ? (
                               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-amber-400" /><p className="text-sm text-muted-foreground">Creating {activeType?.label} mockup...</p>
+                                <Loader2 className="h-8 w-8 animate-spin text-cyan-400" /><p className="text-sm text-muted-foreground">Creating {activeType?.label} mockup...</p>
                               </motion.div>
                             ) : resultUrl ? (
                               <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>

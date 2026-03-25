@@ -114,8 +114,8 @@ export default function Moderation() {
             <Card className="border-border/50 bg-card/50">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-amber-500" />
+                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-cyan-500" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.pending}</p>
@@ -160,7 +160,7 @@ export default function Moderation() {
               <Clock className="h-3.5 w-3.5" />
               Pending
               {stats && stats.pending > 0 && (
-                <span className="ml-1 h-5 w-5 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center">
+                <span className="ml-1 h-5 w-5 rounded-full bg-cyan-500 text-white text-xs flex items-center justify-center">
                   {stats.pending}
                 </span>
               )}

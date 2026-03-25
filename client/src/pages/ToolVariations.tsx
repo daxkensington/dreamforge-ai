@@ -24,7 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const variationTypes = [
   { id: "subtle" as const, label: "Subtle", description: "Minor tweaks to color and lighting", color: "text-blue-400" },
   { id: "moderate" as const, label: "Moderate", description: "Noticeable style and mood changes", color: "text-violet-400" },
-  { id: "dramatic" as const, label: "Dramatic", description: "Bold reinterpretations of the image", color: "text-orange-400" },
+  { id: "dramatic" as const, label: "Dramatic", description: "Bold reinterpretations of the image", color: "text-blue-400" },
   { id: "style-mix" as const, label: "Style Mix", description: "Reimagined in different art styles", color: "text-emerald-400" },
 ];
 

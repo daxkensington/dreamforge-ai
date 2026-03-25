@@ -44,7 +44,7 @@ export default function ToolBatchPrompts() {
   const isProcessing = mutation.isPending;
 
   return (
-    <ToolPageLayout title="Batch Image Generator" description="Generate multiple images from a list of prompts" icon={Layers} gradient="from-orange-500 to-amber-400">
+    <ToolPageLayout title="Batch Image Generator" description="Generate multiple images from a list of prompts" icon={Layers} gradient="from-blue-500 to-cyan-400">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
@@ -95,7 +95,7 @@ export default function ToolBatchPrompts() {
                 <AnimatePresence mode="wait">
                   {isProcessing ? (
                     <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4 py-16">
-                      <Loader2 className="h-12 w-12 animate-spin text-orange-400" />
+                      <Loader2 className="h-12 w-12 animate-spin text-blue-400" />
                       <p className="text-foreground font-medium">Generating {validPrompts.length} images...</p>
                       <p className="text-sm text-muted-foreground">This may take a few minutes</p>
                     </motion.div>
@@ -103,7 +103,7 @@ export default function ToolBatchPrompts() {
                     <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium">Results</h3>
-                        <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+                        <Badge className="bg-blue-500/20 text-blue-400 border-cyan-500/30">
                           {results.filter((r) => r.status === "completed").length}/{results.length} completed
                         </Badge>
                       </div>
@@ -130,7 +130,7 @@ export default function ToolBatchPrompts() {
                     </motion.div>
                   ) : (
                     <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-2 py-16 text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4"><Layers className="h-8 w-8 text-orange-400" /></div>
+                      <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4"><Layers className="h-8 w-8 text-blue-400" /></div>
                       <h3 className="text-lg font-medium mb-2">Batch Results</h3>
                       <p className="text-sm text-muted-foreground max-w-xs">Add multiple prompts and generate all images at once. Import from CSV for bulk workflows.</p>
                     </motion.div>

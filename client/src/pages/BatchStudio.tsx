@@ -159,7 +159,7 @@ export default function BatchStudio() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-400 shadow-lg">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 shadow-lg">
                 <Layers className="h-5 w-5 text-white" />
               </div>
               <h1 className="text-2xl md:text-3xl font-bold">Batch Studio</h1>
@@ -430,7 +430,7 @@ export default function BatchStudio() {
                 <Button
                   onClick={handleGenerate}
                   disabled={validPrompts.length === 0 || processing}
-                  className="w-full gap-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0"
+                  className="w-full gap-2 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white border-0"
                   size="lg"
                 >
                   {processing ? (
@@ -450,7 +450,7 @@ export default function BatchStudio() {
                   <div className="space-y-2">
                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-500"
                         style={{
                           width: `${results.length > 0 ? (results.length / validPrompts.length) * 100 : 5}%`,
                         }}

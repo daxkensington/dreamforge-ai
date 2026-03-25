@@ -17,10 +17,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const EFFECTS = [
-  { value: "fire", label: "🔥 Fire", color: "from-orange-500 to-red-500" },
+  { value: "fire", label: "🔥 Fire", color: "from-blue-500 to-red-500" },
   { value: "water", label: "💧 Water", color: "from-blue-400 to-cyan-500" },
   { value: "neon", label: "💜 Neon", color: "from-purple-500 to-pink-500" },
-  { value: "gold", label: "✨ Gold", color: "from-yellow-400 to-amber-500" },
+  { value: "gold", label: "✨ Gold", color: "from-yellow-400 to-cyan-500" },
   { value: "ice", label: "❄️ Ice", color: "from-sky-300 to-blue-400" },
   { value: "nature", label: "🌿 Nature", color: "from-green-400 to-emerald-500" },
   { value: "galaxy", label: "🌌 Galaxy", color: "from-indigo-500 to-purple-600" },
@@ -81,7 +81,7 @@ export default function ToolTextEffects() {
       title="AI Text Effects"
       description="Generate stunning stylized text with AI-powered effects"
       icon={Type}
-      gradient="from-amber-500 to-orange-400"
+      gradient="from-cyan-500 to-purple-500"
     >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -150,28 +150,28 @@ export default function ToolTextEffects() {
               <CardContent className="p-0">
                 {!resultUrl && !isProcessing ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                      <Type className="h-8 w-8 text-amber-400" />
+                    <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                      <Type className="h-8 w-8 text-cyan-400" />
                     </div>
                     <h3 className="text-lg font-medium mb-2">Enter Your Text</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">Type some text, pick an effect style, and generate stunning AI typography.</p>
                     {text && (
                       <div className="mt-6 px-6 py-3 rounded-xl bg-muted/30 border border-border/50">
-                        <p className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">{text}</p>
+                        <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">{text}</p>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div>
                     <div className="p-6">
-                      <Badge className="mb-4 bg-amber-500/20 text-amber-400 border-amber-500/30">
+                      <Badge className="mb-4 bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
                         {resultUrl ? `${EFFECTS.find(e => e.value === effectStyle)?.label} Effect` : "Generating..."}
                       </Badge>
                       <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30 min-h-[400px] flex items-center justify-center">
                         <AnimatePresence mode="wait">
                           {isProcessing ? (
                             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3">
-                              <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                              <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
                               <p className="text-sm text-muted-foreground">Creating text effect...</p>
                             </motion.div>
                           ) : resultUrl ? (

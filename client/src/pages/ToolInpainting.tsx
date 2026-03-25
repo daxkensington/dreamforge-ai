@@ -121,11 +121,11 @@ export default function ToolInpainting() {
                 </div>
 
                 {/* Pro Tip Card */}
-                <div className="flex gap-2.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <Lightbulb className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex gap-2.5 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                  <Lightbulb className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-medium text-amber-300">Pro Tip</p>
-                    <p className="text-[11px] text-amber-300/80 mt-0.5">For precise edits, describe the region you want to change. E.g., "the sky area" or "the person on the left".</p>
+                    <p className="text-xs font-medium text-cyan-300">Pro Tip</p>
+                    <p className="text-[11px] text-cyan-300/80 mt-0.5">For precise edits, describe the region you want to change. E.g., "the sky area" or "the person on the left".</p>
                   </div>
                 </div>
 

@@ -157,8 +157,8 @@ export default function ToolFilmGrain() {
               <CardContent className="p-0">
                 {!imagePreview && !resultUrl ? (
                   <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                    <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                      <Film className="h-8 w-8 text-amber-400" />
+                    <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                      <Film className="h-8 w-8 text-cyan-400" />
                     </div>
                     <h3 className="text-lg font-medium mb-2">No Image Selected</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">
@@ -169,7 +169,7 @@ export default function ToolFilmGrain() {
                   <div>
                     {isProcessing ? (
                       <div className="flex flex-col items-center justify-center gap-3 py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
                         <p className="text-sm text-muted-foreground">Applying {activeEffect?.label}...</p>
                       </div>
                     ) : imagePreview && resultUrl ? (

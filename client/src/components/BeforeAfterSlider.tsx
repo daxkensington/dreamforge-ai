@@ -52,7 +52,7 @@ export default function BeforeAfterSlider({
   };
 
   const accentColors: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-    amber: { bg: "bg-amber-500", border: "border-amber-500", text: "text-amber-400", glow: "shadow-amber-500/50" },
+    amber: { bg: "bg-cyan-500", border: "border-cyan-500", text: "text-cyan-400", glow: "shadow-cyan-500/50" },
     blue: { bg: "bg-blue-500", border: "border-blue-500", text: "text-blue-400", glow: "shadow-blue-500/50" },
     green: { bg: "bg-green-500", border: "border-green-500", text: "text-green-400", glow: "shadow-green-500/50" },
     purple: { bg: "bg-purple-500", border: "border-purple-500", text: "text-purple-400", glow: "shadow-purple-500/50" },

@@ -27,7 +27,7 @@ interface TimelineClipProps {
 const CLIP_TYPE_COLORS: Record<string, { bg: string; border: string; handle: string }> = {
   video: { bg: "bg-violet-500/30", border: "border-violet-500/60", handle: "bg-violet-400" },
   audio: { bg: "bg-cyan-500/30", border: "border-cyan-500/60", handle: "bg-cyan-400" },
-  text: { bg: "bg-amber-500/30", border: "border-amber-500/60", handle: "bg-amber-400" },
+  text: { bg: "bg-cyan-500/30", border: "border-cyan-500/60", handle: "bg-cyan-400" },
   transition: { bg: "bg-pink-500/30", border: "border-pink-500/60", handle: "bg-pink-400" },
 };
 
