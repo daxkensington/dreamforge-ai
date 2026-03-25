@@ -92,11 +92,9 @@ export default function Footer() {
           {/* Brand column */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600">
-                <Wand2 className="h-4.5 w-4.5 text-white" />
-              </div>
+              <img src="/logo.png" alt="DreamForgeX" className="h-9 w-9 rounded-xl" />
               <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                DreamForge
+                DreamForgeX
               </span>
             </div>
             <p className="text-sm text-white/50 leading-relaxed mb-6 max-w-xs">

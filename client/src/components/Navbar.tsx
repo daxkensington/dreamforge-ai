@@ -187,14 +187,10 @@ export default function Navbar() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 group-hover:from-cyan-400 group-hover:to-blue-500 transition-all shadow-lg shadow-cyan-500/20">
-            <Wand2 className="h-5 w-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight leading-none bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-              DreamForge
-            </span>
-          </div>
+          <img src="/logo.png" alt="DreamForgeX" className="h-9 w-9 rounded-lg shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/30 transition-all" />
+          <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+            DreamForgeX
+          </span>
         </Link>
 
         {/* Desktop Nav */}
