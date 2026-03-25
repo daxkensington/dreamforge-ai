@@ -116,7 +116,7 @@ const faqs = [
   },
   {
     q: "What are credits and how do they work?",
-    a: "Credits are the universal currency for all AI operations on DreamForge. Different tasks cost different amounts — a basic image costs 5 credits, an HD image costs 10, and video generation starts at 50 credits. Your credits refresh each billing cycle.",
+    a: "Credits are the universal currency for all AI operations on DreamForgeX. Different tasks cost different amounts — a basic image costs 5 credits, an HD image costs 10, and video generation starts at 50 credits. Your credits refresh each billing cycle.",
   },
   {
     q: "Do unused credits roll over?",
@@ -132,7 +132,7 @@ const faqs = [
   },
   {
     q: "Is there a free trial for paid plans?",
-    a: "The Free plan itself is a great way to try DreamForge with 1,500 credits per month. No credit card required. When you're ready for more, upgrade instantly.",
+    a: "The Free plan itself is a great way to try DreamForgeX with 1,500 credits per month. No credit card required. When you're ready for more, upgrade instantly.",
   },
   {
     q: "What's included in the commercial license?",
@@ -312,7 +312,7 @@ export default function Pricing() {
                           variant="outline"
                           className="w-full gap-2 bg-transparent"
                           onClick={() => {
-                            window.location.href = "mailto:hello@dreamforge.ai?subject=Studio%20Plan%20Inquiry";
+                            window.location.href = "mailto:hello@dreamforgex.ai?subject=Studio%20Plan%20Inquiry";
                           }}
                         >
                           <Mail className="h-4 w-4" />
@@ -875,7 +875,7 @@ export default function Pricing() {
                 size="lg"
                 className="font-medium gap-2 px-8 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
                 onClick={() => {
-                  window.location.href = "mailto:hello@dreamforge.ai?subject=Enterprise%20Plan%20Inquiry";
+                  window.location.href = "mailto:hello@dreamforgex.ai?subject=Enterprise%20Plan%20Inquiry";
                 }}
               >
                 <Mail className="h-5 w-5" />

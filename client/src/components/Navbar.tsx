@@ -135,7 +135,7 @@ export default function Navbar() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("welcome") === "true" && isAuthenticated) {
       welcomeShown.current = true;
-      toast.success("Welcome to DreamForge!", {
+      toast.success("Welcome to DreamForgeX!", {
         description: "You've received 50 free credits to start creating. Explore our AI tools and bring your ideas to life!",
         duration: 8000,
       });

@@ -189,7 +189,7 @@ export default function Marketplace() {
                 </span>
               </h1>
               <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-2">
-                Discover premium prompts, presets, workflows, and more from talented creators in the DreamForge community.
+                Discover premium prompts, presets, workflows, and more from talented creators in the DreamForgeX community.
               </p>
               <h2 className="text-white/50 text-sm mt-2 mb-6">Join thousands of creators buying and selling AI assets</h2>
               {user && (
@@ -784,7 +784,7 @@ export default function Marketplace() {
               <div className="rounded-2xl bg-gradient-to-r from-blue-900/10 via-purple-900/10 to-blue-900/10 border border-white/10 p-8 md:p-12">
                 <h2 className="text-2xl md:text-3xl font-bold mb-3">Start Selling Today</h2>
                 <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                  Turn your AI creations into income. Join the DreamForge marketplace and reach thousands of creators.
+                  Turn your AI creations into income. Join the DreamForgeX marketplace and reach thousands of creators.
                 </p>
                 {user ? (
                   <Link href="/marketplace/sell">

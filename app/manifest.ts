@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "DreamForge — AI Creative Studio",
-    short_name: "DreamForge",
+    name: "DreamForgeX — AI Creative Studio",
+    short_name: "DreamForgeX",
     description: "Create stunning AI-generated images, videos, and audio with 53+ creative tools.",
     start_url: "/",
     display: "standalone",

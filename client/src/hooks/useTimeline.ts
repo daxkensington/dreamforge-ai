@@ -324,7 +324,7 @@ function createDefaultState(): TimelineState {
         startTime: 1,
         duration: 3,
         name: "Title Card",
-        text: "DreamForge",
+        text: "DreamForgeX",
       },
     ],
     playheadPosition: 0,

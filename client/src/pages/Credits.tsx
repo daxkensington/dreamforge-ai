@@ -1258,7 +1258,7 @@ function LeaderboardSection() {
             <div>
               <CardTitle>Referral Leaderboard</CardTitle>
               <CardDescription>
-                Top referrers in the DreamForge community
+                Top referrers in the DreamForgeX community
               </CardDescription>
             </div>
           </div>
@@ -1905,7 +1905,7 @@ export default function Credits() {
             <Coins className="w-12 h-12 mx-auto text-primary mb-2" />
             <CardTitle>Sign in to manage credits</CardTitle>
             <CardDescription>
-              Purchase generation credits to use DreamForge tools
+              Purchase generation credits to use DreamForgeX tools
             </CardDescription>
           </CardHeader>
           <CardFooter className="justify-center">

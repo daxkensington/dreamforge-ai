@@ -163,7 +163,7 @@ export default function OnboardingWizard({ onComplete, onDismiss }: OnboardingWi
                       <Wand2 className="h-8 w-8 text-white" />
                     </div>
                     <h2 className="text-2xl md:text-3xl font-bold mb-3">
-                      Welcome to DreamForge
+                      Welcome to DreamForgeX
                     </h2>
                     <p className="text-muted-foreground max-w-md mb-8">
                       Create stunning images, videos, and animations with AI. Let's get you started with your first creation in under 60 seconds.

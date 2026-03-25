@@ -11,7 +11,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[DreamForge Error]", error);
+    console.error("[DreamForgeX Error]", error);
   }, [error]);
 
   return (

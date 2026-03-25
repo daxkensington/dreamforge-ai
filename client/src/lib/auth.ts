@@ -15,7 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
     Resend({
       apiKey: process.env.RESEND_API_KEY,
-      from: process.env.RESEND_FROM_ADDRESS || "DreamForge <noreply@dreamforge.ai>",
+      from: process.env.RESEND_FROM_ADDRESS || "DreamForgeX <noreply@dreamforgex.ai>",
     }),
   ],
   session: { strategy: "jwt" },

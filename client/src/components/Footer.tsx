@@ -31,7 +31,7 @@ const footerLinks = {
     { label: "About", href: "/about" },
     { label: "Terms of Service", href: "/terms" },
     { label: "Privacy Policy", href: "/privacy" },
-    { label: "Contact", href: "mailto:support@dreamforge.ai" },
+    { label: "Contact", href: "mailto:support@dreamforgex.ai" },
   ],
 };
 
@@ -39,7 +39,7 @@ const socialLinks = [
   { icon: Twitter, href: "https://twitter.com/dreamforgeai", label: "Twitter" },
   { icon: Github, href: "https://github.com/daxkensington/dreamforge-ai", label: "GitHub" },
   { icon: MessageCircle, href: "#", label: "Discord" },
-  { icon: Mail, href: "mailto:support@dreamforge.ai", label: "Email" },
+  { icon: Mail, href: "mailto:support@dreamforgex.ai", label: "Email" },
 ];
 
 const aiModels = ["Grok", "GPT-4o", "DALL-E 3", "Gemini", "Claude", "Veo 2"];
@@ -229,7 +229,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/30">
-            &copy; {new Date().getFullYear()} DreamForge AI. All rights reserved.
+            &copy; {new Date().getFullYear()} DreamForgeX AI. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link href="/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors">Terms</Link>

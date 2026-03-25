@@ -7,11 +7,11 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "DreamForge — AI Image & Video Generation Studio",
+  title: "DreamForgeX — AI Image & Video Generation Studio",
   description:
-    "Create stunning AI-generated images and videos with DreamForge. Text-to-image, text-to-video, and image-to-video animation — all powered by cutting-edge AI models.",
+    "Create stunning AI-generated images and videos with DreamForgeX. Text-to-image, text-to-video, and image-to-video animation — all powered by cutting-edge AI models.",
   openGraph: {
-    title: "DreamForge — AI Creative Studio",
+    title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
     images: ["/showcase/hero-forge.jpg"],
@@ -19,12 +19,12 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DreamForge — AI Creative Studio",
+    title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
     images: ["/showcase/hero-forge.jpg"],
   },
-  metadataBase: new URL("https://genesis-synth-lab.vercel.app"),
+  metadataBase: new URL("https://dreamforgex.ai"),
   other: {
     "theme-color": "#7c3aed",
   },

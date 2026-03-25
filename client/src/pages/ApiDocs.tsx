@@ -88,8 +88,8 @@ const endpoints = [
     auth: false,
     body: null,
     response: `[
-  { "id": "default", "name": "DreamForge Standard", "speed": "fast", "quality": "high" },
-  { "id": "hd", "name": "DreamForge HD", "speed": "slow", "quality": "ultra" }
+  { "id": "default", "name": "DreamForgeX Standard", "speed": "fast", "quality": "high" },
+  { "id": "hd", "name": "DreamForgeX HD", "speed": "slow", "quality": "ultra" }
 ]`,
   },
 ];
@@ -121,7 +121,7 @@ export default function ApiDocs() {
             </div>
           </div>
           <p className="text-muted-foreground max-w-lg">
-            Integrate DreamForge's 53+ AI tools into your applications with our REST API. Generate images, videos, and more programmatically.
+            Integrate DreamForgeX's 53+ AI tools into your applications with our REST API. Generate images, videos, and more programmatically.
           </p>
           <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">

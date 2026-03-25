@@ -34,7 +34,7 @@ export default function ApiKeys() {
       <div className="container py-20 text-center">
         <Key className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
         <h1 className="text-3xl font-bold mb-4">API Access</h1>
-        <p className="text-muted-foreground mb-6">Manage API keys for programmatic access to DreamForge.</p>
+        <p className="text-muted-foreground mb-6">Manage API keys for programmatic access to DreamForgeX.</p>
         <a href={getLoginUrl()}><Button size="lg">Sign In to Get Started</Button></a>
       </div>
     );
@@ -54,7 +54,7 @@ export default function ApiKeys() {
       <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
         <CardContent className="pt-6">
           <h3 className="font-semibold mb-2 flex items-center gap-2"><Shield className="w-4 h-4" /> API Documentation</h3>
-          <p className="text-sm text-muted-foreground mb-3">Use your API key to access DreamForge programmatically. Include it in the Authorization header:</p>
+          <p className="text-sm text-muted-foreground mb-3">Use your API key to access DreamForgeX programmatically. Include it in the Authorization header:</p>
           <div className="bg-background rounded-lg p-3 font-mono text-sm">
             <span className="text-muted-foreground">Authorization:</span> Bearer df_your_api_key_here
           </div>
@@ -110,7 +110,7 @@ export default function ApiKeys() {
           <CardContent>
             <Key className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">No API Keys</h3>
-            <p className="text-muted-foreground mb-4">Create an API key to start using the DreamForge API.</p>
+            <p className="text-muted-foreground mb-4">Create an API key to start using the DreamForgeX API.</p>
             <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-2" /> Create Key</Button>
           </CardContent>
         </Card>
