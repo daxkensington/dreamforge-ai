@@ -92,7 +92,10 @@ const utilityTools: GridTool[] = [
   { title: "Prompt Builder", desc: "Craft perfect prompts visually", icon: Wand2, href: "/tools/prompt-builder", img: "/showcase/tool-promptbuild.jpg" },
   { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/tool-palette.jpg" },
   { title: "Image-to-Prompt", desc: "Reverse-engineer any image's prompt", icon: FileText, href: "/tools/image-to-prompt", img: "/showcase/tool-img2prompt.jpg" },
-  { title: "Image Caption", desc: "Alt text, social captions, SEO", icon: FileText, href: "/tools/image-caption", img: "/showcase/tool-caption.jpg", badge: "New" },
+  { title: "Image Caption", desc: "Alt text, social captions, SEO", icon: FileText, href: "/tools/image-caption", img: "/showcase/tool-caption.jpg" },
+  { title: "Ad Copy Generator", desc: "Google, Facebook, TikTok ad copy", icon: FileText, href: "/tools/ad-copy", img: "/showcase/tool-promptbuild.jpg", badge: "Hot" },
+  { title: "Blog Writer", desc: "Full SEO blog posts with AI", icon: FileText, href: "/tools/blog-writer", img: "/showcase/tool-caption.jpg", badge: "Hot" },
+  { title: "Caption Writer", desc: "Platform-perfect captions + hashtags", icon: FileText, href: "/tools/caption-writer", img: "/showcase/tool-caption.jpg", badge: "Hot" },
 ];
 
 // ─── Audio Tools ─────────────────────────────────────────────────────────────

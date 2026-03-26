@@ -59,6 +59,31 @@ export async function addImageWatermark(imageBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
+ * Add a brief audio watermark tag to the beginning of audio content.
+ * Prepends a short "Created with DreamForgeX" voice tag.
+ * For free tier songs/TTS outputs.
+ */
+export function getAudioWatermarkNotice(): string {
+  return "This audio was created with DreamForgeX. Upgrade to Pro to remove this message.";
+}
+
+/**
+ * Get video watermark overlay CSS for client-side rendering.
+ * Free-tier videos get a persistent corner watermark.
+ */
+export function getVideoWatermarkStyle(): {
+  text: string;
+  position: string;
+  opacity: number;
+} {
+  return {
+    text: WATERMARK_TEXT,
+    position: "bottom-right",
+    opacity: WATERMARK_OPACITY,
+  };
+}
+
+/**
  * Check if a user's tier requires watermarking.
  */
 export function requiresWatermark(userTier: string): boolean {

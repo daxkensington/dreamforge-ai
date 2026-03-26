@@ -46,75 +46,60 @@ export const LEGACY_CREDIT_COSTS: Record<string, number> = {
 export const SUBSCRIPTION_PLANS = [
   {
     name: "free",
-    displayName: "Free",
+    displayName: "Explorer",
     price: 0,
-    monthlyCredits: 1500,
+    monthlyCredits: 0, // daily credits instead (100/day)
     features: [
-      "1,500 credits/month",
-      "Basic image generation",
-      "Community gallery access",
-      "Standard queue priority",
-    ],
-  },
-  {
-    name: "creator",
-    displayName: "Creator",
-    price: 1200, // $12/mo
-    monthlyCredits: 30000,
-    features: [
-      "30,000 credits/month",
-      "HD image generation",
-      "Video generation (up to 10s)",
-      "Priority queue",
-      "Brand kit (1)",
-      "API access (100 req/hr)",
+      "100 images/day (free models)",
+      "5 songs/day (watermarked)",
+      "3 videos/day (480p, watermarked)",
+      "All 63+ tools with limits",
+      "Non-commercial use only",
     ],
   },
   {
     name: "pro",
     displayName: "Pro",
-    price: 3500, // $35/mo
-    monthlyCredits: 150000,
+    price: 1200, // $12/mo
+    monthlyCredits: 5000,
     features: [
-      "150,000 credits/month",
-      "Ultra HD generation",
-      "Video generation (up to 30s)",
-      "Highest queue priority",
-      "Brand kits (5)",
-      "API access (500 req/hr)",
-      "Batch generation",
-      "Character consistency",
+      "5,000 credits/month",
+      "No watermarks",
+      "Commercial use rights",
+      "All 20 AI models",
+      "HD exports (2048px / 1080p)",
+      "100 songs/month",
+      "Priority queue",
     ],
   },
   {
     name: "studio",
     displayName: "Studio",
-    price: 7500, // $75/mo
-    monthlyCredits: 450000,
+    price: 2900, // $29/mo
+    monthlyCredits: 15000,
     features: [
-      "450,000 credits/month",
+      "15,000 credits/month",
       "Everything in Pro",
-      "Unlimited brand kits",
-      "API access (2000 req/hr)",
-      "Team collaboration (5 seats)",
-      "Priority support",
-      "Custom model fine-tuning",
+      "4K video exports",
+      "Unlimited music videos",
+      "Song stems + MIDI export",
+      "Marketplace selling (85%)",
+      "5 brand kits",
     ],
   },
   {
     name: "enterprise",
     displayName: "Enterprise",
-    price: 0, // custom pricing
-    monthlyCredits: 0, // custom
+    price: 7900, // $79/mo
+    monthlyCredits: 50000,
     features: [
-      "Custom credit allocation",
+      "50,000 credits/month",
       "Everything in Studio",
-      "Unlimited team seats",
+      "API access (2,000 req/hr)",
+      "5 team seats",
+      "White-label exports",
+      "Unlimited brand kits",
       "Dedicated support",
-      "SLA guarantee",
-      "Custom API limits",
-      "On-premise option",
-      "Custom model training",
     ],
   },
 ] as const;
