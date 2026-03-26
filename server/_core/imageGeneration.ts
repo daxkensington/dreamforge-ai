@@ -25,6 +25,8 @@ export type GenerateImageOptions = {
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd";
   style?: "natural" | "vivid";
+  /** User tier — free tier gets watermarked output */
+  userTier?: string;
   originalImages?: Array<{
     url?: string;
     b64Json?: string;
@@ -407,6 +409,12 @@ export async function generateImage(
   } else {
     // Auto mode: try providers in priority order with fallback
     imageBuffer = await generateWithFallback(prompt, size, quality, style);
+  }
+
+  // Apply watermark for free-tier users
+  if (!options.userTier || options.userTier === "free") {
+    const { addImageWatermark } = await import("./watermark");
+    imageBuffer = await addImageWatermark(imageBuffer);
   }
 
   // Save to R2 storage
