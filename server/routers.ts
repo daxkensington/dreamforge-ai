@@ -3029,9 +3029,6 @@ export const appRouter = router({
         }
 
         try {
-          const geminiKey = process.env.GEMINI_API_KEY;
-          if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
-
           const styleEnhancers: Record<string, string> = {
             "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
             "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
@@ -3044,59 +3041,12 @@ export const appRouter = router({
           };
 
           const enhancedPrompt = `${input.prompt}. ${styleEnhancers[input.style]}. High quality, professional production.`;
-
-          // Start async Veo 2 generation
-          const startResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                instances: [{ prompt: enhancedPrompt }],
-                parameters: {
-                  aspectRatio: input.aspectRatio,
-                  durationSeconds: parseInt(input.duration),
-                  sampleCount: 1,
-                },
-              }),
-            }
-          );
-
-          if (!startResponse.ok) {
-            const err = await startResponse.text();
-            throw new Error(`Veo 3 failed to start: ${err}`);
-          }
-
-          const operation = await startResponse.json();
-          const operationName = operation.name;
-          if (!operationName) throw new Error("No operation name returned from Veo 3");
-
-          // Poll for completion (up to 5 minutes)
-          let videoUrl: string | null = null;
-          for (let i = 0; i < 60; i++) {
-            await new Promise((r) => setTimeout(r, 5000));
-
-            const pollResponse = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
-            );
-            const pollResult = await pollResponse.json();
-
-            if (pollResult.done) {
-              const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
-              if (videos && videos.length > 0) {
-                videoUrl = videos[0].video?.uri || videos[0].bytesBase64Encoded
-                  ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
-                  : null;
-              }
-              break;
-            }
-
-            if (pollResult.error) {
-              throw new Error(`Veo 2 error: ${pollResult.error.message || JSON.stringify(pollResult.error)}`);
-            }
-          }
-
-          if (!videoUrl) throw new Error("Video generation timed out or produced no output");
+          const { generateVeo3Video } = await import("./_core/videoGeneration");
+          const videoUrl = await generateVeo3Video({
+            prompt: enhancedPrompt,
+            aspectRatio: input.aspectRatio,
+            durationSeconds: parseInt(input.duration),
+          });
 
           return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
         } catch (error: any) {
@@ -3117,8 +3067,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
         try {
-          const geminiKey = process.env.GEMINI_API_KEY;
-          if (!geminiKey) throw new Error("Gemini API key not configured");
+
 
           const motionDescriptions: Record<string, string> = {
             "subtle": "very subtle gentle motion, slight parallax, breathing effect",
@@ -3138,55 +3087,13 @@ export const appRouter = router({
           const mimeType = imgResponse.headers.get("content-type") || "image/jpeg";
 
           const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
-
-          const startResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                instances: [{
-                  prompt: enhancedPrompt,
-                  image: { bytesBase64Encoded: imgBase64, mimeType },
-                }],
-                parameters: {
-                  durationSeconds: parseInt(input.duration),
-                  sampleCount: 1,
-                },
-              }),
-            }
-          );
-
-          if (!startResponse.ok) {
-            const err = await startResponse.text();
-            throw new Error(`Veo 2 image-to-video failed: ${err}`);
-          }
-
-          const operation = await startResponse.json();
-          const operationName = operation.name;
-          if (!operationName) throw new Error("No operation name returned");
-
-          let videoUrl: string | null = null;
-          for (let i = 0; i < 60; i++) {
-            await new Promise((r) => setTimeout(r, 5000));
-            const pollResponse = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
-            );
-            const pollResult = await pollResponse.json();
-
-            if (pollResult.done) {
-              const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
-              if (videos && videos.length > 0) {
-                videoUrl = videos[0].video?.uri || (videos[0].bytesBase64Encoded
-                  ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
-                  : null);
-              }
-              break;
-            }
-            if (pollResult.error) throw new Error(`Veo 2 error: ${pollResult.error.message}`);
-          }
-
-          if (!videoUrl) throw new Error("Video generation timed out");
+          const { generateVeo3Video } = await import("./_core/videoGeneration");
+          const videoUrl = await generateVeo3Video({
+            prompt: enhancedPrompt,
+            durationSeconds: parseInt(input.duration),
+            imageBase64: imgBase64,
+            imageMimeType: mimeType,
+          });
 
           return { videoUrl, status: "completed" as const, duration: input.duration };
         } catch (error: any) {
@@ -3741,58 +3648,12 @@ export const appRouter = router({
           ? `Music video scene: ${input.concept}. Style: ${input.style}. The subject from the reference photo should appear prominently. Cinematic, high production value, synced to music.`
           : `Music video scene: ${input.concept}. Style: ${input.style}. Cinematic, high production value, visually stunning, synced to music.`;
 
-        // Use Veo 3 for video generation
-        const geminiKey = process.env.GEMINI_API_KEY;
-        if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
-
-        const startResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              instances: [{ prompt: scenePrompt }],
-              parameters: {
-                aspectRatio: input.aspectRatio,
-                durationSeconds: 8,
-                sampleCount: 1,
-              },
-            }),
-          }
-        );
-
-        if (!startResponse.ok) {
-          const err = await startResponse.text();
-          throw new Error(`Video generation failed: ${err}`);
-        }
-
-        const operation = await startResponse.json();
-        const operationName = operation.name;
-        if (!operationName) throw new Error("No operation name returned");
-
-        // Poll for completion
-        let videoUrl: string | null = null;
-        for (let i = 0; i < 60; i++) {
-          await new Promise((r) => setTimeout(r, 5000));
-          const pollResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${geminiKey}`
-          );
-          const pollResult = await pollResponse.json();
-          if (pollResult.done) {
-            const videos = pollResult.response?.generatedSamples || pollResult.response?.predictions;
-            if (videos && videos.length > 0) {
-              videoUrl = videos[0].video?.uri || (videos[0].bytesBase64Encoded
-                ? `data:video/mp4;base64,${videos[0].bytesBase64Encoded}`
-                : null);
-            }
-            break;
-          }
-          if (pollResult.error) {
-            throw new Error(`Video error: ${pollResult.error.message || JSON.stringify(pollResult.error)}`);
-          }
-        }
-
-        if (!videoUrl) throw new Error("Music video generation timed out");
+        const { generateVeo3Video } = await import("./_core/videoGeneration");
+        const videoUrl = await generateVeo3Video({
+          prompt: scenePrompt,
+          aspectRatio: input.aspectRatio,
+          durationSeconds: 8,
+        });
 
         return {
           videoUrl,

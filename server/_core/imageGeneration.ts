@@ -19,6 +19,7 @@
 import { storagePut, generateStorageKey } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
+import { replicatePredict, downloadBuffer } from "./replicate";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -180,7 +181,6 @@ async function generateWithGemini(prompt: string): Promise<Buffer> {
 
 /**
  * Generate image via Replicate — Flux Pro or Flux Schnell.
- * Uses the predictions API with polling for completion.
  */
 async function generateWithFlux(
   prompt: string,
@@ -197,47 +197,14 @@ async function generateWithFlux(
   if (width) input.width = width;
   if (height) input.height = height;
 
-  const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ENV.replicateApiToken}`,
-      Prefer: "wait",
-    },
-    body: JSON.stringify({ model: modelMap[model], input }),
+  const outputUrl = await replicatePredict({
+    model: modelMap[model],
+    input,
+    maxAttempts: 60,
+    pollInterval: 2000,
   });
 
-  if (!createResponse.ok) {
-    const detail = await createResponse.text().catch(() => "");
-    throw new Error(`Flux ${model} failed (${createResponse.status}): ${detail}`);
-  }
-
-  const prediction = (await createResponse.json()) as any;
-
-  // If "Prefer: wait" worked, output is ready
-  let outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-
-  // Otherwise poll for result
-  if (!outputUrl && prediction.status !== "failed" && prediction.urls?.get) {
-    for (let i = 0; i < 60; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const poll = await fetch(prediction.urls.get, {
-        headers: { Authorization: `Bearer ${ENV.replicateApiToken}` },
-      });
-      const data = (await poll.json()) as any;
-      if (data.status === "succeeded" && data.output) {
-        outputUrl = Array.isArray(data.output) ? data.output[0] : data.output;
-        break;
-      }
-      if (data.status === "failed") throw new Error(`Flux prediction failed: ${data.error}`);
-    }
-  }
-
-  if (!outputUrl) throw new Error("Flux returned no output");
-
-  const imageResp = await fetch(outputUrl);
-  if (!imageResp.ok) throw new Error(`Failed to download Flux image: ${imageResp.status}`);
-  return Buffer.from(await imageResp.arrayBuffer());
+  return downloadBuffer(outputUrl);
 }
 
 /**

@@ -10,6 +10,7 @@
 import { storagePut } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
+import { replicatePredict, downloadBuffer } from "./replicate";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -140,66 +141,25 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
 
   const referenceAudio = `${genreStyle}, ${tempoDesc}, ${vocalDesc}, ${request.mood} mood. ${request.instrumentStyle || ""}`.trim();
 
-  // Call MiniMax Music 2.5 on Replicate
-  const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ENV.replicateApiToken}`,
-      Prefer: "wait",
+  // Generate via MiniMax Music 2.5 on Replicate (shared utility handles polling)
+  const outputUrl = await replicatePredict({
+    model: "minimax/music-2.5",
+    input: {
+      lyrics: request.lyrics,
+      reference_audio_text: referenceAudio,
     },
-    body: JSON.stringify({
-      model: "minimax/music-2.5",
-      input: {
-        lyrics: request.lyrics,
-        reference_audio_text: referenceAudio,
-      },
-    }),
+    maxAttempts: 120,
+    pollInterval: 3000,
   });
 
-  if (!createResponse.ok) {
-    const detail = await createResponse.text().catch(() => "");
-    throw new Error(`MiniMax Music failed (${createResponse.status}): ${detail}`);
-  }
-
-  const prediction = (await createResponse.json()) as any;
-
-  // Get the output URL (may need polling)
-  let outputUrl = prediction.output;
-  if (Array.isArray(outputUrl)) outputUrl = outputUrl[0];
-
-  if (!outputUrl && prediction.status !== "failed" && prediction.urls?.get) {
-    // Poll for completion
-    for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const poll = await fetch(prediction.urls.get, {
-        headers: { Authorization: `Bearer ${ENV.replicateApiToken}` },
-      });
-      const data = (await poll.json()) as any;
-      if (data.status === "succeeded" && data.output) {
-        outputUrl = Array.isArray(data.output) ? data.output[0] : data.output;
-        break;
-      }
-      if (data.status === "failed") {
-        throw new Error(`Song generation failed: ${data.error || "Unknown error"}`);
-      }
-    }
-  }
-
-  if (!outputUrl) throw new Error("Song generation returned no output");
-
   // Download and store to R2
-  const downloadResp = await fetch(outputUrl);
-  if (!downloadResp.ok) throw new Error("Failed to download generated song");
-
-  const buffer = Buffer.from(await downloadResp.arrayBuffer());
-  const contentType = downloadResp.headers.get("content-type") || "audio/mpeg";
-  const ext = contentType.includes("wav") ? "wav" : "mp3";
+  const buffer = await downloadBuffer(outputUrl);
+  const ext = "mp3";
 
   const { url } = await storagePut(
     `songs/song_${Date.now()}.${ext}`,
     buffer,
-    contentType,
+    "audio/mpeg",
   );
 
   return {
