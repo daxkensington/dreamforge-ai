@@ -74,15 +74,15 @@ const creativeTools: GridTool[] = [
 const videoTools: GridTool[] = [
   { title: "Text-to-Video", desc: "Generate video from text prompts", icon: Video, href: "/tools/text-to-video", img: "/showcase/tool-t2v.jpg" },
   { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg" },
-  { title: "Music Video Studio", desc: "Create AI music videos from your photo", icon: Film, href: "/tools/music-video", img: "/showcase/tool-video.jpg", badge: "New" },
-  { title: "Social Templates", desc: "TikTok, Reels & Shorts templates", icon: Smartphone, href: "/tools/social-templates", img: "/showcase/tool-social.jpg", badge: "New" },
-  { title: "Viral Clip Maker", desc: "AI picks best moments for clips", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-thumbnail.jpg", badge: "New" },
+  { title: "Music Video Studio", desc: "Create AI music videos from your photo", icon: Film, href: "/tools/music-video", img: "/showcase/tool-music-video.jpg", badge: "New" },
+  { title: "Social Templates", desc: "TikTok, Reels & Shorts templates", icon: Smartphone, href: "/tools/social-templates", img: "/showcase/tool-social-templates.jpg", badge: "New" },
+  { title: "Viral Clip Maker", desc: "AI picks best moments for clips", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-clip-maker.jpg", badge: "New" },
 ];
 
 // ─── Workflow Tools ──────────────────────────────────────────────────────────
 const workflowTools: GridTool[] = [
-  { title: "Image Templates", desc: "25+ templates: posts, ads, cards, flyers", icon: LayoutGrid, href: "/tools/templates", img: "/showcase/tool-mockup.jpg", badge: "Hot" },
-  { title: "AI Presentations", desc: "Full slide decks from a description", icon: Layers, href: "/tools/presentations", img: "/showcase/tool-batch.jpg", badge: "Hot" },
+  { title: "Image Templates", desc: "25+ templates: posts, ads, cards, flyers", icon: LayoutGrid, href: "/tools/templates", img: "/showcase/tool-image-templates.jpg", badge: "Hot" },
+  { title: "AI Presentations", desc: "Full slide decks from a description", icon: Layers, href: "/tools/presentations", img: "/showcase/tool-presentations.jpg", badge: "Hot" },
   { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg" },
   { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg" },
 ];
@@ -93,14 +93,14 @@ const utilityTools: GridTool[] = [
   { title: "Color Palette", desc: "Extract colors and harmonies", icon: Pipette, href: "/tools/color-palette", img: "/showcase/tool-palette.jpg" },
   { title: "Image-to-Prompt", desc: "Reverse-engineer any image's prompt", icon: FileText, href: "/tools/image-to-prompt", img: "/showcase/tool-img2prompt.jpg" },
   { title: "Image Caption", desc: "Alt text, social captions, SEO", icon: FileText, href: "/tools/image-caption", img: "/showcase/tool-caption.jpg" },
-  { title: "Ad Copy Generator", desc: "Google, Facebook, TikTok ad copy", icon: FileText, href: "/tools/ad-copy", img: "/showcase/tool-promptbuild.jpg", badge: "Hot" },
-  { title: "Blog Writer", desc: "Full SEO blog posts with AI", icon: FileText, href: "/tools/blog-writer", img: "/showcase/tool-caption.jpg", badge: "Hot" },
-  { title: "Caption Writer", desc: "Platform-perfect captions + hashtags", icon: FileText, href: "/tools/caption-writer", img: "/showcase/tool-caption.jpg", badge: "Hot" },
+  { title: "Ad Copy Generator", desc: "Google, Facebook, TikTok ad copy", icon: FileText, href: "/tools/ad-copy", img: "/showcase/tool-adcopy.jpg", badge: "Hot" },
+  { title: "Blog Writer", desc: "Full SEO blog posts with AI", icon: FileText, href: "/tools/blog-writer", img: "/showcase/tool-blog.jpg", badge: "Hot" },
+  { title: "Caption Writer", desc: "Platform-perfect captions + hashtags", icon: FileText, href: "/tools/caption-writer", img: "/showcase/tool-captions.jpg", badge: "Hot" },
 ];
 
 // ─── Audio Tools ─────────────────────────────────────────────────────────────
 const audioTools: GridTool[] = [
-  { title: "AI Song Creator", desc: "Full songs with vocals from a concept", icon: Music, href: "/tools/song-creator", img: "/showcase/tool-music.jpg", badge: "Hot" },
+  { title: "AI Song Creator", desc: "Full songs with vocals from a concept", icon: Music, href: "/tools/song-creator", img: "/showcase/tool-songcreator.jpg", badge: "Hot" },
   { title: "AI Music Composer", desc: "Generate instrumentals & scores", icon: Music, href: "/tools/music-gen", img: "/showcase/tool-audio.jpg" },
   { title: "Text-to-Speech", desc: "Natural AI voiceovers", icon: Mic, href: "/tools/text-to-speech", img: "/showcase/tool-tts.jpg" },
   { title: "Audio Enhancer", desc: "Professional audio cleanup", icon: AudioLines, href: "/tools/audio-enhance", img: "/showcase/tool-audio-enhance.jpg" },

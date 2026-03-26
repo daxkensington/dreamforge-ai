@@ -30,6 +30,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "image-to-video", "batch-prompts", "social-resize", "prompt-builder",
     "color-palette", "image-to-prompt", "image-caption", "music-gen",
     "text-to-speech", "audio-enhance", "sound-effects",
+    "song-creator", "music-video", "social-templates", "clip-maker",
+    "presentations", "templates", "ad-copy", "blog-writer", "caption-writer",
   ].map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,
