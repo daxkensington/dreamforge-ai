@@ -1913,36 +1913,48 @@ export const appRouter = router({
           text: z.string().min(1).max(5000),
           voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).default("alloy"),
           speed: z.number().min(0.25).max(4.0).default(1.0),
-          model: z.enum(["tts-1", "tts-1-hd"]).default("tts-1-hd"),
+          model: z.enum(["tts-1", "tts-1-hd", "edge-tts"]).default("edge-tts"),
         })
       )
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "text-to-speech", "Text-to-speech");
         try {
-          const openaiKey = process.env.OPENAI_API_KEY;
-          if (!openaiKey) throw new Error("OpenAI API key not configured");
+          let audioBuffer: Buffer;
 
-          const response = await fetch("https://api.openai.com/v1/audio/speech", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${openaiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: input.model,
-              input: input.text,
-              voice: input.voice,
-              speed: input.speed,
-              response_format: "mp3",
-            }),
-          });
-
-          if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`TTS failed: ${err}`);
+          // Try Edge TTS first (free, unlimited)
+          if (input.model === "edge-tts" || !process.env.OPENAI_API_KEY) {
+            const edgeVoiceMap: Record<string, string> = {
+              alloy: "en-US-AriaNeural",
+              echo: "en-US-GuyNeural",
+              fable: "en-GB-SoniaNeural",
+              onyx: "en-US-ChristopherNeural",
+              nova: "en-US-JennyNeural",
+              shimmer: "en-AU-NatashaNeural",
+            };
+            const { EdgeTTS } = await import("edge-tts-universal");
+            const tts = new EdgeTTS();
+            await tts.synthesize(input.text, edgeVoiceMap[input.voice] || "en-US-AriaNeural", { rate: `${Math.round((input.speed - 1) * 100)}%` });
+            audioBuffer = Buffer.from(await tts.toBuffer());
+          } else {
+            // Fallback to OpenAI TTS (paid)
+            const response = await fetch("https://api.openai.com/v1/audio/speech", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: input.model,
+                input: input.text,
+                voice: input.voice,
+                speed: input.speed,
+                response_format: "mp3",
+              }),
+            });
+            if (!response.ok) throw new Error(`OpenAI TTS failed: ${await response.text()}`);
+            audioBuffer = Buffer.from(await response.arrayBuffer());
           }
 
-          const audioBuffer = Buffer.from(await response.arrayBuffer());
           const base64Audio = audioBuffer.toString("base64");
           const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
 

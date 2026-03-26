@@ -74,7 +74,7 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
-  provider?: "openai" | "anthropic" | "gemini" | "grok";
+  provider?: "groq" | "openai" | "anthropic" | "gemini" | "grok";
   /** When true, automatically falls back to next provider on failure. Default: false. */
   autoFallback?: boolean;
   /** Temperature for generation (0-2). Default: provider default. */
@@ -192,6 +192,18 @@ const PROVIDER_DEFINITIONS: Array<{
   name: string;
   config: () => ProviderConfig | null;
 }> = [
+  {
+    name: "groq",
+    config: () =>
+      ENV.groqApiKey
+        ? {
+            name: "groq",
+            url: "https://api.groq.com/openai/v1/chat/completions",
+            key: ENV.groqApiKey,
+            model: "llama-3.3-70b-versatile",
+          }
+        : null,
+  },
   {
     name: "openai",
     config: () =>

@@ -11,7 +11,7 @@ import { ENV } from "./env";
 export interface AIModel {
   id: string;
   name: string;
-  provider: "grok" | "openai" | "gemini" | "anthropic" | "replicate" | "stability" | "runpod" | "local";
+  provider: "grok" | "openai" | "gemini" | "anthropic" | "replicate" | "stability" | "groq" | "together" | "cloudflare" | "runpod" | "local";
   type: "image" | "llm" | "video" | "audio";
   capabilities: string[];
   maxResolution: { width: number; height: number };
@@ -277,6 +277,72 @@ function openaiTTS(): AIModel {
   };
 }
 
+// ─── Free Providers ─────────────────────────────────────────────────────────
+
+function groqLlm(): AIModel {
+  return {
+    id: "groq-llama-70b",
+    name: "Llama 3.3 70B (Groq)",
+    provider: "groq",
+    type: "llm",
+    capabilities: ["chat", "json-mode", "prompt-enhancement"],
+    maxResolution: { width: 0, height: 0 },
+    creditCost: { base: 0 },
+    isAvailable: !!ENV.groqApiKey,
+    tier: "free",
+    description: "Groq Llama 3.3 70B — blazing fast free LLM inference.",
+    costInfo: "Free (1,000 req/day)",
+  };
+}
+
+function togetherFlux(): AIModel {
+  return {
+    id: "together-flux",
+    name: "Flux Schnell (Together AI)",
+    provider: "together",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1024, height: 1024 },
+    creditCost: { base: 0 },
+    isAvailable: !!ENV.togetherApiKey,
+    tier: "free",
+    description: "Together AI Flux Schnell — free high-quality image generation.",
+    costInfo: "Free for 3 months",
+  };
+}
+
+function cloudflareImage(): AIModel {
+  return {
+    id: "cf-flux-schnell",
+    name: "Flux Schnell (Cloudflare)",
+    provider: "cloudflare",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1024, height: 1024 },
+    creditCost: { base: 0 },
+    isAvailable: !!ENV.cfAiToken,
+    tier: "free",
+    description: "Cloudflare Workers AI — 100K free images per day.",
+    costInfo: "Free (100K/day)",
+  };
+}
+
+function edgeTts(): AIModel {
+  return {
+    id: "edge-tts",
+    name: "Edge TTS",
+    provider: "local",
+    type: "audio",
+    capabilities: ["text-to-speech"],
+    maxResolution: { width: 0, height: 0 },
+    creditCost: { base: 0 },
+    isAvailable: true,
+    tier: "free",
+    description: "Microsoft Edge TTS — free unlimited text-to-speech with 400+ voices.",
+    costInfo: "Free (unlimited)",
+  };
+}
+
 // ─── RunPod / Self-Hosted (future) ─────────────────────────────────────────
 // Add entries here and create a RunPodProvider adapter when ready.
 
@@ -296,10 +362,15 @@ function buildModelList(): AIModel[] {
     veo3Video(),
     minimaxVideo(),
     stableVideo(),
+    // Free image models
+    togetherFlux(),
+    cloudflareImage(),
     // Audio models
+    edgeTts(),
     openaiTTS(),
     musicGen(),
     // LLM models
+    groqLlm(),
     gpt4oMini(),
     grok3Mini(),
     geminiFlash(),

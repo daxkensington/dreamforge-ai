@@ -15,9 +15,13 @@ export const ENV = {
   get stabilityApiKey() { return process.env.STABILITY_API_KEY ?? ""; },
   get replicateApiToken() { return process.env.REPLICATE_API_TOKEN ?? ""; },
   // AI Providers
+  get groqApiKey() { return process.env.GROQ_API_KEY ?? ""; },
+  get togetherApiKey() { return process.env.TOGETHER_API_KEY ?? ""; },
   get grokApiKey() { return process.env.GROK_API_KEY ?? ""; },
   get anthropicApiKey() { return process.env.ANTHROPIC_API_KEY ?? ""; },
   get geminiApiKey() { return process.env.GEMINI_API_KEY ?? ""; },
+  get cfAccountId() { return process.env.CF_ACCOUNT_ID ?? process.env.R2_ACCOUNT_ID ?? ""; },
+  get cfAiToken() { return process.env.CF_AI_TOKEN ?? ""; },
   get r2AccountId() { return process.env.R2_ACCOUNT_ID ?? ""; },
   get r2AccessKeyId() { return process.env.R2_ACCESS_KEY_ID ?? ""; },
   get r2SecretAccessKey() { return process.env.R2_SECRET_ACCESS_KEY ?? ""; },

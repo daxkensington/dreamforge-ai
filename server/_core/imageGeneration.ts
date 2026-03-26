@@ -1,12 +1,10 @@
 /**
  * Image generation with multi-provider fallback.
  *
- * Provider priority (auto mode):
- *   1. Grok (xAI) — grok-2-image / grok-imagine-image
- *   2. Flux Pro (Replicate) — black-forest-labs/flux-1.1-pro
- *   3. OpenAI — DALL-E 3
- *   4. Stability AI — SD3
- *   5. Gemini — gemini-2.0-flash-preview-image-generation
+ * Provider priority (auto mode, cost-optimized):
+ *   FREE:  1. Gemini  2. Together AI (Flux Schnell)  3. Cloudflare Workers AI
+ *   CHEAP: 4. Grok  5. Flux Schnell (Replicate)
+ *   PAID:  6. DALL-E 3  7. SD3  8. Flux Pro
  *
  * When originalImages are provided, uses LLM vision to analyze the source
  * image(s) first, then enriches the prompt with that description before
@@ -23,7 +21,7 @@ import { replicatePredict, downloadBuffer } from "./replicate";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "auto";
+  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd";
   style?: "natural" | "vivid";
@@ -243,6 +241,71 @@ async function generateWithSD3(
   return Buffer.from(b64, "base64");
 }
 
+/**
+ * Generate image via Together AI — Flux Schnell (free for 3 months).
+ */
+async function generateWithTogether(
+  prompt: string,
+  width?: number,
+  height?: number,
+): Promise<Buffer> {
+  const response = await fetch("https://api.together.xyz/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ENV.togetherApiKey}`,
+    },
+    body: JSON.stringify({
+      model: "black-forest-labs/FLUX.1-schnell-Free",
+      prompt,
+      width: width || 1024,
+      height: height || 1024,
+      steps: 4,
+      n: 1,
+      response_format: "b64_json",
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Together AI failed (${response.status}): ${detail}`);
+  }
+
+  const result = (await response.json()) as any;
+  const b64 = result.data?.[0]?.b64_json;
+  if (!b64) throw new Error("Together AI returned no image data");
+  return Buffer.from(b64, "base64");
+}
+
+/**
+ * Generate image via Cloudflare Workers AI (100K free/day).
+ */
+async function generateWithCloudflare(prompt: string): Promise<Buffer> {
+  const accountId = ENV.cfAccountId;
+  const token = ENV.cfAiToken;
+  if (!accountId || !token) throw new Error("Cloudflare AI not configured");
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Cloudflare AI failed (${response.status}): ${detail}`);
+  }
+
+  // Cloudflare returns raw image bytes
+  return Buffer.from(await response.arrayBuffer());
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /** Map arbitrary size string to closest DALL-E 3 preset. */
@@ -357,7 +420,7 @@ export async function generateImage(
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3",
+  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare",
   prompt: string,
   size: string,
   quality: "standard" | "hd",
@@ -384,14 +447,22 @@ async function generateWithExplicitModel(
     case "sd3":
       if (!ENV.stabilityApiKey) throw new Error("Stability API key not configured");
       return generateWithSD3(prompt, w, h);
+    case "together":
+      if (!ENV.togetherApiKey) throw new Error("Together AI API key not configured");
+      return generateWithTogether(prompt, w, h);
+    case "cloudflare":
+      if (!ENV.cfAiToken) throw new Error("Cloudflare AI token not configured");
+      return generateWithCloudflare(prompt);
     default:
       throw new Error(`Unknown image model: ${model}`);
   }
 }
 
 /**
- * Try providers in priority order: Grok -> Flux Pro -> DALL-E -> SD3 -> Gemini.
- * Each provider failure logs a warning and falls through to the next.
+ * Try providers in cost-optimized order: free first, then cheap, then premium.
+ *
+ * Priority: Gemini (free) -> Together AI (free) -> Cloudflare (free) ->
+ *           Grok -> Flux Schnell (cheap) -> DALL-E 3 -> SD3 -> Flux Pro
  */
 async function generateWithFallback(
   prompt: string,
@@ -402,65 +473,67 @@ async function generateWithFallback(
   const errors: string[] = [];
   const [w, h] = size.split("x").map(Number);
 
-  // 1. Try Grok (fastest, free tier)
-  if (ENV.grokApiKey) {
+  const tryProvider = async (name: string, fn: () => Promise<Buffer>): Promise<Buffer | null> => {
     try {
-      return await generateWithGrok(prompt, size);
+      return await fn();
     } catch (err: any) {
       const msg = err.message || "Unknown error";
-      console.warn("[ImageGen] Grok failed, trying next provider:", msg);
-      errors.push(`Grok: ${msg}`);
+      console.warn(`[ImageGen] ${name} failed, trying next:`, msg);
+      errors.push(`${name}: ${msg}`);
+      return null;
     }
-  }
+  };
 
-  // 2. Try Flux Pro (highest quality)
-  if (ENV.replicateApiToken) {
-    try {
-      return await generateWithFlux(prompt, "flux-pro", w, h);
-    } catch (err: any) {
-      const msg = err.message || "Unknown error";
-      console.warn("[ImageGen] Flux Pro failed, trying next provider:", msg);
-      errors.push(`Flux Pro: ${msg}`);
-    }
-  }
-
-  // 3. Try DALL-E 3
-  if (ENV.openaiApiKey) {
-    try {
-      return await generateWithDallE(prompt, size, quality, style);
-    } catch (err: any) {
-      const msg = err.message || "Unknown error";
-      console.warn("[ImageGen] DALL-E failed, trying next provider:", msg);
-      errors.push(`DALL-E: ${msg}`);
-    }
-  }
-
-  // 4. Try SD3
-  if (ENV.stabilityApiKey) {
-    try {
-      return await generateWithSD3(prompt, w, h);
-    } catch (err: any) {
-      const msg = err.message || "Unknown error";
-      console.warn("[ImageGen] SD3 failed, trying next provider:", msg);
-      errors.push(`SD3: ${msg}`);
-    }
-  }
-
-  // 5. Try Gemini (free fallback)
+  // 1. FREE TIER: Gemini (500 free images/day)
   if (ENV.geminiApiKey) {
-    try {
-      return await generateWithGemini(prompt);
-    } catch (err: any) {
-      const msg = err.message || "Unknown error";
-      console.warn("[ImageGen] Gemini failed, no more providers:", msg);
-      errors.push(`Gemini: ${msg}`);
-    }
+    const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
+    if (result) return result;
+  }
+
+  // 2. FREE TIER: Together AI Flux Schnell (free for 3 months)
+  if (ENV.togetherApiKey) {
+    const result = await tryProvider("Together AI", () => generateWithTogether(prompt, w, h));
+    if (result) return result;
+  }
+
+  // 3. FREE TIER: Cloudflare Workers AI (100K free/day)
+  if (ENV.cfAiToken) {
+    const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(prompt));
+    if (result) return result;
+  }
+
+  // 4. CHEAP: Grok
+  if (ENV.grokApiKey) {
+    const result = await tryProvider("Grok", () => generateWithGrok(prompt, size));
+    if (result) return result;
+  }
+
+  // 5. CHEAP: Flux Schnell via Replicate (~$0.003/image)
+  if (ENV.replicateApiToken) {
+    const result = await tryProvider("Flux Schnell", () => generateWithFlux(prompt, "flux-schnell", w, h));
+    if (result) return result;
+  }
+
+  // 6. PAID: DALL-E 3
+  if (ENV.openaiApiKey) {
+    const result = await tryProvider("DALL-E 3", () => generateWithDallE(prompt, size, quality, style));
+    if (result) return result;
+  }
+
+  // 7. PAID: SD3
+  if (ENV.stabilityApiKey) {
+    const result = await tryProvider("SD3", () => generateWithSD3(prompt, w, h));
+    if (result) return result;
+  }
+
+  // 8. PREMIUM: Flux Pro (highest quality, last resort)
+  if (ENV.replicateApiToken) {
+    const result = await tryProvider("Flux Pro", () => generateWithFlux(prompt, "flux-pro", w, h));
+    if (result) return result;
   }
 
   if (errors.length === 0) {
-    throw new Error(
-      "No image generation API key configured. Set GROK_API_KEY, REPLICATE_API_TOKEN, OPENAI_API_KEY, STABILITY_API_KEY, or GEMINI_API_KEY.",
-    );
+    throw new Error("No image generation API key configured.");
   }
 
   throw new Error(
