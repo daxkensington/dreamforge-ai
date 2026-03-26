@@ -99,13 +99,103 @@ const TEMPLATES = [
     aspect: "16:9",
     prompt: "Epic cinematic intro, dramatic music, lens flares, dark moody atmosphere, text reveal with particles, movie trailer quality",
   },
+  // ─── Business & Marketing ──────────────
+  { id: "startup-pitch", name: "Startup Pitch", desc: "60-second startup pitch video", icon: Zap, color: "from-blue-600 to-cyan-500", platform: "LinkedIn", aspect: "16:9", prompt: "Professional startup pitch video, clean office background, confident presenter, key metrics and growth charts, investor-ready" },
+  { id: "testimonial", name: "Customer Testimonial", desc: "Authentic customer review style", icon: MessageSquare, color: "from-emerald-500 to-green-500", platform: "Reels", aspect: "9:16", prompt: "Authentic customer testimonial, natural setting, genuine emotion, positive review, trust-building social proof" },
+  { id: "sale-announcement", name: "Flash Sale", desc: "Urgent limited-time offer promo", icon: Timer, color: "from-red-500 to-orange-500", platform: "Stories", aspect: "9:16", prompt: "Urgent flash sale announcement, bold countdown timer, exciting deal reveal, scarcity urgency, vibrant colors, call to action" },
+  { id: "brand-story", name: "Brand Story", desc: "Tell your brand origin story", icon: Film, color: "from-purple-600 to-indigo-500", platform: "YouTube", aspect: "16:9", prompt: "Emotional brand story video, founder journey, humble beginnings to success, cinematic storytelling, inspiring music" },
+  { id: "behind-scenes", name: "Behind the Scenes", desc: "Raw authentic workspace footage", icon: Camera, color: "from-amber-600 to-yellow-500", platform: "TikTok", aspect: "9:16", prompt: "Authentic behind the scenes, raw workspace footage, creative process revealed, casual authentic vibe" },
+  { id: "unboxing", name: "Unboxing", desc: "Satisfying product unboxing reveal", icon: ShoppingBag, color: "from-pink-500 to-rose-500", platform: "TikTok", aspect: "9:16", prompt: "Satisfying unboxing experience, premium packaging, slow reveal, ASMR-like quality, product details closeup" },
+  // ─── Food & Lifestyle ──────────────
+  { id: "recipe-reel", name: "Recipe Reel", desc: "Viral overhead cooking video", icon: Sparkles, color: "from-orange-500 to-amber-500", platform: "Reels", aspect: "9:16", prompt: "Overhead cooking video, ingredients laid out beautifully, step by step preparation, sizzling closeups, final plating reveal" },
+  { id: "restaurant-promo", name: "Restaurant Promo", desc: "Mouthwatering food showcase", icon: Camera, color: "from-red-600 to-orange-500", platform: "TikTok", aspect: "9:16", prompt: "Mouthwatering food showcase, steam rising from dishes, slow motion pours, restaurant ambiance, warm lighting" },
+  { id: "fitness-motivation", name: "Fitness Motivation", desc: "High-energy workout montage", icon: Zap, color: "from-green-500 to-emerald-500", platform: "Reels", aspect: "9:16", prompt: "High energy fitness montage, dramatic workout clips, sweat and determination, motivational, powerful music sync" },
+  { id: "morning-routine", name: "Morning Routine", desc: "Aesthetic daily routine vlog", icon: Timer, color: "from-sky-500 to-blue-400", platform: "TikTok", aspect: "9:16", prompt: "Aesthetic morning routine, golden hour lighting, minimalist home, healthy breakfast, calm productive vibes" },
+  // ─── Travel & Adventure ──────────────
+  { id: "travel-montage", name: "Travel Montage", desc: "Wanderlust adventure compilation", icon: Camera, color: "from-teal-500 to-cyan-500", platform: "Reels", aspect: "9:16", prompt: "Epic travel montage, stunning landscapes, adventure moments, drone aerials, golden hour, wanderlust" },
+  { id: "hotel-tour", name: "Hotel Tour", desc: "Luxury hotel room walkthrough", icon: Film, color: "from-amber-500 to-yellow-500", platform: "TikTok", aspect: "9:16", prompt: "Luxury hotel room tour, smooth walking camera, reveal each room, pool and amenities, premium vacation vibes" },
+  { id: "city-guide", name: "City Guide", desc: "Quick city highlights reel", icon: Sparkles, color: "from-indigo-500 to-violet-500", platform: "Reels", aspect: "9:16", prompt: "Fast-paced city guide, iconic landmarks, street food, nightlife, hidden gems, local culture, energetic editing" },
+  // ─── Real Estate ──────────────
+  { id: "property-tour", name: "Property Tour", desc: "Real estate walkthrough video", icon: Film, color: "from-emerald-600 to-teal-500", platform: "Reels", aspect: "9:16", prompt: "Professional property tour, smooth drone exterior, walking interior tour, spacious rooms, natural light, premium home" },
+  { id: "listing-ad", name: "Listing Ad", desc: "Quick property listing showcase", icon: ShoppingBag, color: "from-blue-600 to-indigo-500", platform: "Stories", aspect: "9:16", prompt: "Eye-catching property listing, key features highlighted, price reveal, modern home, call to action for viewing" },
+  // ─── Education ──────────────
+  { id: "explainer", name: "Explainer Video", desc: "Educational concept breakdown", icon: MessageSquare, color: "from-cyan-500 to-blue-500", platform: "YouTube Shorts", aspect: "9:16", prompt: "Engaging educational explainer, clear visual diagrams, step by step breakdown, animated graphics, easy to understand" },
+  { id: "study-tips", name: "Study Tips", desc: "Quick study hack video", icon: Sparkles, color: "from-violet-500 to-purple-500", platform: "TikTok", aspect: "9:16", prompt: "Quick study tips video, aesthetic desk setup, productivity hacks, note-taking closeups, motivational student life" },
+  // ─── Music & Entertainment ──────────────
+  { id: "album-promo", name: "Album Promo", desc: "New music release announcement", icon: Music, color: "from-fuchsia-500 to-pink-500", platform: "Reels", aspect: "9:16", prompt: "Dynamic album promo, cover art reveal, audio visualizer effects, artist silhouette, neon lighting, hype energy" },
+  { id: "concert-recap", name: "Concert Recap", desc: "Epic live performance highlights", icon: Music, color: "from-red-500 to-purple-500", platform: "TikTok", aspect: "9:16", prompt: "Epic concert recap, crowd energy, stage lighting, performer closeups, bass drops synced to cuts, festival vibes" },
+  { id: "lyric-video", name: "Lyrics Visualizer", desc: "Animated lyrics on screen", icon: Music, color: "from-blue-500 to-purple-500", platform: "YouTube", aspect: "16:9", prompt: "Stylized lyric video, animated text flowing on screen, atmospheric background, synced to beat, kinetic typography" },
+  // ─── Fashion & Beauty ──────────────
+  { id: "ootd", name: "OOTD", desc: "Outfit of the day showcase", icon: Sparkles, color: "from-pink-500 to-fuchsia-500", platform: "TikTok", aspect: "9:16", prompt: "Outfit of the day showcase, stylish transitions between looks, mirror selfie angles, street style, fashion forward" },
+  { id: "makeup-tutorial", name: "Makeup Tutorial", desc: "Beauty transformation timelapse", icon: Camera, color: "from-rose-500 to-pink-500", platform: "Reels", aspect: "9:16", prompt: "Makeup transformation timelapse, close up application shots, before and after reveal, beauty products, glam finish" },
+  { id: "haul", name: "Shopping Haul", desc: "Try-on haul with reactions", icon: ShoppingBag, color: "from-violet-500 to-fuchsia-500", platform: "TikTok", aspect: "9:16", prompt: "Shopping haul video, excited unboxing, try-on transitions, honest reactions, aesthetic flatlay shots" },
+  // ─── Gaming ──────────────
+  { id: "game-highlight", name: "Game Highlight", desc: "Epic gaming moment clip", icon: Zap, color: "from-green-500 to-cyan-500", platform: "YouTube Shorts", aspect: "9:16", prompt: "Epic gaming highlight clip, screen recording style, clutch play moment, reaction cam overlay, victory celebration" },
+  { id: "game-review", name: "Game Review", desc: "Quick game review format", icon: MessageSquare, color: "from-purple-500 to-indigo-500", platform: "TikTok", aspect: "9:16", prompt: "Quick game review, gameplay footage, pros and cons overlay, rating reveal, engaging commentary style" },
+  // ─── Seasonal & Holiday ──────────────
+  { id: "new-year", name: "New Year Countdown", desc: "NYE celebration video", icon: Timer, color: "from-yellow-500 to-amber-500", platform: "Reels", aspect: "9:16", prompt: "New Year countdown, fireworks, champagne toast, party atmosphere, glitter confetti, celebration energy, midnight" },
+  { id: "valentines", name: "Valentine's Day", desc: "Romantic love story video", icon: Sparkles, color: "from-red-500 to-pink-500", platform: "TikTok", aspect: "9:16", prompt: "Romantic Valentine's video, rose petals, candlelit dinner, love story montage, heartfelt moments, soft focus" },
+  { id: "halloween", name: "Halloween", desc: "Spooky transformation clip", icon: Zap, color: "from-orange-600 to-red-600", platform: "TikTok", aspect: "9:16", prompt: "Spooky Halloween transformation, costume reveal, eerie lighting, fog effects, jump scare ending, creative makeup" },
+  { id: "christmas", name: "Christmas", desc: "Festive holiday celebration", icon: Sparkles, color: "from-red-500 to-green-500", platform: "Reels", aspect: "9:16", prompt: "Festive Christmas video, decorating tree, cozy fireplace, gift unwrapping, snow falling, warm holiday atmosphere" },
+  // ─── Motivation & Quotes ──────────────
+  { id: "motivation-quote", name: "Motivation Quote", desc: "Inspirational quote with visuals", icon: Zap, color: "from-amber-500 to-red-500", platform: "Reels", aspect: "9:16", prompt: "Inspirational quote video, powerful typography, dramatic nature backdrop, motivational, cinematic slow motion" },
+  { id: "day-in-life", name: "Day in My Life", desc: "Lifestyle daily vlog format", icon: Camera, color: "from-sky-500 to-indigo-500", platform: "TikTok", aspect: "9:16", prompt: "Day in my life vlog, casual authentic moments, productive workflow, meals, evening wind down, aesthetic editing" },
+  // ─── Professional ──────────────
+  { id: "portfolio-reel", name: "Portfolio Reel", desc: "Creative work showcase", icon: Film, color: "from-slate-500 to-zinc-500", platform: "LinkedIn", aspect: "16:9", prompt: "Professional portfolio reel, best work samples, smooth transitions, clean typography, minimalist design, impressive" },
+  { id: "job-post", name: "We're Hiring", desc: "Job opening announcement", icon: MessageSquare, color: "from-blue-500 to-cyan-500", platform: "LinkedIn", aspect: "1:1", prompt: "Eye-catching job posting video, company culture shots, team moments, benefits highlights, modern office, apply now CTA" },
+  { id: "event-promo", name: "Event Promo", desc: "Upcoming event announcement", icon: Timer, color: "from-fuchsia-500 to-purple-500", platform: "Stories", aspect: "9:16", prompt: "Exciting event promo, date countdown, venue preview, speaker lineup, ticket urgency, vibrant energy" },
+  // ─── Pet & Animal ──────────────
+  { id: "pet-intro", name: "Meet My Pet", desc: "Adorable pet introduction", icon: Sparkles, color: "from-amber-500 to-orange-400", platform: "TikTok", aspect: "9:16", prompt: "Adorable pet introduction, cute close ups, playful moments, personality showcase, funny reactions, heartwarming" },
+  // ─── Tech & Product ──────────────
+  { id: "app-demo", name: "App Demo", desc: "Mobile app walkthrough", icon: Smartphone, color: "from-cyan-500 to-blue-600", platform: "YouTube Shorts", aspect: "9:16", prompt: "Sleek app demo, screen recording with hand, key features highlighted, smooth UI transitions, modern design" },
+  { id: "tech-review", name: "Tech Review", desc: "Quick gadget review", icon: Zap, color: "from-zinc-500 to-slate-500", platform: "YouTube Shorts", aspect: "9:16", prompt: "Quick tech review, product closeups, specs overlay, comparison shots, verdict reveal, clean minimal aesthetic" },
+  // ─── Meme & Viral ──────────────
+  { id: "meme-reaction", name: "Meme Reaction", desc: "Trending meme format video", icon: Sparkles, color: "from-yellow-500 to-green-500", platform: "TikTok", aspect: "9:16", prompt: "Viral meme format, unexpected twist ending, relatable scenario, comedic timing, trending sound sync" },
+  { id: "storytime", name: "Storytime", desc: "Dramatic personal story format", icon: MessageSquare, color: "from-purple-600 to-pink-500", platform: "TikTok", aspect: "9:16", prompt: "Dramatic storytime, engaging narrator, suspenseful pacing, emotional reveals, captivating hook opening" },
+  { id: "get-ready", name: "Get Ready With Me", desc: "GRWM preparation montage", icon: Camera, color: "from-pink-400 to-rose-500", platform: "TikTok", aspect: "9:16", prompt: "Get ready with me, morning prep routine, skincare to outfit, mirror shots, aesthetic transitions, chatty vibe" },
 ];
 
 export default function SocialTemplates() {
   const { user } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [customPrompt, setCustomPrompt] = useState("");
   const [resultUrl, setResultUrl] = useState("");
+
+  const categories = [
+    { value: "all", label: "All Templates" },
+    { value: "trending", label: "Trending" },
+    { value: "business", label: "Business" },
+    { value: "food", label: "Food & Lifestyle" },
+    { value: "travel", label: "Travel" },
+    { value: "realestate", label: "Real Estate" },
+    { value: "education", label: "Education" },
+    { value: "music", label: "Music" },
+    { value: "fashion", label: "Fashion" },
+    { value: "gaming", label: "Gaming" },
+    { value: "holiday", label: "Seasonal" },
+    { value: "professional", label: "Professional" },
+    { value: "viral", label: "Viral & Meme" },
+  ];
+
+  const categoryMap: Record<string, string[]> = {
+    trending: ["dance-trend", "before-after", "countdown", "tutorial-hook", "aesthetic-montage", "meme-reaction", "storytime", "get-ready"],
+    business: ["startup-pitch", "testimonial", "sale-announcement", "brand-story", "behind-scenes", "unboxing", "product-showcase"],
+    food: ["recipe-reel", "restaurant-promo", "fitness-motivation", "morning-routine"],
+    travel: ["travel-montage", "hotel-tour", "city-guide"],
+    realestate: ["property-tour", "listing-ad"],
+    education: ["explainer", "study-tips"],
+    music: ["album-promo", "concert-recap", "lyric-video"],
+    fashion: ["ootd", "makeup-tutorial", "haul"],
+    gaming: ["game-highlight", "game-review"],
+    holiday: ["new-year", "valentines", "halloween", "christmas"],
+    professional: ["portfolio-reel", "job-post", "event-promo", "talking-head", "cinematic-intro"],
+    viral: ["meme-reaction", "storytime", "get-ready", "day-in-life", "motivation-quote", "pet-intro"],
+  };
+
+  const filteredTemplates = selectedCategory === "all"
+    ? TEMPLATES
+    : TEMPLATES.filter((t) => categoryMap[selectedCategory]?.includes(t.id));
 
   const template = TEMPLATES.find((t) => t.id === selectedTemplate);
 
@@ -170,16 +260,34 @@ export default function SocialTemplates() {
             </span>
           </h1>
           <p className="text-muted-foreground max-w-md">
-            One-click video templates for TikTok, Instagram Reels, and YouTube Shorts. Pick a template, customize, generate.
+            50+ one-click video templates for TikTok, Reels, Shorts, LinkedIn, and more. Pick a category, customize, generate.
           </p>
         </div>
       </div>
 
       <div className="container py-8 max-w-6xl">
         {!selectedTemplate ? (
-          /* Template Grid */
+          <>
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {categories.map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => setSelectedCategory(cat.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  selectedCategory === cat.value
+                    ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30"
+                    : "bg-white/5 text-muted-foreground border border-white/10 hover:border-white/20"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">{filteredTemplates.length} templates</p>
+          {/* Template Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {TEMPLATES.map((t, i) => (
+            {filteredTemplates.map((t, i) => (
               <motion.div
                 key={t.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -206,6 +314,7 @@ export default function SocialTemplates() {
               </motion.div>
             ))}
           </div>
+          </>
         ) : (
           /* Template Editor */
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto space-y-6">

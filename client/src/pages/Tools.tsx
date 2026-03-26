@@ -81,8 +81,10 @@ const videoTools: GridTool[] = [
 
 // ─── Workflow Tools ──────────────────────────────────────────────────────────
 const workflowTools: GridTool[] = [
-  { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg", badge: "New" },
-  { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg", badge: "New" },
+  { title: "Image Templates", desc: "25+ templates: posts, ads, cards, flyers", icon: LayoutGrid, href: "/tools/templates", img: "/showcase/tool-mockup.jpg", badge: "Hot" },
+  { title: "AI Presentations", desc: "Full slide decks from a description", icon: Layers, href: "/tools/presentations", img: "/showcase/tool-batch.jpg", badge: "Hot" },
+  { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg" },
+  { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg" },
 ];
 
 // ─── AI Utility Tools ────────────────────────────────────────────────────────

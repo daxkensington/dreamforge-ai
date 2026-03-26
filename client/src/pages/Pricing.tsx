@@ -382,7 +382,7 @@ export default function Pricing() {
                             "5 songs / day (watermarked)",
                             "3 videos / day (480p, watermarked)",
                             "1 music video / day",
-                            "All 58+ tools (with limits)",
+                            "All 63+ tools (with limits)",
                             "Community gallery access",
                             "Non-commercial use only",
                           ]
@@ -553,7 +553,7 @@ export default function Pricing() {
               custom={1}
               className="text-muted-foreground max-w-lg mx-auto"
             >
-              Pro and Studio users get access to 4x upscaling, style transfer, and 58+ AI tools
+              Pro and Studio users get access to 4x upscaling, style transfer, and 63+ AI tools
             </motion.p>
           </div>
 
