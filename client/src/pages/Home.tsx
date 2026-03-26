@@ -168,11 +168,11 @@ const testimonials = [
 const statItems = [
   { label: "Images Created", target: 50000, suffix: "+" },
   { label: "Active Creators", target: 10000, suffix: "+" },
-  { label: "AI Tools", target: 53, suffix: "+" },
-  { label: "AI Models", target: 6, suffix: "" },
+  { label: "AI Tools", target: 58, suffix: "+" },
+  { label: "AI Models", target: 16, suffix: "" },
 ];
 
-const heroWords = ["Images", "Videos", "Music", "Logos", "Avatars", "Art"];
+const heroWords = ["Images", "Videos", "Songs", "Music Videos", "Logos", "Avatars", "Art"];
 
 /* ── Section divider component ── */
 function SectionDivider() {
@@ -341,7 +341,7 @@ export default function Home() {
               custom={2}
               className="text-lg md:text-xl text-white/60 mb-12 max-w-2xl mx-auto"
             >
-              The all-in-one AI creative studio. Images, video, audio, design — powered by 6 AI models.
+              The all-in-one AI creative studio. Images, video, songs, music videos — powered by 16 AI models.
             </motion.p>
 
             <motion.div
@@ -405,7 +405,7 @@ export default function Home() {
       <section className="py-6 overflow-hidden border-b border-white/5">
         <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by the world's best AI models</p>
         <div className="flex items-center justify-center gap-8 md:gap-12">
-          {["Grok (xAI)", "GPT-4o", "DALL-E 3", "Gemini 2.0", "Claude", "Google Veo 2"].map((model) => (
+          {["Grok (xAI)", "Flux Pro", "DALL-E 3", "SD3", "Gemini", "Veo 3", "Claude", "MiniMax Music"].map((model) => (
             <span key={model} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
               {model}
             </span>

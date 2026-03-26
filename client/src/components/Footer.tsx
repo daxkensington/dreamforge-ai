@@ -13,11 +13,11 @@ const footerLinks = {
   ],
   tools: [
     { label: "Text-to-Image", href: "/workspace" },
+    { label: "AI Song Creator", href: "/tools/song-creator" },
+    { label: "Music Video Studio", href: "/tools/music-video" },
     { label: "Text-to-Video", href: "/tools/text-to-video" },
-    { label: "Image-to-Video", href: "/tools/image-to-video" },
     { label: "AI Headshots", href: "/tools/headshot" },
     { label: "Logo Maker", href: "/tools/logo-maker" },
-    { label: "Interior Design", href: "/tools/interior-design" },
     { label: "All 58+ Tools", href: "/tools" },
   ],
   resources: [
@@ -42,7 +42,7 @@ const socialLinks = [
   { icon: Mail, href: "mailto:support@dreamforgex.ai", label: "Email" },
 ];
 
-const aiModels = ["Grok", "GPT-4o", "DALL-E 3", "Gemini", "Claude", "Veo 2"];
+const aiModels = ["Grok", "Flux Pro", "DALL-E 3", "SD3", "Gemini", "Veo 3", "Claude", "MiniMax Music"];
 
 const galleryStrip = [
   "/showcase/gallery-13.jpg", "/showcase/tool-avatar.jpg", "/showcase/gallery-14.jpg",

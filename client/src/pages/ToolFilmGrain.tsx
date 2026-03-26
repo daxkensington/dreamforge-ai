@@ -89,7 +89,7 @@ export default function ToolFilmGrain() {
       title="Film Grain & Effects"
       description="Apply authentic film grain and analog photography effects"
       icon={Film}
-      gradient="from-amber-600 to-yellow-500"
+      gradient="from-slate-500 to-zinc-400"
     >
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
