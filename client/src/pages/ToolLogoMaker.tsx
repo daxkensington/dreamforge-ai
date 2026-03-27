@@ -72,6 +72,15 @@ export default function ToolLogoMaker() {
   return (
     <ToolPageLayout title="AI Logo Maker" description="Generate professional logos for any brand" icon={Hexagon} gradient="from-violet-500 to-purple-400">
       <div className="max-w-5xl mx-auto">
+        {/* Example Logos Showcase */}
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example AI-generated logos:</p>
+          <div className="grid grid-cols-2 gap-3">
+            <img loading="lazy" src="/showcase/example-logo-1.jpg" alt="AI generated logo examples" className="w-full rounded-lg" />
+            <img loading="lazy" src="/showcase/example-logo-2.jpg" alt="AI generated logo mockups" className="w-full rounded-lg" />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

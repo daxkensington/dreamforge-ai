@@ -110,6 +110,8 @@ export default function Workspace() {
   const [seed, setSeed] = useState("");
   const [styleRef, setStyleRef] = useState("");
   const [aspectPreset, setAspectPreset] = useState("1:1");
+  const [variationStrength, setVariationStrength] = useState(50); // 0-100 slider
+  const [creativityLevel, setCreativityLevel] = useState(70); // for upscale/variation quality
   const [animateDialogOpen, setAnimateDialogOpen] = useState(false);
   const [animateGenId, setAnimateGenId] = useState<number | null>(null);
   const [animateDuration, setAnimateDuration] = useState(4);
@@ -585,6 +587,48 @@ export default function Workspace() {
                             <span className="text-[10px] text-muted-foreground">Style will be applied to generation</span>
                           </div>
                         )}
+                      </div>
+
+                      {/* Variation Strength */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                          <span>Variation Strength</span>
+                          <span className="text-[10px] font-mono">{variationStrength}%</span>
+                        </Label>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className="text-[10px] text-muted-foreground">Subtle</span>
+                          <Slider
+                            value={[variationStrength]}
+                            onValueChange={([v]) => setVariationStrength(v)}
+                            min={10}
+                            max={100}
+                            step={5}
+                            className="flex-1"
+                          />
+                          <span className="text-[10px] text-muted-foreground">Strong</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">Low = subtle tweaks. High = creative reimagination.</p>
+                      </div>
+
+                      {/* Creativity Level */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                          <span>Detail Creativity</span>
+                          <span className="text-[10px] font-mono">{creativityLevel}%</span>
+                        </Label>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className="text-[10px] text-muted-foreground">Faithful</span>
+                          <Slider
+                            value={[creativityLevel]}
+                            onValueChange={([v]) => setCreativityLevel(v)}
+                            min={0}
+                            max={100}
+                            step={5}
+                            className="flex-1"
+                          />
+                          <span className="text-[10px] text-muted-foreground">Creative</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">How much new detail the AI invents (Magnific-style).</p>
                       </div>
 
                       {/* Dimensions */}
