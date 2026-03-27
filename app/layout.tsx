@@ -25,6 +25,23 @@ export const metadata: Metadata = {
     images: ["/showcase/hero-forge.jpg"],
   },
   metadataBase: new URL("https://dreamforgex.ai"),
+  alternates: {
+    languages: {
+      "en": "https://dreamforgex.ai",
+      "es": "https://dreamforgex.ai",
+      "fr": "https://dreamforgex.ai",
+      "de": "https://dreamforgex.ai",
+      "pt": "https://dreamforgex.ai",
+      "zh": "https://dreamforgex.ai",
+      "ja": "https://dreamforgex.ai",
+      "ko": "https://dreamforgex.ai",
+      "ar": "https://dreamforgex.ai",
+      "hi": "https://dreamforgex.ai",
+      "ru": "https://dreamforgex.ai",
+      "tr": "https://dreamforgex.ai",
+      "it": "https://dreamforgex.ai",
+    },
+  },
   other: {
     "theme-color": "#7c3aed",
   },
@@ -38,7 +55,7 @@ const jsonLd = {
       name: "DreamForgeX",
       url: "https://dreamforgex.ai",
       logo: "https://dreamforgex.ai/logo.png",
-      description: "AI Creative Studio — 66+ tools for images, video, audio, songs, and design",
+      description: "AI Creative Studio — 68+ tools for images, video, audio, songs, and design",
       sameAs: ["https://github.com/daxkensington/dreamforge-ai"],
     },
     {
@@ -47,7 +64,7 @@ const jsonLd = {
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web",
       url: "https://dreamforgex.ai",
-      description: "All-in-one AI creative studio with 66+ tools for image generation, video creation, song production, and design",
+      description: "All-in-one AI creative studio with 68+ tools for image generation, video creation, song production, and design",
       offers: {
         "@type": "AggregateOffer",
         lowPrice: "0",

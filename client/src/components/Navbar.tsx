@@ -40,6 +40,7 @@ import {
   Music,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -414,6 +415,7 @@ export default function Navbar() {
               Sign in
             </Button>
           )}
+          <LanguageSwitcher />
 
           {/* Mobile menu toggle */}
           <button

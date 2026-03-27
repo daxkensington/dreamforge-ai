@@ -83,6 +83,8 @@ const videoTools: GridTool[] = [
 const workflowTools: GridTool[] = [
   { title: "Image Templates", desc: "25+ templates: posts, ads, cards, flyers", icon: LayoutGrid, href: "/tools/templates", img: "/showcase/tool-image-templates.jpg", badge: "Hot" },
   { title: "AI Presentations", desc: "Full slide decks from a description", icon: Layers, href: "/tools/presentations", img: "/showcase/tool-presentations.jpg", badge: "Hot" },
+  { title: "AI Resume Builder", desc: "Professional ATS-optimized resumes", icon: FileText, href: "/tools/resume-builder", img: "/showcase/tool-blog.jpg", badge: "Hot" },
+  { title: "Logo Animator", desc: "Animated video intros from your logo", icon: Film, href: "/tools/logo-animator", img: "/showcase/tool-music-video.jpg", badge: "Hot" },
   { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg" },
   { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg" },
 ];

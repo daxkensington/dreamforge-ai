@@ -121,7 +121,7 @@ export default function ApiDocs() {
             </div>
           </div>
           <p className="text-muted-foreground max-w-lg">
-            Integrate DreamForgeX's 66+ AI tools into your applications with our REST API. Generate images, videos, and more programmatically.
+            Integrate DreamForgeX's 68+ AI tools into your applications with our REST API. Generate images, videos, and more programmatically.
           </p>
           <div className="flex items-center gap-4 mt-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
