@@ -320,7 +320,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
             >
               <Sparkles className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-white/90">68+ AI Tools — One Platform</span>
+              <span className="text-sm font-medium text-white/90">71+ AI Tools — One Platform</span>
             </motion.div>
 
             <motion.h1

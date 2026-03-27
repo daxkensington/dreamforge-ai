@@ -21,9 +21,9 @@ import { replicatePredict, downloadBuffer } from "./replicate";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "auto";
+  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
-  quality?: "standard" | "hd";
+  quality?: "standard" | "hd" | "ultra";
   style?: "natural" | "vivid";
   /** User tier — free tier gets watermarked output */
   userTier?: string;
@@ -105,7 +105,7 @@ async function generateWithGrok(
 async function generateWithDallE(
   prompt: string,
   size: string = "1024x1024",
-  quality: "standard" | "hd" = "standard",
+  quality: "standard" | "hd" | "ultra" = "standard",
   style: "natural" | "vivid" = "vivid",
 ): Promise<Buffer> {
   const validSize = resolveDallESize(size);
@@ -241,6 +241,57 @@ async function generateWithSD3(
   const b64 = result.image || result.artifacts?.[0]?.base64;
   if (!b64) throw new Error("SD3 returned no image data");
   return Buffer.from(b64, "base64");
+}
+
+/**
+ * DreamForgeX Ultra — flagship quality mode.
+ * Uses Flux Pro with enhanced prompt engineering to produce Midjourney-competitive images.
+ * Enhances the user's prompt with professional photography/art direction tokens.
+ */
+async function generateUltra(
+  prompt: string,
+  width?: number,
+  height?: number,
+): Promise<Buffer> {
+  // Step 1: Enhance the prompt with professional quality tokens
+  const qualityTokens = [
+    "masterpiece, best quality, highly detailed",
+    "professional photography, 8K resolution, sharp focus",
+    "cinematic lighting, volumetric light, ray tracing",
+    "detailed textures, natural skin tones, perfect composition",
+    "award-winning, editorial quality, hyperrealistic",
+  ].join(", ");
+
+  const enhancedPrompt = `${prompt}. ${qualityTokens}`;
+
+  // Step 2: Try Flux Pro first (highest quality available)
+  if (ENV.replicateApiToken) {
+    try {
+      const outputUrl = await replicatePredict({
+        model: "black-forest-labs/flux-1.1-pro",
+        input: {
+          prompt: enhancedPrompt,
+          width: width || 1440,
+          height: height || 1440,
+          num_inference_steps: 50,
+          guidance_scale: 7.5,
+        },
+        maxAttempts: 90,
+        pollInterval: 2000,
+      });
+      return downloadBuffer(outputUrl);
+    } catch (err: any) {
+      console.warn("[Ultra] Flux Pro failed, trying DALL-E HD:", err.message);
+    }
+  }
+
+  // Step 3: Fallback to DALL-E 3 HD
+  if (ENV.openaiApiKey) {
+    return generateWithDallE(enhancedPrompt, "1024x1024", "hd", "vivid");
+  }
+
+  // Step 4: Last resort — best available model
+  return generateWithFallback(enhancedPrompt, `${width || 1024}x${height || 1024}`, "hd", "vivid");
 }
 
 /**
@@ -428,10 +479,10 @@ export async function generateImage(
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare",
+  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra",
   prompt: string,
   size: string,
-  quality: "standard" | "hd",
+  quality: "standard" | "hd" | "ultra",
   style: "natural" | "vivid",
 ): Promise<Buffer> {
   const [w, h] = size.split("x").map(Number);
@@ -461,6 +512,8 @@ async function generateWithExplicitModel(
     case "cloudflare":
       if (!ENV.cfAiToken) throw new Error("Cloudflare AI token not configured");
       return generateWithCloudflare(prompt);
+    case "ultra":
+      return generateUltra(prompt, w, h);
     default:
       throw new Error(`Unknown image model: ${model}`);
   }
@@ -475,7 +528,7 @@ async function generateWithExplicitModel(
 async function generateWithFallback(
   prompt: string,
   size: string,
-  quality: "standard" | "hd",
+  quality: "standard" | "hd" | "ultra",
   style: "natural" | "vivid",
 ): Promise<Buffer> {
   const errors: string[] = [];

@@ -55,6 +55,7 @@ import { StylePresets } from "@/components/StylePresets";
 
 const MODEL_OPTIONS = [
   // Image models
+  { value: "ultra", label: "DreamForgeX Ultra", desc: "Flagship quality — Midjourney-competitive output", types: ["image"], tier: "pro", badge: "Ultra" },
   { value: "auto", label: "Auto (Best Available)", desc: "Automatically picks the best model", types: ["image"], tier: "free", badge: "Recommended" },
   { value: "grok", label: "Grok Image Gen", desc: "Fast generation via xAI", types: ["image"], tier: "free" },
   { value: "flux-pro", label: "Flux 1.1 Pro", desc: "Highest quality, photorealistic", types: ["image"], tier: "creator", badge: "Premium" },

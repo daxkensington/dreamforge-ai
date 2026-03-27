@@ -85,6 +85,8 @@ const workflowTools: GridTool[] = [
   { title: "AI Presentations", desc: "Full slide decks from a description", icon: Layers, href: "/tools/presentations", img: "/showcase/tool-presentations.jpg", badge: "Hot" },
   { title: "AI Resume Builder", desc: "Professional ATS-optimized resumes", icon: FileText, href: "/tools/resume-builder", img: "/showcase/tool-blog.jpg", badge: "Hot" },
   { title: "Logo Animator", desc: "Animated video intros from your logo", icon: Film, href: "/tools/logo-animator", img: "/showcase/tool-music-video.jpg", badge: "Hot" },
+  { title: "AI Design Canvas", desc: "Drag-drop editor with AI elements", icon: LayoutGrid, href: "/tools/design-canvas", img: "/showcase/tool-canvas.jpg", badge: "New" },
+  { title: "Train Custom Model", desc: "LoRA fine-tuning on your images", icon: Layers, href: "/tools/train-model", img: "/showcase/tool-style-transfer.jpg", badge: "New" },
   { title: "Batch Generator", desc: "Generate multiple images at once", icon: Layers, href: "/tools/batch-prompts", img: "/showcase/tool-batch.jpg" },
   { title: "Social Resizer", desc: "Auto-resize for all platforms", icon: Share2, href: "/tools/social-resize", img: "/showcase/tool-social.jpg" },
 ];

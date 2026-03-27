@@ -25,6 +25,24 @@ export interface AIModel {
   costInfo?: string;
 }
 
+// ─── Flagship Model ──────────────────────────────────────────────────────────
+
+function ultraMode(): AIModel {
+  return {
+    id: "ultra",
+    name: "DreamForgeX Ultra",
+    provider: "replicate",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1440, height: 1440 },
+    creditCost: { base: 10, hd: 15 },
+    isAvailable: !!ENV.replicateApiToken || !!ENV.openaiApiKey,
+    tier: "pro",
+    description: "Flagship quality — enhanced prompt engineering + Flux Pro max settings. Midjourney-competitive output.",
+    costInfo: "10-15 credits (Pro+)",
+  };
+}
+
 // ─── Image Models ──────────────────────────────────────────────────────────
 
 function grokImage(): AIModel {
@@ -351,6 +369,8 @@ function edgeTts(): AIModel {
 /** Build the model list fresh each time (picks up runtime API key changes). */
 function buildModelList(): AIModel[] {
   return [
+    // Flagship
+    ultraMode(),
     // Image models
     grokImage(),
     dalleModel(),

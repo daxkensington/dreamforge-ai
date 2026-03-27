@@ -21,7 +21,7 @@ export const metadata: Metadata = {
         url: "https://dreamforgex.ai/og-image.jpg",
         width: 1408,
         height: 768,
-        alt: "DreamForgeX — AI Creative Studio with 68+ tools",
+        alt: "DreamForgeX — AI Creative Studio with 71+ tools",
       },
     ],
     type: "website",
@@ -66,7 +66,7 @@ const jsonLd = {
       name: "DreamForgeX",
       url: "https://dreamforgex.ai",
       logo: "https://dreamforgex.ai/logo.png",
-      description: "AI Creative Studio — 68+ tools for images, video, audio, songs, and design",
+      description: "AI Creative Studio — 71+ tools for images, video, audio, songs, and design",
       sameAs: ["https://github.com/daxkensington/dreamforge-ai"],
     },
     {
@@ -75,7 +75,7 @@ const jsonLd = {
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web",
       url: "https://dreamforgex.ai",
-      description: "All-in-one AI creative studio with 68+ tools for image generation, video creation, song production, and design",
+      description: "All-in-one AI creative studio with 71+ tools for image generation, video creation, song production, and design",
       offers: {
         "@type": "AggregateOffer",
         lowPrice: "0",
