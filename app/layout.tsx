@@ -14,15 +14,26 @@ export const metadata: Metadata = {
     title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
-    images: ["/og-image.jpg"],
+    url: "https://dreamforgex.ai",
+    siteName: "DreamForgeX",
+    images: [
+      {
+        url: "https://dreamforgex.ai/og-image.jpg",
+        width: 1408,
+        height: 768,
+        alt: "DreamForgeX — AI Creative Studio with 68+ tools",
+      },
+    ],
     type: "website",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
-    images: ["/og-image.jpg"],
+    images: ["https://dreamforgex.ai/og-image.jpg"],
+    site: "@dreamforgex",
   },
   metadataBase: new URL("https://dreamforgex.ai"),
   alternates: {
