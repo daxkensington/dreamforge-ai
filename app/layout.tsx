@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
-    images: ["/showcase/hero-forge.jpg"],
+    images: ["/og-image.jpg"],
     type: "website",
   },
   twitter: {
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     title: "DreamForgeX — AI Creative Studio",
     description:
       "Turn words into stunning images, videos, and animations — powered by AI.",
-    images: ["/showcase/hero-forge.jpg"],
+    images: ["/og-image.jpg"],
   },
   metadataBase: new URL("https://dreamforgex.ai"),
   alternates: {
