@@ -3611,7 +3611,7 @@ export const appRouter = router({
       .input(
         z.object({
           concept: z.string().min(1).max(1000),
-          genre: z.enum(["pop", "rock", "hiphop", "rnb", "country", "electronic", "jazz", "indie", "latin", "classical", "lofi", "metal", "soul", "funk"]),
+          genre: z.enum(["pop", "rock", "hiphop", "rnb", "reggae", "dancehall", "afrobeats", "electronic", "house", "techno", "drill", "trap", "lofi", "jazz", "blues", "indie", "country", "latin", "reggaeton", "kpop", "soul", "gospel", "funk", "disco", "metal", "punk", "folk", "classical", "ambient", "phonk"]),
           mood: z.enum(["happy", "sad", "energetic", "chill", "dark", "romantic", "empowering", "nostalgic", "dreamy", "aggressive"]),
           songStructure: z.string().max(200).optional(),
           language: z.string().max(50).optional(),
