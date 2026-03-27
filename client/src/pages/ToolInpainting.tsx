@@ -100,6 +100,10 @@ export default function ToolInpainting() {
       gradient="from-teal-500 to-cyan-400"
     >
       <div className="max-w-5xl mx-auto">
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example output:</p>
+          <img loading="lazy" src="/showcase/example-inpaint-1.jpg" alt="AI inpainting before and after" className="w-full rounded-lg" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Controls */}
           <div className="lg:col-span-2 space-y-6">

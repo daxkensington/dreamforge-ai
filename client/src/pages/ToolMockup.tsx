@@ -64,6 +64,10 @@ export default function ToolMockup() {
   return (
     <ToolPageLayout title="Product Mockup Generator" description="Place your designs on realistic product mockups" icon={Frame} gradient="from-cyan-500 to-yellow-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example output:</p>
+          <img loading="lazy" src="/showcase/example-mockup-1.jpg" alt="AI product mockup examples" className="w-full rounded-lg" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

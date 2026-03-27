@@ -63,6 +63,10 @@ export default function ToolAvatar() {
   return (
     <ToolPageLayout title="AI Avatar Generator" description="Create custom avatars in any style" icon={CircleUser} gradient="from-fuchsia-500 to-pink-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example output:</p>
+          <img loading="lazy" src="/showcase/example-avatar-1.jpg" alt="AI generated avatar styles" className="w-full rounded-lg" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

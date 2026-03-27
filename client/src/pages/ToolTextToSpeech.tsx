@@ -45,6 +45,10 @@ export default function ToolTextToSpeech() {
   return (
     <ToolPageLayout title="Text-to-Speech" description="Generate natural voiceovers with AI" icon={Mic} gradient="from-sky-500 to-blue-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example output:</p>
+          <img loading="lazy" src="/showcase/example-tts-1.jpg" alt="Text to speech voice options" className="w-full rounded-lg" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-3 space-y-6">
             <Card className="border-border/50">

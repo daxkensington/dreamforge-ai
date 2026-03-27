@@ -48,6 +48,10 @@ export default function ToolSoundEffects() {
   return (
     <ToolPageLayout title="Sound Effects Generator" description="Design custom sound effects with AI" icon={Waves} gradient="from-red-500 to-rose-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-xs text-muted-foreground mb-3">Example output:</p>
+          <img loading="lazy" src="/showcase/example-sfx-1.jpg" alt="AI sound effect waveforms" className="w-full rounded-lg" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">
