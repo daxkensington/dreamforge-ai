@@ -102,6 +102,10 @@ export default function ToolThumbnail() {
       gradient="from-red-500 to-pink-400"
     >
       <div className="max-w-5xl mx-auto">
+        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
+          <img loading="lazy" src="/showcase/tool-thumbnail.jpg" alt="YouTube thumbnail" className="w-full rounded-lg max-h-48 object-cover" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Controls */}
           <div className="lg:col-span-2 space-y-6">

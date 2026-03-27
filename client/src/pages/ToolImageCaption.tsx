@@ -77,6 +77,10 @@ export default function ToolImageCaption() {
   return (
     <ToolPageLayout title="Image Caption Generator" description="Generate descriptions, alt text, and social captions" icon={FileText} gradient="from-teal-500 to-cyan-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
+          <img loading="lazy" src="/showcase/tool-caption.jpg" alt="Image caption generation" className="w-full rounded-lg max-h-48 object-cover" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

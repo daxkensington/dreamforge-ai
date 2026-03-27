@@ -61,6 +61,10 @@ export default function ToolPanorama() {
   return (
     <ToolPageLayout title="Panorama Generator" description="Extend images into sweeping panoramic views" icon={ScanLine} gradient="from-sky-500 to-indigo-400">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
+          <img loading="lazy" src="/showcase/tool-panorama.jpg" alt="AI panorama extension" className="w-full rounded-lg max-h-48 object-cover" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

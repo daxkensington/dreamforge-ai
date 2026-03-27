@@ -75,6 +75,10 @@ export default function ToolImageToVideo() {
   return (
     <ToolPageLayout title="Image-to-Video" description="Animate still images into video clips with Veo 2" icon={Film} gradient="from-purple-500 to-violet-500">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
+          <img loading="lazy" src="/showcase/tool-i2v.jpg" alt="Image to video animation" className="w-full rounded-lg max-h-48 object-cover" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <Card className="border-border/50">

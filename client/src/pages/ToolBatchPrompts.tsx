@@ -46,6 +46,10 @@ export default function ToolBatchPrompts() {
   return (
     <ToolPageLayout title="Batch Image Generator" description="Generate multiple images from a list of prompts" icon={Layers} gradient="from-blue-500 to-cyan-400">
       <div className="max-w-6xl mx-auto">
+        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
+          <img loading="lazy" src="/showcase/tool-batch.jpg" alt="Batch generation results" className="w-full rounded-lg max-h-48 object-cover" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
             <Card className="border-border/50">
