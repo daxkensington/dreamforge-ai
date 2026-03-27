@@ -130,7 +130,7 @@ export default function ModelComparison() {
                       <p className="text-sm text-destructive">{result.error}</p>
                     </div>
                   ) : result.url ? (
-                    <img src={result.url} alt={`${model?.name} output`} className="w-full rounded-lg" />
+                    <img loading="lazy" src={result.url} alt={`${model?.name} output`} className="w-full rounded-lg" />
                   ) : (
                     <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
                       <Image className="w-8 h-8 text-muted-foreground" />

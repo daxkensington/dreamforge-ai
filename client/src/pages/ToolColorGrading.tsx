@@ -130,7 +130,7 @@ export default function ToolColorGrading() {
 
                 <div>
                   <Label className="text-sm font-medium mb-3 block">Intensity</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {INTENSITIES.map((i) => (
                       <button key={i.value} onClick={() => setIntensity(i.value)}
                         className={`flex flex-col items-center p-3 rounded-lg border text-sm transition-all ${intensity === i.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground hover:text-foreground"}`}>
@@ -183,7 +183,7 @@ export default function ToolColorGrading() {
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          {imagePreview && <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />}
+                          {imagePreview && <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />}
                         </div>
                         <p className="text-sm text-muted-foreground py-12 text-center">Result will appear here</p>
                       </div>

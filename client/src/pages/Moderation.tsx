@@ -65,7 +65,7 @@ export default function Moderation() {
       <PageLayout>
         <div className="container py-12">
           <Skeleton className="h-8 w-48 mb-8" />
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <Skeleton className="h-24" />
             <Skeleton className="h-24" />
             <Skeleton className="h-24" />
@@ -110,7 +110,7 @@ export default function Moderation() {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <Card className="border-border/50 bg-card/50">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">

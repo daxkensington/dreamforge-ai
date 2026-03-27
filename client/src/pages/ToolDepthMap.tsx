@@ -111,7 +111,7 @@ export default function ToolDepthMap() {
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          {imagePreview && <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />}
+                          {imagePreview && <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />}
                         </div>
                       </div>
                       <div className="p-4">
@@ -124,7 +124,7 @@ export default function ToolDepthMap() {
                               </motion.div>
                             ) : resultUrl ? (
                               <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                                <img src={resultUrl} alt="Depth Map" className="w-full h-auto max-h-[300px] object-contain" />
+                                <img loading="lazy" src={resultUrl} alt="Depth Map" className="w-full h-auto max-h-[300px] object-contain" />
                               </motion.div>
                             ) : (
                               <motion.div key="waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-2 py-12">

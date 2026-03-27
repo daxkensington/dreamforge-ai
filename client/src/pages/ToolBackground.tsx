@@ -256,7 +256,7 @@ export default function ToolBackground() {
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && (
-                            <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
+                            <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
                           )}
                         </div>
                       </div>
@@ -286,7 +286,7 @@ export default function ToolBackground() {
                                 animate={{ opacity: 1, scale: 1 }}
                                 className={mode === "remove" ? "bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%23333%22%2F%3E%3Crect%20x%3D%2210%22%20y%3D%2210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%23333%22%2F%3E%3Crect%20x%3D%2210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%23444%22%2F%3E%3Crect%20y%3D%2210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%23444%22%2F%3E%3C%2Fsvg%3E')]" : ""}
                               >
-                                <img src={resultUrl} alt="Result" className="w-full h-auto max-h-[350px] object-contain" />
+                                <img loading="lazy" src={resultUrl} alt="Result" className="w-full h-auto max-h-[350px] object-contain" />
                               </motion.div>
                             ) : (
                               <motion.div

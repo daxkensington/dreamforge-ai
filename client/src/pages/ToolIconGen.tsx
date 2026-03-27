@@ -106,12 +106,12 @@ export default function ToolIconGen() {
                     <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                       <div className="p-8 flex flex-col items-center gap-6">
                         <div className="p-4 rounded-2xl bg-[repeating-conic-gradient(#80808015_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
-                          <img src={resultUrl} alt="Icon" className="w-48 h-48 object-contain" />
+                          <img loading="lazy" src={resultUrl} alt="Icon" className="w-48 h-48 object-contain" />
                         </div>
                         <div className="flex gap-4 items-end">
                           {["16", "32", "64"].map((s) => (
                             <div key={s} className="flex flex-col items-center gap-1">
-                              <img src={resultUrl} alt={`${s}px`} style={{ width: `${parseInt(s)}px`, height: `${parseInt(s)}px` }} className="object-contain" />
+                              <img loading="lazy" src={resultUrl} alt={`${s}px`} style={{ width: `${parseInt(s)}px`, height: `${parseInt(s)}px` }} className="object-contain" />
                               <span className="text-[10px] text-muted-foreground">{s}px</span>
                             </div>
                           ))}

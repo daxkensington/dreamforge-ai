@@ -88,7 +88,7 @@ export default function ToolTextToVideo() {
 
                 <div className="space-y-3">
                   <Label className="text-sm font-medium flex items-center gap-1.5"><Camera className="h-3.5 w-3.5" />Camera Movement</Label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     {cameraPresets.map((c) => (
                       <button key={c.value} onClick={() => setCameraMovement(c.value)}
                         className={`px-2 py-1.5 rounded-lg border text-[10px] font-medium transition-all ${cameraMovement === c.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground"}`}>

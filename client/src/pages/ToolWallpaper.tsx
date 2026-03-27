@@ -60,7 +60,7 @@ export default function ToolWallpaper() {
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Device</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {resolutions.map((r) => (
                       <button key={r.value} onClick={() => setResolution(r.value)}
                         className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${resolution === r.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
@@ -111,7 +111,7 @@ export default function ToolWallpaper() {
                     </motion.div>
                   ) : resultUrl ? (
                     <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <img src={resultUrl} alt="Wallpaper" className="w-full h-auto" />
+                      <img loading="lazy" src={resultUrl} alt="Wallpaper" className="w-full h-auto" />
                       <div className="p-4 border-t border-border/50 flex justify-end">
                         <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download Wallpaper</Button>
                       </div>

@@ -152,7 +152,7 @@ export default function Characters() {
                   <div className="flex gap-1">
                     {(char.referenceImages as string[]).slice(0, 3).map((url, i) => (
                       <div key={i} className="w-10 h-10 rounded bg-muted overflow-hidden">
-                        <img src={url} alt="Character reference" className="w-full h-full object-cover" />
+                        <img loading="lazy" src={url} alt="Character reference" className="w-full h-full object-cover" />
                       </div>
                     ))}
                     <Badge variant="outline" className="text-xs"><ImageIcon className="w-3 h-3 mr-1" /> {(char.referenceImages as string[]).length} refs</Badge>
@@ -173,7 +173,7 @@ export default function Characters() {
                           {generateMut.isPending ? "Generating..." : "Generate Image"}
                         </Button>
                         {generateMut.data?.url && (
-                          <img src={generateMut.data.url} alt="Generated" className="w-full rounded-lg" />
+                          <img loading="lazy" src={generateMut.data.url} alt="Generated" className="w-full rounded-lg" />
                         )}
                       </div>
                     </DialogContent>

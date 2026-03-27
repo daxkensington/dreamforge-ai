@@ -174,7 +174,7 @@ export default function ToolSketchToImage() {
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Sketch</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          {imagePreview && <img src={imagePreview} alt="Sketch" className="w-full h-auto max-h-[350px] object-contain" />}
+                          {imagePreview && <img loading="lazy" src={imagePreview} alt="Sketch" className="w-full h-auto max-h-[350px] object-contain" />}
                         </div>
                       </div>
                       <div className="p-4">

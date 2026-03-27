@@ -109,9 +109,9 @@ export default function SearchGenerations() {
               <Card key={gen.id} className="overflow-hidden group hover:shadow-lg transition-shadow cursor-pointer">
                 <div className="aspect-square bg-muted relative">
                   {gen.imageUrl ? (
-                    <img src={gen.imageUrl} alt="Generated image" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={gen.imageUrl} alt="Generated image" className="w-full h-full object-cover" />
                   ) : gen.thumbnailUrl ? (
-                    <img src={gen.thumbnailUrl} alt="Generated thumbnail" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={gen.thumbnailUrl} alt="Generated thumbnail" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       {gen.mediaType === "video" ? <Video className="w-8 h-8 text-muted-foreground" /> : <Image className="w-8 h-8 text-muted-foreground" />}

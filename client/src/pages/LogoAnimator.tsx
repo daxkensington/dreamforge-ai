@@ -86,7 +86,7 @@ export default function LogoAnimator() {
                 {logoPreview ? (
                   <div className="flex items-center gap-3">
                     <div className="h-20 w-20 rounded-xl bg-white/10 p-2 overflow-hidden">
-                      <img src={logoPreview} alt="Your logo" className="w-full h-full object-contain" />
+                      <img loading="lazy" src={logoPreview} alt="Your logo" className="w-full h-full object-contain" />
                     </div>
                     <Button variant="outline" size="sm" className="bg-transparent" onClick={() => { setLogoUrl(""); setLogoPreview(""); }}>Change</Button>
                   </div>

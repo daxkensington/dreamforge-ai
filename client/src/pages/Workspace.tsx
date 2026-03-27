@@ -249,7 +249,7 @@ export default function Workspace() {
         <div className="container py-12">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-4 w-64 mb-8" />
-          <div className="grid grid-cols-4 gap-3 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-16 rounded-xl" />
             ))}
@@ -509,7 +509,7 @@ export default function Workspace() {
                 {/* Aspect Ratio Presets */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-2 block">Aspect Ratio</Label>
-                  <div className="grid grid-cols-5 gap-1.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                     {[
                       { label: "1:1", w: 1024, h: 1024, icon: "■" },
                       { label: "4:3", w: 1024, h: 768, icon: "▬" },
@@ -581,7 +581,7 @@ export default function Workspace() {
                         />
                         {styleRef && (
                           <div className="mt-2 flex items-center gap-2">
-                            <img src={styleRef} alt="Style ref" className="h-12 w-12 rounded object-cover border border-border/50" />
+                            <img loading="lazy" src={styleRef} alt="Style ref" className="h-12 w-12 rounded object-cover border border-border/50" />
                             <span className="text-[10px] text-muted-foreground">Style will be applied to generation</span>
                           </div>
                         )}

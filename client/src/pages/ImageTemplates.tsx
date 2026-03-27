@@ -230,7 +230,7 @@ export default function ImageTemplates() {
                 <CardContent className="p-6">
                   {resultUrl ? (
                     <div className="space-y-4">
-                      <img src={resultUrl} alt={template?.name} className="w-full rounded-lg" />
+                      <img loading="lazy" src={resultUrl} alt={template?.name} className="w-full rounded-lg" />
                       <div className="flex gap-2">
                         <Button variant="outline" className="flex-1 gap-2 bg-transparent text-xs" asChild>
                           <a href={resultUrl} download={`${template?.id}.png`}>

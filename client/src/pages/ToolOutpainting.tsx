@@ -121,7 +121,7 @@ export default function ToolOutpainting() {
               <CardContent className="p-6 space-y-5">
                 <div>
                   <Label className="text-sm font-medium mb-3 block">Expansion Direction</Label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                     {DIRECTIONS.map((d) => {
                       const Icon = d.icon;
                       return (
@@ -181,7 +181,7 @@ export default function ToolOutpainting() {
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          {imagePreview && <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />}
+                          {imagePreview && <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />}
                         </div>
                       </div>
                       <div className="p-4">

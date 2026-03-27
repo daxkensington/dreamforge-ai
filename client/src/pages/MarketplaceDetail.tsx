@@ -223,7 +223,7 @@ export default function MarketplaceDetail() {
                       currentImage === i ? "border-primary ring-1 ring-primary/30" : "border-white/10 hover:border-white/30"
                     }`}
                   >
-                    <img src={img} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                    <img loading="lazy" src={img} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>

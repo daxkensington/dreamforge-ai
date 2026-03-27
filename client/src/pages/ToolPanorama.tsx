@@ -77,7 +77,7 @@ export default function ToolPanorama() {
 
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Direction</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {directions.map((d) => (
                       <button key={d.value} onClick={() => setDirection(d.value)}
                         className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${direction === d.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
@@ -90,7 +90,7 @@ export default function ToolPanorama() {
 
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Expansion</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {expansions.map((e) => (
                       <button key={e.value} onClick={() => setExpansion(e.value)}
                         className={`p-3 rounded-xl border-2 transition-all text-center font-bold ${expansion === e.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
@@ -127,13 +127,13 @@ export default function ToolPanorama() {
                     </motion.div>
                   ) : resultUrl ? (
                     <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <div className="p-4 overflow-x-auto"><img src={resultUrl} alt="Panorama" className="max-h-[400px] rounded-lg" /></div>
+                      <div className="p-4 overflow-x-auto"><img loading="lazy" src={resultUrl} alt="Panorama" className="max-h-[400px] rounded-lg" /></div>
                       <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
                     </motion.div>
                   ) : imagePreview ? (
                     <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4">
                       <Badge variant="secondary" className="mb-3">Source Image</Badge>
-                      <img src={imagePreview} alt="Source" className="w-full max-h-[400px] object-contain rounded-lg" />
+                      <img loading="lazy" src={imagePreview} alt="Source" className="w-full max-h-[400px] object-contain rounded-lg" />
                     </motion.div>
                   ) : null}
                 </AnimatePresence>

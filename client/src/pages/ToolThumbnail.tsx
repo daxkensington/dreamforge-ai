@@ -137,7 +137,7 @@ export default function ToolThumbnail() {
             <Card className="border-border/50">
               <CardContent className="p-6 space-y-4">
                 <Label className="text-sm font-medium">Platform</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {PLATFORMS.map((p) => (
                     <button
                       key={p.value}
@@ -231,7 +231,7 @@ export default function ToolThumbnail() {
                     {imagePreview && (
                       <div className="px-6 py-3 border-t border-border/50">
                         <p className="text-xs text-muted-foreground mb-2">Reference image used:</p>
-                        <img src={imagePreview} alt="Reference" className="h-16 rounded object-cover" />
+                        <img loading="lazy" src={imagePreview} alt="Reference" className="h-16 rounded object-cover" />
                       </div>
                     )}
                     <div className="p-4 border-t border-border/50 flex justify-end">

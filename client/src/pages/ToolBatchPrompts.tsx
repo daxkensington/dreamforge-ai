@@ -113,7 +113,7 @@ export default function ToolBatchPrompts() {
                             className="rounded-lg overflow-hidden border border-border/30">
                             {r.url ? (
                               <div className="relative group cursor-pointer" onClick={() => window.open(r.url!, "_blank")}>
-                                <img src={r.url} alt={r.prompt} className="w-full aspect-square object-cover" />
+                                <img loading="lazy" src={r.url} alt={r.prompt} className="w-full aspect-square object-cover" />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
                                   <Download className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>

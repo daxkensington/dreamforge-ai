@@ -150,7 +150,7 @@ export default function ToolImageToVideo() {
                       {imagePreview ? (
                         <div className="p-4">
                           <Badge variant="secondary" className="mb-3">Source Image</Badge>
-                          <img src={imagePreview} alt="Source" className="w-full h-auto max-h-[400px] object-contain rounded-lg" />
+                          <img loading="lazy" src={imagePreview} alt="Source" className="w-full h-auto max-h-[400px] object-contain rounded-lg" />
                           <p className="text-xs text-muted-foreground text-center mt-3">Describe the motion and click "Animate Image"</p>
                         </div>
                       ) : (

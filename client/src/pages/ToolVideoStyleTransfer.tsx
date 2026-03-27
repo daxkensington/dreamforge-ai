@@ -63,7 +63,7 @@ export default function ToolVideoStyleTransfer() {
             className="border-2 border-dashed border-border/50 rounded-xl p-8 text-center cursor-pointer hover:border-violet-500/50 transition-colors group"
           >
             {imageUrl ? (
-              <img src={imageUrl} alt="Source" className="max-h-48 mx-auto rounded-lg object-contain" />
+              <img loading="lazy" src={imageUrl} alt="Source" className="max-h-48 mx-auto rounded-lg object-contain" />
             ) : (
               <>
                 <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40 group-hover:text-violet-400 transition-colors" />
@@ -130,7 +130,7 @@ export default function ToolVideoStyleTransfer() {
           {transfer.data && transfer.data.status === "completed" && transfer.data.url && (
             <div className="space-y-4">
               <div className="rounded-xl overflow-hidden border border-border/40">
-                <img src={transfer.data.url} alt="Styled frame" className="w-full" />
+                <img loading="lazy" src={transfer.data.url} alt="Styled frame" className="w-full" />
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline" className="capitalize">{transfer.data.style}</Badge>

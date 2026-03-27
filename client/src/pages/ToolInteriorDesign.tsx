@@ -225,7 +225,7 @@ export default function ToolInteriorDesign() {
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && (
-                            <img src={imagePreview} alt="Original room" className="w-full h-auto max-h-[350px] object-contain" />
+                            <img loading="lazy" src={imagePreview} alt="Original room" className="w-full h-auto max-h-[350px] object-contain" />
                           )}
                         </div>
                       </div>

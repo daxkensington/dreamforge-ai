@@ -132,10 +132,10 @@ export default function ToolCollage() {
 
                 {/* Uploaded previews */}
                 {images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {images.map((img, i) => (
                       <div key={i} className="relative group rounded-lg overflow-hidden border border-border/30">
-                        <img src={img.preview} alt={`Image ${i + 1}`} className="w-full h-20 object-cover" />
+                        <img loading="lazy" src={img.preview} alt={`Image ${i + 1}`} className="w-full h-20 object-cover" />
                         <button
                           onClick={() => removeImage(i)}
                           className="absolute top-1 right-1 h-5 w-5 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

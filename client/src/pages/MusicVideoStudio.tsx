@@ -172,7 +172,7 @@ export default function MusicVideoStudio() {
                 {photoDataUrl ? (
                   <div className="space-y-3">
                     <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-white/10">
-                      <img src={photoDataUrl} alt="Your photo" className="w-full h-full object-cover" />
+                      <img loading="lazy" src={photoDataUrl} alt="Your photo" className="w-full h-full object-cover" />
                     </div>
                     <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setPhotoDataUrl("")}>
                       Remove

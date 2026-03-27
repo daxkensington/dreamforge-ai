@@ -112,7 +112,7 @@ export default function ToolVariations() {
                 {/* Preview */}
                 {imagePreview && (
                   <div className="rounded-lg overflow-hidden border border-border/30">
-                    <img src={imagePreview} alt="Source" className="w-full h-auto max-h-[180px] object-contain bg-muted/30" />
+                    <img loading="lazy" src={imagePreview} alt="Source" className="w-full h-auto max-h-[180px] object-contain bg-muted/30" />
                   </div>
                 )}
 
@@ -212,7 +212,7 @@ export default function ToolVariations() {
                           >
                             {r.status === "completed" && r.url ? (
                               <>
-                                <img src={r.url} alt={`Variation ${i + 1}`} className="w-full aspect-square object-cover" />
+                                <img loading="lazy" src={r.url} alt={`Variation ${i + 1}`} className="w-full aspect-square object-cover" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                                   <div className="absolute bottom-0 left-0 right-0 p-3">
                                     <p className="text-xs text-white/80 mb-2 line-clamp-2">{r.variation}</p>

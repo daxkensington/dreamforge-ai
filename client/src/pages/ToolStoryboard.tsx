@@ -219,7 +219,7 @@ export default function ToolStoryboard() {
                 >
                   {scene.imageUrl ? (
                     <div className="relative aspect-video bg-black/20">
-                      <img src={scene.imageUrl} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
+                      <img loading="lazy" src={scene.imageUrl} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
                       <div className="absolute top-2 left-2">
                         <Badge className="bg-black/60 text-white border-0 text-xs">Scene {i + 1}</Badge>
                       </div>

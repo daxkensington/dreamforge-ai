@@ -261,7 +261,7 @@ export default function ToolStyleTransfer() {
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && (
-                            <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
+                            <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
                           )}
                         </div>
                         <div className="flex flex-col items-center gap-2 py-12">

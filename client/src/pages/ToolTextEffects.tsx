@@ -112,7 +112,7 @@ export default function ToolTextEffects() {
 
                 <div>
                   <Label className="text-sm font-medium mb-3 block">Background</Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {BACKGROUNDS.map((b) => (
                       <button key={b.value} onClick={() => setBackgroundColor(b.value)}
                         className={`p-2.5 rounded-lg border text-xs font-medium transition-all ${backgroundColor === b.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground hover:text-foreground"}`}>
@@ -124,7 +124,7 @@ export default function ToolTextEffects() {
 
                 <div>
                   <Label className="text-sm font-medium mb-3 block">Size</Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {FONT_SIZES.map((s) => (
                       <button key={s.value} onClick={() => setFontSize(s.value)}
                         className={`p-2.5 rounded-lg border text-xs font-bold transition-all ${fontSize === s.value ? "border-primary bg-primary/10 text-primary" : "border-border/50 hover:border-border text-muted-foreground hover:text-foreground"}`}>

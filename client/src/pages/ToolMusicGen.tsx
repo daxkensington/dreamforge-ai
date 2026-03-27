@@ -103,7 +103,7 @@ export default function ToolMusicGen() {
 
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Duration</Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {durations.map((d) => (
                       <button key={d.value} onClick={() => setDuration(d.value)}
                         className={`flex flex-col items-center gap-0.5 p-3 rounded-xl border-2 transition-all ${duration === d.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>

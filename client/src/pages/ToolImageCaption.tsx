@@ -138,7 +138,7 @@ export default function ToolImageCaption() {
             {imagePreview && (
               <Card className="border-border/50 overflow-hidden">
                 <CardContent className="p-4">
-                  <img src={imagePreview} alt="Preview" className="w-full h-auto max-h-[300px] object-contain rounded-lg" />
+                  <img loading="lazy" src={imagePreview} alt="Preview" className="w-full h-auto max-h-[300px] object-contain rounded-lg" />
                 </CardContent>
               </Card>
             )}

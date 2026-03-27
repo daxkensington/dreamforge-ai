@@ -95,7 +95,7 @@ export default function ToolQrArt() {
                     </motion.div>
                   ) : resultUrl ? (
                     <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                      <div className="p-6 flex items-center justify-center"><img src={resultUrl} alt="QR Art" className="max-w-full max-h-[400px] object-contain rounded-lg" /></div>
+                      <div className="p-6 flex items-center justify-center"><img loading="lazy" src={resultUrl} alt="QR Art" className="max-w-full max-h-[400px] object-contain rounded-lg" /></div>
                       <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
                     </motion.div>
                   ) : null}

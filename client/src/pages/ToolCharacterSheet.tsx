@@ -113,7 +113,7 @@ export default function ToolCharacterSheet() {
                       <div className="p-4">
                         <Badge className="mb-3 bg-red-500/20 text-red-400 border-red-500/30">Character Sheet</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          <img src={resultUrl} alt="Character Sheet" className="w-full h-auto object-contain" />
+                          <img loading="lazy" src={resultUrl} alt="Character Sheet" className="w-full h-auto object-contain" />
                         </div>
                       </div>
                       <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>

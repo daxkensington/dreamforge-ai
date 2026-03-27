@@ -190,7 +190,7 @@ export default function ToolFaceEnhancer() {
                       <div className="p-4">
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                          <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />
+                          <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[300px] object-contain" />
                         </div>
                         <div className="flex flex-col items-center gap-2 py-12">
                           <ArrowRight className="h-6 w-6 text-muted-foreground/50" />

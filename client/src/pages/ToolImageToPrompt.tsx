@@ -136,7 +136,7 @@ export default function ToolImageToPrompt() {
                 {/* Image Preview */}
                 {imagePreview && (
                   <div className="rounded-lg overflow-hidden border border-border/30">
-                    <img src={imagePreview} alt="Source" className="w-full h-auto max-h-[250px] object-contain bg-muted/30" />
+                    <img loading="lazy" src={imagePreview} alt="Source" className="w-full h-auto max-h-[250px] object-contain bg-muted/30" />
                   </div>
                 )}
 

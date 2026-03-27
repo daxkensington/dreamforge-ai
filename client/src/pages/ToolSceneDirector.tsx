@@ -91,7 +91,7 @@ export default function ToolSceneDirector() {
             {/* Mood */}
             <div>
               <label className="text-sm font-medium text-foreground/80 mb-2 block">Mood</label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 {MOODS.map((m) => (
                   <button
                     key={m.id}
@@ -178,7 +178,7 @@ export default function ToolSceneDirector() {
                   <div className="w-48 md:w-64 shrink-0">
                     {kf.imageUrl ? (
                       <div className="relative aspect-video">
-                        <img src={kf.imageUrl} alt={`Keyframe ${kf.frameNumber}`} className="w-full h-full object-cover" />
+                        <img loading="lazy" src={kf.imageUrl} alt={`Keyframe ${kf.frameNumber}`} className="w-full h-full object-cover" />
                         <div className="absolute top-2 left-2">
                           <Badge className="bg-black/60 text-white border-0 text-xs">KF {kf.frameNumber}</Badge>
                         </div>

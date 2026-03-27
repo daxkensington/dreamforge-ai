@@ -267,7 +267,7 @@ export default function ToolUpscaler() {
                   ) : imagePreview ? (
                     <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4">
                       <Badge variant="secondary" className="mb-3">Source Image</Badge>
-                      <img src={imagePreview} alt="Source" className="w-full max-h-[500px] object-contain rounded-lg" />
+                      <img loading="lazy" src={imagePreview} alt="Source" className="w-full max-h-[500px] object-contain rounded-lg" />
                       <p className="text-xs text-muted-foreground text-center mt-3">Adjust controls and click "Upscale Image"</p>
                     </motion.div>
                   ) : null}

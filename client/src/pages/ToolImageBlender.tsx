@@ -97,7 +97,7 @@ export default function ToolImageBlender() {
         </Button>
         {preview && (
           <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-            <img src={preview} alt={`Image ${slot}`} className="w-full h-32 object-cover" />
+            <img loading="lazy" src={preview} alt={`Image ${slot}`} className="w-full h-32 object-cover" />
           </div>
         )}
       </CardContent>

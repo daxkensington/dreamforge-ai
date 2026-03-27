@@ -184,7 +184,7 @@ function StoryboardTab() {
                     <div className="flex flex-col sm:flex-row">
                       {scene.imageUrl && (
                         <div className="sm:w-48 h-32 sm:h-auto flex-shrink-0">
-                          <img src={scene.imageUrl} alt={`Scene ${scene.sceneNumber}`} className="w-full h-full object-cover" />
+                          <img loading="lazy" src={scene.imageUrl} alt={`Scene ${scene.sceneNumber}`} className="w-full h-full object-cover" />
                         </div>
                       )}
                       <div className="p-4 flex-1 min-w-0">
@@ -373,7 +373,7 @@ function SceneDirectorTab() {
                     <div className="flex flex-col sm:flex-row">
                       {kf.imageUrl && (
                         <div className="sm:w-48 h-32 sm:h-auto flex-shrink-0">
-                          <img src={kf.imageUrl} alt={`Keyframe ${i + 1}`} className="w-full h-full object-cover" />
+                          <img loading="lazy" src={kf.imageUrl} alt={`Keyframe ${i + 1}`} className="w-full h-full object-cover" />
                         </div>
                       )}
                       <div className="p-4 flex-1 min-w-0">

@@ -158,7 +158,7 @@ export default function ToolColorPalette() {
                 {/* Image Preview */}
                 {imagePreview && (
                   <div className="rounded-lg overflow-hidden border border-border/30">
-                    <img src={imagePreview} alt="Source" className="w-full h-auto max-h-[200px] object-contain bg-muted/30" />
+                    <img loading="lazy" src={imagePreview} alt="Source" className="w-full h-auto max-h-[200px] object-contain bg-muted/30" />
                   </div>
                 )}
 

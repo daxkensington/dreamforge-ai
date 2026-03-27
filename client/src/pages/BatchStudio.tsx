@@ -377,7 +377,7 @@ export default function BatchStudio() {
                 {/* Resolution */}
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">Resolution</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
                       { w: 512, h: 512, label: "512²" },
                       { w: 768, h: 768, label: "768²" },

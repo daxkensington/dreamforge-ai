@@ -170,7 +170,7 @@ export default function Tools() {
       <div className="min-h-screen">
         {/* Hero */}
         <section className="relative h-[520px] flex items-center justify-center overflow-hidden">
-          <img src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover" />
+          <img loading="lazy" src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/75 backdrop-blur-[2px]" />
           <motion.div
             variants={fadeUp} initial="hidden" animate="visible"
@@ -199,7 +199,7 @@ export default function Tools() {
             <Link href="/workspace">
               <div className="group grid md:grid-cols-2 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-cyan-500/30 transition-all duration-300 hover:scale-[1.01]">
                 <div className="aspect-[16/10] md:aspect-auto overflow-hidden">
-                  <img src="/showcase/gallery-2.jpg" alt="Text to Image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img loading="lazy" src="/showcase/gallery-2.jpg" alt="Text to Image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="flex flex-col justify-center p-8 lg:p-12">
                   <div className="flex items-center gap-3 mb-4">
@@ -224,7 +224,7 @@ export default function Tools() {
             <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
               <Link href="/tools/nl-edit">
                 <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                  <img src="/showcase/tool-nl-edit.jpg" alt="NL Edit" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img loading="lazy" src="/showcase/tool-nl-edit.jpg" alt="NL Edit" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
                   <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-green-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
                   <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
@@ -244,7 +244,7 @@ export default function Tools() {
             <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
               <Link href="/tools/headshot">
                 <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                  <img src="/showcase/tool-headshot.jpg" alt="Headshots" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img loading="lazy" src="/showcase/tool-headshot.jpg" alt="Headshots" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
                   <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
                   <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
@@ -266,7 +266,7 @@ export default function Tools() {
           <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
             <Link href="/video-studio">
               <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                <img src="/showcase/tool-video.jpg" alt="AI Video" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img loading="lazy" src="/showcase/tool-video.jpg" alt="AI Video" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
                 <div className="relative h-full flex flex-col justify-center p-8 lg:p-12 max-w-lg">
                   <div className="flex items-center gap-3 mb-4">

@@ -127,7 +127,7 @@ export default function ToolAvatar() {
                     <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                       <div className="p-8 flex items-center justify-center">
                         <div className="w-64 h-64 rounded-full overflow-hidden border-4 border-fuchsia-500/30 shadow-2xl shadow-fuchsia-500/20">
-                          <img src={resultUrl} alt="Avatar" className="w-full h-full object-cover" />
+                          <img loading="lazy" src={resultUrl} alt="Avatar" className="w-full h-full object-cover" />
                         </div>
                       </div>
                       <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>

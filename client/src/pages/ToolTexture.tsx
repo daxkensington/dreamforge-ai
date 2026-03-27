@@ -115,15 +115,15 @@ export default function ToolTexture() {
                         <div className="grid grid-cols-2 gap-2 mb-4">
                           <div>
                             <p className="text-xs text-muted-foreground mb-2">Single Tile</p>
-                            <img src={resultUrl} alt="Texture" className="w-full rounded-lg" />
+                            <img loading="lazy" src={resultUrl} alt="Texture" className="w-full rounded-lg" />
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground mb-2">2×2 Tiled Preview</p>
                             <div className="grid grid-cols-2 rounded-lg overflow-hidden">
-                              <img src={resultUrl} alt="Tile" className="w-full" />
-                              <img src={resultUrl} alt="Tile" className="w-full" />
-                              <img src={resultUrl} alt="Tile" className="w-full" />
-                              <img src={resultUrl} alt="Tile" className="w-full" />
+                              <img loading="lazy" src={resultUrl} alt="Tile" className="w-full" />
+                              <img loading="lazy" src={resultUrl} alt="Tile" className="w-full" />
+                              <img loading="lazy" src={resultUrl} alt="Tile" className="w-full" />
+                              <img loading="lazy" src={resultUrl} alt="Tile" className="w-full" />
                             </div>
                           </div>
                         </div>

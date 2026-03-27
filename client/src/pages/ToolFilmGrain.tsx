@@ -186,7 +186,7 @@ export default function ToolFilmGrain() {
                         <Badge variant="secondary" className="mb-3">Original</Badge>
                         <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
                           {imagePreview && (
-                            <img src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
+                            <img loading="lazy" src={imagePreview} alt="Original" className="w-full h-auto max-h-[350px] object-contain" />
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground py-12 text-center">Result will appear here</p>

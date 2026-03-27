@@ -237,7 +237,7 @@ export default function ToolCanvas() {
                     </motion.div>
                   ) : resultUrl ? (
                     <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                      <img src={resultUrl} alt="Generated" className="w-full" />
+                      <img loading="lazy" src={resultUrl} alt="Generated" className="w-full" />
                       <div className="p-3 border-t border-border/50 flex justify-end">
                         <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-1" />Download</Button>
                       </div>
