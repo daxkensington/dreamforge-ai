@@ -475,25 +475,25 @@ export default function Pricing() {
                 tier: "Free",
                 gradient: "from-slate-500 to-zinc-400",
                 label: "Standard Quality",
-                images: ["/showcase/gallery-13.jpg", "/showcase/gallery-15.jpg"],
+                images: ["/showcase/hero-pricing-free.jpg", "/showcase/gallery-3.jpg"],
               },
               {
                 tier: "Creator",
                 gradient: "from-cyan-500 to-blue-400",
                 label: "HD Quality",
-                images: ["/showcase/gallery-14.jpg", "/showcase/tool-headshot.jpg", "/showcase/gallery-16.jpg"],
+                images: ["/showcase/hero-pricing-pro.jpg", "/showcase/gallery-7.jpg", "/showcase/gallery-9.jpg"],
               },
               {
                 tier: "Pro",
                 gradient: "from-violet-500 to-fuchsia-400",
                 label: "Ultra HD + Video",
-                images: ["/showcase/gallery-17.jpg", "/showcase/tool-style-transfer.jpg", "/showcase/gallery-18.jpg"],
+                images: ["/showcase/hero-pricing-studio.jpg", "/showcase/gallery-4.jpg", "/showcase/gallery-12.jpg"],
               },
               {
                 tier: "Studio",
                 gradient: "from-cyan-500 to-purple-500",
                 label: "Custom Models",
-                images: ["/showcase/gallery-19.jpg", "/showcase/tool-charsheet.jpg", "/showcase/gallery-20.jpg"],
+                images: ["/showcase/hero-pricing-studio.jpg", "/showcase/gallery-14.jpg", "/showcase/gallery-18.jpg"],
               },
             ].map((col, i) => (
               <motion.div

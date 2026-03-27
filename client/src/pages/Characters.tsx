@@ -89,7 +89,7 @@ export default function Characters() {
               </p>
             </div>
             <div className="flex gap-2">
-              {["/showcase/tool-charsheet.jpg", "/showcase/tool-avatar.jpg", "/showcase/tool-headshot.jpg"].map((img, i) => (
+              {["/showcase/hero-characters-1.jpg", "/showcase/hero-characters-2.jpg", "/showcase/hero-characters-3.jpg"].map((img, i) => (
                 <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
                   <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
                 </div>

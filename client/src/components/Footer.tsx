@@ -45,10 +45,10 @@ const socialLinks = [
 const aiModels = ["Grok", "Flux Pro", "DALL-E 3", "SD3", "Gemini", "Veo 3", "Claude", "MiniMax Music"];
 
 const galleryStrip = [
-  "/showcase/gallery-13.jpg", "/showcase/tool-avatar.jpg", "/showcase/gallery-14.jpg",
-  "/showcase/tool-logo.jpg", "/showcase/gallery-15.jpg", "/showcase/tool-interior.jpg",
-  "/showcase/gallery-16.jpg", "/showcase/tool-blend.jpg", "/showcase/gallery-17.jpg",
-  "/showcase/tool-headshot.jpg", "/showcase/gallery-18.jpg", "/showcase/tool-texture.jpg",
+  "/showcase/gallery-strip-1.jpg", "/showcase/gallery-strip-2.jpg", "/showcase/gallery-strip-3.jpg",
+  "/showcase/gallery-strip-4.jpg", "/showcase/gallery-15.jpg", "/showcase/tool-interior.jpg",
+  "/showcase/gallery-16.jpg", "/showcase/hero-marketplace-1.jpg", "/showcase/hero-marketplace-2.jpg",
+  "/showcase/gallery-18.jpg", "/showcase/hero-brandkit-1.jpg", "/showcase/hero-characters-1.jpg",
 ];
 
 export default function Footer() {

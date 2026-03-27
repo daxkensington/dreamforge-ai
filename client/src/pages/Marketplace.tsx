@@ -54,19 +54,19 @@ const CREATOR_SPOTLIGHTS = [
     name: "PixelDreamer",
     specialty: "Fantasy & Sci-Fi Prompts",
     sales: "2,400+",
-    images: ["/showcase/tool-charsheet.jpg", "/showcase/tool-avatar.jpg", "/showcase/tool-style.jpg", "/showcase/tool-variations.jpg"],
+    images: ["/showcase/hero-characters-1.jpg", "/showcase/hero-characters-2.jpg", "/showcase/hero-characters-3.jpg", "/showcase/gallery-strip-1.jpg"],
   },
   {
     name: "NeonForge",
     specialty: "Cyberpunk Presets & Workflows",
     sales: "1,800+",
-    images: ["/showcase/tool-colorgrade.jpg", "/showcase/tool-blend.jpg", "/showcase/tool-texteffect.jpg", "/showcase/tool-canvas.jpg"],
+    images: ["/showcase/hero-brandkit-1.jpg", "/showcase/hero-brandkit-2.jpg", "/showcase/hero-brandkit-3.jpg", "/showcase/gallery-strip-2.jpg"],
   },
   {
     name: "ArtisanAI",
     specialty: "Professional Asset Packs",
     sales: "3,100+",
-    images: ["/showcase/tool-logo.jpg", "/showcase/tool-mockup.jpg", "/showcase/tool-product.jpg", "/showcase/tool-texture.jpg"],
+    images: ["/showcase/hero-marketplace-1.jpg", "/showcase/hero-marketplace-2.jpg", "/showcase/gallery-strip-3.jpg", "/showcase/gallery-strip-4.jpg"],
   },
 ];
 
