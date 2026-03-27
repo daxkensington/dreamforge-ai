@@ -1200,7 +1200,7 @@ export default function VideoStudio() {
             <div className="flex gap-2">
               {["/showcase/tool-t2v.jpg", "/showcase/tool-video.jpg", "/showcase/home-tool-video.jpg"].map((img, i) => (
                 <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
-                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
                 </div>
               ))}
             </div>

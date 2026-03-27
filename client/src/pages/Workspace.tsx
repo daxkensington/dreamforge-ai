@@ -320,7 +320,7 @@ export default function Workspace() {
             <div className="flex gap-2">
               {["/showcase/gallery-13.jpg", "/showcase/gallery-17.jpg", "/showcase/gallery-20.jpg"].map((img, i) => (
                 <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
-                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
                 </div>
               ))}
             </div>

@@ -11,7 +11,7 @@ export default function NotFound() {
       <div className="absolute inset-0">
         <img
           src="/showcase/hero-forge.jpg"
-          alt=""
+          alt="DreamForgeX background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />

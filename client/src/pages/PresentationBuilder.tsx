@@ -322,7 +322,7 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
                   </CardHeader>
                   <CardContent>
                     {slides[currentSlide]?.imageUrl ? (
-                      <img src={slides[currentSlide].imageUrl} alt="" className="w-full rounded-lg" />
+                      <img src={slides[currentSlide].imageUrl} alt="Slide visual" className="w-full rounded-lg" />
                     ) : (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">{slides[currentSlide]?.imagePrompt}</p>

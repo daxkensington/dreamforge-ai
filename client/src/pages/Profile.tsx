@@ -534,7 +534,7 @@ export default function Profile() {
                               {gen.imageUrl ? (
                                 <img
                                   src={gen.imageUrl}
-                                  alt=""
+                                  alt="User avatar"
                                   className="h-12 w-12 rounded-lg object-cover bg-muted shrink-0"
                                 />
                               ) : (

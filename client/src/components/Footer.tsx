@@ -65,7 +65,7 @@ export default function Footer() {
         <div className="flex gap-3 animate-footer-marquee">
           {[...galleryStrip, ...galleryStrip].map((img, i) => (
             <div key={i} className="flex-shrink-0 h-20 w-28 rounded-lg overflow-hidden opacity-60 hover:opacity-100 transition-opacity duration-300">
-              <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
             </div>
           ))}
         </div>

@@ -30,10 +30,44 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "DreamForgeX",
+      url: "https://dreamforgex.ai",
+      logo: "https://dreamforgex.ai/logo.png",
+      description: "AI Creative Studio — 66+ tools for images, video, audio, songs, and design",
+      sameAs: ["https://github.com/daxkensington/dreamforge-ai"],
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "DreamForgeX",
+      applicationCategory: "MultimediaApplication",
+      operatingSystem: "Web",
+      url: "https://dreamforgex.ai",
+      description: "All-in-one AI creative studio with 66+ tools for image generation, video creation, song production, and design",
+      offers: {
+        "@type": "AggregateOffer",
+        lowPrice: "0",
+        highPrice: "79",
+        priceCurrency: "USD",
+        offerCount: "4",
+      },
+      featureList: "AI Image Generation, AI Video Creation, AI Song Creator, Music Video Studio, 50+ Social Templates, 25 Design Templates, AI Presentations, Blog Writer, Ad Copy Generator",
+    },
+  ],
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -211,7 +211,7 @@ export default function TimelineClip({
               <div className="absolute inset-0 opacity-20">
                 <img
                   src={clip.thumbnailUrl}
-                  alt=""
+                  alt="AI generated content"
                   className="w-full h-full object-cover"
                 />
               </div>

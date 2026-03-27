@@ -302,7 +302,7 @@ export default function Home() {
           <img
             key={src}
             src={src}
-            alt=""
+            alt="Hero background"
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out -z-10"
             style={{ opacity: i === heroIdx ? 1 : 0 }}
           />
@@ -667,7 +667,7 @@ export default function Home() {
                   <div className="absolute inset-0">
                     <img
                       src={tool.bg}
-                      alt=""
+                      alt="Hero background"
                       loading="lazy"
                       className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity duration-500"
                     />

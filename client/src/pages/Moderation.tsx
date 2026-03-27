@@ -203,7 +203,7 @@ export default function Moderation() {
                           {item.generation?.imageUrl ? (
                             <img
                               src={item.generation.imageUrl}
-                              alt=""
+                              alt="Moderation item"
                               className="w-full h-full object-cover"
                             />
                           ) : (

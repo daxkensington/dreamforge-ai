@@ -81,7 +81,7 @@ export default function Characters() {
             <div className="flex gap-2">
               {["/showcase/hero-characters-1.jpg", "/showcase/hero-characters-2.jpg", "/showcase/hero-characters-3.jpg"].map((img, i) => (
                 <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
-                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
                 </div>
               ))}
             </div>
@@ -152,7 +152,7 @@ export default function Characters() {
                   <div className="flex gap-1">
                     {(char.referenceImages as string[]).slice(0, 3).map((url, i) => (
                       <div key={i} className="w-10 h-10 rounded bg-muted overflow-hidden">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <img src={url} alt="Character reference" className="w-full h-full object-cover" />
                       </div>
                     ))}
                     <Badge variant="outline" className="text-xs"><ImageIcon className="w-3 h-3 mr-1" /> {(char.referenceImages as string[]).length} refs</Badge>

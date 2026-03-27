@@ -168,7 +168,7 @@ export default function Tools() {
       <div className="min-h-screen">
         {/* Hero */}
         <section className="relative h-[520px] flex items-center justify-center overflow-hidden">
-          <img src="/showcase/gallery-4.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/75 backdrop-blur-[2px]" />
           <motion.div
             variants={fadeUp} initial="hidden" animate="visible"

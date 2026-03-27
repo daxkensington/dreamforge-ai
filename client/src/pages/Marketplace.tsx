@@ -691,7 +691,7 @@ export default function Marketplace() {
                     <div className="grid grid-cols-2 gap-1 p-1">
                       {creator.images.map((img, j) => (
                         <div key={j} className="aspect-square overflow-hidden rounded-lg">
-                          <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
                         </div>
                       ))}
                     </div>
