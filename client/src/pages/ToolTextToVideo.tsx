@@ -12,14 +12,24 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const cameraPresets = [
-  { value: "static", label: "Static" },
-  { value: "pan-left", label: "Pan Left" },
-  { value: "pan-right", label: "Pan Right" },
-  { value: "zoom-in", label: "Zoom In" },
-  { value: "zoom-out", label: "Zoom Out" },
-  { value: "orbit", label: "Orbit" },
-  { value: "dolly-forward", label: "Dolly Forward" },
-  { value: "crane-up", label: "Crane Up" },
+  { value: "static", label: "Static", desc: "Locked camera, no movement" },
+  { value: "pan-left", label: "Pan Left", desc: "Smooth horizontal sweep left" },
+  { value: "pan-right", label: "Pan Right", desc: "Smooth horizontal sweep right" },
+  { value: "tilt-up", label: "Tilt Up", desc: "Reveal from ground to sky" },
+  { value: "tilt-down", label: "Tilt Down", desc: "Reveal from sky to ground" },
+  { value: "zoom-in", label: "Zoom In", desc: "Push into the subject" },
+  { value: "zoom-out", label: "Zoom Out", desc: "Pull back to reveal scene" },
+  { value: "dolly-forward", label: "Dolly Forward", desc: "Physical camera move toward subject" },
+  { value: "dolly-back", label: "Dolly Back", desc: "Physical camera pull away" },
+  { value: "orbit", label: "Orbit", desc: "360° rotation around subject" },
+  { value: "crane-up", label: "Crane Up", desc: "Rising aerial reveal" },
+  { value: "crane-down", label: "Crane Down", desc: "Descending into scene" },
+  { value: "tracking-left", label: "Track Left", desc: "Move alongside subject, left" },
+  { value: "tracking-right", label: "Track Right", desc: "Move alongside subject, right" },
+  { value: "handheld", label: "Handheld", desc: "Raw, authentic slight shake" },
+  { value: "drone-aerial", label: "Drone Aerial", desc: "High sweeping bird's eye view" },
+  { value: "vertigo-effect", label: "Vertigo Effect", desc: "Dolly zoom — background warps" },
+  { value: "whip-pan", label: "Whip Pan", desc: "Fast dramatic turn between subjects" },
 ];
 
 const videoStyles = [

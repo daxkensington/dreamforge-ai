@@ -44,6 +44,26 @@ export default function ToolUpscaler() {
   const [hdr, setHdr] = useState(0.5);
   const [sharpness, setSharpness] = useState(0.6);
   const [guidancePrompt, setGuidancePrompt] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
+  const optimizationPresets = [
+    { id: "portrait", label: "Portrait", emoji: "👤", desc: "Enhance skin, eyes, hair", creativity: 0.4, resemblance: 0.85, hdr: 0.4, sharpness: 0.7, prompt: "portrait photo, detailed skin texture, sharp eyes, natural hair" },
+    { id: "landscape", label: "Landscape", emoji: "🌄", desc: "Enhance foliage, sky, water", creativity: 0.5, resemblance: 0.75, hdr: 0.7, sharpness: 0.5, prompt: "landscape photography, detailed foliage, dramatic sky, crisp water" },
+    { id: "aifix", label: "AI Art Fix", emoji: "🔧", desc: "Fix hands, text, artifacts", creativity: 0.2, resemblance: 0.95, hdr: 0.3, sharpness: 0.8, prompt: "fix AI artifacts, correct hands and fingers, sharpen text, clean details" },
+    { id: "architecture", label: "Architecture", emoji: "🏛️", desc: "Enhance buildings, interiors", creativity: 0.3, resemblance: 0.9, hdr: 0.6, sharpness: 0.8, prompt: "architectural photography, sharp lines, detailed materials, clean geometry" },
+    { id: "product", label: "Product", emoji: "📦", desc: "E-commerce product photos", creativity: 0.2, resemblance: 0.9, hdr: 0.5, sharpness: 0.9, prompt: "product photography, clean white background, crisp details, commercial quality" },
+    { id: "anime", label: "Anime/Art", emoji: "🎨", desc: "Enhance illustration detail", creativity: 0.6, resemblance: 0.7, hdr: 0.3, sharpness: 0.4, prompt: "illustration, anime style, clean lines, vibrant colors" },
+  ];
+
+  const applyPreset = (preset: typeof optimizationPresets[0]) => {
+    setCreativity(preset.creativity);
+    setResemblance(preset.resemblance);
+    setHdr(preset.hdr);
+    setSharpness(preset.sharpness);
+    setGuidancePrompt(preset.prompt);
+    setActivePreset(preset.id);
+    toast.success(`Applied ${preset.label} preset`);
+  };
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +138,30 @@ export default function ToolUpscaler() {
                   {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
                   {uploading ? "Uploading..." : "Upload Image"}
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Optimization Presets */}
+            <Card className="border-border/50">
+              <CardContent className="p-5 space-y-3">
+                <Label className="text-sm font-medium">Quick Presets</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {optimizationPresets.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => applyPreset(p)}
+                      className={`p-2.5 rounded-lg text-left transition-all ${
+                        activePreset === p.id
+                          ? "bg-cyan-500/15 border border-cyan-500/30"
+                          : "bg-white/5 border border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      <span className="text-base">{p.emoji}</span>
+                      <p className="text-[10px] font-medium mt-0.5">{p.label}</p>
+                      <p className="text-[9px] text-muted-foreground">{p.desc}</p>
+                    </button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 

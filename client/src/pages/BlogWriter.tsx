@@ -132,6 +132,17 @@ export default function BlogWriter() {
                 <Button variant="outline" className="gap-1 bg-transparent text-xs" onClick={downloadMarkdown}><Download className="h-3 w-3" /> Markdown</Button>
               </div>
             </div>
+            {/* Tone adjustment */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Adjust tone:</span>
+              {["More Professional", "More Casual", "More Technical", "More Simple", "Shorter", "Longer"].map((adj) => (
+                <Button key={adj} variant="outline" size="sm" className="bg-transparent text-[10px] h-6 px-2"
+                  onClick={() => { setTone(adj.toLowerCase().replace("more ", "")); setResult(null); handleGenerate(); }}
+                >
+                  {adj}
+                </Button>
+              ))}
+            </div>
             {result.meta && (
               <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
                 <p className="text-[10px] text-muted-foreground mb-1">SEO Meta Description:</p>
