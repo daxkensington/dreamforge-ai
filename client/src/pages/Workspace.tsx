@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { StylePresets } from "@/components/StylePresets";
 
 const MODEL_OPTIONS = [
   // Image models
@@ -493,6 +494,17 @@ export default function Workspace() {
                     ))}
                   </div>
                 </div>
+
+                {/* Style Presets */}
+                <StylePresets
+                  compact
+                  onApply={(preset) => {
+                    setPrompt((prev) => prev ? `${prev}, ${preset.promptSuffix}` : preset.promptSuffix);
+                    if (preset.negativePrompt) setNegativePrompt(preset.negativePrompt);
+                    if (preset.creativity) setCreativityLevel(preset.creativity);
+                    if (preset.resemblance) setVariationStrength(100 - preset.resemblance);
+                  }}
+                />
 
                 {/* Negative Prompt */}
                 <div>
