@@ -81,22 +81,6 @@ export default function ClipMaker() {
     });
   };
 
-  if (!user) {
-    return (
-      <PageLayout>
-        <div className="container py-20 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-6">
-            <Scissors className="w-10 h-10 text-cyan-400" />
-          </div>
-          <h1 className="text-3xl font-bold mb-3">Viral Clip Maker</h1>
-          <p className="text-muted-foreground mb-6">Sign in to create viral short-form clips</p>
-          <Button asChild className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
-            <a href={getLoginUrl()}>Sign In to Get Started</a>
-          </Button>
-        </div>
-      </PageLayout>
-    );
-  }
 
   return (
     <PageLayout>

@@ -48,16 +48,6 @@ export default function Characters() {
     setStyleNotes(char.styleNotes || "");
   }
 
-  if (!user) {
-    return (
-      <div className="container py-20 text-center">
-        <User className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-        <h1 className="text-3xl font-bold mb-4">Character Library</h1>
-        <p className="text-muted-foreground mb-6">Create consistent characters across all your generations.</p>
-        <a href={getLoginUrl()}><Button size="lg">Sign In to Get Started</Button></a>
-      </div>
-    );
-  }
 
   return (
     <div>

@@ -1,6 +1,6 @@
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -23,25 +23,6 @@ export default function ToolPageLayout({
   children,
 }: ToolPageLayoutProps) {
   const { isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return (
-      <PageLayout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <div className={`inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} shadow-lg mb-6`}>
-              <Icon className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold mb-3">{title}</h1>
-            <p className="text-muted-foreground mb-6">{description}</p>
-            <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-              Sign in to Use This Tool
-            </Button>
-          </div>
-        </div>
-      </PageLayout>
-    );
-  }
 
   return (
     <PageLayout>
@@ -74,7 +55,26 @@ export default function ToolPageLayout({
           </div>
         </section>
 
-        {/* Tool Content */}
+        {/* Sign-in banner for unauthenticated users */}
+        {!isAuthenticated && (
+          <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/20">
+            <div className="container py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-cyan-400" />
+                <span className="text-sm text-white/80">Sign in to generate — it's free to start</span>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs h-8"
+                onClick={() => (window.location.href = getLoginUrl())}
+              >
+                Sign In Free
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Tool Content — always visible */}
         <section className="container py-8">
           {children}
         </section>

@@ -54,18 +54,6 @@ export default function BrandKits() {
     toast.info(`Applied "${preset.name}" preset`);
   }
 
-  if (!user) {
-    return (
-      <div className="container py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mx-auto mb-4">
-          <Palette className="w-8 h-8 text-cyan-400" />
-        </div>
-        <h1 className="text-3xl font-bold mb-4">Brand Kits</h1>
-        <p className="text-muted-foreground mb-6">Create reusable style presets for consistent branding.</p>
-        <a href={getLoginUrl()}><Button size="lg" className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">Sign In to Get Started</Button></a>
-      </div>
-    );
-  }
 
   const KitForm = ({ onSubmit, submitLabel, isPending }: { onSubmit: () => void; submitLabel: string; isPending: boolean }) => (
     <div className="space-y-4">

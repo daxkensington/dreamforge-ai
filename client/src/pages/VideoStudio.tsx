@@ -1174,23 +1174,6 @@ function TemplateBrowserSection() {
 export default function VideoStudio() {
   const { user } = useAuth();
 
-  if (!user) {
-    return (
-      <PageLayout>
-        <div className="container max-w-4xl py-20 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mx-auto mb-6">
-            <Video className="w-10 h-10 text-cyan-400" />
-          </div>
-          <h1 className="text-3xl font-bold text-foreground mb-3">Video Studio</h1>
-          <p className="text-muted-foreground mb-6">Sign in to access the full video creation suite</p>
-          <Button asChild className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
-            <a href={getLoginUrl()}>Sign In to Get Started</a>
-          </Button>
-        </div>
-      </PageLayout>
-    );
-  }
-
   return (
     <PageLayout>
       {/* Hero */}

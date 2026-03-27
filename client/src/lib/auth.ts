@@ -22,15 +22,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     authorized({ auth, request }) {
       const isAuthenticated = !!auth?.user;
-      const isProtected = request.nextUrl.pathname.startsWith("/workspace")
-        || request.nextUrl.pathname.startsWith("/profile")
+      // Only protect truly private pages — let users browse tools/studio/video
+      const isProtected = request.nextUrl.pathname.startsWith("/profile")
         || request.nextUrl.pathname.startsWith("/admin")
         || request.nextUrl.pathname.startsWith("/credits")
         || request.nextUrl.pathname.startsWith("/api-keys")
-        || request.nextUrl.pathname.startsWith("/batch")
-        || request.nextUrl.pathname.startsWith("/characters")
-        || request.nextUrl.pathname.startsWith("/video-studio")
-        || request.nextUrl.pathname.startsWith("/brand-kits")
         || request.nextUrl.pathname.startsWith("/notifications");
 
       if (isProtected && !isAuthenticated) return false; // redirects to signIn page
