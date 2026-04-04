@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { enforceRateLimit } from "../rate-limit";
 import {
   generateAudio,
   syncAudioToVideo,
@@ -74,6 +75,9 @@ export const audioRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Rate limit: 10 audio requests per minute per user
+      enforceRateLimit(`audio.generate:${ctx.user.id}`, 10, 60_000, "Audio generation rate limit exceeded — max 10 per minute.");
+
       const creditTool = `audio-${input.type}`;
       await tryDeductAudioCredits(
         ctx.user.id,

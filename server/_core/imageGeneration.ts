@@ -53,6 +53,8 @@ async function generateWithGrok(
 
   for (const model of models) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
       const response = await fetch("https://api.x.ai/v1/images/generations", {
         method: "POST",
         headers: {
@@ -66,7 +68,9 @@ async function generateWithGrok(
           size,
           response_format: "b64_json",
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
@@ -110,6 +114,8 @@ async function generateWithDallE(
 ): Promise<Buffer> {
   const validSize = resolveDallESize(size);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: {
@@ -125,7 +131,9 @@ async function generateWithDallE(
       style,
       response_format: "b64_json",
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -146,6 +154,8 @@ async function generateWithDallE(
 async function generateWithGemini(prompt: string): Promise<Buffer> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${ENV.geminiApiKey}`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -155,7 +165,9 @@ async function generateWithGemini(prompt: string): Promise<Buffer> {
         responseModalities: ["TEXT", "IMAGE"],
       },
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -222,6 +234,8 @@ async function generateWithSD3(
   if (width) body.width = width;
   if (height) body.height = height;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch("https://api.stability.ai/v2beta/stable-image/generate/sd3", {
     method: "POST",
     headers: {
@@ -230,7 +244,9 @@ async function generateWithSD3(
       Authorization: `Bearer ${ENV.stabilityApiKey}`,
     },
     body: JSON.stringify(body),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -302,6 +318,8 @@ async function generateWithTogether(
   width?: number,
   height?: number,
 ): Promise<Buffer> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch("https://api.together.xyz/v1/images/generations", {
     method: "POST",
     headers: {
@@ -317,7 +335,9 @@ async function generateWithTogether(
       n: 1,
       response_format: "b64_json",
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -338,6 +358,8 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
   const token = ENV.cfAiToken;
   if (!accountId || !token) throw new Error("Cloudflare AI not configured");
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
     {
@@ -347,8 +369,10 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ prompt }),
+      signal: controller.signal,
     }
   );
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");

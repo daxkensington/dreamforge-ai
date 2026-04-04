@@ -30,12 +30,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         || request.nextUrl.pathname.startsWith("/notifications");
 
       if (isProtected && !isAuthenticated) return false; // redirects to signIn page
+
+      // Admin routes require admin role
+      if (request.nextUrl.pathname.startsWith("/admin")) {
+        const token = auth as any;
+        const role = token?.user?.role || token?.role;
+        if (role !== "admin") {
+          return Response.redirect(new URL("/", request.nextUrl.origin));
+        }
+      }
+
       return true;
     },
     async jwt({ token, user, account }) {
       if (user) {
         token.provider = account?.provider;
         token.email = user.email;
+        token.role = (user as any).role || "user";
       }
       return token;
     },
@@ -43,6 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.sub!;
         (session as any).provider = token.provider;
+        (session as any).role = token.role || "user";
       }
       return session;
     },

@@ -12,9 +12,31 @@ import {
   createSceneKeyframe, listSceneKeyframes, updateSceneKeyframe, deleteSceneKeyframes,
   searchGenerations,
 } from "./dbExtended";
-import { getVideoProject, getGenerationById } from "./db";
+import { getVideoProject, getGenerationById, getDb } from "./db";
 import { createNotification } from "./routersPhase15";
 import { createHash, randomBytes } from "crypto";
+import { deductCredits, CREDIT_COSTS } from "./stripe";
+import { eq } from "drizzle-orm";
+import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
+
+// ─── Credit Deduction Helper ────────────────────────────────────────────────
+async function tryDeductCredits(userId: number, tool: string, description?: string) {
+  const cost = CREDIT_COSTS[tool] || 1;
+  if (cost === 0) return { success: true, balance: 0, needed: 0 };
+  try {
+    const result = await deductCredits(userId, cost, description || `Used ${tool}`);
+    if (!result.success) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
+      });
+    }
+    return result;
+  } catch (e: any) {
+    if (e instanceof TRPCError) throw e;
+    return { success: true, balance: 0, needed: 0 };
+  }
+}
 
 // ─── P0: Video Generation (Scene Keyframes) ────────────────────────────────
 
@@ -30,6 +52,11 @@ export const videoGenRouter = router({
     .mutation(async ({ ctx, input }) => {
       const project = await getVideoProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+
+      // Deduct credits for each keyframe scene
+      for (const scene of input.scenes) {
+        await tryDeductCredits(ctx.user.id, "text-to-image", `Video keyframe: ${scene.prompt.slice(0, 50)}`);
+      }
 
       // Delete existing keyframes for this project
       await deleteSceneKeyframes(input.projectId);
@@ -88,6 +115,9 @@ export const videoGenRouter = router({
       const keyframes = await listSceneKeyframes(input.projectId);
       const keyframe = keyframes.find((kf) => kf.id === input.keyframeId);
       if (!keyframe) throw new TRPCError({ code: "NOT_FOUND", message: "Keyframe not found in this project" });
+
+      // Deduct credits for regeneration
+      await tryDeductCredits(ctx.user.id, "text-to-image", `Regenerate keyframe: ${input.prompt.slice(0, 50)}`);
 
       await updateSceneKeyframe(input.keyframeId, { status: "generating", prompt: input.prompt });
       
@@ -498,6 +528,24 @@ export const apiKeyRouter = router({
       rateLimit: z.number().min(10).max(10000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Verify user has Enterprise subscription before allowing API key creation
+      const db = await getDb();
+      if (db) {
+        const subRows = await db
+          .select({ planName: subscriptionPlans.name })
+          .from(userSubscriptions)
+          .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+          .where(eq(userSubscriptions.userId, ctx.user.id))
+          .limit(1);
+        const planName = subRows[0]?.planName;
+        if (planName !== "enterprise") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "API key creation requires an Enterprise subscription.",
+          });
+        }
+      }
+
       // Generate a random API key
       const rawKey = `df_${randomBytes(32).toString("hex")}`;
       const keyHash = createHash("sha256").update(rawKey).digest("hex");

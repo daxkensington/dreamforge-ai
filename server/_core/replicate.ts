@@ -42,6 +42,8 @@ export async function replicatePredict(options: ReplicatePredictionOptions): Pro
   if (options.model) body.model = options.model;
   if (options.version) body.version = options.version;
 
+  const createController = new AbortController();
+  const createTimeout = setTimeout(() => createController.abort(), 30000);
   const createResponse = await fetch(REPLICATE_API_URL, {
     method: "POST",
     headers: {
@@ -50,7 +52,9 @@ export async function replicatePredict(options: ReplicatePredictionOptions): Pro
       Prefer: "wait",
     },
     body: JSON.stringify(body),
+    signal: createController.signal,
   });
+  clearTimeout(createTimeout);
 
   if (!createResponse.ok) {
     const detail = await createResponse.text().catch(() => "");
@@ -93,9 +97,13 @@ async function pollForResult(
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, intervalMs));
 
+    const pollController = new AbortController();
+    const pollTimeout = setTimeout(() => pollController.abort(), 30000);
     const response = await fetch(getUrl, {
       headers: { Authorization: `Bearer ${ENV.replicateApiToken}` },
+      signal: pollController.signal,
     });
+    clearTimeout(pollTimeout);
 
     if (!response.ok) continue;
 
@@ -117,7 +125,10 @@ async function pollForResult(
  * Download a remote URL and return as Buffer.
  */
 export async function downloadBuffer(url: string): Promise<Buffer> {
-  const response = await fetch(url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  const response = await fetch(url, { signal: controller.signal });
+  clearTimeout(timeout);
   if (!response.ok) throw new Error(`Failed to download from ${url}: ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
 }

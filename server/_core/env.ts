@@ -27,4 +27,8 @@ export const ENV = {
   get r2SecretAccessKey() { return process.env.R2_SECRET_ACCESS_KEY ?? ""; },
   get r2BucketName() { return process.env.R2_BUCKET_NAME ?? "dreamforge-assets"; },
   get r2PublicUrl() { return process.env.R2_PUBLIC_URL ?? ""; },
+  // Video Providers
+  get runwayApiKey() { return process.env.RUNWAY_API_KEY ?? ""; },
+  get klingAccessKey() { return process.env.KLING_ACCESS_KEY ?? ""; },
+  get klingSecretKey() { return process.env.KLING_SECRET_KEY ?? ""; },
 };

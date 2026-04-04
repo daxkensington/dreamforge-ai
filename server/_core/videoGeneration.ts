@@ -25,6 +25,8 @@ export async function generateVeo3Video(options: Veo3Options): Promise<string> {
   const geminiKey = ENV.geminiApiKey;
   if (!geminiKey) throw new Error("Gemini API key not configured for video generation");
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const startResponse = await fetch(
     `${VEO_BASE}/models/${VEO_MODEL}:predictLongRunning?key=${geminiKey}`,
     {
@@ -41,8 +43,10 @@ export async function generateVeo3Video(options: Veo3Options): Promise<string> {
           sampleCount: 1,
         },
       }),
+      signal: controller.signal,
     }
   );
+  clearTimeout(timeout);
 
   if (!startResponse.ok) {
     const err = await startResponse.text();
@@ -57,7 +61,10 @@ export async function generateVeo3Video(options: Veo3Options): Promise<string> {
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 5000));
 
-    const pollResponse = await fetch(`${VEO_BASE}/${operationName}?key=${geminiKey}`);
+    const pollController = new AbortController();
+    const pollTimeout = setTimeout(() => pollController.abort(), 30000);
+    const pollResponse = await fetch(`${VEO_BASE}/${operationName}?key=${geminiKey}`, { signal: pollController.signal });
+    clearTimeout(pollTimeout);
     const pollResult = await pollResponse.json();
 
     if (pollResult.done) {

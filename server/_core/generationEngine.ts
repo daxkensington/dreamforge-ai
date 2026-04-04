@@ -12,6 +12,9 @@ import type { GenerationRequest, GenerationResult, ProviderAdapter } from "./pro
 import { GrokProvider } from "./providers/grok";
 import { GeminiProvider } from "./providers/gemini";
 import { OpenAIProvider } from "./providers/openai";
+import { RunwayProvider } from "./providers/runway";
+import { KlingProvider } from "./providers/kling";
+import { ReplicateProvider } from "./providers/replicate";
 
 // ─── Provider Instances (lazy singletons) ─────────────────────────────────
 
@@ -23,6 +26,9 @@ function getProviders(): Record<string, ProviderAdapter> {
       grok: new GrokProvider(),
       openai: new OpenAIProvider(),
       gemini: new GeminiProvider(),
+      runway: new RunwayProvider(),
+      kling: new KlingProvider(),
+      replicate: new ReplicateProvider(),
     };
   }
   return _providers;

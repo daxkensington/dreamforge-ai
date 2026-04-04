@@ -99,6 +99,41 @@ import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { collaborationRouter } from "./routers/collaboration";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
+import { getDb } from "./db";
+import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { enforceRateLimit } from "./rate-limit";
+import { getTierConfig } from "@shared/tiers";
+
+// ─── Premium Models (require paid tier) ────────────────────────────────────
+const PREMIUM_MODEL_IDS = new Set([
+  "ultra",
+  "dall-e-3",
+  "dall-e-3-hd",
+  "stability-ultra",
+  "stability-core",
+  "flux-pro",
+  "runway-gen4.5",
+  "runway-gen4-turbo",
+  "kling-2.0",
+]);
+
+// ─── User Tier Helper ──────────────────────────────────────────────────────
+async function getUserTier(userId: number): Promise<string> {
+  try {
+    const db = await getDb();
+    if (!db) return "free";
+    const rows = await db
+      .select({ planName: subscriptionPlans.name })
+      .from(userSubscriptions)
+      .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
+      .where(eq(userSubscriptions.userId, userId))
+      .limit(1);
+    return rows[0]?.planName ?? "free";
+  } catch {
+    return "free";
+  }
+}
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
 async function tryDeductCredits(userId: number, tool: string, description?: string) {
@@ -115,8 +150,8 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
     return result;
   } catch (e: any) {
     if (e instanceof TRPCError) throw e;
-    // If credit system is unavailable, allow generation to proceed
-    return { success: true, balance: 0, needed: 0 };
+    console.error("[tryDeductCredits] Credit deduction failed for user", userId, "tool", tool, ":", e);
+    throw e;
   }
 }
 
@@ -387,6 +422,29 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Rate limit: 20 requests per minute per user
+        enforceRateLimit(`generation.create:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
+
+        // Get user tier for watermark decision + enforcement
+        const userTier = await getUserTier(ctx.user.id);
+        const tierConfig = getTierConfig(userTier);
+
+        // Block premium models for free tier
+        if (!tierConfig.premiumModels && PREMIUM_MODEL_IDS.has(input.modelVersion)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Model "${input.modelVersion}" requires a Pro or higher subscription.`,
+          });
+        }
+
+        // Cap resolution for the user's tier
+        if (input.width > tierConfig.maxImageResolution || input.height > tierConfig.maxImageResolution) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Max resolution for your plan is ${tierConfig.maxImageResolution}x${tierConfig.maxImageResolution}. Upgrade to increase.`,
+          });
+        }
+
         // Deduct credits
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
         await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`);
@@ -417,7 +475,7 @@ export const appRouter = router({
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
 
-          const { url } = await generateImage({ prompt: enhancedPrompt });
+          const { url } = await generateImage({ prompt: enhancedPrompt, userTier });
 
           await updateGeneration(genId, {
             status: "completed",
@@ -644,11 +702,20 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Deduct credits for entire batch upfront
+        // Rate limit: 5 batch requests per minute per user
+        enforceRateLimit(`generation.batchCreate:${ctx.user.id}`, 5, 60_000, "Batch generation rate limit exceeded — max 5 per minute.");
+
+        // Deduct credits for entire batch upfront using actual total cost
         const totalCost = input.prompts.reduce((sum, p) => {
           return sum + (CREDIT_COSTS[p.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1);
         }, 0);
-        await tryDeductCredits(ctx.user.id, "text-to-image", `Batch generation (${input.prompts.length} items)`);
+        const batchResult = await deductCredits(ctx.user.id, totalCost, `Batch generation (${input.prompts.length} items)`);
+        if (!batchResult.success) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Insufficient credits. Need ${batchResult.needed}, have ${batchResult.balance}. Purchase more credits to continue.`,
+          });
+        }
 
         const results: Array<{ id: number; status: string; prompt: string; error?: string; imageUrl?: string | null }> = [];
 
@@ -2248,9 +2315,15 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Charge per image
-        for (let i = 0; i < input.prompts.length; i++) {
-          await tryDeductCredits(ctx.user.id, "text-to-image", `Batch image ${i + 1}/${input.prompts.length}`);
+        // Charge for all images upfront using actual total cost
+        const perImageCost = CREDIT_COSTS["text-to-image"] || 1;
+        const totalCost = perImageCost * input.prompts.length;
+        const batchResult = await deductCredits(ctx.user.id, totalCost, `Batch prompts (${input.prompts.length} images)`);
+        if (!batchResult.success) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Insufficient credits. Need ${batchResult.needed}, have ${batchResult.balance}. Purchase more credits to continue.`,
+          });
         }
         const results: Array<{ prompt: string; url: string | null; status: string; error?: string }> = [];
 
@@ -3017,53 +3090,103 @@ export const appRouter = router({
           duration: z.enum(["4", "8"]).default("8"),
           aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
           style: z.enum(["cinematic", "anime", "documentary", "slow-motion", "timelapse", "drone", "handheld", "commercial"]).default("cinematic"),
-          model: z.enum(["veo-3", "minimax", "auto"]).default("auto"),
+          model: z.enum(["veo-3", "minimax", "runway-gen4.5", "runway-gen4-turbo", "kling-2.0", "kling-1.6", "auto"]).default("auto"),
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Rate limit: 10 video requests per minute per user
+        enforceRateLimit(`video.textToVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
 
-        // Try Minimax via Replicate if selected or as fallback
-        if (input.model === "minimax" || (input.model === "auto" && !process.env.GEMINI_API_KEY && process.env.REPLICATE_API_TOKEN)) {
+        const styleEnhancers: Record<string, string> = {
+          "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
+          "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
+          "documentary": "documentary style, natural lighting, handheld camera, realistic",
+          "slow-motion": "slow motion, 120fps, ultra smooth, dramatic moment captured in detail",
+          "timelapse": "timelapse, hours compressed into seconds, dynamic movement of time",
+          "drone": "aerial drone shot, sweeping bird's eye view, cinematic flyover",
+          "handheld": "handheld camera, raw authentic feel, slight shake, intimate perspective",
+          "commercial": "polished commercial production, perfect lighting, premium quality, advertising grade",
+        };
+        const enhancedPrompt = `${input.prompt}. ${styleEnhancers[input.style]}. High quality, professional production.`;
+
+        // Direct model selection
+        if (input.model.startsWith("runway-")) {
+          const { RunwayProvider } = await import("./_core/providers/runway");
+          const provider = new RunwayProvider();
+          const result = await provider.generate({ prompt: enhancedPrompt, model: input.model, options: { duration: parseInt(input.duration) } });
+          return { status: "completed" as const, videoUrl: result.url, model: input.model };
+        }
+
+        if (input.model.startsWith("kling-")) {
+          const { KlingProvider } = await import("./_core/providers/kling");
+          const provider = new KlingProvider();
+          const result = await provider.generate({ prompt: enhancedPrompt, model: input.model, options: { duration: parseInt(input.duration) } });
+          return { status: "completed" as const, videoUrl: result.url, model: input.model };
+        }
+
+        if (input.model === "minimax") {
+          const { ReplicateProvider } = await import("./_core/providers/replicate");
+          const provider = new ReplicateProvider();
+          const result = await provider.generate({ prompt: enhancedPrompt, model: "minimax-video", options: { prompt_optimizer: true } });
+          return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
+        }
+
+        // Auto mode: try providers in priority order based on availability
+        const errors: string[] = [];
+
+        // Priority 1: Runway Gen-4.5 (best quality)
+        if (input.model === "auto" && process.env.RUNWAY_API_KEY) {
           try {
-            const { ReplicateProvider } = await import("./_core/providers/replicate");
-            const provider = new ReplicateProvider();
-            const result = await provider.generate({
-              prompt: `${input.prompt}. Style: ${input.style}. High quality, professional production.`,
-              model: "minimax-video",
-              options: { prompt_optimizer: true },
-            });
-            return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
+            const { RunwayProvider } = await import("./_core/providers/runway");
+            const provider = new RunwayProvider();
+            const result = await provider.generate({ prompt: enhancedPrompt, model: "runway-gen4.5", options: { duration: parseInt(input.duration) } });
+            return { status: "completed" as const, videoUrl: result.url, model: "runway-gen4.5" };
           } catch (err: any) {
-            if (input.model === "minimax") throw err;
-            console.warn("[Video] Minimax failed, trying Veo 3:", err.message);
+            errors.push(`Runway: ${err.message}`);
+            console.warn("[Video] Runway failed, trying next:", err.message);
           }
         }
 
-        try {
-          const styleEnhancers: Record<string, string> = {
-            "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
-            "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
-            "documentary": "documentary style, natural lighting, handheld camera, realistic",
-            "slow-motion": "slow motion, 120fps, ultra smooth, dramatic moment captured in detail",
-            "timelapse": "timelapse, hours compressed into seconds, dynamic movement of time",
-            "drone": "aerial drone shot, sweeping bird's eye view, cinematic flyover",
-            "handheld": "handheld camera, raw authentic feel, slight shake, intimate perspective",
-            "commercial": "polished commercial production, perfect lighting, premium quality, advertising grade",
-          };
-
-          const enhancedPrompt = `${input.prompt}. ${styleEnhancers[input.style]}. High quality, professional production.`;
-          const { generateVeo3Video } = await import("./_core/videoGeneration");
-          const videoUrl = await generateVeo3Video({
-            prompt: enhancedPrompt,
-            aspectRatio: input.aspectRatio,
-            durationSeconds: parseInt(input.duration),
-          });
-
-          return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
-        } catch (error: any) {
-          return { videoUrl: null, status: "failed" as const, error: error.message };
+        // Priority 2: Google Veo 3
+        if ((input.model === "auto" || input.model === "veo-3") && process.env.GEMINI_API_KEY) {
+          try {
+            const { generateVeo3Video } = await import("./_core/videoGeneration");
+            const videoUrl = await generateVeo3Video({ prompt: enhancedPrompt, aspectRatio: input.aspectRatio, durationSeconds: parseInt(input.duration) });
+            return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
+          } catch (err: any) {
+            if (input.model === "veo-3") return { videoUrl: null, status: "failed" as const, error: err.message };
+            errors.push(`Veo 3: ${err.message}`);
+            console.warn("[Video] Veo 3 failed, trying next:", err.message);
+          }
         }
+
+        // Priority 3: Kling 2.0 (best value)
+        if (input.model === "auto" && process.env.KLING_ACCESS_KEY) {
+          try {
+            const { KlingProvider } = await import("./_core/providers/kling");
+            const provider = new KlingProvider();
+            const result = await provider.generate({ prompt: enhancedPrompt, model: "kling-2.0", options: { duration: parseInt(input.duration) } });
+            return { status: "completed" as const, videoUrl: result.url, model: "kling-2.0" };
+          } catch (err: any) {
+            errors.push(`Kling: ${err.message}`);
+            console.warn("[Video] Kling failed, trying next:", err.message);
+          }
+        }
+
+        // Priority 4: Minimax via Replicate (fallback)
+        if (input.model === "auto" && process.env.REPLICATE_API_TOKEN) {
+          try {
+            const { ReplicateProvider } = await import("./_core/providers/replicate");
+            const provider = new ReplicateProvider();
+            const result = await provider.generate({ prompt: enhancedPrompt, model: "minimax-video", options: { prompt_optimizer: true } });
+            return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
+          } catch (err: any) {
+            errors.push(`Minimax: ${err.message}`);
+          }
+        }
+
+        return { videoUrl: null, status: "failed" as const, error: `All video providers failed:\n${errors.join("\n")}` }
       }),
 
     // Image-to-Video — animate a still image into a video clip via Veo 3
@@ -3077,6 +3200,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Rate limit: 10 video requests per minute per user
+        enforceRateLimit(`video.imageToVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
         try {
 
@@ -3586,8 +3711,8 @@ export const appRouter = router({
   export: router({
     metadata: protectedProcedure
       .input(z.object({ ids: z.array(z.number()).min(1).max(50) }))
-      .query(async ({ input }) => {
-        const gens = await getGenerationsForExport(input.ids);
+      .query(async ({ ctx, input }) => {
+        const gens = await getGenerationsForExport(input.ids, ctx.user.id);
         return gens.map((g) => ({
           id: g.id,
           prompt: g.prompt,
@@ -3653,6 +3778,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Rate limit: 10 video requests per minute per user
+        enforceRateLimit(`song.generateMusicVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "text-to-video", "Music video generation");
 
         // Generate video scenes based on the concept + photo

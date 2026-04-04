@@ -35,14 +35,19 @@ export async function storagePut(
 ): Promise<{ key: string; url: string }> {
   const finalKey = key.startsWith("/") ? key.slice(1) : key;
 
-  await getS3().send(
-    new PutObjectCommand({
-      Bucket: BUCKET(),
-      Key: finalKey,
-      Body: typeof data === "string" ? Buffer.from(data, "base64") : data,
-      ContentType: contentType,
-    })
-  );
+  try {
+    await getS3().send(
+      new PutObjectCommand({
+        Bucket: BUCKET(),
+        Key: finalKey,
+        Body: typeof data === "string" ? Buffer.from(data, "base64") : data,
+        ContentType: contentType,
+      })
+    );
+  } catch (error: any) {
+    console.error(`[Storage] R2 upload failed for key "${finalKey}":`, error.message || error);
+    throw new Error(`Failed to upload file to storage: ${error.message || "Unknown R2 error"}`);
+  }
 
   const url = ENV.r2PublicUrl
     ? `${ENV.r2PublicUrl}/${finalKey}`
@@ -105,7 +110,8 @@ export function generateStorageKey(prefix: string, extension: string): string {
 export async function getUploadUrl(
   key: string,
   contentType: string,
-  expiresIn: number = 3600
+  expiresIn: number = 3600,
+  maxSizeBytes: number = 50 * 1024 * 1024 // 50MB default
 ): Promise<string> {
   return getSignedUrl(
     getS3(),
@@ -113,7 +119,11 @@ export async function getUploadUrl(
       Bucket: BUCKET(),
       Key: key,
       ContentType: contentType,
+      ContentLength: maxSizeBytes,
     }),
-    { expiresIn }
+    {
+      expiresIn,
+      signableHeaders: new Set(["content-length"]),
+    }
   );
 }

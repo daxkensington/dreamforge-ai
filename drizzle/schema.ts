@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -105,7 +106,11 @@ export const generations = pgTable("generations", {
   metadata: jsonb("metadata"), // extra generation params
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("generations_userId_idx").on(table.userId),
+  index("generations_status_idx").on(table.status),
+  index("generations_createdAt_idx").on(table.createdAt),
+]);
 
 export type Generation = typeof generations.$inferSelect;
 export type InsertGeneration = typeof generations.$inferInsert;
@@ -115,7 +120,10 @@ export const generationTags = pgTable("generationTags", {
   id: serial("id").primaryKey(),
   generationId: integer("generationId").notNull(),
   tagId: integer("tagId").notNull(),
-});
+}, (table) => [
+  index("generationTags_generationId_idx").on(table.generationId),
+  index("generationTags_tagId_idx").on(table.tagId),
+]);
 
 export type GenerationTag = typeof generationTags.$inferSelect;
 
@@ -132,7 +140,10 @@ export const galleryItems = pgTable("galleryItems", {
   approvedBy: integer("approvedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("galleryItems_generationId_idx").on(table.generationId),
+  index("galleryItems_userId_idx").on(table.userId),
+]);
 
 export type GalleryItem = typeof galleryItems.$inferSelect;
 export type InsertGalleryItem = typeof galleryItems.$inferInsert;
@@ -150,7 +161,9 @@ export const moderationQueue = pgTable("moderationQueue", {
   reviewedAt: timestamp("reviewedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("moderationQueue_status_idx").on(table.status),
+]);
 
 export type ModerationItem = typeof moderationQueue.$inferSelect;
 export type InsertModerationItem = typeof moderationQueue.$inferInsert;
@@ -379,7 +392,9 @@ export const creditTransactions = pgTable("creditTransactions", {
   expiresAt: timestamp("expiresAt"), // null = never expires; set for bonus/signup credits
   expired: boolean("expired").default(false).notNull(), // true once credits have been deducted
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("creditTransactions_userId_idx").on(table.userId),
+]);
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type InsertCreditTransaction = typeof creditTransactions.$inferInsert;
@@ -394,7 +409,9 @@ export const notifications = pgTable("notifications", {
   read: boolean("read").default(false).notNull(),
   metadata: jsonb("metadata"), // extra data (projectId, generationId, etc.)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("notifications_userId_idx").on(table.userId),
+]);
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
@@ -488,7 +505,10 @@ export const marketplaceListings = pgTable("marketplaceListings", {
   isFeatured: boolean("isFeatured").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("marketplaceListings_sellerId_idx").on(table.sellerId),
+  index("marketplaceListings_status_idx").on(table.status),
+]);
 
 export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type InsertMarketplaceListing = typeof marketplaceListings.$inferInsert;

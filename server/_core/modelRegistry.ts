@@ -11,7 +11,7 @@ import { ENV } from "./env";
 export interface AIModel {
   id: string;
   name: string;
-  provider: "grok" | "openai" | "gemini" | "anthropic" | "replicate" | "stability" | "groq" | "together" | "cloudflare" | "runpod" | "local";
+  provider: "grok" | "openai" | "gemini" | "anthropic" | "replicate" | "stability" | "groq" | "together" | "cloudflare" | "runpod" | "local" | "runway" | "kling";
   type: "image" | "llm" | "video" | "audio";
   capabilities: string[];
   maxResolution: { width: number; height: number };
@@ -261,6 +261,74 @@ function veo3Video(): AIModel {
   };
 }
 
+// ─── Runway Models (Video) ────────────────────────────────────────────────────
+
+function runwayGen45(): AIModel {
+  return {
+    id: "runway-gen4.5",
+    name: "Runway Gen-4.5",
+    provider: "runway",
+    type: "video",
+    capabilities: ["text-to-video", "image-to-video"],
+    maxResolution: { width: 1280, height: 720 },
+    creditCost: { base: 12 },
+    isAvailable: !!ENV.runwayApiKey,
+    tier: "creator",
+    description: "Runway Gen-4.5 — flagship commercial-grade video generation. Best-in-class quality and coherence.",
+    costInfo: "~$1.20/10s video",
+  };
+}
+
+function runwayGen4Turbo(): AIModel {
+  return {
+    id: "runway-gen4-turbo",
+    name: "Runway Gen-4 Turbo",
+    provider: "runway",
+    type: "video",
+    capabilities: ["text-to-video", "image-to-video"],
+    maxResolution: { width: 1280, height: 720 },
+    creditCost: { base: 5 },
+    isAvailable: !!ENV.runwayApiKey,
+    tier: "creator",
+    description: "Runway Gen-4 Turbo — fast, cost-effective video generation with great quality.",
+    costInfo: "~$0.50/10s video",
+  };
+}
+
+// ─── Kling Models (Video) ─────────────────────────────────────────────────────
+
+function kling20(): AIModel {
+  return {
+    id: "kling-2.0",
+    name: "Kling 2.0 Master",
+    provider: "kling",
+    type: "video",
+    capabilities: ["text-to-video", "image-to-video"],
+    maxResolution: { width: 1920, height: 1080 },
+    creditCost: { base: 8 },
+    isAvailable: !!ENV.klingAccessKey && !!ENV.klingSecretKey,
+    tier: "creator",
+    description: "Kling 2.0 Master — high-quality video generation with excellent motion and detail. Best value.",
+    costInfo: "~$0.28/5s video",
+  };
+}
+
+function kling16(): AIModel {
+  return {
+    id: "kling-1.6",
+    name: "Kling 1.6 Standard",
+    provider: "kling",
+    type: "video",
+    capabilities: ["text-to-video", "image-to-video"],
+    maxResolution: { width: 1920, height: 1080 },
+    creditCost: { base: 4 },
+    isAvailable: !!ENV.klingAccessKey && !!ENV.klingSecretKey,
+    tier: "free",
+    description: "Kling 1.6 — fast and affordable video generation. Great for quick iterations.",
+    costInfo: "~$0.14/5s video",
+  };
+}
+
 // ─── Audio Models ───────────────────────────────────────────────────────────
 
 function musicGen(): AIModel {
@@ -380,6 +448,10 @@ function buildModelList(): AIModel[] {
     sd3Image(),
     // Video models
     veo3Video(),
+    runwayGen45(),
+    runwayGen4Turbo(),
+    kling20(),
+    kling16(),
     minimaxVideo(),
     stableVideo(),
     // Free image models

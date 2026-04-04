@@ -487,14 +487,14 @@ export async function getModerationStats() {
 
 // ─── Export Helpers ──────────────────────────────────────────────────────────
 
-export async function getGenerationsForExport(ids: number[]) {
+export async function getGenerationsForExport(ids: number[], userId: number) {
   const db = await getDb();
   if (!db) return [];
 
   const gens = await db
     .select()
     .from(generations)
-    .where(inArray(generations.id, ids));
+    .where(and(inArray(generations.id, ids), eq(generations.userId, userId)));
 
   const tagRows = await db
     .select({ generationId: generationTags.generationId, tag: tags })
