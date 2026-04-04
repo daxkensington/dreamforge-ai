@@ -705,6 +705,19 @@ export const appRouter = router({
         // Rate limit: 5 batch requests per minute per user
         enforceRateLimit(`generation.batchCreate:${ctx.user.id}`, 5, 60_000, "Batch generation rate limit exceeded — max 5 per minute.");
 
+        // Tier enforcement for batch
+        const userTier = await getUserTier(ctx.user.id);
+        const tierConfig = getTierConfig(userTier);
+
+        for (const item of input.prompts) {
+          if (!tierConfig.premiumModels && PREMIUM_MODEL_IDS.has(item.modelVersion)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a Pro or higher subscription.` });
+          }
+          if (item.width > tierConfig.maxImageResolution || item.height > tierConfig.maxImageResolution) {
+            throw new TRPCError({ code: "FORBIDDEN", message: `Max resolution for your plan is ${tierConfig.maxImageResolution}x${tierConfig.maxImageResolution}.` });
+          }
+        }
+
         // Deduct credits for entire batch upfront using actual total cost
         const totalCost = input.prompts.reduce((sum, p) => {
           return sum + (CREDIT_COSTS[p.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1);
@@ -741,7 +754,7 @@ export const appRouter = router({
               ? `${item.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${item.width}x${item.height} resolution, ${item.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`
               : `${item.prompt}. Style: high quality digital art, ${item.width}x${item.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
 
-            const { url } = await generateImage({ prompt: enhancedPrompt });
+            const { url } = await generateImage({ prompt: enhancedPrompt, userTier });
 
             await updateGeneration(genId, {
               status: "completed",

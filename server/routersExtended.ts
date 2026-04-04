@@ -34,7 +34,8 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
     return result;
   } catch (e: any) {
     if (e instanceof TRPCError) throw e;
-    return { success: true, balance: 0, needed: 0 };
+    console.error("[Credits] Extended router deduction failed:", e);
+    throw e;
   }
 }
 
