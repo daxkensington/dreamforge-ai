@@ -881,6 +881,27 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "super-resolution", "Image upscale");
         try {
+          // Try RunPod Real-ESRGAN first (true pixel-level upscaling, 90% cheaper)
+          const { isRunPodAvailable, runpodUpscale } = await import("./_core/runpod");
+          if (isRunPodAvailable()) {
+            try {
+              const imgResp = await fetch(input.imageUrl);
+              if (imgResp.ok) {
+                const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+                const imageB64 = imgBuffer.toString("base64");
+                const scale = input.scaleFactor === "4x" ? 4 : 2;
+                const resultBuffer = await runpodUpscale(imageB64, scale);
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const key = generateStorageKey("upscaled", "png");
+                const { url } = await storagePut(key, resultBuffer, "image/png");
+                return { url, status: "completed" as const };
+              }
+            } catch (err: any) {
+              console.warn("[Upscale] RunPod ESRGAN failed, falling back to LLM:", err.message);
+            }
+          }
+
+          // Fallback: LLM-based upscale via generateImage
           const scaleLabel = input.scaleFactor === "4x" ? "ultra high resolution 4K" : "high resolution 2K";
           const detailBoost = input.enhanceDetails ? ", enhanced fine details, sharpened textures, crisp edges" : "";
           const upscalePrompt = `Upscale and enhance this image to ${scaleLabel}. Preserve all original content exactly, improve clarity and sharpness${detailBoost}. Professional quality enhancement.`;
@@ -958,6 +979,28 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "background-edit", "Background edit");
         try {
+          // For "remove" mode, try RunPod RMBG-2.0 first (true segmentation, 95% cheaper)
+          if (input.mode === "remove") {
+            const { isRunPodAvailable, runpodRemoveBackground } = await import("./_core/runpod");
+            if (isRunPodAvailable()) {
+              try {
+                const imgResp = await fetch(input.imageUrl);
+                if (imgResp.ok) {
+                  const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+                  const imageB64 = imgBuffer.toString("base64");
+                  const resultBuffer = await runpodRemoveBackground(imageB64);
+                  const { storagePut, generateStorageKey } = await import("./storage");
+                  const key = generateStorageKey("bg-removed", "png");
+                  const { url } = await storagePut(key, resultBuffer, "image/png");
+                  return { url, status: "completed" as const, mode: input.mode };
+                }
+              } catch (err: any) {
+                console.warn("[BgRemove] RunPod RMBG failed, falling back to LLM:", err.message);
+              }
+            }
+          }
+
+          // Fallback: LLM-based bg edit via generateImage (also handles "replace" mode)
           let prompt: string;
           if (input.mode === "remove") {
             prompt = "Remove the background from this image completely, leaving only the main subject on a clean transparent/white background. Preserve all details of the subject with clean edges.";

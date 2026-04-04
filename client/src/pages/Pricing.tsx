@@ -487,7 +487,7 @@ export default function Pricing() {
                 tier: "Pro",
                 gradient: "from-violet-500 to-fuchsia-400",
                 label: "Ultra HD + Video",
-                images: ["/showcase/hero-pricing-studio.jpg", "/showcase/gallery-4.jpg", "/showcase/gallery-12.jpg"],
+                images: ["/showcase/hero-pricing-pro.jpg", "/showcase/gallery-4.jpg", "/showcase/gallery-12.jpg"],
               },
               {
                 tier: "Studio",

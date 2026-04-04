@@ -429,8 +429,71 @@ function edgeTts(): AIModel {
   };
 }
 
-// ─── RunPod / Self-Hosted (future) ─────────────────────────────────────────
-// Add entries here and create a RunPodProvider adapter when ready.
+// ─── RunPod / Self-Hosted ──────────────────────────────────────────────────
+
+function runpodFluxDev(): AIModel {
+  return {
+    id: "runpod-flux-dev",
+    name: "Flux Dev (Self-Hosted)",
+    provider: "runpod",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1440, height: 1440 },
+    creditCost: { base: 2, hd: 3 },
+    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    tier: "free",
+    description: "Flux Dev on DreamForge GPUs — high quality at 80% lower cost. 20-step generation.",
+    costInfo: "~$0.004/image (self-hosted)",
+  };
+}
+
+function runpodFluxSchnell(): AIModel {
+  return {
+    id: "runpod-flux-schnell",
+    name: "Flux Schnell (Self-Hosted)",
+    provider: "runpod",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1024, height: 1024 },
+    creditCost: { base: 1 },
+    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    tier: "free",
+    description: "Flux Schnell on DreamForge GPUs — fast 4-step generation at minimal cost.",
+    costInfo: "~$0.001/image (self-hosted)",
+  };
+}
+
+function runpodUpscaler(): AIModel {
+  return {
+    id: "runpod-esrgan",
+    name: "Real-ESRGAN (Self-Hosted)",
+    provider: "runpod",
+    type: "image",
+    capabilities: ["upscale"],
+    maxResolution: { width: 4096, height: 4096 },
+    creditCost: { base: 1 },
+    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    tier: "free",
+    description: "Real-ESRGAN 4x upscaling on DreamForge GPUs — 90% cheaper than API.",
+    costInfo: "~$0.0005/image (self-hosted)",
+  };
+}
+
+function runpodBgRemoval(): AIModel {
+  return {
+    id: "runpod-rmbg",
+    name: "RMBG-2.0 (Self-Hosted)",
+    provider: "runpod",
+    type: "image",
+    capabilities: ["background-removal"],
+    maxResolution: { width: 2048, height: 2048 },
+    creditCost: { base: 1 },
+    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    tier: "free",
+    description: "RMBG-2.0 background removal on DreamForge GPUs — 95% cheaper than API.",
+    costInfo: "~$0.0003/image (self-hosted)",
+  };
+}
 
 // ─── Registry ──────────────────────────────────────────────────────────────
 
@@ -454,6 +517,11 @@ function buildModelList(): AIModel[] {
     kling16(),
     minimaxVideo(),
     stableVideo(),
+    // Self-hosted (RunPod) — cheapest image gen
+    runpodFluxDev(),
+    runpodFluxSchnell(),
+    runpodUpscaler(),
+    runpodBgRemoval(),
     // Free image models
     togetherFlux(),
     cloudflareImage(),

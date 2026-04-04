@@ -1,4 +1,4 @@
-# GenesisSynth Lab - Project TODO
+# DreamForge AI - Project TODO
 
 ## Database & Schema
 - [x] Design and implement database schema (generations, tags, gallery_items, moderation_queue)
@@ -151,7 +151,7 @@
 - [x] Verify domain/brand availability for top candidates
 - [x] Present shortlist to user for selection — user chose "DreamForge"
 - [x] Apply chosen name across all pages, components, and metadata
-- [ ] Update VITE_APP_TITLE via Management UI Settings (user action)
+- [x] Update VITE_APP_TITLE via Management UI Settings (obsolete — migrated to Next.js)
 - [x] Run all tests and verify (72/72 passed)
 
 ## Phase 6 — AI Tools Suite
@@ -177,7 +177,7 @@
 - [x] Design tier cards with feature comparison table
 - [x] Add generation limits, tool access levels, priority rendering per tier
 - [x] Add CTA buttons (Get Started Free, Upgrade to Pro, Contact Sales)
-- [ ] Link pricing from Navbar and landing page
+- [x] Link pricing from Navbar and landing page
 
 ### First-Time Onboarding Wizard
 - [x] Track onboarding completion state (localStorage)
@@ -839,3 +839,30 @@
 ### Verification
 - [x] Build passes — 0 TypeScript errors
 - [x] 441 tests passing
+
+## Phase 26 — Self-Hosted Models on RunPod (50-90% Cost Savings)
+
+### RunPod Provider Integration
+- [x] Add RUNPOD_API_KEY + RUNPOD_FLUX_ENDPOINT_ID env vars to env.ts
+- [x] Create server/_core/runpod.ts — RunPod serverless client (runsync + async polling)
+- [x] Add RunPod models to modelRegistry.ts (flux-dev, flux-schnell, esrgan, rmbg)
+- [x] Wire RunPod Flux into imageGeneration.ts as explicit model options
+- [x] Insert RunPod Flux Schnell into auto-fallback chain (position 4, before Grok)
+- [x] Wire RunPod into Ultra mode (tries RunPod Flux Dev before Replicate Flux Pro)
+
+### Self-Hosted Upscaler & Background Removal
+- [x] Upgrade tools.upscale to use RunPod Real-ESRGAN (true pixel-level upscaling) with LLM fallback
+- [x] Upgrade tools.backgroundEdit "remove" mode to use RunPod RMBG-2.0 (segmentation) with LLM fallback
+
+### RunPod Worker (Docker)
+- [x] Create runpod-worker/handler.py — multi-model handler (Flux + ESRGAN + RMBG-2.0)
+- [x] Create runpod-worker/Dockerfile — GPU container with pre-downloaded model weights
+- [x] Create runpod-worker/requirements.txt — Python dependencies
+- [x] Create runpod-worker/README.md — deployment guide with cost comparison
+
+### Environment & Docs
+- [x] Update .env.example with RunPod + video provider env vars
+- [ ] Deploy RunPod worker Docker image to registry
+- [ ] Create RunPod serverless endpoint (A40 48GB, Flex workers)
+- [ ] Set RUNPOD_API_KEY + RUNPOD_FLUX_ENDPOINT_ID on Vercel
+- [ ] Test end-to-end: image gen, upscale, bg removal via RunPod

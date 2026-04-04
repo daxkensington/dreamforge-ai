@@ -539,20 +539,65 @@ export default function Marketplace() {
               ))}
             </div>
           ) : listings.length === 0 ? (
-            <div className="text-center py-24">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mx-auto mb-4">
-                <Store className="h-8 w-8 text-muted-foreground opacity-30" />
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">
-                {hasFilters ? "No listings match your filters" : "No listings yet"}
-              </p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
-                {hasFilters ? "Try adjusting your search or filter criteria" : "Be the first to list your AI-generated assets"}
-              </p>
-              {hasFilters && (
+            hasFilters ? (
+              <div className="text-center py-24">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mx-auto mb-4">
+                  <Store className="h-8 w-8 text-muted-foreground opacity-30" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">No listings match your filters</p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">Try adjusting your search or filter criteria</p>
                 <Button variant="outline" size="sm" onClick={clearFilters} className="bg-transparent">Clear Filters</Button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-2">Coming Soon — Be a Founding Seller</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    The marketplace is launching soon. List your prompts, presets, and assets now to be featured on day one.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { title: "Cinematic Prompt Pack", type: "Prompts", price: "$4.99", image: "/showcase/gallery-13.jpg", seller: "You?" },
+                    { title: "Neon Cyberpunk Preset", type: "Presets", price: "$2.99", image: "/showcase/gallery-16.jpg", seller: "You?" },
+                    { title: "Fantasy Art Workflow", type: "Workflows", price: "$9.99", image: "/showcase/gallery-20.jpg", seller: "You?" },
+                  ].map((sample, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1, duration: 0.4 }}
+                      className="group rounded-xl bg-white/5 backdrop-blur-sm border border-dashed border-white/20 overflow-hidden hover:border-cyan-500/30 transition-all duration-300"
+                    >
+                      <div className="aspect-video relative overflow-hidden">
+                        <img src={sample.image} alt={sample.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300" loading="lazy" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <div className="absolute top-2 left-2">
+                          <Badge className="text-[10px] border-0 bg-cyan-500/20 text-cyan-400">{sample.type}</Badge>
+                        </div>
+                        <div className="absolute top-2 right-2">
+                          <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-xs font-semibold text-white">{sample.price}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        <h3 className="text-sm font-medium">{sample.title}</h3>
+                        <p className="text-xs text-muted-foreground italic">This could be your listing</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+                {user && (
+                  <div className="text-center">
+                    <Link href="/marketplace/sell">
+                      <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/20">
+                        <Plus className="h-4 w-4" />
+                        List Your First Asset
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

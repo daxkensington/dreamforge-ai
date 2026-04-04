@@ -18,10 +18,11 @@ import { storagePut, generateStorageKey } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
+import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell } from "./runpod";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "auto";
+  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd" | "ultra";
   style?: "natural" | "vivid";
@@ -280,7 +281,16 @@ async function generateUltra(
 
   const enhancedPrompt = `${prompt}. ${qualityTokens}`;
 
-  // Step 2: Try Flux Pro first (highest quality available)
+  // Step 2: Try RunPod Flux Dev first (self-hosted, cheapest high-quality)
+  if (isRunPodAvailable()) {
+    try {
+      return await runpodFluxDev(enhancedPrompt, width || 1440, height || 1440, 30, 7.5);
+    } catch (err: any) {
+      console.warn("[Ultra] RunPod Flux Dev failed, trying Flux Pro:", err.message);
+    }
+  }
+
+  // Step 3: Try Flux Pro via Replicate
   if (ENV.replicateApiToken) {
     try {
       const outputUrl = await replicatePredict({
@@ -297,16 +307,16 @@ async function generateUltra(
       });
       return downloadBuffer(outputUrl);
     } catch (err: any) {
-      console.warn("[Ultra] Flux Pro failed, trying DALL-E HD:", err.message);
+      console.warn("[Ultra] Replicate Flux Pro failed, trying DALL-E HD:", err.message);
     }
   }
 
-  // Step 3: Fallback to DALL-E 3 HD
+  // Step 4: Fallback to DALL-E 3 HD
   if (ENV.openaiApiKey) {
     return generateWithDallE(enhancedPrompt, "1024x1024", "hd", "vivid");
   }
 
-  // Step 4: Last resort — best available model
+  // Step 5: Last resort — best available model
   return generateWithFallback(enhancedPrompt, `${width || 1024}x${height || 1024}`, "hd", "vivid");
 }
 
@@ -503,7 +513,7 @@ export async function generateImage(
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra",
+  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell",
   prompt: string,
   size: string,
   quality: "standard" | "hd" | "ultra",
@@ -512,6 +522,12 @@ async function generateWithExplicitModel(
   const [w, h] = size.split("x").map(Number);
 
   switch (model) {
+    case "runpod-flux-dev":
+      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
+      return runpodFluxDev(prompt, w || 1024, h || 1024);
+    case "runpod-flux-schnell":
+      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
+      return runpodFluxSchnell(prompt, w || 1024, h || 1024);
     case "grok":
       if (!ENV.grokApiKey) throw new Error("Grok API key not configured");
       return generateWithGrok(prompt, size);
@@ -547,7 +563,8 @@ async function generateWithExplicitModel(
  * Try providers in cost-optimized order: free first, then cheap, then premium.
  *
  * Priority: Gemini (free) -> Together AI (free) -> Cloudflare (free) ->
- *           Grok -> Flux Schnell (cheap) -> DALL-E 3 -> SD3 -> Flux Pro
+ *           RunPod Flux Schnell (self-hosted) -> Grok -> Flux Schnell (Replicate) ->
+ *           DALL-E 3 -> SD3 -> Flux Pro
  */
 async function generateWithFallback(
   prompt: string,
@@ -587,31 +604,37 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 4. CHEAP: Grok
+  // 4. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image) — cheapest paid option
+  if (isRunPodAvailable()) {
+    const result = await tryProvider("RunPod Flux Schnell", () => runpodFluxSchnell(prompt, w, h));
+    if (result) return result;
+  }
+
+  // 5. CHEAP: Grok
   if (ENV.grokApiKey) {
     const result = await tryProvider("Grok", () => generateWithGrok(prompt, size));
     if (result) return result;
   }
 
-  // 5. CHEAP: Flux Schnell via Replicate (~$0.003/image)
+  // 7. CHEAP: Flux Schnell via Replicate (~$0.003/image)
   if (ENV.replicateApiToken) {
     const result = await tryProvider("Flux Schnell", () => generateWithFlux(prompt, "flux-schnell", w, h));
     if (result) return result;
   }
 
-  // 6. PAID: DALL-E 3
+  // 8. PAID: DALL-E 3
   if (ENV.openaiApiKey) {
     const result = await tryProvider("DALL-E 3", () => generateWithDallE(prompt, size, quality, style));
     if (result) return result;
   }
 
-  // 7. PAID: SD3
+  // 9. PAID: SD3
   if (ENV.stabilityApiKey) {
     const result = await tryProvider("SD3", () => generateWithSD3(prompt, w, h));
     if (result) return result;
   }
 
-  // 8. PREMIUM: Flux Pro (highest quality, last resort)
+  // 10. PREMIUM: Flux Pro (highest quality, last resort)
   if (ENV.replicateApiToken) {
     const result = await tryProvider("Flux Pro", () => generateWithFlux(prompt, "flux-pro", w, h));
     if (result) return result;

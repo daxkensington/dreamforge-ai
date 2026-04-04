@@ -1,0 +1,240 @@
+"""
+DreamForge RunPod Serverless Handler
+=====================================
+Single endpoint serving multiple models:
+  - Flux.1 Dev/Schnell (image generation)
+  - Real-ESRGAN (image upscaling)
+  - RMBG-2.0 (background removal)
+
+Routes to the correct model via the `task` field in the input payload.
+
+Deploy: docker build -t dreamforge-worker . && docker push <your-registry>/dreamforge-worker
+Then create a RunPod Serverless endpoint pointing to this image.
+"""
+
+import runpod
+import torch
+import base64
+import io
+import os
+import time
+from PIL import Image
+
+# ─── Lazy Model Loading ──────────────────────────────────────────────────────
+# Models are loaded on first use to minimize cold-start memory.
+
+_flux_pipe = None
+_esrgan_model = None
+_rmbg_model = None
+_rmbg_transform = None
+
+
+def get_flux_pipe(model_type="dev"):
+    """Load Flux.1 pipeline (Dev or Schnell)."""
+    global _flux_pipe
+    if _flux_pipe is None or _flux_pipe._model_type != model_type:
+        from diffusers import FluxPipeline
+
+        model_id = (
+            "black-forest-labs/FLUX.1-dev"
+            if model_type == "dev"
+            else "black-forest-labs/FLUX.1-schnell"
+        )
+        print(f"[DreamForge] Loading {model_id}...")
+        pipe = FluxPipeline.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+        )
+        pipe.to("cuda")
+
+        # Optimize with torch.compile for 30-50% speedup
+        if hasattr(torch, "compile"):
+            try:
+                pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead")
+                print("[DreamForge] torch.compile applied to transformer")
+            except Exception as e:
+                print(f"[DreamForge] torch.compile skipped: {e}")
+
+        pipe._model_type = model_type
+        _flux_pipe = pipe
+    return _flux_pipe
+
+
+def get_esrgan_model():
+    """Load Real-ESRGAN model."""
+    global _esrgan_model
+    if _esrgan_model is None:
+        from realesrgan import RealESRGANer
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+
+        print("[DreamForge] Loading Real-ESRGAN...")
+        model = RRDBNet(
+            num_in_ch=3, num_out_ch=3, num_feat=64,
+            num_block=23, num_grow_ch=32, scale=4,
+        )
+        _esrgan_model = RealESRGANer(
+            scale=4,
+            model_path="/models/RealESRGAN_x4plus.pth",
+            model=model,
+            tile=0,
+            tile_pad=10,
+            pre_pad=0,
+            half=True,
+            device="cuda",
+        )
+    return _esrgan_model
+
+
+def get_rmbg_model():
+    """Load RMBG-2.0 background removal model."""
+    global _rmbg_model, _rmbg_transform
+    if _rmbg_model is None:
+        from transformers import AutoModelForImageSegmentation
+        from torchvision import transforms
+
+        print("[DreamForge] Loading RMBG-2.0...")
+        _rmbg_model = AutoModelForImageSegmentation.from_pretrained(
+            "briaai/RMBG-2.0", trust_remote_code=True,
+        )
+        _rmbg_model.to("cuda")
+        _rmbg_model.eval()
+
+        _rmbg_transform = transforms.Compose([
+            transforms.Resize((1024, 1024)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+    return _rmbg_model, _rmbg_transform
+
+
+# ─── Task Handlers ───────────────────────────────────────────────────────────
+
+def handle_flux(job_input):
+    """Generate image with Flux.1 Dev or Schnell."""
+    task = job_input.get("task", "flux-dev")
+    prompt = job_input.get("prompt", "")
+    width = job_input.get("width", 1024)
+    height = job_input.get("height", 1024)
+    steps = job_input.get("num_inference_steps", 20 if task == "flux-dev" else 4)
+    guidance = job_input.get("guidance_scale", 7.5 if task == "flux-dev" else 0.0)
+
+    # Ensure dimensions are multiples of 8
+    width = (width // 8) * 8
+    height = (height // 8) * 8
+
+    model_type = "dev" if task == "flux-dev" else "schnell"
+    pipe = get_flux_pipe(model_type)
+
+    start = time.time()
+    result = pipe(
+        prompt=prompt,
+        width=width,
+        height=height,
+        num_inference_steps=steps,
+        guidance_scale=guidance,
+        generator=torch.Generator("cuda").manual_seed(int(time.time()) % 2**32),
+    )
+    inference_time = time.time() - start
+    print(f"[DreamForge] Flux {model_type} generated in {inference_time:.1f}s")
+
+    image = result.images[0]
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"image_b64": image_b64, "inference_time": inference_time}
+
+
+def handle_esrgan(job_input):
+    """Upscale image with Real-ESRGAN."""
+    import numpy as np
+    import cv2
+
+    image_b64 = job_input.get("image_b64", "")
+    scale = job_input.get("scale", 4)
+
+    if not image_b64:
+        raise ValueError("image_b64 is required for upscaling")
+
+    img_bytes = base64.b64decode(image_b64)
+    img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_UNCHANGED)
+
+    if img is None:
+        raise ValueError("Failed to decode input image")
+
+    model = get_esrgan_model()
+
+    start = time.time()
+    output, _ = model.enhance(img, outscale=scale)
+    inference_time = time.time() - start
+    print(f"[DreamForge] ESRGAN upscaled {scale}x in {inference_time:.1f}s")
+
+    _, buf = cv2.imencode(".png", output)
+    image_b64 = base64.b64encode(buf.tobytes()).decode("utf-8")
+
+    return {"image_b64": image_b64, "inference_time": inference_time}
+
+
+def handle_rmbg(job_input):
+    """Remove background with RMBG-2.0."""
+    import numpy as np
+
+    image_b64 = job_input.get("image_b64", "")
+    if not image_b64:
+        raise ValueError("image_b64 is required for background removal")
+
+    img_bytes = base64.b64decode(image_b64)
+    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    original_size = image.size
+
+    model, transform = get_rmbg_model()
+
+    start = time.time()
+    input_tensor = transform(image).unsqueeze(0).to("cuda")
+
+    with torch.no_grad():
+        preds = model(input_tensor)[-1].sigmoid().cpu()
+
+    pred = preds[0].squeeze()
+    mask = (pred * 255).byte().numpy()
+
+    # Resize mask back to original image size
+    mask_image = Image.fromarray(mask).resize(original_size, Image.BILINEAR)
+
+    # Apply mask as alpha channel
+    result = image.copy()
+    result.putalpha(mask_image)
+
+    inference_time = time.time() - start
+    print(f"[DreamForge] RMBG-2.0 completed in {inference_time:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG")
+    image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"image_b64": image_b64, "inference_time": inference_time}
+
+
+# ─── RunPod Handler ──────────────────────────────────────────────────────────
+
+def handler(job):
+    """Main RunPod serverless handler — routes to the correct model."""
+    job_input = job.get("input", {})
+    task = job_input.get("task", "flux-dev")
+
+    try:
+        if task in ("flux-dev", "flux-schnell"):
+            return handle_flux(job_input)
+        elif task == "esrgan":
+            return handle_esrgan(job_input)
+        elif task == "rmbg":
+            return handle_rmbg(job_input)
+        else:
+            return {"error": f"Unknown task: {task}"}
+    except Exception as e:
+        print(f"[DreamForge] Error in {task}: {e}")
+        return {"error": str(e)}
+
+
+runpod.serverless.start({"handler": handler})

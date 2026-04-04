@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-DreamForge (formerly GenesisSynth Lab) has pivoted from an academic synthetic media research platform to a consumer-facing AI creative studio. This document defines the brand positioning, messaging framework, tone of voice, and implementation guidelines that will drive the rebrand across all touchpoints — from the landing page to in-app copy.
+DreamForge is a consumer-facing AI creative studio. This document defines the brand positioning, messaging framework, tone of voice, and implementation guidelines that will drive the rebrand across all touchpoints — from the landing page to in-app copy.
 
 ---
 
