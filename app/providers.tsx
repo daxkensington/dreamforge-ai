@@ -9,6 +9,8 @@ import { trpc } from "@/lib/trpc";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -42,6 +44,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               {children}
               <Toaster />
+              <PWAInstallPrompt />
+              <ServiceWorkerRegistration />
             </TooltipProvider>
           </ThemeProvider>
         </QueryClientProvider>
