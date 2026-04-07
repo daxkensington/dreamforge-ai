@@ -48,27 +48,8 @@ const TRENDING_IMAGES = [
   { src: "/showcase/gallery-20.jpg", prompt: "Cosmic tree of life in deep space nebula" },
 ];
 
-// Creator spotlight data
-const CREATOR_SPOTLIGHTS = [
-  {
-    name: "PixelDreamer",
-    specialty: "Fantasy & Sci-Fi Prompts",
-    sales: "2,400+",
-    images: ["/showcase/hero-characters-1.jpg", "/showcase/hero-characters-2.jpg", "/showcase/hero-characters-3.jpg", "/showcase/gallery-strip-1.jpg"],
-  },
-  {
-    name: "NeonForge",
-    specialty: "Cyberpunk Presets & Workflows",
-    sales: "1,800+",
-    images: ["/showcase/hero-brandkit-1.jpg", "/showcase/hero-brandkit-2.jpg", "/showcase/hero-brandkit-3.jpg", "/showcase/gallery-strip-2.jpg"],
-  },
-  {
-    name: "ArtisanAI",
-    specialty: "Professional Asset Packs",
-    sales: "3,100+",
-    images: ["/showcase/hero-marketplace-1.jpg", "/showcase/hero-marketplace-2.jpg", "/showcase/gallery-strip-3.jpg", "/showcase/gallery-strip-4.jpg"],
-  },
-];
+// Creator spotlight placeholder (shown when no real creators exist yet)
+const CREATOR_SPOTLIGHTS: { name: string; specialty: string; sales: string; images: string[] }[] = [];
 
 // What you can sell categories with images
 const SELL_CATEGORIES = [
@@ -169,8 +150,15 @@ export default function Marketplace() {
       <div className="min-h-screen">
         {/* Hero Section */}
         <div className="relative overflow-hidden border-b border-white/5">
+          {/* Layered gradient background */}
           <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/10" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/5 via-transparent to-transparent" />
+          {/* Animated gradient mesh orbs */}
+          <div className="absolute top-10 left-1/4 w-72 h-72 bg-cyan-500/10 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] animate-[pulse_4s_ease-in-out_infinite]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-blue-500/5 rounded-full blur-[80px] animate-[pulse_6s_ease-in-out_infinite]" />
+          {/* Subtle grid overlay */}
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAyKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCBmaWxsPSJ1cmwoI2dyaWQpIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIi8+PC9zdmc+')] opacity-60" />
           <div className="container relative py-16 md:py-24">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -202,33 +190,50 @@ export default function Marketplace() {
               )}
             </motion.div>
 
-            {/* Stats Bar */}
+            {/* Stats Bar — only show real stats when listings exist, otherwise show launch CTA */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.4 }}
               className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-10"
             >
-              {[
-                { label: "Listings", value: "1,200+" },
-                { label: "Creators", value: "500+" },
-                { label: "Sales", value: "10,000+" },
-                { label: "Avg Rating", value: "4.8\u2605" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 text-center"
-                >
-                  <div className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                    {stat.value}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
-                </div>
-              ))}
+              {total > 0
+                ? [
+                    { label: "Listings", value: String(total) },
+                    { label: "Creators", value: "Growing" },
+                    { label: "Asset Types", value: "6" },
+                    { label: "Avg Rating", value: "4.8\u2605" },
+                  ].map((stat) => (
+                    <div
+                      key={stat.label}
+                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 text-center"
+                    >
+                      <div className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                        {stat.value}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
+                    </div>
+                  ))
+                : [
+                    { label: "Asset Types", value: "6 Categories" },
+                    { label: "Revenue Share", value: "85%" },
+                    { label: "Payout", value: "Instant" },
+                    { label: "Status", value: "Launching Soon" },
+                  ].map((stat) => (
+                    <div
+                      key={stat.label}
+                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 text-center"
+                    >
+                      <div className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                        {stat.value}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
+                    </div>
+                  ))}
             </motion.div>
 
-            {/* Category Pills */}
-            {categories && categories.length > 0 && (
+            {/* Category Pills — hide when all counts are 0 */}
+            {categories && categories.length > 0 && categories.some((cat: any) => cat.count > 0) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -369,10 +374,10 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* Browse Section */}
+        {/* Browse Section — hide search/filters when marketplace is empty */}
         <div className="container py-8">
-          {/* Search Bar + Sort */}
-          <div className="flex gap-3 mb-6">
+          {/* Search Bar + Sort — only show when there are listings or active filters */}
+          {(total > 0 || hasFilters) && <div className="flex gap-3 mb-6">
             <div className="relative flex-1 border-cyan-500/30 rounded-md focus-within:shadow-[0_0_20px_-5px_rgba(245,158,11,0.3)] transition-shadow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -412,7 +417,7 @@ export default function Marketplace() {
                 </span>
               )}
             </Button>
-          </div>
+          </div>}
 
           {/* Filters Panel */}
           <AnimatePresence>
@@ -520,8 +525,8 @@ export default function Marketplace() {
             </div>
           )}
 
-          {/* Results Count */}
-          {browseData && (
+          {/* Results Count — hide when empty and no filters */}
+          {browseData && (total > 0 || hasFilters) && (
             <p className="text-sm text-muted-foreground mb-4">
               {total} {total === 1 ? "listing" : "listings"} found
             </p>
@@ -549,53 +554,130 @@ export default function Marketplace() {
                 <Button variant="outline" size="sm" onClick={clearFilters} className="bg-transparent">Clear Filters</Button>
               </div>
             ) : (
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-2">Coming Soon — Be a Founding Seller</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    The marketplace is launching soon. List your prompts, presets, and assets now to be featured on day one.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    { title: "Cinematic Prompt Pack", type: "Prompts", price: "$4.99", image: "/showcase/gallery-13.jpg", seller: "You?" },
-                    { title: "Neon Cyberpunk Preset", type: "Presets", price: "$2.99", image: "/showcase/gallery-16.jpg", seller: "You?" },
-                    { title: "Fantasy Art Workflow", type: "Workflows", price: "$9.99", image: "/showcase/gallery-20.jpg", seller: "You?" },
-                  ].map((sample, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1, duration: 0.4 }}
-                      className="group rounded-xl bg-white/5 backdrop-blur-sm border border-dashed border-white/20 overflow-hidden hover:border-cyan-500/30 transition-all duration-300"
-                    >
-                      <div className="aspect-video relative overflow-hidden">
-                        <img src={sample.image} alt={sample.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300" loading="lazy" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        <div className="absolute top-2 left-2">
-                          <Badge className="text-[10px] border-0 bg-cyan-500/20 text-cyan-400">{sample.type}</Badge>
-                        </div>
-                        <div className="absolute top-2 right-2">
-                          <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-xs font-semibold text-white">{sample.price}</span>
-                        </div>
-                      </div>
-                      <div className="p-4 space-y-2">
-                        <h3 className="text-sm font-medium">{sample.title}</h3>
-                        <p className="text-xs text-muted-foreground italic">This could be your listing</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-                {user && (
-                  <div className="text-center">
-                    <Link href="/marketplace/sell">
-                      <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/20">
+              <div className="space-y-12">
+                {/* Coming Soon Hero Banner */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.6 }}
+                  className="relative rounded-2xl overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/20 via-blue-600/20 to-purple-600/20" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,_rgba(6,182,212,0.15),_transparent_60%)]" />
+                  <div className="relative px-8 py-12 md:py-16 text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-500/25 text-cyan-400 text-sm font-medium mb-4">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                      </span>
+                      Launching Soon
+                    </div>
+                    <h3 className="text-2xl md:text-3xl font-bold mb-3">
+                      Be a{" "}
+                      <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                        Founding Seller
+                      </span>
+                    </h3>
+                    <p className="text-muted-foreground max-w-lg mx-auto mb-6">
+                      The DreamForgeX marketplace is opening soon. List your AI-generated prompts, presets, and creative assets now to be featured on launch day.
+                    </p>
+                    {user ? (
+                      <Link href="/marketplace/sell">
+                        <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/25 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0">
+                          <Plus className="h-4 w-4" />
+                          List Your First Asset
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button size="lg" className="gap-2 shadow-lg shadow-cyan-500/25 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 border-0">
                         <Plus className="h-4 w-4" />
-                        List Your First Asset
+                        Get Started
                       </Button>
-                    </Link>
+                    )}
                   </div>
-                )}
+                </motion.div>
+
+                {/* Sell Categories Showcase Grid */}
+                <div>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl md:text-2xl font-bold mb-2">
+                      What You Can{" "}
+                      <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                        Sell
+                      </span>
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      Six categories of AI-generated assets. Turn your expertise into income.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {SELL_CATEGORIES.map((cat, i) => (
+                      <motion.div
+                        key={cat.type}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.08, duration: 0.5 }}
+                        className="group relative rounded-2xl overflow-hidden aspect-[3/2] cursor-pointer"
+                      >
+                        <img
+                          src={cat.image}
+                          alt={cat.type}
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
+                        <div className="absolute inset-0 border border-white/0 group-hover:border-cyan-500/30 rounded-2xl transition-colors duration-300" />
+                        <div className="relative h-full flex flex-col justify-end p-5">
+                          <div
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold w-fit mb-2"
+                            style={{ backgroundColor: cat.color + "25", color: cat.color }}
+                          >
+                            {cat.type}
+                          </div>
+                          <p className="text-sm text-white/80">{cat.desc}</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Example Listing Previews */}
+                <div>
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold mb-1">Preview: What Listings Will Look Like</h3>
+                    <p className="text-xs text-muted-foreground">These could be yours</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { title: "Cinematic Prompt Pack", type: "Prompts", price: "$4.99", image: "/showcase/gallery-13.jpg" },
+                      { title: "Neon Cyberpunk Preset", type: "Presets", price: "$2.99", image: "/showcase/gallery-16.jpg" },
+                      { title: "Fantasy Art Workflow", type: "Workflows", price: "$9.99", image: "/showcase/gallery-20.jpg" },
+                    ].map((sample, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + i * 0.1, duration: 0.4 }}
+                        className="group rounded-xl bg-white/5 backdrop-blur-sm border border-dashed border-white/20 overflow-hidden hover:border-cyan-500/30 transition-all duration-300"
+                      >
+                        <div className="aspect-video relative overflow-hidden">
+                          <img src={sample.image} alt={sample.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-75 transition-opacity duration-300 grayscale-[30%] group-hover:grayscale-0" loading="lazy" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                          <div className="absolute top-2 left-2">
+                            <Badge className="text-[10px] border-0 bg-cyan-500/20 text-cyan-400">{sample.type}</Badge>
+                          </div>
+                          <div className="absolute top-2 right-2">
+                            <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-xs font-semibold text-white">{sample.price}</span>
+                          </div>
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <h3 className="text-sm font-medium">{sample.title}</h3>
+                          <p className="text-xs text-muted-foreground italic">This could be your listing</p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )
           ) : (
@@ -713,55 +795,25 @@ export default function Marketplace() {
                 className="text-center mb-10"
               >
                 <h2 className="text-2xl md:text-3xl font-bold mb-3">
-                  Top{" "}
+                  Be the First{" "}
                   <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                    Creators
+                    Creator
                   </span>
                 </h2>
                 <p className="text-muted-foreground max-w-lg mx-auto">
-                  Meet the creators driving the marketplace with their stunning AI assets
+                  The marketplace is brand new — list your prompts, presets, and assets to start earning today
                 </p>
               </motion.div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {CREATOR_SPOTLIGHTS.map((creator, i) => (
-                  <motion.div
-                    key={creator.name}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1, duration: 0.5 }}
-                    className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden hover:border-cyan-500/20 transition-all duration-300"
-                  >
-                    {/* Creator image grid */}
-                    <div className="grid grid-cols-2 gap-1 p-1">
-                      {creator.images.map((img, j) => (
-                        <div key={j} className="aspect-square overflow-hidden rounded-lg">
-                          <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
-                        </div>
-                      ))}
+              <div className="max-w-2xl mx-auto rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 p-8 text-center">
+                <div className="grid grid-cols-4 gap-2 mb-6">
+                  {["/showcase/hero-characters-1.jpg", "/showcase/hero-brandkit-1.jpg", "/showcase/hero-marketplace-1.jpg", "/showcase/gallery-strip-1.jpg"].map((img, j) => (
+                    <div key={j} className="aspect-square overflow-hidden rounded-lg">
+                      <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
                     </div>
-                    {/* Creator info */}
-                    <div className="p-5">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black font-bold text-sm">
-                          {creator.name[0]}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-sm">{creator.name}</h3>
-                          <p className="text-xs text-muted-foreground">{creator.specialty}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-                        <span className="text-xs text-muted-foreground">
-                          <Download className="inline h-3 w-3 mr-1" />{creator.sales} sales
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <StarRating rating={5} size={10} />
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                  ))}
+                </div>
+                <h3 className="font-semibold text-lg mb-2">Start Selling Your AI Creations</h3>
+                <p className="text-sm text-muted-foreground mb-4">Upload prompts, presets, workflows, asset packs, LoRAs, and templates. Set your price and earn on every sale.</p>
               </div>
             </div>
           </div>

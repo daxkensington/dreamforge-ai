@@ -21,7 +21,7 @@ import {
   Search,
   Check,
   Crown,
-  Quote,
+  Wand2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -82,94 +82,64 @@ const beforeAfterDemos = [
 ];
 
 const tools = [
-  { icon: Image, title: "Text-to-Image", desc: "Generate any scene from a text prompt", bg: "/showcase/home-tool-txtimg.jpg", href: "/workspace" },
-  { icon: Film, title: "AI Video", desc: "Create animated clips from descriptions", bg: "/showcase/home-tool-video.jpg", href: "/workspace" },
-  { icon: Video, title: "Image-to-Video", desc: "Animate any image with cinematic motion", bg: "/showcase/home-tool-img2vid.jpg", href: "/workspace" },
-  { icon: Music, title: "Audio Generation", desc: "AI-powered soundscapes and music", bg: "/showcase/home-tool-audio.jpg", href: "/workspace" },
-  { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell AI-generated creations", bg: "/showcase/home-tool-market.jpg", href: "/marketplace" },
-  { icon: Users, title: "Community Gallery", desc: "Discover and share trending artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
+  { icon: Image, title: "Text-to-Image", desc: "30+ models — Flux, DALL-E 3, Gemini, Grok, Seedream", bg: "/showcase/home-tool-txtimg.jpg", href: "/workspace" },
+  { icon: Film, title: "AI Video", desc: "Runway, Kling, Veo 3, Wan 2.5 — text or image to video", bg: "/showcase/home-tool-video.jpg", href: "/video-studio" },
+  { icon: Music, title: "AI Songs & Audio", desc: "Generate songs, music videos, TTS, and sound effects", bg: "/showcase/home-tool-audio.jpg", href: "/tools/song-creator" },
+  { icon: Wand2, title: "75+ Creative Tools", desc: "Headshots, logos, QR art, upscaling, style transfer & more", bg: "/showcase/home-tool-img2vid.jpg", href: "/tools" },
+  { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell prompts, presets, and workflows", bg: "/showcase/home-tool-market.jpg", href: "/marketplace" },
+  { icon: Users, title: "Community Gallery", desc: "Discover and share AI-generated artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
 ];
 
 const pricingPlans = [
   {
-    name: "Free",
+    name: "Explorer",
     price: "$0",
     period: "",
-    features: ["50 images / month", "3 AI models", "Community gallery access", "720p exports"],
-    cta: "Get Started",
+    features: ["50 credits / day", "Free AI models", "Community gallery", "1024px images"],
+    cta: "Start Free",
     highlighted: false,
   },
   {
     name: "Creator",
-    price: "$12",
+    price: "$9",
     period: "/mo",
-    features: ["500 images / month", "All AI models", "HD exports", "Priority queue"],
-    cta: "Start Creating",
+    features: ["3,000 credits / month", "Standard models", "No watermarks", "Commercial rights"],
+    cta: "Go Creator",
     highlighted: false,
   },
   {
     name: "Pro",
-    price: "$35",
+    price: "$19",
     period: "/mo",
-    features: ["2,500 images / month", "4K exports", "API access", "Commercial license"],
+    features: ["10,000 credits / month", "Premium models", "1080p video", "Priority queue"],
     cta: "Go Pro",
     highlighted: true,
     badge: "Most Popular",
   },
   {
     name: "Studio",
-    price: "$75",
+    price: "$39",
     period: "/mo",
-    features: ["Unlimited images", "Team collaboration", "Custom model training", "Dedicated support"],
-    cta: "Contact Sales",
+    features: ["30,000 credits / month", "All models + Ultra", "4K video", "Marketplace selling"],
+    cta: "Go Studio",
     highlighted: false,
   },
 ];
 
-const testimonials = [
-  {
-    name: "Sarah Chen",
-    role: "Digital Artist",
-    quote: "DreamForgeX has completely transformed my creative workflow. I can iterate on concepts 10x faster than before.",
-    gradient: "from-cyan-500 to-blue-600",
-  },
-  {
-    name: "Marcus Rivera",
-    role: "Game Developer",
-    quote: "The quality of the AI-generated assets is incredible. We use DreamForgeX for all our concept art and marketing materials.",
-    gradient: "from-blue-500 to-cyan-500",
-  },
-  {
-    name: "Aisha Patel",
-    role: "Content Creator",
-    quote: "I went from zero design skills to creating stunning visuals for my brand. The tools are intuitive and powerful.",
-    gradient: "from-blue-500 to-red-500",
-  },
-  {
-    name: "David Park",
-    role: "E-commerce Owner",
-    quote: "The product photo tool alone saved us thousands in photography costs. Every listing looks professional now.",
-    gradient: "from-emerald-500 to-teal-500",
-  },
-  {
-    name: "Lisa Nakamura",
-    role: "YouTube Creator",
-    quote: "Text-to-video is a game changer. I generate b-roll, thumbnails, and intros all in one platform. Nothing else comes close.",
-    gradient: "from-violet-500 to-purple-500",
-  },
-  {
-    name: "James Osei",
-    role: "Startup Founder",
-    quote: "We built our entire brand identity — logo, icons, marketing assets — using DreamForgeX in a single weekend.",
-    gradient: "from-rose-500 to-pink-500",
-  },
+const showcaseItems = [
+  { src: "/showcase/gallery-13.jpg", label: "Fantasy Landscapes" },
+  { src: "/showcase/gallery-15.jpg", label: "Product Photography" },
+  { src: "/showcase/gallery-17.jpg", label: "Concept Art" },
+  { src: "/showcase/hero-characters-1.jpg", label: "Character Design" },
+  { src: "/showcase/hero-brandkit-1.jpg", label: "Brand Identity" },
+  { src: "/showcase/gallery-20.jpg", label: "Sci-Fi Worlds" },
 ];
 
 const statItems = [
-  { label: "Images Created", target: 50000, suffix: "+" },
-  { label: "Active Creators", target: 10000, suffix: "+" },
-  { label: "AI Tools", target: 58, suffix: "+" },
-  { label: "AI Models", target: 16, suffix: "" },
+  { label: "AI Tools", target: 75, suffix: "+" },
+  { label: "AI Models", target: 30, suffix: "+" },
+  { label: "AI Providers", target: 13, suffix: "" },
+  { label: "Free to Start", target: 50, suffix: " cr/day" },
 ];
 
 const heroWords = ["Images", "Videos", "Songs", "Music Videos", "Logos", "Avatars", "Art"];
@@ -320,7 +290,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
             >
               <Sparkles className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-white/90">71+ AI Tools — One Platform</span>
+              <span className="text-sm font-medium text-white/90">75+ AI Tools — One Platform</span>
             </motion.div>
 
             <motion.h1
@@ -341,7 +311,7 @@ export default function Home() {
               custom={2}
               className="text-lg md:text-xl text-white/60 mb-12 max-w-2xl mx-auto"
             >
-              The all-in-one AI creative studio. Images, video, songs, music videos — powered by 16 AI models.
+              The all-in-one AI creative studio. Images, video, songs, music videos — powered by 30+ AI models.
             </motion.p>
 
             <motion.div
@@ -405,7 +375,7 @@ export default function Home() {
       <section className="py-6 overflow-hidden border-b border-white/5">
         <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by the world's best AI models</p>
         <div className="flex items-center justify-center gap-8 md:gap-12">
-          {["Grok (xAI)", "Flux Pro", "DALL-E 3", "SD3", "Gemini", "Veo 3", "Claude", "MiniMax Music"].map((model) => (
+          {["Grok", "OpenAI", "Gemini", "Claude", "Flux Pro", "DALL-E 3", "Veo 3", "Runway", "Kling", "Seedream", "fal.ai", "Groq"].map((model) => (
             <span key={model} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
               {model}
             </span>
@@ -777,7 +747,7 @@ export default function Home() {
 
       <SectionDivider />
 
-      {/* ═══════ SECTION 8: SOCIAL PROOF ═══════ */}
+      {/* ═══════ SECTION 8: SHOWCASE ═══════ */}
       <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.p
@@ -788,7 +758,7 @@ export default function Home() {
             custom={0}
             className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
           >
-            Trusted by Creators Worldwide
+            AI-Generated Showcase
           </motion.p>
           <motion.h2
             initial="hidden"
@@ -798,28 +768,25 @@ export default function Home() {
             custom={1}
             className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
           >
-            What People Are <span className="gradient-text">Saying</span>
+            What You Can <span className="gradient-text">Create</span>
           </motion.h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {testimonials.map((t, i) => (
+            {showcaseItems.map((item, i) => (
               <motion.div
-                key={t.name}
+                key={item.label}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true }}
                 variants={fadeUp}
                 custom={i}
-                className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-sm"
+                className="rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm group"
               >
-                <Quote className="h-6 w-6 text-cyan-400/40 mb-4" />
-                <p className="text-sm text-white/70 leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.gradient} shrink-0`} />
-                  <div>
-                    <p className="text-sm font-semibold text-white">{t.name}</p>
-                    <p className="text-xs text-white/50">{t.role}</p>
-                  </div>
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img src={item.src} alt={item.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                </div>
+                <div className="p-4 bg-white/5">
+                  <p className="text-sm font-semibold text-white">{item.label}</p>
                 </div>
               </motion.div>
             ))}
@@ -833,7 +800,7 @@ export default function Home() {
             custom={4}
             className="text-center text-white/60 mt-12"
           >
-            Join <span className="text-white font-semibold">10,000+</span> creators already using DreamForgeX
+            Every image above was generated with DreamForgeX — start creating for free today
           </motion.p>
         </div>
       </section>

@@ -539,10 +539,10 @@ export const apiKeyRouter = router({
           .where(eq(userSubscriptions.userId, ctx.user.id))
           .limit(1);
         const planName = subRows[0]?.planName;
-        if (planName !== "enterprise") {
+        if (!planName || !["business", "agency", "enterprise"].includes(planName)) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "API key creation requires an Enterprise subscription.",
+            message: "API key creation requires a Business or Agency subscription.",
           });
         }
       }

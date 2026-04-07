@@ -140,7 +140,7 @@ export default function DesignCanvas() {
                   <ZoomIn className="h-3 w-3" />
                 </Button>
               </div>
-              <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent text-xs" onClick={() => toast.info("Export coming soon!")}>
+              <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent text-xs" onClick={() => toast.info("Export feature launching soon — stay tuned!")}>
                 <Download className="h-3 w-3" /> Export
               </Button>
             </div>

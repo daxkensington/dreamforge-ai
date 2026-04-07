@@ -8,6 +8,7 @@ import {
   syncAudioToVideo,
   type AudioGenerationRequest,
 } from "../_core/audioGeneration";
+import { SyncLabsProvider } from "../_core/providers/synclabs";
 import { getDb } from "../db";
 import { audioGenerations, audioPresets, videoProjects } from "../../drizzle/schema";
 import { deductCredits, CREDIT_COSTS } from "../stripe";
@@ -20,12 +21,22 @@ CREDIT_COSTS["audio-music"] = 4;
 CREDIT_COSTS["audio-voiceover"] = 3;
 CREDIT_COSTS["audio-ambient"] = 3;
 CREDIT_COSTS["audio-merge"] = 2;
+CREDIT_COSTS["audio-stable-audio"] = 8;
+CREDIT_COSTS["video-lipsync"] = 50;
 
 async function tryDeductAudioCredits(userId: number, tool: string, description?: string) {
   const cost = CREDIT_COSTS[tool] || 2;
   try {
-    await deductCredits(userId, cost, description ?? `Audio: ${tool}`);
+    const result = await deductCredits(userId, cost, description ?? `Audio: ${tool}`);
+    if (!result.success) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
+      });
+    }
+    return result;
   } catch (error: any) {
+    if (error instanceof TRPCError) throw error;
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: error.message || "Insufficient credits",
@@ -380,5 +391,43 @@ export const audioRouter = router({
       }
 
       return { mergedUrl, status: "complete" as const };
+    }),
+
+  // Lip sync — sync audio to video using Sync Labs
+  lipSync: protectedProcedure
+    .input(
+      z.object({
+        videoUrl: z.string().url().max(2048),
+        audioUrl: z.string().url().max(2048),
+        model: z.enum(["synclabs-sync3", "synclabs-lipsync-2"]).default("synclabs-sync3"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      enforceRateLimit(`audio.lipSync:${ctx.user.id}`, 5, 60_000, "Lip sync rate limit exceeded — max 5 per minute.");
+
+      await tryDeductAudioCredits(
+        ctx.user.id,
+        "video-lipsync",
+        `Lip sync: ${input.model}`
+      );
+
+      const provider = new SyncLabsProvider();
+      if (!provider.isAvailable) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Sync Labs is not configured. Lip sync is temporarily unavailable.",
+        });
+      }
+
+      const result = await provider.generate({
+        prompt: "",
+        model: input.model,
+        options: {
+          videoUrl: input.videoUrl,
+          audioUrl: input.audioUrl,
+        },
+      });
+
+      return { url: result.url, status: "complete" as const };
     }),
 });

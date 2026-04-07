@@ -1,5 +1,5 @@
 "use client";
-import ImageTemplates from "@/pages/ImageTemplates";
+import ToolTemplates from "@/pages/ToolTemplates";
 export default function Page() {
-  return <ImageTemplates />;
+  return <ToolTemplates />;
 }

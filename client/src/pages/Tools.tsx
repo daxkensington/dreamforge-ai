@@ -212,7 +212,7 @@ export default function Tools() {
                   </div>
                   <h3 className="text-2xl lg:text-3xl font-bold mb-3">Text-to-Image Generation</h3>
                   <p className="text-foreground/60 mb-2">Generate any scene from a text prompt with photorealistic quality.</p>
-                  <p className="text-foreground/50 text-sm mb-6">Choose from 3 AI models: Grok, DALL-E 3, Gemini</p>
+                  <p className="text-foreground/50 text-sm mb-6">Choose from 30+ AI models across 13 providers</p>
                   <Button variant="outline" className="w-fit gap-2 group-hover:border-cyan-500/50">
                     Try It <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>

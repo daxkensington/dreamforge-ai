@@ -64,7 +64,7 @@ export async function addImageWatermark(imageBuffer: Buffer): Promise<Buffer> {
  * For free tier songs/TTS outputs.
  */
 export function getAudioWatermarkNotice(): string {
-  return "This audio was created with DreamForgeX. Upgrade to Pro to remove this message.";
+  return "This audio was created with DreamForgeX. Upgrade to Creator to remove this message.";
 }
 
 /**
@@ -85,9 +85,10 @@ export function getVideoWatermarkStyle(): {
 
 /**
  * Check if a user's tier requires watermarking.
+ * Only free/explorer tier gets watermarks.
  */
 export function requiresWatermark(userTier: string): boolean {
-  return userTier === "free" || !userTier;
+  return userTier === "free" || userTier === "explorer" || !userTier;
 }
 
 /**
@@ -95,14 +96,19 @@ export function requiresWatermark(userTier: string): boolean {
  */
 export function getMaxResolution(userTier: string): { width: number; height: number } {
   switch (userTier) {
-    case "enterprise":
+    case "agency":
+    case "business":
     case "studio":
       return { width: 4096, height: 4096 }; // 4K
     case "pro":
-    case "creator":
       return { width: 2048, height: 2048 }; // HD
+    case "creator":
+      return { width: 1536, height: 1536 }; // 1536px
+    // Legacy mapping
+    case "enterprise":
+      return { width: 4096, height: 4096 };
     default:
-      return { width: 1024, height: 768 }; // 480p-ish for free
+      return { width: 1024, height: 768 }; // Free tier
   }
 }
 
@@ -116,14 +122,19 @@ export function getDailyLimits(userTier: string): {
   musicVideos: number;
 } {
   switch (userTier) {
-    case "enterprise":
+    case "agency":
+    case "business":
       return { images: -1, songs: -1, videos: -1, musicVideos: -1 }; // unlimited
     case "studio":
-      return { images: 500, songs: 50, videos: 30, musicVideos: -1 }; // generous
+      return { images: -1, songs: -1, videos: -1, musicVideos: -1 }; // unlimited (credit-gated)
     case "pro":
+      return { images: -1, songs: -1, videos: -1, musicVideos: -1 }; // unlimited (credit-gated)
     case "creator":
-      return { images: 150, songs: 10, videos: 10, musicVideos: 10 };
+      return { images: -1, songs: 100, videos: -1, musicVideos: 10 }; // credit-gated, but music limits
+    // Legacy mapping
+    case "enterprise":
+      return { images: -1, songs: -1, videos: -1, musicVideos: -1 };
     default:
-      return { images: 100, songs: 5, videos: 3, musicVideos: 1 }; // free
+      return { images: -1, songs: 5, videos: -1, musicVideos: 1 }; // free: 50 credits/day limit
   }
 }

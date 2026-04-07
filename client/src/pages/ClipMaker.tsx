@@ -271,7 +271,7 @@ export default function ClipMaker() {
                     ))}
 
                     <div className="pt-3 flex gap-2">
-                      <Button variant="outline" className="flex-1 gap-2 bg-transparent text-xs" onClick={() => toast.info("Export coming soon!")}>
+                      <Button variant="outline" className="flex-1 gap-2 bg-transparent text-xs" onClick={() => toast.info("Export feature launching soon — stay tuned!")}>
                         <Share2 className="h-3 w-3" /> Export All
                       </Button>
                       <Button

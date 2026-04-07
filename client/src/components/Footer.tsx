@@ -1,4 +1,4 @@
-import { Wand2, Heart, Twitter, Github, MessageCircle, Mail, ExternalLink, ArrowRight } from "lucide-react";
+import { Wand2, Heart, Twitter, Mail, ExternalLink, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
 
@@ -18,7 +18,7 @@ const footerLinks = {
     { label: "Text-to-Video", href: "/tools/text-to-video" },
     { label: "AI Headshots", href: "/tools/headshot" },
     { label: "Logo Maker", href: "/tools/logo-maker" },
-    { label: "All 71+ Tools", href: "/tools" },
+    { label: "All 75+ Tools", href: "/tools" },
   ],
   resources: [
     { label: "Pricing", href: "/pricing" },
@@ -36,13 +36,11 @@ const footerLinks = {
 };
 
 const socialLinks = [
-  { icon: Twitter, href: "https://twitter.com/dreamforgeai", label: "Twitter" },
-  { icon: Github, href: "https://github.com/daxkensington/dreamforge-ai", label: "GitHub" },
-  { icon: MessageCircle, href: "#", label: "Discord" },
+  { icon: Twitter, href: "https://x.com/dreamforgex_ai", label: "Twitter" },
   { icon: Mail, href: "mailto:support@dreamforgex.ai", label: "Email" },
 ];
 
-const aiModels = ["Grok", "Flux Pro", "DALL-E 3", "SD3", "Gemini", "Veo 3", "Claude", "MiniMax Music"];
+const aiModels = ["Grok", "Flux Pro", "DALL-E 3", "Gemini", "Veo 3", "Claude", "Seedream", "Runway", "Kling", "fal.ai", "Groq"];
 
 const galleryStrip = [
   "/showcase/gallery-strip-1.jpg", "/showcase/gallery-strip-2.jpg", "/showcase/gallery-strip-3.jpg",
@@ -57,8 +55,9 @@ export default function Footer() {
 
   return (
     <footer className="relative border-t border-white/5 bg-black">
-      {/* Fire gradient accent line at top */}
+      {/* Fire gradient accent line at top with glow */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent blur-sm" />
 
       {/* Mini Gallery Strip */}
       <div className="overflow-hidden py-6">
@@ -98,7 +97,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm text-white/50 leading-relaxed mb-6 max-w-xs">
-              The all-in-one AI creative studio. 71+ tools for images, video, audio, and design — powered by the world's best AI models.
+              The all-in-one AI creative studio. 75+ tools for images, video, audio, and design — powered by the world's best AI models.
             </p>
 
             {/* Social links */}
@@ -224,8 +223,15 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Product Hunt Badge */}
+        <div className="border-t border-white/5 pt-6 flex justify-center">
+          <a href="https://www.producthunt.com/products/dreamforgex?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-dreamforgex" target="_blank" rel="noopener noreferrer">
+            <img alt="DreamForgeX on Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1116609&theme=dark&t=1775446426701" />
+          </a>
+        </div>
+
         {/* Bottom bar */}
-        <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="border-t border-white/5 pt-6 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/30">
             &copy; {new Date().getFullYear()} DreamForgeX AI. All rights reserved.
           </p>

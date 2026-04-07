@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Image Templates — DreamForgeX",
-  description: "25+ design templates for social posts, ads, and print",
+  title: "Project Templates — DreamForgeX",
+  description: "24 ready-to-use creative project templates for social media, marketing, art, design, photography, and video",
   openGraph: {
-    title: "AI Image Templates — DreamForgeX",
-    description: "25+ design templates for social posts, ads, and print",
+    title: "Project Templates — DreamForgeX",
+    description: "24 ready-to-use creative project templates for social media, marketing, art, design, photography, and video",
   },
 };
 

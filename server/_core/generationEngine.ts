@@ -15,6 +15,7 @@ import { OpenAIProvider } from "./providers/openai";
 import { RunwayProvider } from "./providers/runway";
 import { KlingProvider } from "./providers/kling";
 import { ReplicateProvider } from "./providers/replicate";
+import { FalProvider } from "./providers/fal";
 
 // ─── Provider Instances (lazy singletons) ─────────────────────────────────
 
@@ -29,6 +30,7 @@ function getProviders(): Record<string, ProviderAdapter> {
       runway: new RunwayProvider(),
       kling: new KlingProvider(),
       replicate: new ReplicateProvider(),
+      fal: new FalProvider(),
     };
   }
   return _providers;
@@ -43,7 +45,8 @@ export interface EngineGenerationRequest {
   height?: number;
   steps?: number;
   modelId: string;
-  userTier: AIModel["tier"];
+  /** User's subscription tier (free/creator/pro/studio/business/agency) */
+  userTier: string;
   quality?: "standard" | "hd";
   style?: "natural" | "vivid";
   /** If true, try other providers when the selected one fails. Default: true. */
@@ -71,7 +74,7 @@ export async function runGeneration(
     throw new Error(`Model "${model.name}" is currently unavailable (API key not configured)`);
   }
 
-  // 3. Check tier access
+  // 3. Check tier access (user subscription tier vs model's required tier)
   if (!canAccessModel(request.userTier, model.tier)) {
     throw new Error(
       `Your "${request.userTier}" tier does not have access to "${model.name}". ` +
@@ -151,7 +154,7 @@ async function tryFallbackProviders(
     const adapter = providers[fallbackModel.provider];
     if (!adapter || !adapter.isAvailable) continue;
 
-    // Check tier access for fallback
+    // Check tier access for fallback (user subscription tier vs model required tier)
     if (!canAccessModel(engineRequest.userTier, fallbackModel.tier)) continue;
 
     try {

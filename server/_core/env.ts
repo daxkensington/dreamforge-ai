@@ -30,8 +30,12 @@ export const ENV = {
   // RunPod Self-Hosted
   get runpodApiKey() { return process.env.RUNPOD_API_KEY ?? ""; },
   get runpodFluxEndpointId() { return process.env.RUNPOD_FLUX_ENDPOINT_ID ?? ""; },
+  // fal.ai
+  get falApiKey() { return process.env.FAL_API_KEY ?? ""; },
   // Video Providers
   get runwayApiKey() { return process.env.RUNWAY_API_KEY ?? ""; },
   get klingAccessKey() { return process.env.KLING_ACCESS_KEY ?? ""; },
   get klingSecretKey() { return process.env.KLING_SECRET_KEY ?? ""; },
+  // Sync Labs (lip sync)
+  get syncLabsApiKey() { return process.env.SYNC_LABS_API_KEY ?? ""; },
 };

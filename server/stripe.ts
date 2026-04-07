@@ -57,7 +57,7 @@ export const CREDIT_PACKAGES = [
   },
   {
     id: "enterprise",
-    name: "Enterprise Pack",
+    name: "Ultimate Pack",
     credits: 5000,
     price: 14999, // $149.99
     priceDisplay: "$149.99",
@@ -68,7 +68,9 @@ export const CREDIT_PACKAGES = [
 ] as const;
 
 // ─── Credit Costs per Tool ──────────────────────────────────────────────────
-// Costs aligned with shared/creditCosts.ts LEGACY_CREDIT_COSTS (what users see in the UI)
+// For model-based generations (text-to-image, text-to-video), the actual cost
+// is determined by the MODEL selected (see MODEL_CREDIT_COSTS in shared/creditCosts.ts).
+// These are fallback/default costs for tool-based operations.
 export const CREDIT_COSTS: Record<string, number> = {
   "text-to-image": 5,
   "image-to-image": 5,
@@ -105,14 +107,14 @@ export const CREDIT_COSTS: Record<string, number> = {
   "avatar": 10,
   "product-photo": 10,
   "image-caption": 0,
-  "text-to-speech": 10,
+  "text-to-speech": 8,
   "audio-enhance": 5,
-  "sound-effects": 10,
+  "sound-effects": 4,
   "hdr-enhance": 5,
   "transparent-png": 5,
   "icon-gen": 5,
   "batch-prompts": 5,
-  "music-gen": 10,
+  "music-gen": 6,
   "mockup": 5,
   "social-resize": 5,
   "depth-map": 5,
@@ -216,6 +218,33 @@ export async function addCredits(
     stripeSessionId: stripeSessionId || null,
     stripePaymentIntentId: stripePaymentIntentId || null,
   });
+}
+
+export async function refundCredits(
+  userId: number,
+  amount: number,
+  reason: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await getOrCreateBalance(userId);
+
+  await db
+    .update(creditBalances)
+    .set({
+      balance: sql`${creditBalances.balance} + ${amount}`,
+      lifetimeSpent: sql`GREATEST(${creditBalances.lifetimeSpent} - ${amount}, 0)`,
+    })
+    .where(eq(creditBalances.userId, userId));
+
+  await db.insert(creditTransactions).values({
+    userId,
+    amount,
+    type: "refund" as const,
+    description: reason,
+  });
+
+  return { success: true, refunded: amount };
 }
 
 export async function getCreditHistory(userId: number, limit = 50) {

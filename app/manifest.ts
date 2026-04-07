@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "DreamForgeX — AI Creative Studio",
     short_name: "DreamForgeX",
     description:
-      "Create stunning AI-generated images, videos, and audio with 71+ creative tools.",
+      "Create stunning AI-generated images, videos, and audio with 75+ creative tools.",
     start_url: "/",
     scope: "/",
     display: "standalone",

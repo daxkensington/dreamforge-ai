@@ -96,7 +96,7 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
     setGeneratingImages(true);
     try {
       const result = await fetch("/api/trpc/tools.upscale", { method: "POST" }); // placeholder
-      toast.info("Image generation for slides coming soon!");
+      toast.info("Slide image generation launching soon — stay tuned!");
     } catch {
       toast.error("Failed to generate slide image");
     }
@@ -214,7 +214,7 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Slide {currentSlide + 1} of {slides.length}</span>
               </div>
-              <Button variant="outline" className="gap-2 bg-transparent" onClick={() => toast.info("PDF export coming soon!")}>
+              <Button variant="outline" className="gap-2 bg-transparent" onClick={() => toast.info("PDF export launching soon — stay tuned!")}>
                 <Download className="h-4 w-4" /> Export PDF
               </Button>
             </div>

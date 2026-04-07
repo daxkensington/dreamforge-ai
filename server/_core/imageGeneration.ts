@@ -22,7 +22,7 @@ import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell } from "./runpod";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "auto";
+  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "fal-flux-dev" | "fal-flux-schnell" | "fal-flux-pro-ultra" | "fal-seedream" | "fal-flux-kontext" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd" | "ultra";
   style?: "natural" | "vivid";
@@ -290,6 +290,15 @@ async function generateUltra(
     }
   }
 
+  // Step 2b: Try fal.ai Flux Pro Ultra
+  if (ENV.falApiKey) {
+    try {
+      return await generateWithFal(enhancedPrompt, "fal-ai/flux-pro/v1.1-ultra", width || 1440, height || 1440);
+    } catch (err: any) {
+      console.warn("[Ultra] fal.ai Flux Pro Ultra failed, trying Replicate:", err.message);
+    }
+  }
+
   // Step 3: Try Flux Pro via Replicate
   if (ENV.replicateApiToken) {
     try {
@@ -391,6 +400,78 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
 
   // Cloudflare returns raw image bytes
   return Buffer.from(await response.arrayBuffer());
+}
+
+/**
+ * Generate image via fal.ai queue API.
+ * Supports Flux Dev, Flux Schnell, Flux Pro Ultra, Seedream, and Flux Kontext.
+ */
+async function generateWithFal(
+  prompt: string,
+  falModel: string = "fal-ai/flux/dev",
+  width?: number,
+  height?: number,
+): Promise<Buffer> {
+  const apiKey = ENV.falApiKey;
+  if (!apiKey) throw new Error("fal.ai API key not configured");
+
+  const body: Record<string, unknown> = {
+    prompt,
+    image_size: { width: width || 1024, height: height || 1024 },
+  };
+
+  // Submit to queue
+  const submitResponse = await fetch(`https://queue.fal.run/${falModel}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!submitResponse.ok) {
+    const detail = await submitResponse.text().catch(() => "");
+    throw new Error(`fal.ai submit failed (${submitResponse.status}): ${detail}`);
+  }
+
+  const { request_id } = (await submitResponse.json()) as { request_id: string };
+  if (!request_id) throw new Error("fal.ai returned no request_id");
+
+  // Poll for result (up to 2 minutes)
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const statusResp = await fetch(
+      `https://queue.fal.run/${falModel}/requests/${request_id}/status`,
+      { headers: { Authorization: `Key ${apiKey}` } },
+    );
+    if (!statusResp.ok) continue;
+
+    const status = (await statusResp.json()) as { status: string; error?: string };
+
+    if (status.status === "COMPLETED") {
+      const resultResp = await fetch(
+        `https://queue.fal.run/${falModel}/requests/${request_id}`,
+        { headers: { Authorization: `Key ${apiKey}` } },
+      );
+      if (!resultResp.ok) throw new Error("Failed to fetch fal.ai result");
+
+      const result = (await resultResp.json()) as { images?: Array<{ url: string }> };
+      const imageUrl = result.images?.[0]?.url;
+      if (!imageUrl) throw new Error("fal.ai returned no image data");
+
+      const imgResp = await fetch(imageUrl);
+      if (!imgResp.ok) throw new Error("Failed to download fal.ai image");
+      return Buffer.from(await imgResp.arrayBuffer());
+    }
+
+    if (status.status === "FAILED") {
+      throw new Error(`fal.ai generation failed: ${status.error || "Unknown"}`);
+    }
+  }
+
+  throw new Error("fal.ai generation timed out");
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -513,7 +594,7 @@ export async function generateImage(
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell",
+  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "fal-flux-dev" | "fal-flux-schnell" | "fal-flux-pro-ultra" | "fal-seedream" | "fal-flux-kontext",
   prompt: string,
   size: string,
   quality: "standard" | "hd" | "ultra",
@@ -554,6 +635,21 @@ async function generateWithExplicitModel(
       return generateWithCloudflare(prompt);
     case "ultra":
       return generateUltra(prompt, w, h);
+    case "fal-flux-dev":
+      if (!ENV.falApiKey) throw new Error("fal.ai API key not configured");
+      return generateWithFal(prompt, "fal-ai/flux/dev", w, h);
+    case "fal-flux-schnell":
+      if (!ENV.falApiKey) throw new Error("fal.ai API key not configured");
+      return generateWithFal(prompt, "fal-ai/flux/schnell", w, h);
+    case "fal-flux-pro-ultra":
+      if (!ENV.falApiKey) throw new Error("fal.ai API key not configured");
+      return generateWithFal(prompt, "fal-ai/flux-pro/v1.1-ultra", w, h);
+    case "fal-seedream":
+      if (!ENV.falApiKey) throw new Error("fal.ai API key not configured");
+      return generateWithFal(prompt, "fal-ai/seedream-3.0", w, h);
+    case "fal-flux-kontext":
+      if (!ENV.falApiKey) throw new Error("fal.ai API key not configured");
+      return generateWithFal(prompt, "fal-ai/flux-kontext/pro", w, h);
     default:
       throw new Error(`Unknown image model: ${model}`);
   }
@@ -613,6 +709,14 @@ async function generateWithFallback(
   // 5. CHEAP: Grok
   if (ENV.grokApiKey) {
     const result = await tryProvider("Grok", () => generateWithGrok(prompt, size));
+    if (result) return result;
+  }
+
+  // 5b. CHEAP: fal.ai Flux Schnell (~$0.008/image)
+  if (ENV.falApiKey) {
+    const result = await tryProvider("fal.ai Flux Schnell", () =>
+      generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
+    );
     if (result) return result;
   }
 

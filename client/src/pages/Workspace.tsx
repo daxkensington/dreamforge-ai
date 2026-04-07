@@ -318,7 +318,7 @@ export default function Workspace() {
                 </span>
               </h1>
               <p className="text-muted-foreground max-w-md">
-                Describe your vision and let AI bring it to life — images, videos, and animations powered by 6 AI models.
+                Describe your vision and let AI bring it to life — images, videos, and animations powered by 30+ AI models.
               </p>
             </div>
             <div className="flex gap-2">

@@ -144,7 +144,7 @@ export const pricingRouter = router({
   subscribe: protectedProcedure
     .input(
       z.object({
-        planName: z.enum(["creator", "pro", "studio"]),
+        planName: z.enum(["creator", "pro", "studio", "business", "agency"]),
         origin: z.string().url(),
       })
     )
@@ -243,7 +243,7 @@ export const pricingRouter = router({
   changePlan: protectedProcedure
     .input(
       z.object({
-        newPlanName: z.enum(["free", "creator", "pro", "studio"]),
+        newPlanName: z.enum(["free", "creator", "pro", "studio", "business", "agency"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -38,7 +38,7 @@ export interface AudioGenerationResult {
 // ─── Replicate Model Versions ───────────────────────────────────────────────
 
 const REPLICATE_MODELS = {
-  musicgen: "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedxxx",
+  musicgen: "meta/musicgen:b05b1dff1d8c6dc63d14b0cdb42135571e41c36ba5eeebb2b1d37dc8e3baa3c5",
   audiogen: "meta/audiogen:0a9c7e04e09560e9b740eeeda3e24e22fc0dc92e9e3e68ef62387a58b4633ace",
   bark: "suno-ai/bark:b76242b40d67c76ab6742e987628a2a9ac019e11d56571d42727c2cb41f00bea",
 } as const;

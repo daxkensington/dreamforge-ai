@@ -98,24 +98,29 @@ import { pricingRouter } from "./routers/pricing";
 import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { collaborationRouter } from "./routers/collaboration";
-import { deductCredits, CREDIT_COSTS } from "./stripe";
+import { supportChatRouter } from "./routers/supportChat";
+import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
 import { getDb } from "./db";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { enforceRateLimit } from "./rate-limit";
-import { getTierConfig } from "@shared/tiers";
+import { getTierConfig, resolveTierName } from "@shared/tiers";
+import { LEGACY_CREDIT_COSTS, TOOL_CREDIT_COSTS } from "@shared/creditCosts";
+import { getModelById, canAccessModel } from "./_core/modelRegistry";
 
-// ─── Premium Models (require paid tier) ────────────────────────────────────
+// ─── Model Tier Gating ────────────────────────────────────────────────────
+// Models are now gated by subscription tier via canAccessModel().
+// Legacy PREMIUM_MODEL_IDS kept as a quick-check fallback.
 const PREMIUM_MODEL_IDS = new Set([
-  "ultra",
-  "dall-e-3",
-  "dall-e-3-hd",
-  "stability-ultra",
-  "stability-core",
-  "flux-pro",
-  "runway-gen4.5",
-  "runway-gen4-turbo",
-  "kling-2.0",
+  // Ultra tier (Studio+)
+  "ultra", "fal-flux-pro-ultra", "runway-gen4.5", "runway-gen4-turbo",
+  // Premium tier (Pro+)
+  "dall-e-3", "dall-e-3-hd", "flux-pro", "fal-flux-kontext", "kling-2.0",
+  // Quality tier (Pro+)
+  "flux-schnell", "fal-flux-dev", "fal-seedream", "sd3", "kling-1.6", "fal-kling-video",
+  // Standard tier (Creator+)
+  "grok-image", "fal-flux-schnell", "runpod-flux-dev", "runpod-flux-schnell",
+  "fal-wan-video", "minimax-video", "stable-video",
 ]);
 
 // ─── User Tier Helper ──────────────────────────────────────────────────────
@@ -129,18 +134,35 @@ async function getUserTier(userId: number): Promise<string> {
       .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
       .where(eq(userSubscriptions.userId, userId))
       .limit(1);
-    return rows[0]?.planName ?? "free";
+    const rawTier = rows[0]?.planName ?? "free";
+    // Resolve legacy tier names (e.g. "enterprise" -> "business")
+    return resolveTierName(rawTier);
   } catch {
     return "free";
   }
 }
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
-async function tryDeductCredits(userId: number, tool: string, description?: string) {
-  const cost = CREDIT_COSTS[tool] || 1;
+/**
+ * Deduct credits for a tool operation.
+ * For model-based generations, pass the modelId to use model-tier-aware pricing.
+ * For non-model tools, falls back to TOOL_CREDIT_COSTS or LEGACY_CREDIT_COSTS.
+ */
+async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string) {
+  let cost: number;
+
+  if (modelId) {
+    // Model-aware pricing: use the model's creditCost.base
+    const model = getModelById(modelId);
+    cost = model?.creditCost.base ?? (LEGACY_CREDIT_COSTS[tool] || 1);
+  } else {
+    // Tool-based pricing
+    cost = TOOL_CREDIT_COSTS[tool] ?? LEGACY_CREDIT_COSTS[tool] ?? CREDIT_COSTS[tool] ?? 1;
+  }
+
   if (cost === 0) return { success: true, balance: 0, needed: 0 };
   try {
-    const result = await deductCredits(userId, cost, description || `Used ${tool}`);
+    const result = await deductCredits(userId, cost, description || `Used ${tool}${modelId ? ` (${modelId})` : ""}`);
     if (!result.success) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
@@ -429,11 +451,12 @@ export const appRouter = router({
         const userTier = await getUserTier(ctx.user.id);
         const tierConfig = getTierConfig(userTier);
 
-        // Block premium models for free tier
-        if (!tierConfig.premiumModels && PREMIUM_MODEL_IDS.has(input.modelVersion)) {
+        // Block models the user's tier can't access
+        const requestedModel = getModelById(input.modelVersion);
+        if (requestedModel && !canAccessModel(userTier, requestedModel.tier)) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: `Model "${input.modelVersion}" requires a Pro or higher subscription.`,
+            message: `Model "${input.modelVersion}" requires a ${requestedModel.tier} or higher subscription.`,
           });
         }
 
@@ -497,6 +520,13 @@ export const appRouter = router({
             status: "failed",
             errorMessage: error.message || "Generation failed",
           });
+          // Refund credits on generation failure
+          const refundCost = CREDIT_COSTS[creditTool] || 1;
+          try {
+            await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${(error.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[generation.create] Credit refund failed:", refundErr);
+          }
           return { id: genId, status: "failed", error: error.message };
         }
       }),
@@ -710,8 +740,9 @@ export const appRouter = router({
         const tierConfig = getTierConfig(userTier);
 
         for (const item of input.prompts) {
-          if (!tierConfig.premiumModels && PREMIUM_MODEL_IDS.has(item.modelVersion)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a Pro or higher subscription.` });
+          const batchModel = getModelById(item.modelVersion);
+          if (batchModel && !canAccessModel(userTier, batchModel.tier)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a ${batchModel.tier} or higher subscription.` });
           }
           if (item.width > tierConfig.maxImageResolution || item.height > tierConfig.maxImageResolution) {
             throw new TRPCError({ code: "FORBIDDEN", message: `Max resolution for your plan is ${tierConfig.maxImageResolution}x${tierConfig.maxImageResolution}.` });
@@ -768,6 +799,13 @@ export const appRouter = router({
               status: "failed",
               errorMessage: error.message || "Generation failed",
             });
+            // Refund credits for this failed batch item
+            const itemCost = CREDIT_COSTS[item.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1;
+            try {
+              await refundCredits(ctx.user.id, itemCost, `Refund: batch item failed — ${(error.message || "unknown error").slice(0, 100)}`);
+            } catch (refundErr) {
+              console.error("[generation.batchCreate] Credit refund failed:", refundErr);
+            }
             results.push({ id: genId, status: "failed", prompt: item.prompt, error: error.message });
           }
         }
@@ -3764,6 +3802,9 @@ export const appRouter = router({
   // ─── Real-time Collaboration ─────────────────────────────────────────
   collaboration: collaborationRouter,
 
+  // ─── AI Support Chatbot ─────────────────────────────────────────────
+  supportChat: supportChatRouter,
+
   export: router({
     metadata: protectedProcedure
       .input(z.object({ ids: z.array(z.number()).min(1).max(50) }))
@@ -3799,6 +3840,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        enforceRateLimit(`song.generateLyrics:${ctx.user.id}`, 20, 60_000, "Lyrics generation rate limit exceeded — max 20 per minute.");
         await tryDeductCredits(ctx.user.id, "prompt-assist", "AI lyrics generation");
         const { generateLyrics } = await import("./_core/songGeneration");
         return generateLyrics(input);
@@ -3817,6 +3859,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        enforceRateLimit(`song.generateSong:${ctx.user.id}`, 10, 60_000, "Song generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
         const { generateSong } = await import("./_core/songGeneration");
         const result = await generateSong(input);

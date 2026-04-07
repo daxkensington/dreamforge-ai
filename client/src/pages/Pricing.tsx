@@ -17,13 +17,15 @@ import {
   Package,
   Mail,
   ChevronDown,
+  Building2,
+  Rocket,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { CREDIT_PACKS } from "@shared/creditCosts";
 
-/* ── Animation variants ── */
+/* -- Animation variants -- */
 const fadeUp = {
   hidden: (i: number) => ({ opacity: 0, y: 24, transition: { duration: 0.5, delay: i * 0.1 } }),
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.1 } }),
@@ -36,15 +38,16 @@ const scaleIn = {
 
 type BillingPeriod = "monthly" | "yearly";
 
-/* ── Plan card data ── */
+/* -- Plan card data -- */
 const plans = [
   {
     name: "Explorer",
+    tier: "free",
     icon: Sparkles,
-    description: "100 free images/day, 5 songs, 3 videos. Watermarked outputs, non-commercial.",
+    description: "50 credits/day, free models only. Watermarked, non-commercial.",
     monthlyPrice: 0,
     yearlyPrice: 0,
-    credits: "100/day",
+    credits: "50/day",
     gradient: "from-slate-500 to-zinc-400",
     borderColor: "border-border/50",
     popular: false,
@@ -52,68 +55,101 @@ const plans = [
     ctaVariant: "outline" as const,
   },
   {
-    name: "Pro",
+    name: "Creator",
+    tier: "creator",
     icon: Zap,
-    description: "No watermarks, commercial rights, HD exports. For creators who post content.",
-    monthlyPrice: 12,
-    yearlyPrice: 115,
-    credits: "5,000",
+    description: "No watermarks, commercial rights, standard models. For hobbyists who share.",
+    monthlyPrice: 9,
+    yearlyPrice: 86,
+    credits: "3,000",
     gradient: "from-cyan-500 to-blue-400",
     borderColor: "border-cyan-500/30",
+    popular: false,
+    cta: "Go Creator",
+    ctaVariant: "default" as const,
+  },
+  {
+    name: "Pro",
+    tier: "pro",
+    icon: Crown,
+    description: "Quality + premium models, 1080p, priority queue. For serious creators.",
+    monthlyPrice: 19,
+    yearlyPrice: 182,
+    credits: "10,000",
+    gradient: "from-violet-500 to-fuchsia-400",
+    borderColor: "border-violet-500/50",
     popular: true,
     cta: "Go Pro",
     ctaVariant: "default" as const,
   },
   {
     name: "Studio",
-    icon: Crown,
-    description: "Unlimited music videos, song stems, MIDI export. Sell on marketplace.",
-    monthlyPrice: 29,
-    yearlyPrice: 276,
-    credits: "15,000",
-    gradient: "from-violet-500 to-fuchsia-400",
-    borderColor: "border-violet-500/50",
+    tier: "studio",
+    icon: Gem,
+    description: "All models, 4K, stems, marketplace selling. For professional studios.",
+    monthlyPrice: 39,
+    yearlyPrice: 374,
+    credits: "30,000",
+    gradient: "from-purple-500 to-pink-400",
+    borderColor: "border-purple-500/30",
     popular: false,
     cta: "Go Studio",
     ctaVariant: "outline" as const,
   },
   {
-    name: "Enterprise",
-    icon: Gem,
-    description: "API access, 5 team seats, white-label exports. For agencies and businesses.",
+    name: "Business",
+    tier: "business",
+    icon: Building2,
+    description: "API access, 10 team seats, 90% marketplace rev share. For companies.",
     monthlyPrice: 79,
-    yearlyPrice: 756,
-    credits: "50,000",
+    yearlyPrice: 758,
+    credits: "100,000",
     gradient: "from-cyan-500 to-purple-500",
     borderColor: "border-cyan-500/30",
     popular: false,
-    cta: "Contact Sales",
+    cta: "Go Business",
+    ctaVariant: "outline" as const,
+  },
+  {
+    name: "Agency",
+    tier: "agency",
+    icon: Rocket,
+    description: "White-label, custom LoRAs, 25 seats, dedicated support. For agencies.",
+    monthlyPrice: 149,
+    yearlyPrice: 1430,
+    credits: "300,000",
+    gradient: "from-amber-500 to-orange-500",
+    borderColor: "border-amber-500/30",
+    popular: false,
+    cta: "Go Agency",
     ctaVariant: "outline" as const,
   },
 ];
 
-/* ── Feature comparison rows ── */
+/* -- Feature comparison rows -- */
 const comparisonFeatures: { label: string; values: (string | boolean)[] }[] = [
-  { label: "Credits", values: ["100/day", "5,000/mo", "15,000/mo", "50,000/mo"] },
-  { label: "Watermark-free", values: [false, true, true, true] },
-  { label: "Commercial rights", values: [false, true, true, true] },
-  { label: "AI models", values: ["Free models", "All 20 models", "All 20 models", "All + priority"] },
-  { label: "Image resolution", values: ["1024px", "2048px (HD)", "4096px (4K)", "4096px (4K)"] },
-  { label: "Video exports", values: ["480p watermarked", "1080p HD", "4K", "4K"] },
-  { label: "Song creation", values: ["5/day watermarked", "100/mo", "Unlimited", "Unlimited"] },
-  { label: "Song stems + MIDI", values: [false, false, true, true] },
-  { label: "Music Video Studio", values: ["1/day", "10/mo", "Unlimited", "Unlimited"] },
-  { label: "Social templates", values: ["Watermarked", true, true, true] },
-  { label: "Marketplace selling", values: [false, false, "85% rev share", "85% rev share"] },
-  { label: "API access", values: [false, false, false, "2,000 req/hr"] },
-  { label: "Team seats", values: [false, false, false, "5 seats"] },
-  { label: "Batch generation", values: [false, true, "Up to 20", "Up to 50"] },
-  { label: "Brand kits", values: [false, "1", "5", "Unlimited"] },
-  { label: "Priority queue", values: [false, true, true, true] },
-  { label: "White-label exports", values: [false, false, false, true] },
+  { label: "Credits", values: ["50/day", "3,000/mo", "10,000/mo", "30,000/mo", "100,000/mo", "300,000/mo"] },
+  { label: "Watermark-free", values: [false, true, true, true, true, true] },
+  { label: "Commercial rights", values: [false, true, true, true, true, true] },
+  { label: "AI models", values: ["Free only", "+ Standard", "+ Quality/Premium", "All + Ultra", "All", "All"] },
+  { label: "Image resolution", values: ["1024px", "1536px", "2048px", "4096px", "4096px", "4096px"] },
+  { label: "Video exports", values: ["480p", "720p", "1080p", "4K", "4K", "4K"] },
+  { label: "Songs / month", values: ["5/day", "100", "Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
+  { label: "Music videos / mo", values: ["1/day", "10", "Unlimited", "Unlimited", "Unlimited", "Unlimited"] },
+  { label: "Song stems + MIDI", values: [false, false, false, true, true, true] },
+  { label: "Batch generation", values: [false, "Up to 5", "Up to 15", "Up to 30", "Up to 50", "Up to 100"] },
+  { label: "Brand kits", values: [false, "1", "3", "10", "Unlimited", "Unlimited"] },
+  { label: "Team seats", values: [false, false, false, "3", "10", "25"] },
+  { label: "Credit rollover", values: [false, "500", "3,000", "15,000", "50,000", "200,000"] },
+  { label: "Marketplace", values: ["Browse", "Browse", "Buy", "Buy + Sell (85%)", "Buy + Sell (90%)", "Buy + Sell (90%)"] },
+  { label: "API access", values: [false, false, false, false, "5K req/hr", "20K req/hr"] },
+  { label: "Priority queue", values: [false, false, true, true, true, true] },
+  { label: "White-label exports", values: [false, false, false, false, false, true] },
+  { label: "Custom LoRAs", values: [false, false, false, false, false, "3 included"] },
+  { label: "Dedicated support", values: [false, false, false, false, false, true] },
 ];
 
-/* ── FAQ data ── */
+/* -- FAQ data -- */
 const faqs = [
   {
     q: "Can I switch plans at any time?",
@@ -121,11 +157,11 @@ const faqs = [
   },
   {
     q: "What are credits and how do they work?",
-    a: "Credits are the universal currency for all AI operations on DreamForgeX. Different tasks cost different amounts — a basic image costs 5 credits, an HD image costs 10, and video generation starts at 50 credits. Your credits refresh each billing cycle.",
+    a: "Credits are the universal currency for all AI operations on DreamForgeX. Different models cost different amounts -- a free-tier image costs 2 credits, a standard model costs 5, quality 10, premium 15, and ultra models cost 25 credits. Video generation ranges from 10 to 200 credits depending on the model.",
   },
   {
     q: "Do unused credits roll over?",
-    a: "Subscription credits do not roll over to the next month. However, credits purchased from Credit Packs never expire and are always available in your account.",
+    a: "Yes! Each plan includes credit rollover. Creator rolls over up to 500, Pro up to 3,000, Studio up to 15,000, Business up to 50,000, and Agency up to 200,000 credits. Purchased credit packs never expire.",
   },
   {
     q: "Can I buy extra credits without upgrading?",
@@ -133,23 +169,27 @@ const faqs = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "We accept all major credit cards, debit cards, and PayPal. Enterprise customers can also pay via invoice with net-30 terms.",
+    a: "We accept all major credit cards, debit cards, and PayPal. Business and Agency customers can also pay via invoice with net-30 terms.",
   },
   {
     q: "Is there a free trial for paid plans?",
-    a: "The Free plan itself is a great way to try DreamForgeX with 1,500 credits per month. No credit card required. When you're ready for more, upgrade instantly.",
+    a: "The Free plan itself is a great way to try DreamForgeX with 50 credits per day (~1,500/month). No credit card required. When you're ready for more, upgrade instantly.",
   },
   {
     q: "What's included in the commercial license?",
-    a: "Creator, Pro, and Studio plans include a commercial license that lets you use all AI-generated content for business purposes — marketing materials, client work, merchandise, and more.",
+    a: "Creator and above plans include a commercial license that lets you use all AI-generated content for business purposes -- marketing materials, client work, merchandise, and more.",
   },
   {
     q: "Can I cancel my subscription?",
     a: "Yes, cancel anytime from your account settings. You'll keep access to your plan's features until the end of the current billing period. Your generated content remains yours forever.",
   },
+  {
+    q: "What models can I use on the free tier?",
+    a: "Free tier includes Gemini Imagen, Together AI, Cloudflare Workers AI for images, Veo 3 for video, and Edge TTS for speech. These are high-quality models that cost us nothing to run.",
+  },
 ];
 
-/* ── Credit pack helpers ── */
+/* -- Credit pack helpers -- */
 function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(0)}`;
 }
@@ -162,7 +202,7 @@ function packSavingsPercent(idx: number): string | null {
   return pct > 0 ? `Save ${pct}%` : null;
 }
 
-/* ══════════════════════════════════════════════════════ */
+/* ====================================================== */
 export default function Pricing() {
   const { isAuthenticated } = useAuth();
   const [billing, setBilling] = useState<BillingPeriod>("monthly");
@@ -170,10 +210,13 @@ export default function Pricing() {
 
   return (
     <PageLayout>
-      {/* ═══════ HERO ═══════ */}
+      {/* ======= HERO ======= */}
       <section className="pt-24 pb-16 md:pt-32 md:pb-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute top-16 left-[15%] w-64 h-64 bg-violet-500/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-0 right-[10%] w-80 h-80 bg-cyan-500/8 rounded-full blur-[110px] animate-[pulse_5s_ease-in-out_infinite]" />
+        <div className="absolute top-1/3 right-[30%] w-48 h-48 bg-fuchsia-500/8 rounded-full blur-[80px] animate-[pulse_7s_ease-in-out_infinite]" />
         <div className="container relative text-center">
           <motion.div
             initial="hidden"
@@ -206,7 +249,7 @@ export default function Pricing() {
             custom={2}
             className="text-lg text-muted-foreground max-w-xl mx-auto mb-10"
           >
-            Start free with 1,500 credits. Upgrade when you need more power. No hidden fees, cancel anytime.
+            Start free with 50 credits/day. Upgrade when you need more power. Save 20% with annual billing.
           </motion.p>
 
           {/* Billing Toggle */}
@@ -244,13 +287,13 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ═══════ PLAN CARDS ═══════ */}
+      {/* ======= PLAN CARDS ======= */}
       <section className="pb-24 relative">
         <div className="container">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
             {plans.map((plan, i) => {
               const monthlyPrice = plan.monthlyPrice;
-              const annualMonthly = plan.yearlyPrice > 0 ? Math.round(plan.yearlyPrice / 12) : 0;
+              const annualMonthly = plan.yearlyPrice > 0 ? +(plan.yearlyPrice / 12).toFixed(2) : 0;
               const displayPrice = billing === "yearly" ? annualMonthly : monthlyPrice;
 
               return (
@@ -294,11 +337,19 @@ export default function Pricing() {
                     {/* Price */}
                     <div className="mb-6">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">${displayPrice}</span>
+                        <span className="text-4xl font-bold">${billing === "yearly" ? Math.round(displayPrice) : displayPrice}</span>
                         {displayPrice > 0 && <span className="text-muted-foreground text-sm">/ month</span>}
                       </div>
                       {billing === "yearly" && plan.yearlyPrice > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">${plan.yearlyPrice} billed annually</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <span className="line-through text-muted-foreground/60">${plan.monthlyPrice}</span>{" "}
+                          billed as ${plan.yearlyPrice}/year
+                        </p>
+                      )}
+                      {billing === "monthly" && plan.monthlyPrice > 0 && (
+                        <p className="text-xs text-emerald-400 mt-1">
+                          Save ${plan.monthlyPrice * 12 - plan.yearlyPrice}/yr with annual billing
+                        </p>
                       )}
                       {displayPrice === 0 && <p className="text-xs text-emerald-400 mt-1">Free forever</p>}
                     </div>
@@ -307,22 +358,32 @@ export default function Pricing() {
                     <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-lg bg-white/5 border border-white/5">
                       <Zap className="h-4 w-4 text-cyan-400" />
                       <span className="text-sm font-semibold">{plan.credits}</span>
-                      <span className="text-xs text-muted-foreground">credits / month</span>
+                      <span className="text-xs text-muted-foreground">credits{plan.tier === "free" ? "" : " / month"}</span>
                     </div>
 
-                    {/* CTA — pushed to bottom */}
+                    {/* CTA -- pushed to bottom */}
                     <div className="mt-auto">
-                      {plan.name === "Studio" ? (
-                        <Button
-                          variant="outline"
-                          className="w-full gap-2 bg-transparent"
-                          onClick={() => {
-                            window.location.href = "mailto:hello@dreamforgex.ai?subject=Studio%20Plan%20Inquiry";
-                          }}
-                        >
-                          <Mail className="h-4 w-4" />
-                          {plan.cta}
-                        </Button>
+                      {plan.name === "Agency" ? (
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            className="w-full gap-2 bg-transparent"
+                            onClick={() => {
+                              if (!isAuthenticated) {
+                                window.location.href = getLoginUrl();
+                              }
+                            }}
+                          >
+                            Go Agency
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                          <a
+                            href="mailto:hello@dreamforgex.ai?subject=Agency%20Plan%20Inquiry"
+                            className="block text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            or contact sales
+                          </a>
+                        </div>
                       ) : plan.popular ? (
                         <Button
                           className="w-full gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white border-0 shadow-lg shadow-violet-500/25"
@@ -335,7 +396,7 @@ export default function Pricing() {
                           {plan.cta}
                           <Zap className="h-4 w-4" />
                         </Button>
-                      ) : plan.name === "Free" ? (
+                      ) : plan.tier === "free" ? (
                         isAuthenticated ? (
                           <Button asChild variant="outline" className="w-full gap-2 bg-transparent">
                             <Link href="/workspace">
@@ -376,53 +437,77 @@ export default function Pricing() {
                       What's included
                     </p>
                     <ul className="space-y-3">
-                      {(plan.name === "Explorer"
+                      {(plan.tier === "free"
                         ? [
-                            "100 free images / day",
+                            "50 credits / day (~1,500/mo)",
+                            "Free models only (Gemini, Together, Cloudflare, Veo 3)",
                             "5 songs / day (watermarked)",
-                            "3 videos / day (480p, watermarked)",
                             "1 music video / day",
-                            "All 71+ tools (with limits)",
-                            "Community gallery access",
+                            "1024px images / 480p video",
+                            "Browse marketplace",
                             "Non-commercial use only",
                           ]
-                        : plan.name === "Pro"
+                        : plan.tier === "creator"
                           ? [
-                              "5,000 credits / month",
-                              "No watermarks on any output",
+                              "3,000 credits / month",
+                              "No watermarks",
                               "Commercial use rights",
-                              "All 20 AI models",
-                              "HD exports (2048px / 1080p)",
+                              "Standard + Free models",
+                              "1536px images / 720p video",
                               "100 songs / month",
                               "10 music videos / month",
-                              "Priority queue",
                               "1 brand kit",
-                              "Batch generation",
+                              "Batch gen (up to 5)",
+                              "500 credit rollover",
                             ]
-                          : plan.name === "Studio"
+                          : plan.tier === "pro"
                             ? [
-                                "15,000 credits / month",
-                                "Everything in Pro",
-                                "4K video exports",
-                                "Unlimited music videos",
-                                "Song stems + MIDI export",
-                                "Sell on marketplace (85%)",
-                                "5 brand kits",
-                                "Batch generation (up to 20)",
-                                "Credit rollover (10,000)",
-                                "Priority support",
+                                "10,000 credits / month",
+                                "Everything in Creator",
+                                "Quality + Premium models",
+                                "2048px images / 1080p video",
+                                "Unlimited songs & music videos",
+                                "Priority queue",
+                                "Marketplace buying",
+                                "3 brand kits",
+                                "Batch gen (up to 15)",
+                                "3,000 credit rollover",
                               ]
-                            : [
-                                "50,000 credits / month",
-                                "Everything in Studio",
-                                "API access (2,000 req/hr)",
-                                "5 team seats",
-                                "White-label exports",
-                                "Unlimited brand kits",
-                                "Batch generation (up to 50)",
-                                "Credit rollover (30,000)",
-                                "Dedicated support",
-                              ]
+                            : plan.tier === "studio"
+                              ? [
+                                  "30,000 credits / month",
+                                  "Everything in Pro",
+                                  "All models including Ultra",
+                                  "4K video exports",
+                                  "Song stems + MIDI export",
+                                  "Marketplace selling (85%)",
+                                  "3 team seats",
+                                  "10 brand kits",
+                                  "Batch gen (up to 30)",
+                                  "15,000 credit rollover",
+                                ]
+                              : plan.tier === "business"
+                                ? [
+                                    "100,000 credits / month",
+                                    "Everything in Studio",
+                                    "API access (5,000 req/hr)",
+                                    "10 team seats",
+                                    "Marketplace selling (90%)",
+                                    "Unlimited brand kits",
+                                    "Batch gen (up to 50)",
+                                    "50,000 credit rollover",
+                                  ]
+                                : [
+                                    "300,000 credits / month",
+                                    "Everything in Business",
+                                    "API access (20,000 req/hr)",
+                                    "25 team seats",
+                                    "White-label exports",
+                                    "3 custom LoRAs included",
+                                    "Batch gen (up to 100)",
+                                    "200,000 credit rollover",
+                                    "Dedicated support",
+                                  ]
                       ).map((feat) => (
                         <li key={feat} className="flex items-start gap-3">
                           <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
@@ -437,10 +522,35 @@ export default function Pricing() {
               );
             })}
           </div>
+
+          {/* Enterprise banner */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            custom={0}
+            className="mt-12 max-w-7xl mx-auto rounded-2xl border border-border/50 bg-gradient-to-r from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm p-8 md:p-12 text-center"
+          >
+            <h3 className="text-2xl md:text-3xl font-bold mb-3">Need even more?</h3>
+            <p className="text-muted-foreground max-w-lg mx-auto mb-6">
+              Custom plans with unlimited credits, SLA, and dedicated infrastructure.
+            </p>
+            <Button
+              size="lg"
+              className="gap-2 px-8 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
+              onClick={() => {
+                window.location.href = "mailto:hello@dreamforgex.ai?subject=Custom%20Plan%20Inquiry";
+              }}
+            >
+              <Mail className="h-5 w-5" />
+              Contact Sales
+            </Button>
+          </motion.div>
         </div>
       </section>
 
-      {/* ═══════ TIER SHOWCASE — What Each Plan Creates ═══════ */}
+      {/* ======= MODEL CREDIT COSTS ======= */}
       <section className="py-24 border-t border-border/50">
         <div className="container">
           <div className="text-center mb-16">
@@ -452,9 +562,9 @@ export default function Pricing() {
               custom={0}
               className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
             >
-              See What Each Tier{" "}
+              Model-Based{" "}
               <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                Creates
+                Credit Costs
               </span>
             </motion.h2>
             <motion.p
@@ -465,134 +575,73 @@ export default function Pricing() {
               custom={1}
               className="text-muted-foreground max-w-lg mx-auto"
             >
-              Higher tiers unlock better models, higher resolution, and more creative tools
+              Credits are charged based on which AI model you select, not just the tool you use
             </motion.p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {[
-              {
-                tier: "Free",
-                gradient: "from-slate-500 to-zinc-400",
-                label: "Standard Quality",
-                images: ["/showcase/hero-pricing-free.jpg", "/showcase/gallery-3.jpg"],
-              },
-              {
-                tier: "Creator",
-                gradient: "from-cyan-500 to-blue-400",
-                label: "HD Quality",
-                images: ["/showcase/hero-pricing-pro.jpg", "/showcase/gallery-7.jpg", "/showcase/gallery-9.jpg"],
-              },
-              {
-                tier: "Pro",
-                gradient: "from-violet-500 to-fuchsia-400",
-                label: "Ultra HD + Video",
-                images: ["/showcase/hero-pricing-pro.jpg", "/showcase/gallery-4.jpg", "/showcase/gallery-12.jpg"],
-              },
-              {
-                tier: "Studio",
-                gradient: "from-cyan-500 to-purple-500",
-                label: "Custom Models",
-                images: ["/showcase/hero-pricing-studio.jpg", "/showcase/gallery-14.jpg", "/showcase/gallery-18.jpg"],
-              },
-            ].map((col, i) => (
-              <motion.div
-                key={col.tier}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={scaleIn}
-                custom={i}
-                className="space-y-3"
-              >
-                <div className="text-center mb-4">
-                  <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r ${col.gradient} text-white`}>
-                    {col.tier}
-                  </span>
-                  <p className="text-xs text-muted-foreground mt-2">{col.label}</p>
-                </div>
-                {col.images.map((img, j) => (
-                  <div key={j} className="rounded-xl overflow-hidden group">
-                    <img
-                      src={img}
-                      alt={`${col.tier} tier example`}
-                      className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Image credits */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={scaleIn}
+              custom={0}
+              className="rounded-2xl bg-white/5 border border-white/10 p-6"
+            >
+              <h3 className="text-lg font-bold mb-4">Image Generation</h3>
+              <div className="space-y-3">
+                {[
+                  { tier: "Free", models: "Gemini, Together, Cloudflare", credits: 2, color: "text-emerald-400" },
+                  { tier: "Standard", models: "Grok, fal Schnell, RunPod", credits: 5, color: "text-cyan-400" },
+                  { tier: "Quality", models: "fal Dev, Replicate, Seedream", credits: 10, color: "text-blue-400" },
+                  { tier: "Premium", models: "DALL-E 3, Flux Pro, Kontext Pro", credits: 15, color: "text-violet-400" },
+                  { tier: "Ultra", models: "DALL-E 3 HD, Flux Pro Ultra", credits: 25, color: "text-fuchsia-400" },
+                ].map((row) => (
+                  <div key={row.tier} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div>
+                      <span className={`text-sm font-semibold ${row.color}`}>{row.tier}</span>
+                      <p className="text-xs text-muted-foreground">{row.models}</p>
+                    </div>
+                    <span className="text-sm font-bold">{row.credits} cr</span>
                   </div>
                 ))}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+              </div>
+            </motion.div>
 
-      {/* ═══════ BEFORE/AFTER DEMO ═══════ */}
-      <section className="py-24 border-t border-border/50 bg-card/20">
-        <div className="container">
-          <div className="text-center mb-16">
-            <motion.h2
+            {/* Video credits */}
+            <motion.div
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true }}
-              variants={fadeUp}
-              custom={0}
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
-            >
-              The{" "}
-              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                DreamForge
-              </span>{" "}
-              Difference
-            </motion.h2>
-            <motion.p
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
+              variants={scaleIn}
               custom={1}
-              className="text-muted-foreground max-w-lg mx-auto"
+              className="rounded-2xl bg-white/5 border border-white/10 p-6"
             >
-              Pro and Studio users get access to 4x upscaling, style transfer, and 71+ AI tools
-            </motion.p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              { label: "4x AI Upscaler", before: "/showcase/demo-upscale-before.jpg", after: "/showcase/demo-upscale-after.jpg" },
-              { label: "Style Transfer", before: "/showcase/demo-style-before.jpg", after: "/showcase/demo-style-after.jpg" },
-              { label: "Background Replace", before: "/showcase/demo-bg-before.jpg", after: "/showcase/demo-bg-after.jpg" },
-            ].map((demo, i) => (
-              <motion.div
-                key={demo.label}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={scaleIn}
-                custom={i}
-                className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden"
-              >
-                <div className="grid grid-cols-2 gap-0.5 p-0.5">
-                  <div className="relative aspect-square overflow-hidden rounded-tl-xl">
-                    <img src={demo.before} alt="Before" className="w-full h-full object-cover" loading="lazy" />
-                    <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded bg-black/60 text-white/80">BEFORE</span>
+              <h3 className="text-lg font-bold mb-4">Video Generation</h3>
+              <div className="space-y-3">
+                {[
+                  { tier: "Free", models: "Veo 3", credits: 10, color: "text-emerald-400" },
+                  { tier: "Standard", models: "fal Wan 2.5", credits: 40, color: "text-cyan-400" },
+                  { tier: "Quality", models: "Kling 1.6, fal Kling", credits: 50, color: "text-blue-400" },
+                  { tier: "Premium", models: "Kling 2.0", credits: 75, color: "text-violet-400" },
+                  { tier: "Ultra", models: "Runway Gen-4.5, Gen-4 Turbo", credits: 200, color: "text-fuchsia-400" },
+                ].map((row) => (
+                  <div key={row.tier} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div>
+                      <span className={`text-sm font-semibold ${row.color}`}>{row.tier}</span>
+                      <p className="text-xs text-muted-foreground">{row.models}</p>
+                    </div>
+                    <span className="text-sm font-bold">{row.credits} cr</span>
                   </div>
-                  <div className="relative aspect-square overflow-hidden rounded-tr-xl">
-                    <img src={demo.after} alt="After" className="w-full h-full object-cover" loading="lazy" />
-                    <span className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/80 text-black">AFTER</span>
-                  </div>
-                </div>
-                <div className="p-4 text-center">
-                  <p className="text-sm font-semibold">{demo.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Available on Creator, Pro & Studio</p>
-                </div>
-              </motion.div>
-            ))}
+                ))}
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* ═══════ FEATURE COMPARISON TABLE ═══════ */}
+      {/* ======= FEATURE COMPARISON TABLE ======= */}
       <section className="py-24 border-t border-border/50 bg-card/20">
         <div className="container">
           <div className="text-center mb-16">
@@ -624,17 +673,18 @@ export default function Pricing() {
             viewport={{ once: true }}
             variants={fadeUp}
             custom={2}
-            className="max-w-5xl mx-auto overflow-x-auto"
+            className="max-w-7xl mx-auto"
           >
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="border-b border-border/50">
-                  <th className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/4">Feature</th>
+                  <th className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/7">Feature</th>
                   {plans.map((plan) => (
-                    <th key={plan.name} className="text-center py-4 px-3 font-semibold">
-                      <div className="flex items-center justify-center gap-2">
-                        <plan.icon className="h-4 w-4" />
-                        <span className={plan.popular ? "text-violet-400" : ""}>{plan.name}</span>
+                    <th key={plan.name} className="text-center py-4 px-2 font-semibold">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <plan.icon className="h-3.5 w-3.5" />
+                        <span className={plan.popular ? "text-violet-400" : ""} style={{ fontSize: "0.8rem" }}>{plan.name}</span>
                       </div>
                     </th>
                   ))}
@@ -645,7 +695,7 @@ export default function Pricing() {
                   <tr key={row.label} className="border-b border-border/30">
                     <td className="py-3 pr-4 text-muted-foreground">{row.label}</td>
                     {row.values.map((val, ci) => (
-                      <td key={ci} className="py-3 px-3 text-center">
+                      <td key={ci} className="py-3 px-2 text-center">
                         {val === true ? (
                           <Check className="h-4 w-4 text-emerald-400 mx-auto" />
                         ) : val === false ? (
@@ -659,11 +709,12 @@ export default function Pricing() {
                 ))}
               </tbody>
             </table>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      {/* ═══════ CREDIT PACKS ═══════ */}
+      {/* ======= CREDIT PACKS ======= */}
       <section className="py-24 border-t border-border/50">
         <div className="container">
           <div className="text-center mb-16">
@@ -690,6 +741,16 @@ export default function Pricing() {
               className="text-muted-foreground max-w-lg mx-auto"
             >
               One-time credit packs available on any plan. Purchased credits never expire.
+            </motion.p>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={2}
+              className="text-sm text-emerald-400 mt-2"
+            >
+              One-time purchases. Available on any plan, including Free. Never expire.
             </motion.p>
           </div>
 
@@ -742,7 +803,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ═══════ FAQ ═══════ */}
+      {/* ======= FAQ ======= */}
       <section className="py-24 border-t border-border/50 bg-card/20">
         <div className="container">
           <div className="text-center mb-16">
@@ -814,14 +875,14 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ═══════ TRUST BADGES ═══════ */}
+      {/* ======= TRUST BADGES ======= */}
       <section className="py-16 border-t border-border/50">
         <div className="container">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">
             {[
               { icon: Shield, label: "Secure & Private", desc: "Your creations are yours" },
               { icon: Zap, label: "Fast Rendering", desc: "Results in seconds" },
-              { icon: Users, label: "10K+ Creators", desc: "Growing community" },
+              { icon: Users, label: "Instant Access", desc: "Start creating in seconds" },
               { icon: Headphones, label: "Support", desc: "Help when you need it" },
             ].map((badge, i) => (
               <motion.div
@@ -844,7 +905,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ═══════ ENTERPRISE CTA ═══════ */}
+      {/* ======= AGENCY CTA ======= */}
       <section className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-20" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]" />
@@ -859,7 +920,7 @@ export default function Pricing() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-500/30 bg-cyan-500/5 backdrop-blur-sm mb-8">
               <Crown className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-cyan-300">Enterprise</span>
+              <span className="text-sm font-medium text-cyan-300">Agency</span>
             </div>
 
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
@@ -869,7 +930,7 @@ export default function Pricing() {
               </span>
             </h2>
             <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-              Custom credit allocations, unlimited team seats, SLA guarantees, dedicated support, and on-premise
+              Custom credit allocations, unlimited team seats, SLA guarantees, dedicated support, and white-label
               deployment options for organizations of any size.
             </p>
 
@@ -878,7 +939,7 @@ export default function Pricing() {
                 size="lg"
                 className="font-medium gap-2 px-8 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border-0"
                 onClick={() => {
-                  window.location.href = "mailto:hello@dreamforgex.ai?subject=Enterprise%20Plan%20Inquiry";
+                  window.location.href = "mailto:hello@dreamforgex.ai?subject=Agency%20Plan%20Inquiry";
                 }}
               >
                 <Mail className="h-5 w-5" />
