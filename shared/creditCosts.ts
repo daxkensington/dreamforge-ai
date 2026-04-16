@@ -28,6 +28,11 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "storyboard": 15,
   "character-sheet": 15,
   "animate": 40,
+  "virtual-tryon": 10,
+  "relight": 10,
+  "3d-generate": 15,
+  "comic-strip": 15,
+  "tshirt-design": 10,
 };
 
 // ─── Old flat costs (kept for backward compat) ───────────────────────────

@@ -2796,6 +2796,266 @@ export const appRouter = router({
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
+
+    // Virtual Try-On — overlay a garment onto a person image via fal.ai CatVTON
+    virtualTryOn: protectedProcedure
+      .input(
+        z.object({
+          personImageUrl: z.string().url(),
+          garmentImageUrl: z.string().url(),
+          clothType: z.enum(["upper", "lower", "overall"]).default("upper"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
+        try {
+          const { ENV } = await import("./_core/env");
+          const FAL_QUEUE_BASE = "https://queue.fal.run";
+          const slug = "fal-ai/cat-vton";
+          const headers = { Authorization: `Key ${ENV.falApiKey}`, "Content-Type": "application/json" };
+
+          const submitRes = await fetch(`${FAL_QUEUE_BASE}/${slug}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              human_image_url: input.personImageUrl,
+              garment_image_url: input.garmentImageUrl,
+              cloth_type: input.clothType,
+            }),
+          });
+          const { request_id } = await submitRes.json();
+
+          let result: any;
+          for (let i = 0; i < 40; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            const statusRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}/status`, {
+              headers: { Authorization: `Key ${ENV.falApiKey}` },
+            });
+            const statusData = await statusRes.json();
+            if (statusData.status === "COMPLETED") {
+              const resultRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}`, {
+                headers: { Authorization: `Key ${ENV.falApiKey}` },
+              });
+              result = await resultRes.json();
+              break;
+            }
+            if (statusData.status === "FAILED") throw new Error(statusData.error || "fal.ai virtual try-on failed");
+          }
+          if (!result) throw new Error("fal.ai virtual try-on timed out");
+
+          // Download and store the result image
+          const imageUrl = result.image?.url;
+          if (!imageUrl) throw new Error("No image returned from fal.ai");
+          const imgResp = await fetch(imageUrl);
+          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+          const { storagePut, generateStorageKey } = await import("./storage");
+          const key = generateStorageKey("tryon", "png");
+          const { url } = await storagePut(key, imgBuffer, "image/png");
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Relight — change lighting of an image via fal.ai IC-Light v2
+    relight: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          prompt: z.string().max(500),
+          strength: z.number().min(0.1).max(1.0).default(0.7),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "relight", "AI relighting");
+        try {
+          const { ENV } = await import("./_core/env");
+          const FAL_QUEUE_BASE = "https://queue.fal.run";
+          const slug = "fal-ai/iclight-v2";
+          const headers = { Authorization: `Key ${ENV.falApiKey}`, "Content-Type": "application/json" };
+
+          const submitRes = await fetch(`${FAL_QUEUE_BASE}/${slug}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              image_url: input.imageUrl,
+              prompt: input.prompt,
+              guidance_scale: 5,
+              num_inference_steps: 28,
+            }),
+          });
+          const { request_id } = await submitRes.json();
+
+          let result: any;
+          for (let i = 0; i < 40; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            const statusRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}/status`, {
+              headers: { Authorization: `Key ${ENV.falApiKey}` },
+            });
+            const statusData = await statusRes.json();
+            if (statusData.status === "COMPLETED") {
+              const resultRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}`, {
+                headers: { Authorization: `Key ${ENV.falApiKey}` },
+              });
+              result = await resultRes.json();
+              break;
+            }
+            if (statusData.status === "FAILED") throw new Error(statusData.error || "fal.ai relighting failed");
+          }
+          if (!result) throw new Error("fal.ai relighting timed out");
+
+          // Download and store the first result image
+          const imageUrl = result.images?.[0]?.url;
+          if (!imageUrl) throw new Error("No image returned from fal.ai");
+          const imgResp = await fetch(imageUrl);
+          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+          const { storagePut, generateStorageKey } = await import("./storage");
+          const key = generateStorageKey("relight", "png");
+          const { url } = await storagePut(key, imgBuffer, "image/png");
+
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Generate 3D — convert an image to a 3D GLB model via fal.ai Trellis
+    generate3D: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "3d-generate", "3D model generation");
+        try {
+          const { ENV } = await import("./_core/env");
+          const FAL_QUEUE_BASE = "https://queue.fal.run";
+          const slug = "fal-ai/trellis";
+          const headers = { Authorization: `Key ${ENV.falApiKey}`, "Content-Type": "application/json" };
+
+          const submitRes = await fetch(`${FAL_QUEUE_BASE}/${slug}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ image_url: input.imageUrl }),
+          });
+          const { request_id } = await submitRes.json();
+
+          let result: any;
+          for (let i = 0; i < 40; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            const statusRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}/status`, {
+              headers: { Authorization: `Key ${ENV.falApiKey}` },
+            });
+            const statusData = await statusRes.json();
+            if (statusData.status === "COMPLETED") {
+              const resultRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}`, {
+                headers: { Authorization: `Key ${ENV.falApiKey}` },
+              });
+              result = await resultRes.json();
+              break;
+            }
+            if (statusData.status === "FAILED") throw new Error(statusData.error || "fal.ai 3D generation failed");
+          }
+          if (!result) throw new Error("fal.ai 3D generation timed out");
+
+          const { storagePut, generateStorageKey } = await import("./storage");
+
+          // Download and store the GLB model
+          const glbUrl = result.glb_file?.url || result.model_mesh?.url;
+          if (!glbUrl) throw new Error("No GLB model returned from fal.ai");
+          const glbResp = await fetch(glbUrl);
+          const glbBuffer = Buffer.from(await glbResp.arrayBuffer());
+          const glbKey = generateStorageKey("3d-model", "glb");
+          const { url: modelUrl } = await storagePut(glbKey, glbBuffer, "model/gltf-binary");
+
+          // Try to extract and store a preview image if available
+          let previewUrl: string | undefined;
+          const previewSrc = result.preview?.url || result.rendered_image?.url;
+          if (previewSrc) {
+            try {
+              const prevResp = await fetch(previewSrc);
+              const prevBuffer = Buffer.from(await prevResp.arrayBuffer());
+              const prevKey = generateStorageKey("3d-preview", "png");
+              const stored = await storagePut(prevKey, prevBuffer, "image/png");
+              previewUrl = stored.url;
+            } catch {
+              // Preview is optional, continue without it
+            }
+          }
+
+          return { modelUrl, previewUrl, status: "completed" as const };
+        } catch (error: any) {
+          return { modelUrl: null, previewUrl: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Comic Strip — generate a multi-panel comic strip via LLM + image generation
+    comicStrip: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(1000),
+          panels: z.number().min(2).max(6).default(4),
+          style: z.enum(["manga", "western", "cartoon", "noir"]).default("western"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "comic-strip", "Comic strip generation");
+        try {
+          // Step 1: Generate panel descriptions via LLM
+          const llmResponse = await invokeLLM({
+            systemPrompt: `You are a comic strip writer. Given a concept, create ${input.panels} panel descriptions for a comic strip. Return ONLY a JSON array of strings, each describing one panel scene in detail for image generation. Keep characters consistent. All content must be 100% fictional.`,
+            userPrompt: input.concept,
+          });
+
+          let panelDescriptions: string[];
+          try {
+            // Extract JSON array from the response (handle markdown code blocks)
+            const jsonMatch = llmResponse.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) throw new Error("No JSON array found");
+            panelDescriptions = JSON.parse(jsonMatch[0]);
+          } catch {
+            throw new Error("Failed to parse panel descriptions from LLM response");
+          }
+
+          if (!Array.isArray(panelDescriptions) || panelDescriptions.length === 0) {
+            throw new Error("LLM returned invalid panel descriptions");
+          }
+
+          // Step 2: Generate an image for each panel
+          const panels: { description: string; imageUrl: string }[] = [];
+          for (const description of panelDescriptions) {
+            const prompt = `Comic strip panel, ${input.style} style, ${description}. Consistent art style, bold outlines, speech-bubble-ready composition, high quality.`;
+            const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+            panels.push({ description, imageUrl: url });
+          }
+
+          return { panels, status: "completed" as const };
+        } catch (error: any) {
+          return { panels: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // T-Shirt Design — generate a print-ready t-shirt design
+    tshirtDesign: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(500),
+          style: z.enum(["minimalist", "vintage", "graffiti", "illustrative", "typography", "abstract"]).default("illustrative"),
+          colorScheme: z.enum(["full-color", "monochrome", "limited-palette"]).default("full-color"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "tshirt-design", "T-shirt design");
+        try {
+          const prompt = `T-shirt print design, ${input.style} style, ${input.concept}. ${input.colorScheme} palette. Centered composition on transparent/white background, print-ready, high contrast, no background scene, isolated design suitable for DTG printing. Professional merchandise artwork.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+          return { url, status: "completed" as const, style: input.style };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({
