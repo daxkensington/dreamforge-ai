@@ -18,7 +18,18 @@ import base64
 import io
 import os
 import time
+import sys
 from PIL import Image
+
+# ─── Compatibility Shim ────────────────────────────────────────────────────
+# torchvision >= 0.20 removed transforms.functional_tensor, but basicsr/
+# realesrgan still import it. Create a shim so the import doesn't fail.
+import types
+import torchvision.transforms
+if not hasattr(torchvision.transforms, "functional_tensor"):
+    import torchvision.transforms.functional as _F
+    torchvision.transforms.functional_tensor = _F
+    sys.modules["torchvision.transforms.functional_tensor"] = _F
 
 # ─── Lazy Model Loading ──────────────────────────────────────────────────────
 # Models are loaded on first use to minimize cold-start memory.
