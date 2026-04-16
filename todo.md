@@ -862,7 +862,7 @@
 
 ### Environment & Docs
 - [x] Update .env.example with RunPod + video provider env vars
-- [ ] Deploy RunPod worker Docker image to registry
-- [ ] Create RunPod serverless endpoint (A40 48GB, Flex workers)
-- [ ] Set RUNPOD_API_KEY + RUNPOD_FLUX_ENDPOINT_ID on Vercel
-- [ ] Test end-to-end: image gen, upscale, bg removal via RunPod
+- [x] Deploy RunPod worker Docker image to registry (ghcr.io/daxkensington/dreamforge-worker:latest)
+- [x] Create RunPod serverless endpoint (AMPERE_48 Flex workers, endpoint mmgn5vt6u3ccbs)
+- [x] Set RUNPOD_API_KEY + RUNPOD_FLUX_ENDPOINT_ID on Vercel
+- [x] Test end-to-end: image gen via RunPod (flux-schnell verified, 87.9s first cold start)

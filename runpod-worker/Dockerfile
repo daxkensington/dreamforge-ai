@@ -1,4 +1,4 @@
-FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04
+FROM runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2204
 
 WORKDIR /app
 
@@ -11,17 +11,18 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download Real-ESRGAN weights
+# Enable fast parallel HF downloads at runtime (first worker startup)
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+RUN pip install --no-cache-dir hf-transfer
+
+# Download Real-ESRGAN weights (small, no HF gating)
 RUN mkdir -p /models && \
     wget -q -O /models/RealESRGAN_x4plus.pth \
     https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
 
-# Pre-download RMBG-2.0 model weights (cached in HuggingFace cache)
-RUN python -c "from transformers import AutoModelForImageSegmentation; AutoModelForImageSegmentation.from_pretrained('briaai/RMBG-2.0', trust_remote_code=True)"
-
-# Pre-download Flux Schnell (smaller, always loaded)
-# Flux Dev will be downloaded on first use if needed
-RUN python -c "from diffusers import FluxPipeline; FluxPipeline.from_pretrained('black-forest-labs/FLUX.1-schnell', torch_dtype='auto')"
+# Flux + RMBG-2.0 are downloaded lazily on first request — HF_TOKEN must be set
+# at runtime via RunPod endpoint env vars. RunPod's network to HF CDN is far
+# faster than pre-baking weights into the image.
 
 # Copy handler
 COPY handler.py .
