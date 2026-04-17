@@ -57,6 +57,13 @@ const MODEL_OPTIONS = [
   // Image models
   { value: "ultra", label: "DreamForgeX Ultra", desc: "Flagship quality — Midjourney-competitive output", types: ["image"], tier: "pro", badge: "Ultra" },
   { value: "auto", label: "Auto (Best Available)", desc: "Automatically picks the best model", types: ["image"], tier: "free", badge: "Recommended" },
+  // DreamForge Exclusive Styles (self-hosted LoRAs)
+  { value: "df-cinematic", label: "DreamForge Cinematic", desc: "Dramatic lighting, film grain, cinematic color grading", types: ["image"], tier: "creator", badge: "Exclusive" },
+  { value: "df-anime", label: "DreamForge Anime", desc: "High-quality anime with cel shading & vibrant colors", types: ["image"], tier: "creator", badge: "Exclusive" },
+  { value: "df-fantasy", label: "DreamForge Fantasy", desc: "Epic fantasy art, magical effects, D&D inspired", types: ["image"], tier: "creator", badge: "Exclusive" },
+  { value: "df-product", label: "DreamForge Product", desc: "Clean studio photography, commercial quality", types: ["image"], tier: "creator", badge: "Exclusive" },
+  { value: "df-abstract", label: "DreamForge Abstract", desc: "Artistic, painterly, surreal compositions", types: ["image"], tier: "creator", badge: "Exclusive" },
+  // Standard models
   { value: "grok", label: "Grok Image Gen", desc: "Fast generation via xAI", types: ["image"], tier: "free" },
   { value: "flux-pro", label: "Flux 1.1 Pro", desc: "Highest quality, photorealistic", types: ["image"], tier: "creator", badge: "Premium" },
   { value: "flux-schnell", label: "Flux Schnell", desc: "Fast, high-quality iteration", types: ["image"], tier: "free" },
@@ -65,6 +72,7 @@ const MODEL_OPTIONS = [
   { value: "gemini", label: "Gemini Imagen", desc: "Google's image generation", types: ["image"], tier: "free" },
   // Video models
   { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "free", badge: "Best" },
+  { value: "cogvideo", label: "CogVideoX (Self-Hosted)", desc: "Text-to-video on DreamForge GPUs — 75% cheaper", types: ["video"], tier: "creator" },
   { value: "minimax", label: "Minimax Video", desc: "High-quality short video clips", types: ["video"], tier: "creator" },
 ];
 

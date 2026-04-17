@@ -1,0 +1,134 @@
+{
+  "styles": [
+    {
+      "id": "dreamforge-cinematic",
+      "name": "DreamForge Cinematic",
+      "description": "Photorealistic, dramatic lighting, shallow depth of field, film grain, professional color grading",
+      "hf_repo": "daxkensington/dreamforge-cinematic",
+      "trigger_word": "dfcinematic",
+      "training": {
+        "rank": 64,
+        "learning_rate": 1e-4,
+        "steps": 2000,
+        "batch_size": 1,
+        "resolution": 1024
+      },
+      "prompts": [
+        "dramatic portrait with golden rim lighting, shallow depth of field, cinematic color grading, film grain, moody atmosphere",
+        "sweeping landscape at golden hour, volumetric fog, dramatic clouds, cinematic wide shot, professional photography",
+        "urban street scene at night, neon reflections on wet pavement, shallow focus, anamorphic lens flare, cinematic",
+        "close-up of hands holding an object, warm side lighting, bokeh background, film grain, intimate mood",
+        "aerial view of a coastline at sunset, dramatic cloud formations, golden light, epic cinematic scale",
+        "silhouette figure against a dramatic sky, backlit, lens flare, cinematic composition, film look",
+        "moody interior scene with window light casting shadows, warm tones, dust particles in light, cinematic",
+        "portrait in rain with dramatic backlighting, water droplets caught in light, shallow depth of field",
+        "desert landscape with long shadows at magic hour, warm color palette, cinematic wide angle",
+        "foggy forest scene with light rays breaking through, ethereal atmosphere, cinematic grading"
+      ]
+    },
+    {
+      "id": "dreamforge-anime",
+      "name": "DreamForge Anime",
+      "description": "High-quality anime/manga style, cel shading, vibrant colors, clean linework, expressive characters",
+      "hf_repo": "daxkensington/dreamforge-anime",
+      "trigger_word": "dfanime",
+      "training": {
+        "rank": 64,
+        "learning_rate": 1e-4,
+        "steps": 2000,
+        "batch_size": 1,
+        "resolution": 1024
+      },
+      "prompts": [
+        "anime girl with flowing hair in wind, cherry blossom petals, vibrant colors, cel shading, detailed eyes",
+        "anime warrior standing on cliff edge, dramatic pose, sunset sky, detailed armor, clean linework",
+        "cozy anime cafe interior, warm lighting, detailed food illustration, Studio Ghibli inspired atmosphere",
+        "anime mecha robot in battle stance, dynamic pose, explosion effects, detailed mechanical design",
+        "anime school scene with students, sakura trees, soft lighting, slice of life, warm colors",
+        "anime magical girl transformation sequence, sparkles and light effects, dynamic composition, vibrant",
+        "anime landscape with floating islands, fantasy sky, detailed clouds, vibrant color palette",
+        "anime detective in noir rain scene, dark atmosphere, neon signs, dramatic shadows, detailed",
+        "anime character portrait with heterochromia eyes, detailed hair, gentle expression, soft lighting",
+        "anime ocean scene with ship, dramatic waves, detailed water reflections, adventure atmosphere"
+      ]
+    },
+    {
+      "id": "dreamforge-fantasy",
+      "name": "DreamForge Fantasy",
+      "description": "Fantasy art, D&D inspired, epic scenes, magical effects, detailed creatures and characters",
+      "hf_repo": "daxkensington/dreamforge-fantasy",
+      "trigger_word": "dffantasy",
+      "training": {
+        "rank": 64,
+        "learning_rate": 1e-4,
+        "steps": 2000,
+        "batch_size": 1,
+        "resolution": 1024
+      },
+      "prompts": [
+        "epic fantasy dragon perched on a mountain peak, glowing eyes, scales catching firelight, dramatic clouds",
+        "elven city in ancient forest, magical glowing lanterns, intricate architecture, ethereal atmosphere",
+        "dark wizard casting a spell, magical energy swirling, arcane symbols glowing, dramatic lighting",
+        "fantasy tavern interior with diverse adventurers, warm firelight, detailed props, cozy atmosphere",
+        "crystal cave with bioluminescent plants, underground lake reflection, magical atmosphere, detailed gems",
+        "fantasy battle scene with knights and creatures, dynamic composition, magical explosions, epic scale",
+        "enchanted forest path with fairy lights, mystical fog, ancient trees with faces, magical atmosphere",
+        "fantasy castle floating in the sky, waterfalls cascading off edges, dramatic sunset, epic scale",
+        "dwarven forge deep underground, molten metal, massive anvil, fire and steam, detailed stonework",
+        "ancient library of magic, floating books, glowing runes, spiral staircases, mystical atmosphere"
+      ]
+    },
+    {
+      "id": "dreamforge-product",
+      "name": "DreamForge Product",
+      "description": "Clean product photography, studio lighting, white/gradient backgrounds, commercial quality",
+      "hf_repo": "daxkensington/dreamforge-product",
+      "trigger_word": "dfproduct",
+      "training": {
+        "rank": 64,
+        "learning_rate": 1e-4,
+        "steps": 1500,
+        "batch_size": 1,
+        "resolution": 1024
+      },
+      "prompts": [
+        "luxury watch on white surface, studio lighting, sharp focus, clean reflections, commercial photography",
+        "sleek smartphone floating with gradient background, professional product shot, soft shadows, minimal",
+        "premium headphones on marble surface, dramatic side lighting, clean background, commercial quality",
+        "cosmetics products arranged aesthetically, soft lighting, pastel background, beauty photography",
+        "designer sneakers on white background, studio lighting, multiple angles implied, e-commerce quality",
+        "glass perfume bottle with light refracting through, elegant composition, studio shot, luxury feel",
+        "tech gadget on clean desk, minimal composition, soft shadows, professional product photography",
+        "food dish beautifully plated, overhead shot, clean white plate, professional food photography",
+        "jewelry piece on velvet surface, dramatic spotlight, macro detail, commercial quality",
+        "coffee bag packaging mockup, clean background, professional lighting, brand photography"
+      ]
+    },
+    {
+      "id": "dreamforge-abstract",
+      "name": "DreamForge Abstract",
+      "description": "Artistic, painterly, surreal, abstract compositions, bold colors and textures",
+      "hf_repo": "daxkensington/dreamforge-abstract",
+      "trigger_word": "dfabstract",
+      "training": {
+        "rank": 64,
+        "learning_rate": 1e-4,
+        "steps": 2000,
+        "batch_size": 1,
+        "resolution": 1024
+      },
+      "prompts": [
+        "swirling abstract color vortex, deep blues and golds, fluid dynamics, painterly texture, ethereal",
+        "geometric abstract composition, overlapping translucent shapes, vibrant palette, modern art style",
+        "abstract portrait dissolving into particles, surreal transformation, bold colors, artistic",
+        "liquid marble texture with metallic veins, abstract close-up, iridescent colors, organic flow",
+        "abstract cityscape at night, deconstructed geometry, neon colors bleeding into dark, surreal",
+        "organic abstract forms like underwater creatures, bioluminescent, flowing shapes, dreamlike",
+        "abstract explosion of color and light, dynamic movement, paint splatter effect, expressive",
+        "surreal melting landscape, Salvador Dali inspired, impossible architecture, dreamlike atmosphere",
+        "abstract flower garden, impressionistic brushstrokes, vibrant color harmony, textured canvas",
+        "cosmic abstract nebula, swirling gases and stars, deep space colors, ethereal beauty"
+      ]
+    }
+  ]
+}

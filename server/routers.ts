@@ -498,7 +498,40 @@ export const appRouter = router({
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
 
-          const { url } = await generateImage({ prompt: enhancedPrompt, userTier });
+          // Map DreamForge exclusive styles to RunPod Flux + LoRA
+          const DF_LORA_MAP: Record<string, string> = {
+            "df-cinematic": "daxkensington/dreamforge-cinematic",
+            "df-anime": "daxkensington/dreamforge-anime",
+            "df-fantasy": "daxkensington/dreamforge-fantasy",
+            "df-product": "daxkensington/dreamforge-product",
+            "df-abstract": "daxkensington/dreamforge-abstract",
+          };
+
+          let url: string | undefined;
+          const loraId = DF_LORA_MAP[input.modelVersion];
+          if (loraId) {
+            // DreamForge exclusive style — use RunPod Flux Dev with LoRA
+            const { isRunPodAvailable, runpodFluxDev } = await import("./_core/runpod");
+            if (isRunPodAvailable()) {
+              const styleHint = input.modelVersion.replace("df-", "dreamforge ");
+              const styledPrompt = `${styleHint} style. ${enhancedPrompt}`;
+              const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
+              const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
+              const key = gk("generations", "png");
+              ({ url } = await sp(key, buffer, "image/png"));
+            }
+          }
+
+          if (!url) {
+            // Standard model — map UI model names to generateImage model param
+            const modelMap: Record<string, string> = {
+              "built-in-v1": "auto", "grok": "grok", "flux-pro": "flux-pro",
+              "flux-schnell": "flux-schnell", "dall-e-3": "dall-e-3", "sd3": "sd3",
+              "gemini": "gemini", "ultra": "ultra",
+            };
+            const model = modelMap[input.modelVersion] || "auto";
+            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier }));
+          }
 
           await updateGeneration(genId, {
             status: "completed",
