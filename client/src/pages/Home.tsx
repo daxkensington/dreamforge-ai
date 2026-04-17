@@ -22,6 +22,13 @@ import {
   Check,
   Crown,
   Wand2,
+  Shirt,
+  Box,
+  LayoutGrid,
+  Sun,
+  Server,
+  Mic,
+  Palette,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -78,6 +85,57 @@ const beforeAfterDemos = [
     desc: "Swap backgrounds with AI-powered scene generation",
     before: "/showcase/demo-bg-before.jpg",
     after: "/showcase/demo-bg-after.jpg",
+  },
+];
+
+const whatsNew = [
+  {
+    icon: Shirt,
+    title: "Virtual Try-On",
+    desc: "See how any garment looks on you — self-hosted CatVTON",
+    href: "/tools/virtual-tryon",
+    img: "/showcase/tool-tryon.jpg",
+    tag: "New tool",
+  },
+  {
+    icon: Box,
+    title: "3D Model Generator",
+    desc: "Turn any image into a downloadable 3D model",
+    href: "/tools/3d-generator",
+    img: "/showcase/tool-3d.jpg",
+    tag: "New tool",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Comic Strip Studio",
+    desc: "Multi-panel comics from a single concept",
+    href: "/tools/comic-strip",
+    img: "/showcase/tool-comic.jpg",
+    tag: "New tool",
+  },
+  {
+    icon: Sun,
+    title: "AI Relighting",
+    desc: "Re-light any photo — golden hour, studio, neon",
+    href: "/tools/relight",
+    img: "/showcase/tool-relight.jpg",
+    tag: "New tool",
+  },
+  {
+    icon: Palette,
+    title: "DreamForge LoRA Styles",
+    desc: "Exclusive trained styles you can't get anywhere else",
+    href: "/workspace",
+    img: "/showcase/tool-lora.jpg",
+    tag: "Exclusive",
+  },
+  {
+    icon: Server,
+    title: "Self-Hosted Audio",
+    desc: "Bark TTS + MusicGen + AudioGen on our GPUs",
+    href: "/tools/song-creator",
+    img: "/showcase/tool-audio-self.jpg",
+    tag: "Self-hosted",
   },
 ];
 
@@ -380,6 +438,112 @@ export default function Home() {
               {model}
             </span>
           ))}
+        </div>
+      </section>
+
+      <SectionDivider />
+
+      {/* ═══════ SECTION 2.5: WHAT'S NEW ═══════ */}
+      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.03] via-transparent to-transparent pointer-events-none" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div>
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                custom={0}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                  Just shipped
+                </span>
+              </motion.div>
+              <motion.h2
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                custom={1}
+                className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white"
+              >
+                What's <span className="gradient-text">new this week</span>
+              </motion.h2>
+              <motion.p
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                custom={2}
+                className="text-white/60 mt-3 max-w-xl"
+              >
+                Five new tools, exclusive LoRA styles, and self-hosted audio models — all live now.
+              </motion.p>
+            </div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              custom={3}
+            >
+              <Button
+                asChild
+                variant="outline"
+                className="bg-transparent border-white/20 hover:bg-white/10 gap-2"
+              >
+                <Link href="/tools">
+                  Browse all 75+ tools <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {whatsNew.map((item, i) => (
+              <Link key={item.title} href={item.href}>
+                <motion.div
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  variants={scaleIn}
+                  custom={i}
+                  className="group relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 hover:border-cyan-500/40 transition-all duration-500 cursor-pointer min-h-[200px]"
+                >
+                  <div className="absolute inset-0">
+                    <img
+                      src={item.img}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/showcase/hero-forge.jpg";
+                      }}
+                      className="w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/40" />
+                  </div>
+                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <item.icon className="h-6 w-6 text-cyan-400" />
+                      </div>
+                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
+                        {item.tag}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-1 text-white">{item.title}</h3>
+                    <p className="text-sm text-white/60 mb-4">{item.desc}</p>
+                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Try it now <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </motion.div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
