@@ -2797,7 +2797,7 @@ export const appRouter = router({
         }
       }),
 
-    // Virtual Try-On — overlay a garment onto a person image via fal.ai CatVTON
+    // Virtual Try-On — overlay a garment onto a person via self-hosted CatVTON on RunPod
     virtualTryOn: protectedProcedure
       .input(
         z.object({
@@ -2809,48 +2809,17 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
         try {
-          const { ENV } = await import("./_core/env");
-          const FAL_QUEUE_BASE = "https://queue.fal.run";
-          const slug = "fal-ai/cat-vton";
-          const headers = { Authorization: `Key ${ENV.falApiKey}`, "Content-Type": "application/json" };
+          const { isRunPodAvailable, runpodTryOn } = await import("./_core/runpod");
+          if (!isRunPodAvailable()) throw new Error("RunPod not configured");
 
-          const submitRes = await fetch(`${FAL_QUEUE_BASE}/${slug}`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              human_image_url: input.personImageUrl,
-              garment_image_url: input.garmentImageUrl,
-              cloth_type: input.clothType,
-            }),
-          });
-          const { request_id } = await submitRes.json();
-
-          let result: any;
-          for (let i = 0; i < 40; i++) {
-            await new Promise(r => setTimeout(r, 3000));
-            const statusRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}/status`, {
-              headers: { Authorization: `Key ${ENV.falApiKey}` },
-            });
-            const statusData = await statusRes.json();
-            if (statusData.status === "COMPLETED") {
-              const resultRes = await fetch(`${FAL_QUEUE_BASE}/${slug}/requests/${request_id}`, {
-                headers: { Authorization: `Key ${ENV.falApiKey}` },
-              });
-              result = await resultRes.json();
-              break;
-            }
-            if (statusData.status === "FAILED") throw new Error(statusData.error || "fal.ai virtual try-on failed");
-          }
-          if (!result) throw new Error("fal.ai virtual try-on timed out");
-
-          // Download and store the result image
-          const imageUrl = result.image?.url;
-          if (!imageUrl) throw new Error("No image returned from fal.ai");
-          const imgResp = await fetch(imageUrl);
-          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+          const resultBuffer = await runpodTryOn(
+            input.personImageUrl,
+            input.garmentImageUrl,
+            input.clothType,
+          );
           const { storagePut, generateStorageKey } = await import("./storage");
           const key = generateStorageKey("tryon", "png");
-          const { url } = await storagePut(key, imgBuffer, "image/png");
+          const { url } = await storagePut(key, resultBuffer, "image/png");
 
           return { url, status: "completed" as const };
         } catch (error: any) {

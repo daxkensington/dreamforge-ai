@@ -20,9 +20,12 @@ RUN mkdir -p /models && \
     wget -q -O /models/RealESRGAN_x4plus.pth \
     https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
 
-# Flux + RMBG-2.0 are downloaded lazily on first request — HF_TOKEN must be set
-# at runtime via RunPod endpoint env vars. RunPod's network to HF CDN is far
-# faster than pre-baking weights into the image.
+# Clone CatVTON (virtual try-on) — need the custom pipeline + masker code
+RUN git clone --depth 1 https://github.com/Zheng-Chong/CatVTON.git /app/catvton && \
+    rm -rf /app/catvton/.git
+
+# Flux + RMBG-2.0 + CatVTON weights are downloaded lazily on first request.
+# HF_TOKEN must be set at runtime via RunPod endpoint env vars.
 
 # Copy handler
 COPY handler.py .

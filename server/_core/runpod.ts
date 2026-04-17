@@ -20,7 +20,8 @@ export type RunPodTask =
   | "flux-dev"
   | "flux-schnell"
   | "esrgan"
-  | "rmbg";
+  | "rmbg"
+  | "tryon";
 
 export interface RunPodInput {
   task: RunPodTask;
@@ -33,6 +34,12 @@ export interface RunPodInput {
   image_b64?: string;
   /** Upscale factor for Real-ESRGAN (2 or 4) */
   scale?: number;
+  /** Person image URL for virtual try-on */
+  person_image_url?: string;
+  /** Garment image URL for virtual try-on */
+  garment_image_url?: string;
+  /** Cloth type for virtual try-on */
+  cloth_type?: string;
 }
 
 interface RunPodRunResponse {
@@ -272,6 +279,24 @@ export async function runpodRemoveBackground(
     runpodRun({
       task: "rmbg",
       image_b64: imageB64,
+    }),
+  );
+}
+
+/**
+ * Virtual try-on with CatVTON — overlay garment onto person.
+ */
+export async function runpodTryOn(
+  personImageUrl: string,
+  garmentImageUrl: string,
+  clothType: string = "upper",
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun({
+      task: "tryon",
+      person_image_url: personImageUrl,
+      garment_image_url: garmentImageUrl,
+      cloth_type: clothType,
     }),
   );
 }

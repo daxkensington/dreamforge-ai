@@ -5,6 +5,7 @@ Single endpoint serving multiple models:
   - Flux.1 Dev/Schnell (image generation)
   - Real-ESRGAN (image upscaling)
   - RMBG-2.0 (background removal)
+  - CatVTON (virtual try-on)
 
 Routes to the correct model via the `task` field in the input payload.
 
@@ -38,6 +39,8 @@ _flux_pipe = None
 _esrgan_model = None
 _rmbg_model = None
 _rmbg_transform = None
+_catvton_pipe = None
+_catvton_masker = None
 
 
 def get_flux_pipe(model_type="dev"):
@@ -116,6 +119,37 @@ def get_rmbg_model():
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
     return _rmbg_model, _rmbg_transform
+
+
+def get_catvton():
+    """Load CatVTON virtual try-on pipeline + auto-masker."""
+    global _catvton_pipe, _catvton_masker
+    if _catvton_pipe is None:
+        sys.path.insert(0, "/app/catvton")
+        from model.pipeline import CatVTONPipeline
+        from model.cloth_masker import AutoMasker
+        from huggingface_hub import snapshot_download
+
+        print("[DreamForge] Loading CatVTON...")
+        repo_path = snapshot_download("zhengchong/CatVTON")
+
+        _catvton_pipe = CatVTONPipeline(
+            base_ckpt="runwayml/stable-diffusion-inpainting",
+            attn_ckpt=repo_path,
+            attn_ckpt_version="mix",
+            weight_dtype=torch.bfloat16,
+            use_tf32=True,
+            device="cuda",
+        )
+
+        _catvton_masker = AutoMasker(
+            densepose_ckpt=os.path.join(repo_path, "DensePose"),
+            schp_ckpt=os.path.join(repo_path, "SCHP"),
+            device="cuda",
+        )
+        print("[DreamForge] CatVTON loaded")
+
+    return _catvton_pipe, _catvton_masker
 
 
 # ─── Task Handlers ───────────────────────────────────────────────────────────
@@ -227,6 +261,57 @@ def handle_rmbg(job_input):
     return {"image_b64": image_b64, "inference_time": inference_time}
 
 
+def handle_tryon(job_input):
+    """Virtual try-on with CatVTON — overlay garment onto person."""
+    import requests as req_lib
+    from torchvision import transforms
+
+    person_url = job_input.get("person_image_url", "")
+    garment_url = job_input.get("garment_image_url", "")
+    cloth_type = job_input.get("cloth_type", "upper")
+    steps = job_input.get("num_inference_steps", 30)
+    guidance = job_input.get("guidance_scale", 2.5)
+
+    if not person_url or not garment_url:
+        raise ValueError("person_image_url and garment_image_url are required")
+
+    # Download images
+    person_img = Image.open(io.BytesIO(req_lib.get(person_url).content)).convert("RGB")
+    garment_img = Image.open(io.BytesIO(req_lib.get(garment_url).content)).convert("RGB")
+
+    # Resize to CatVTON's expected resolution (768x1024)
+    target_w, target_h = 768, 1024
+    person_img = person_img.resize((target_w, target_h), Image.LANCZOS)
+    garment_img = garment_img.resize((target_w, target_h), Image.LANCZOS)
+
+    pipeline, masker = get_catvton()
+
+    start = time.time()
+
+    # Generate mask automatically
+    mask = masker(person_img, cloth_type)["mask"]
+
+    # Run try-on
+    generator = torch.Generator("cuda").manual_seed(int(time.time()) % 2**32)
+    result = pipeline(
+        image=person_img,
+        condition_image=garment_img,
+        mask=mask,
+        num_inference_steps=steps,
+        guidance_scale=guidance,
+        generator=generator,
+    )[0]
+
+    inference_time = time.time() - start
+    print(f"[DreamForge] CatVTON try-on completed in {inference_time:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG")
+    image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"image_b64": image_b64, "inference_time": inference_time}
+
+
 # ─── RunPod Handler ──────────────────────────────────────────────────────────
 
 def handler(job):
@@ -241,6 +326,8 @@ def handler(job):
             return handle_esrgan(job_input)
         elif task == "rmbg":
             return handle_rmbg(job_input)
+        elif task == "tryon":
+            return handle_tryon(job_input)
         else:
             return {"error": f"Unknown task: {task}"}
     except Exception as e:

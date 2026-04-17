@@ -866,3 +866,37 @@
 - [x] Create RunPod serverless endpoint (AMPERE_48 Flex workers, endpoint mmgn5vt6u3ccbs)
 - [x] Set RUNPOD_API_KEY + RUNPOD_FLUX_ENDPOINT_ID on Vercel
 - [x] Test end-to-end: image gen via RunPod (flux-schnell verified, 87.9s first cold start)
+
+## Phase 27 — New Tool Wave (5 Tools)
+
+### Virtual Try-On
+- [x] Server route: fal.ai CatVTON integration (person + garment → composite)
+- [x] Frontend: dual image upload, cloth type selector, result preview
+- [x] Credit cost: 10 credits
+
+### AI Relighting
+- [x] Server route: fal.ai IC-Light v2 integration
+- [x] Frontend: image upload, lighting prompt, strength slider, 6 presets
+- [x] Credit cost: 10 credits
+
+### 3D Model Generator
+- [x] Server route: fal.ai Trellis image-to-GLB
+- [x] Frontend: image upload, GLB download, preview image
+- [x] Credit cost: 15 credits
+
+### Comic Strip Generator
+- [x] Server route: LLM panel scripting + generateImage per panel
+- [x] Frontend: concept textarea, panel count (2-6), 4 style options
+- [x] Credit cost: 15 credits
+
+### T-Shirt Designer
+- [x] Server route: generateImage with DTG-print-ready prompts
+- [x] Frontend: concept input, 6 styles, 3 color schemes
+- [x] Credit cost: 10 credits
+
+### Integration
+- [x] Tools registered in Tools.tsx listing page
+- [x] Showcase images generated (Grok API)
+- [x] Credit costs added to shared/creditCosts.ts
+- [x] Build passes — 0 TypeScript errors
+- [x] Deployed to production
