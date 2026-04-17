@@ -9,6 +9,11 @@ import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
+  clearToolStatus,
+  getAllToolStatus,
+  setToolStatus,
+} from "./_core/toolStatus";
+import {
   createGeneration,
   createModerationItem,
   createTag,
@@ -364,6 +369,41 @@ const VIDEO_TEMPLATES: VideoTemplate[] = [
 
 export const appRouter = router({
   system: systemRouter,
+
+  toolStatus: router({
+    // Public: UI uses this to show degraded/offline banners before submit
+    listPublic: publicProcedure.query(async () => {
+      const rows = await getAllToolStatus();
+      return rows.filter((r) => r.status !== "active");
+    }),
+    // Admin: full table for the kill-switch UI
+    listAdmin: adminProcedure.query(async () => {
+      return getAllToolStatus();
+    }),
+    set: adminProcedure
+      .input(
+        z.object({
+          toolId: z.string().min(1).max(100),
+          status: z.enum(["active", "degraded", "offline"]),
+          message: z.string().max(500).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await setToolStatus(
+          input.toolId,
+          input.status,
+          input.message ?? null,
+          ctx.user.id,
+        );
+        return { success: true };
+      }),
+    clear: adminProcedure
+      .input(z.object({ toolId: z.string().min(1).max(100) }))
+      .mutation(async ({ input }) => {
+        await clearToolStatus(input.toolId);
+        return { success: true };
+      }),
+  }),
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),

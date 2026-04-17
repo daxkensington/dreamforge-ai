@@ -8,6 +8,13 @@
       "when": 1774217000438,
       "tag": "0000_old_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776413700000,
+      "tag": "0001_tool_status",
+      "breakpoints": true
     }
   ]
 }

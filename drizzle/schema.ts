@@ -45,6 +45,19 @@ export const activityActionEnum = pgEnum("activityAction", [
   "member_left",
 ]);
 export const keyframeStatusEnum = pgEnum("keyframeStatus", ["pending", "generating", "completed", "failed"]);
+export const toolStatusEnum = pgEnum("toolStatus", ["active", "degraded", "offline"]);
+
+// ─── Tool Kill-Switch ────────────────────────────────────────────────────────
+// Operator-controlled per-tool status so a broken tool can be disabled without
+// a redeploy. Rows present → override; rows absent → tool defaults to active.
+export const toolStatus = pgTable("tool_status", {
+  toolId: varchar("toolId", { length: 100 }).primaryKey(),
+  status: toolStatusEnum("status").notNull().default("active"),
+  message: text("message"),
+  updatedBy: integer("updatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type ToolStatus = typeof toolStatus.$inferSelect;
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {

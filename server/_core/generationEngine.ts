@@ -16,6 +16,7 @@ import { RunwayProvider } from "./providers/runway";
 import { KlingProvider } from "./providers/kling";
 import { ReplicateProvider } from "./providers/replicate";
 import { FalProvider } from "./providers/fal";
+import { requireToolActive } from "./toolStatus";
 
 // ─── Provider Instances (lazy singletons) ─────────────────────────────────
 
@@ -52,10 +53,15 @@ export interface EngineGenerationRequest {
   /** If true, try other providers when the selected one fails. Default: true. */
   autoFallback?: boolean;
   options?: Record<string, unknown>;
+  /** Logical tool ID for the kill-switch (e.g. "text-to-image", "upscale").
+   *  Falls back to model.type if omitted, so old callers still benefit. */
+  toolId?: string;
 }
 
 export interface EngineGenerationResult extends GenerationResult {
   creditCost: number;
+  /** Present when the tool is in "degraded" state — UI can surface a banner. */
+  degradedMessage?: string;
 }
 
 // ─── Main entry point ──────────────────────────────────────────────────────
@@ -63,11 +69,13 @@ export interface EngineGenerationResult extends GenerationResult {
 export async function runGeneration(
   request: EngineGenerationRequest,
 ): Promise<EngineGenerationResult> {
-  // 1. Look up the model
+  // 0. Kill-switch — block offline tools BEFORE any credit spend
   const model = getModelById(request.modelId);
   if (!model) {
     throw new Error(`Unknown model: ${request.modelId}`);
   }
+  const toolId = request.toolId ?? model.type;
+  const toolState = await requireToolActive(toolId);
 
   // 2. Check availability
   if (!model.isAvailable) {
@@ -114,10 +122,13 @@ export async function runGeneration(
     options: request.options,
   };
 
+  const degradedMessage =
+    toolState.status === "degraded" ? toolState.message ?? "Tool is currently degraded." : undefined;
+
   try {
     const result = await adapter.generate(genRequest);
     const creditCost = calculateCreditCost(model, request);
-    return { ...result, creditCost };
+    return { ...result, creditCost, degradedMessage };
   } catch (primaryError: any) {
     // 6. Auto-fallback to other available providers of the same type
     if (request.autoFallback !== false) {
@@ -127,7 +138,7 @@ export async function runGeneration(
         request,
         primaryError,
       );
-      if (fallbackResult) return fallbackResult;
+      if (fallbackResult) return { ...fallbackResult, degradedMessage };
     }
 
     throw primaryError;
