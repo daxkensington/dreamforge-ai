@@ -44,6 +44,7 @@ _catvton_pipe = None
 _catvton_masker = None
 _musicgen_model = None
 _audiogen_model = None
+_cogvideo_pipe = None
 
 
 def get_flux_pipe(model_type="dev"):
@@ -144,6 +145,23 @@ def get_rmbg_model():
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
     return _rmbg_model, _rmbg_transform
+
+
+def get_cogvideo_pipe():
+    """Load CogVideoX-5B text-to-video pipeline."""
+    global _cogvideo_pipe
+    if _cogvideo_pipe is None:
+        from diffusers import CogVideoXPipeline
+
+        print("[DreamForge] Loading CogVideoX-5B...")
+        _cogvideo_pipe = CogVideoXPipeline.from_pretrained(
+            "THUDM/CogVideoX-5b",
+            torch_dtype=torch.bfloat16,
+        )
+        _cogvideo_pipe.enable_model_cpu_offload()
+        _cogvideo_pipe.vae.enable_tiling()
+        print("[DreamForge] CogVideoX-5B loaded")
+    return _cogvideo_pipe
 
 
 def get_musicgen(model_size="large"):
@@ -405,6 +423,53 @@ def handle_rmbg(job_input):
     return {"image_b64": image_b64, "inference_time": inference_time}
 
 
+def handle_cogvideo(job_input):
+    """Generate video with CogVideoX-5B."""
+    from diffusers.utils import export_to_video
+
+    prompt = job_input.get("prompt", "")
+    num_frames = job_input.get("num_frames", 49)  # ~6 seconds at 8fps
+    steps = job_input.get("num_inference_steps", 50)
+    guidance = job_input.get("guidance_scale", 6.0)
+    seed = job_input.get("seed")
+
+    if not prompt:
+        raise ValueError("prompt is required for video generation")
+
+    # Clamp frames (CogVideoX supports 49 frames = ~6s at 8fps)
+    num_frames = max(17, min(num_frames, 49))
+
+    pipe = get_cogvideo_pipe()
+
+    if seed is None:
+        seed = int(time.time()) % 2**32
+    generator = torch.Generator("cuda").manual_seed(seed)
+
+    start = time.time()
+    video = pipe(
+        prompt=prompt,
+        num_inference_steps=steps,
+        num_frames=num_frames,
+        guidance_scale=guidance,
+        generator=generator,
+    ).frames[0]
+    inference_time = time.time() - start
+    print(f"[DreamForge] CogVideoX generated {num_frames} frames in {inference_time:.1f}s (seed={seed})")
+
+    # Export to MP4
+    video_path = f"/tmp/cogvideo_{int(time.time())}.mp4"
+    export_to_video(video, video_path, fps=8)
+
+    # Read and base64 encode
+    with open(video_path, "rb") as f:
+        video_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    # Clean up
+    os.remove(video_path)
+
+    return {"video_b64": video_b64, "inference_time": inference_time, "seed": seed, "num_frames": num_frames}
+
+
 def handle_musicgen(job_input):
     """Generate music with Meta MusicGen."""
     import torchaudio
@@ -527,6 +592,8 @@ def handler(job):
             return handle_rmbg(job_input)
         elif task == "tryon":
             return handle_tryon(job_input)
+        elif task == "cogvideo":
+            return handle_cogvideo(job_input)
         elif task == "musicgen":
             return handle_musicgen(job_input)
         elif task == "audiogen":

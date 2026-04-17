@@ -3413,7 +3413,7 @@ export const appRouter = router({
           duration: z.enum(["4", "8"]).default("8"),
           aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("16:9"),
           style: z.enum(["cinematic", "anime", "documentary", "slow-motion", "timelapse", "drone", "handheld", "commercial"]).default("cinematic"),
-          model: z.enum(["veo-3", "minimax", "runway-gen4.5", "runway-gen4-turbo", "kling-2.0", "kling-1.6", "auto"]).default("auto"),
+          model: z.enum(["veo-3", "minimax", "runway-gen4.5", "runway-gen4-turbo", "kling-2.0", "kling-1.6", "cogvideo", "auto"]).default("auto"),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -3453,6 +3453,17 @@ export const appRouter = router({
           const provider = new ReplicateProvider();
           const result = await provider.generate({ prompt: enhancedPrompt, model: "minimax-video", options: { prompt_optimizer: true } });
           return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
+        }
+
+        // Direct CogVideoX selection
+        if (input.model === "cogvideo") {
+          const { isRunPodAvailable, runpodCogVideo } = await import("./_core/runpod");
+          if (!isRunPodAvailable()) return { videoUrl: null, status: "failed" as const, error: "RunPod not configured" };
+          const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
+          const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
+          const key = genKey("video", "mp4");
+          const { url } = await stPut(key, videoBuffer, "video/mp4");
+          return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
         }
 
         // Auto mode: try providers in priority order based on availability
@@ -3497,7 +3508,24 @@ export const appRouter = router({
           }
         }
 
-        // Priority 4: Minimax via Replicate (fallback)
+        // Priority 4: Self-hosted CogVideoX on RunPod (~$0.07-0.18/video vs $0.50+ API)
+        {
+          const { isRunPodAvailable, runpodCogVideo } = await import("./_core/runpod");
+          if (input.model === "auto" && isRunPodAvailable()) {
+            try {
+              const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
+              const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
+              const key = genKey("video", "mp4");
+              const { url } = await stPut(key, videoBuffer, "video/mp4");
+              return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
+            } catch (err: any) {
+              errors.push(`CogVideoX: ${err.message}`);
+              console.warn("[Video] CogVideoX failed, trying Minimax:", err.message);
+            }
+          }
+        }
+
+        // Priority 5: Minimax via Replicate (fallback)
         if (input.model === "auto" && process.env.REPLICATE_API_TOKEN) {
           try {
             const { ReplicateProvider } = await import("./_core/providers/replicate");

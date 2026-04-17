@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir --no-deps audiocraft && \
-    pip install --no-cache-dir lameenc num2words flashy torchaudio
+    pip install --no-cache-dir lameenc num2words flashy torchaudio imageio-ffmpeg imageio
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1

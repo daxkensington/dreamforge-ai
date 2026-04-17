@@ -23,6 +23,7 @@ export type RunPodTask =
   | "esrgan"
   | "rmbg"
   | "tryon"
+  | "cogvideo"
   | "musicgen"
   | "audiogen";
 
@@ -69,6 +70,8 @@ interface RunPodOutput {
   image_url?: string;
   /** Base64-encoded audio output */
   audio_b64?: string;
+  /** Base64-encoded video output */
+  video_b64?: string;
   /** Inference time in seconds */
   inference_time?: number;
   /** Seed used for generation */
@@ -224,6 +227,10 @@ function extractOutput(result: RunPodRunResponse): Buffer {
     return Buffer.from(result.output.audio_b64, "base64");
   }
 
+  if (result.output.video_b64) {
+    return Buffer.from(result.output.video_b64, "base64");
+  }
+
   // URL output requires a follow-up download
   if (result.output.image_url) {
     // Return a marker — caller should download
@@ -327,6 +334,32 @@ export async function runpodFluxImg2Img(
       guidance_scale: guidanceScale,
     }),
   );
+}
+
+/**
+ * Generate video with CogVideoX-5B (text-to-video).
+ * ~$0.07-0.18/video vs $0.50-1.00 on API providers.
+ */
+/**
+ * Generate video with CogVideoX-5B (text-to-video).
+ * ~$0.07-0.18/video vs $0.50-1.00 on API providers.
+ */
+export async function runpodCogVideo(
+  prompt: string,
+  numFrames: number = 49,
+  steps: number = 50,
+  guidanceScale: number = 6.0,
+): Promise<Buffer> {
+  // CogVideoX uses a custom input shape — pass num_frames directly
+  const input: RunPodInput = {
+    task: "cogvideo",
+    prompt,
+    num_inference_steps: steps,
+    guidance_scale: guidanceScale,
+  };
+  // Add num_frames to the input (handler reads it from job_input)
+  (input as any).num_frames = numFrames;
+  return handleRunpodResult(runpodRun(input));
 }
 
 /**

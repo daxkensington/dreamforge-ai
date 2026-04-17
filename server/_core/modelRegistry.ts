@@ -352,6 +352,23 @@ function kling16(): AIModel {
   };
 }
 
+function cogVideoX(): AIModel {
+  return {
+    id: "cogvideo",
+    name: "CogVideoX (Self-Hosted)",
+    provider: "runpod",
+    type: "video",
+    capabilities: ["text-to-video"],
+    maxResolution: { width: 720, height: 480 },
+    creditCost: { base: 20 },
+    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    modelTier: "standard",
+    tier: "creator",
+    description: "CogVideoX-5B on DreamForge GPUs — 75% cheaper than API video.",
+    costInfo: "20 credits (Creator+)",
+  };
+}
+
 // ─── Audio Models ───────────────────────────────────────────────────────────
 
 function musicGen(): AIModel {
@@ -742,6 +759,8 @@ function buildModelList(): AIModel[] {
     // Free image models
     togetherFlux(),
     cloudflareImage(),
+    // Self-hosted video
+    cogVideoX(),
     // Lip sync models
     syncLabsSync3(),
     syncLabsLipsync2(),
