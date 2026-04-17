@@ -13,7 +13,7 @@
 import { storagePut } from "../storage";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
-import { isRunPodAvailable, runpodMusicGen, runpodAudioGen } from "./runpod";
+import { isRunPodAvailable, runpodMusicGen, runpodAudioGen, runpodBarkTTS } from "./runpod";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -176,6 +176,23 @@ export async function generateVoiceover(
 ): Promise<AudioGenerationResult> {
   const voicePreset = request.options?.voiceId ?? "v2/en_speaker_6";
 
+  // Try self-hosted Bark TTS on RunPod first
+  if (isRunPodAvailable()) {
+    try {
+      const buffer = await runpodBarkTTS(request.prompt, voicePreset);
+      const { url } = await storagePut(`audio/voiceover_${Date.now()}.wav`, buffer, "audio/wav");
+      return {
+        audioUrl: url,
+        duration: request.duration,
+        model: "bark-selfhosted",
+        metadata: { type: "voiceover", originalPrompt: request.prompt, voiceId: voicePreset },
+      };
+    } catch (err: any) {
+      console.warn("[Bark] RunPod failed, falling back to Replicate:", err.message);
+    }
+  }
+
+  // Fallback: Replicate API
   const outputUrl = await audioPredict(REPLICATE_MODELS.bark, {
     prompt: request.prompt,
     history_prompt: voicePreset,

@@ -45,6 +45,8 @@ _catvton_masker = None
 _musicgen_model = None
 _audiogen_model = None
 _cogvideo_pipe = None
+_bark_processor = None
+_bark_model = None
 
 
 def get_flux_pipe(model_type="dev"):
@@ -147,6 +149,23 @@ def get_rmbg_model():
     return _rmbg_model, _rmbg_transform
 
 
+def get_bark():
+    """Load Bark TTS model for natural speech generation."""
+    global _bark_processor, _bark_model
+    if _bark_model is None:
+        from transformers import AutoProcessor, BarkModel
+
+        print("[DreamForge] Loading Bark TTS...")
+        _bark_processor = AutoProcessor.from_pretrained("suno/bark")
+        _bark_model = BarkModel.from_pretrained(
+            "suno/bark",
+            torch_dtype=torch.float16,
+        )
+        _bark_model.to("cuda")
+        print("[DreamForge] Bark TTS loaded")
+    return _bark_processor, _bark_model
+
+
 def get_cogvideo_pipe():
     """Load CogVideoX-5B text-to-video pipeline."""
     global _cogvideo_pipe
@@ -241,10 +260,23 @@ def handle_flux(job_input):
     model_type = "dev" if task == "flux-dev" else "schnell"
     pipe = get_flux_pipe(model_type)
 
-    # Load LoRA weights if requested
+    # Load LoRA weights if requested (supports HF repo ID or direct URL to .safetensors)
     if lora_id:
         try:
-            pipe.load_lora_weights(lora_id)
+            if lora_id.startswith("http://") or lora_id.startswith("https://"):
+                # Direct URL — download to temp file and load
+                import requests as req_lib
+                lora_path = f"/tmp/lora_{hash(lora_id) % 10**8}.safetensors"
+                if not os.path.exists(lora_path):
+                    print(f"[DreamForge] Downloading LoRA from URL: {lora_id}")
+                    resp = req_lib.get(lora_id, timeout=120)
+                    resp.raise_for_status()
+                    with open(lora_path, "wb") as f:
+                        f.write(resp.content)
+                pipe.load_lora_weights(lora_path)
+            else:
+                # HuggingFace repo ID
+                pipe.load_lora_weights(lora_id)
             pipe.fuse_lora(lora_scale=lora_scale)
             print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
         except Exception as e:
@@ -423,6 +455,35 @@ def handle_rmbg(job_input):
     return {"image_b64": image_b64, "inference_time": inference_time}
 
 
+def handle_bark_tts(job_input):
+    """Generate speech with Bark TTS."""
+    import scipy.io.wavfile as wavfile
+
+    text = job_input.get("prompt", "")
+    voice_preset = job_input.get("voice_preset", "v2/en_speaker_6")
+
+    if not text:
+        raise ValueError("prompt (text) is required for TTS")
+
+    processor, model = get_bark()
+
+    start = time.time()
+    inputs = processor(text, voice_preset=voice_preset, return_tensors="pt").to("cuda")
+    with torch.no_grad():
+        audio_array = model.generate(**inputs)
+    audio_array = audio_array.cpu().numpy().squeeze()
+    inference_time = time.time() - start
+    print(f"[DreamForge] Bark TTS generated in {inference_time:.1f}s")
+
+    # Save to WAV buffer
+    sample_rate = model.generation_config.sample_rate
+    buf = io.BytesIO()
+    wavfile.write(buf, rate=sample_rate, data=audio_array)
+    audio_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"audio_b64": audio_b64, "inference_time": inference_time}
+
+
 def handle_cogvideo(job_input):
     """Generate video with CogVideoX-5B."""
     from diffusers.utils import export_to_video
@@ -592,6 +653,8 @@ def handler(job):
             return handle_rmbg(job_input)
         elif task == "tryon":
             return handle_tryon(job_input)
+        elif task == "bark-tts":
+            return handle_bark_tts(job_input)
         elif task == "cogvideo":
             return handle_cogvideo(job_input)
         elif task == "musicgen":

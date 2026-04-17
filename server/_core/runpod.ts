@@ -23,6 +23,7 @@ export type RunPodTask =
   | "esrgan"
   | "rmbg"
   | "tryon"
+  | "bark-tts"
   | "cogvideo"
   | "musicgen"
   | "audiogen";
@@ -54,6 +55,8 @@ export interface RunPodInput {
   duration?: number;
   /** Img2img strength (0.0-1.0, higher = more change) */
   strength?: number;
+  /** Bark TTS voice preset */
+  voice_preset?: string;
 }
 
 interface RunPodRunResponse {
@@ -309,6 +312,22 @@ export async function runpodRemoveBackground(
     runpodRun({
       task: "rmbg",
       image_b64: imageB64,
+    }),
+  );
+}
+
+/**
+ * Text-to-speech with Bark (natural AI voiceovers).
+ */
+export async function runpodBarkTTS(
+  text: string,
+  voicePreset: string = "v2/en_speaker_6",
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun({
+      task: "bark-tts",
+      prompt: text,
+      voice_preset: voicePreset,
     }),
   );
 }
