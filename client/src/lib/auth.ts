@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import Resend from "next-auth/providers/resend";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // NextAuth v5 uses AUTH_SECRET; fall back to NEXTAUTH_SECRET for backward compat
@@ -15,10 +14,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    }),
-    Resend({
-      apiKey: process.env.RESEND_API_KEY,
-      from: process.env.RESEND_FROM_ADDRESS || "DreamForgeX <noreply@dreamforgex.ai>",
     }),
   ],
   session: { strategy: "jwt" },

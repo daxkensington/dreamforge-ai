@@ -2,23 +2,8 @@
 
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { Mail } from "lucide-react";
 
 export default function SignInPage() {
-  const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setLoading(true);
-    await signIn("resend", { email, callbackUrl: "/" });
-    setEmailSent(true);
-    setLoading(false);
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-zinc-900/80 p-10 shadow-2xl shadow-purple-500/5 backdrop-blur-sm">
@@ -64,43 +49,6 @@ export default function SignInPage() {
             Continue with GitHub
           </Button>
         </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-zinc-800" />
-          <span className="text-xs text-zinc-500">or</span>
-          <div className="h-px flex-1 bg-zinc-800" />
-        </div>
-
-        {/* Email Magic Link */}
-        {emailSent ? (
-          <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-6 text-center">
-            <Mail className="mx-auto mb-3 size-8 text-purple-400" />
-            <p className="text-sm font-medium text-white">Check your email</p>
-            <p className="mt-1 text-xs text-zinc-400">
-              We sent a sign-in link to <span className="text-purple-300">{email}</span>
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleEmailSignIn} className="space-y-3">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              required
-            />
-            <Button
-              type="submit"
-              disabled={loading || !email}
-              className="w-full bg-purple-600 py-6 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
-            >
-              <Mail className="mr-2 size-4" />
-              {loading ? "Sending..." : "Sign in with Email"}
-            </Button>
-          </form>
-        )}
 
         {/* Footer */}
         <p className="text-center text-xs text-zinc-500">
