@@ -19,6 +19,7 @@ const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 export type RunPodTask =
   | "flux-dev"
   | "flux-schnell"
+  | "flux-img2img"
   | "esrgan"
   | "rmbg"
   | "tryon"
@@ -50,6 +51,8 @@ export interface RunPodInput {
   lora_scale?: number;
   /** Audio duration in seconds for musicgen/audiogen */
   duration?: number;
+  /** Img2img strength (0.0-1.0, higher = more change) */
+  strength?: number;
 }
 
 interface RunPodRunResponse {
@@ -299,6 +302,29 @@ export async function runpodRemoveBackground(
     runpodRun({
       task: "rmbg",
       image_b64: imageB64,
+    }),
+  );
+}
+
+/**
+ * Img2img with Flux — real diffusion-based image transformation.
+ * Replaces the LLM describe-then-generate hack for dramatically better quality.
+ */
+export async function runpodFluxImg2Img(
+  imageB64: string,
+  prompt: string,
+  strength: number = 0.7,
+  steps: number = 20,
+  guidanceScale: number = 7.5,
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun({
+      task: "flux-img2img",
+      image_b64: imageB64,
+      prompt,
+      strength,
+      num_inference_steps: steps,
+      guidance_scale: guidanceScale,
     }),
   );
 }

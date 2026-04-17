@@ -36,6 +36,7 @@ if not hasattr(torchvision.transforms, "functional_tensor"):
 # Models are loaded on first use to minimize cold-start memory.
 
 _flux_pipe = None
+_flux_img2img_pipe = None
 _esrgan_model = None
 _rmbg_model = None
 _rmbg_transform = None
@@ -74,6 +75,28 @@ def get_flux_pipe(model_type="dev"):
         pipe._model_type = model_type
         _flux_pipe = pipe
     return _flux_pipe
+
+
+def get_flux_img2img_pipe(model_type="dev"):
+    """Load Flux.1 img2img pipeline."""
+    global _flux_img2img_pipe
+    if _flux_img2img_pipe is None or getattr(_flux_img2img_pipe, "_model_type", None) != model_type:
+        from diffusers import FluxImg2ImgPipeline
+
+        model_id = (
+            "black-forest-labs/FLUX.1-dev"
+            if model_type == "dev"
+            else "black-forest-labs/FLUX.1-schnell"
+        )
+        print(f"[DreamForge] Loading Flux img2img ({model_id})...")
+        pipe = FluxImg2ImgPipeline.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+        )
+        pipe.to("cuda")
+        pipe._model_type = model_type
+        _flux_img2img_pipe = pipe
+    return _flux_img2img_pipe
 
 
 def get_esrgan_model():
@@ -240,6 +263,75 @@ def handle_flux(job_input):
     image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
     return {"image_b64": image_b64, "inference_time": inference_time, "seed": seed}
+
+
+def handle_flux_img2img(job_input):
+    """Transform an existing image with Flux.1 img2img — real diffusion, not LLM hack."""
+    prompt = job_input.get("prompt", "")
+    image_b64 = job_input.get("image_b64", "")
+    strength = job_input.get("strength", 0.7)
+    steps = job_input.get("num_inference_steps", 20)
+    guidance = job_input.get("guidance_scale", 7.5)
+    seed = job_input.get("seed")
+    lora_id = job_input.get("lora_id")
+    lora_scale = job_input.get("lora_scale", 0.8)
+
+    if not image_b64:
+        raise ValueError("image_b64 is required for img2img")
+    if not prompt:
+        raise ValueError("prompt is required for img2img")
+
+    # Decode input image
+    img_bytes = base64.b64decode(image_b64)
+    init_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+    # Resize to multiples of 8
+    w, h = init_image.size
+    w = (w // 8) * 8
+    h = (h // 8) * 8
+    if (w, h) != init_image.size:
+        init_image = init_image.resize((w, h), Image.LANCZOS)
+
+    pipe = get_flux_img2img_pipe("dev")
+
+    # Load LoRA if requested
+    if lora_id:
+        try:
+            pipe.load_lora_weights(lora_id)
+            pipe.fuse_lora(lora_scale=lora_scale)
+            print(f"[DreamForge] img2img LoRA loaded: {lora_id}")
+        except Exception as e:
+            print(f"[DreamForge] img2img LoRA load failed: {e}")
+
+    if seed is None:
+        seed = int(time.time()) % 2**32
+    generator = torch.Generator("cuda").manual_seed(seed)
+
+    start = time.time()
+    result = pipe(
+        prompt=prompt,
+        image=init_image,
+        strength=max(0.1, min(strength, 1.0)),
+        num_inference_steps=steps,
+        guidance_scale=guidance,
+        generator=generator,
+    )
+    inference_time = time.time() - start
+    print(f"[DreamForge] Flux img2img completed in {inference_time:.1f}s (seed={seed}, strength={strength})")
+
+    if lora_id:
+        try:
+            pipe.unfuse_lora()
+            pipe.unload_lora_weights()
+        except Exception:
+            pass
+
+    output_image = result.images[0]
+    buf = io.BytesIO()
+    output_image.save(buf, format="PNG")
+    out_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"image_b64": out_b64, "inference_time": inference_time, "seed": seed}
 
 
 def handle_esrgan(job_input):
@@ -427,6 +519,8 @@ def handler(job):
     try:
         if task in ("flux-dev", "flux-schnell"):
             return handle_flux(job_input)
+        elif task == "flux-img2img":
+            return handle_flux_img2img(job_input)
         elif task == "esrgan":
             return handle_esrgan(job_input)
         elif task == "rmbg":

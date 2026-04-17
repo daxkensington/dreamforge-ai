@@ -18,7 +18,7 @@ import { storagePut, generateStorageKey } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
-import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell } from "./runpod";
+import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -559,22 +559,50 @@ export async function generateImage(
     style = "vivid",
   } = options;
 
-  // If original images are provided, analyze them and enrich the prompt
-  if (options.originalImages && options.originalImages.length > 0) {
-    const description = await describeOriginalImages(options.originalImages);
-    if (description) {
-      prompt = `[Original image description: ${description}]\n\nTask: ${prompt}`;
+  let imageBuffer: Buffer | undefined;
+
+  // If original images are provided, try real img2img on RunPod first
+  // (dramatically better quality than the LLM describe-then-generate approach)
+  if (options.originalImages && options.originalImages.length > 0 && isRunPodAvailable()) {
+    try {
+      const sourceImg = options.originalImages[0];
+      if (sourceImg.url) {
+        const imgResp = await fetch(sourceImg.url);
+        if (imgResp.ok) {
+          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+          const imageB64 = imgBuffer.toString("base64");
+          imageBuffer = await runpodFluxImg2Img(imageB64, prompt, 0.7);
+          console.log("[ImageGen] Used RunPod Flux img2img (real diffusion)");
+        } else {
+          throw new Error("Failed to fetch source image");
+        }
+      } else if (sourceImg.b64Json) {
+        imageBuffer = await runpodFluxImg2Img(sourceImg.b64Json, prompt, 0.7);
+        console.log("[ImageGen] Used RunPod Flux img2img (real diffusion, b64)");
+      } else {
+        throw new Error("No source image URL or b64");
+      }
+    } catch (err: any) {
+      console.warn("[ImageGen] RunPod img2img failed, falling back to LLM approach:", err.message);
+      // Fall through to LLM describe-then-generate below
+      imageBuffer = undefined;
     }
   }
 
-  let imageBuffer: Buffer;
+  // Fallback: LLM describe-then-generate (or no original images provided)
+  if (!imageBuffer) {
+    if (options.originalImages && options.originalImages.length > 0) {
+      const description = await describeOriginalImages(options.originalImages);
+      if (description) {
+        prompt = `[Original image description: ${description}]\n\nTask: ${prompt}`;
+      }
+    }
 
-  if (model !== "auto") {
-    // Explicit model requested — no fallback
-    imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
-  } else {
-    // Auto mode: try providers in priority order with fallback
-    imageBuffer = await generateWithFallback(prompt, size, quality, style);
+    if (model !== "auto") {
+      imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
+    } else {
+      imageBuffer = await generateWithFallback(prompt, size, quality, style);
+    }
   }
 
   // Apply watermark for free-tier users
