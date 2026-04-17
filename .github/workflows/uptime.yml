@@ -1,0 +1,119 @@
+name: Uptime Probe
+
+# Synthetic uptime monitor — runs every 15 minutes and on demand. Probes a
+# curated list of pages and API endpoints; opens (or reuses) a GitHub Issue
+# titled "[uptime] dreamforgex.ai is DOWN" on failure, and auto-closes it
+# when the next run is healthy.
+#
+# Why GitHub Actions instead of Better Uptime/Checkly: zero external accounts,
+# zero monthly cost, lives next to the code. Trade-off: 5-minute cron minimum,
+# jobs occasionally queue under heavy GH load. For tighter SLAs, swap in a
+# real uptime SaaS — the script (scripts/health-check.mjs) works against
+# anything that can hit a URL.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to probe (default: https://dreamforgex.ai)"
+        required: false
+        default: "https://dreamforgex.ai"
+
+permissions:
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run health probes
+        id: probe
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://dreamforgex.ai' }}
+        # We always want to inspect the result — don't short-circuit on failure.
+        continue-on-error: true
+        run: node scripts/health-check.mjs
+
+      - name: Open or update incident issue
+        if: steps.probe.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "[uptime] dreamforgex.ai is DOWN";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `🚨 **Uptime probe failed at ${new Date().toISOString()}**`,
+              ``,
+              `Run: ${runUrl}`,
+              ``,
+              `See workflow log for failure details. This issue will auto-close on the next healthy probe.`,
+            ].join("\n");
+
+            // Look for an existing open incident.
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "uptime-incident",
+              per_page: 5,
+            });
+            const existing = open.data.find((i) => i.title === title);
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              console.log(`Commented on existing incident #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["uptime-incident", "bug"],
+              });
+              console.log(`Opened incident #${created.data.number}`);
+            }
+
+      - name: Close incident on recovery
+        if: steps.probe.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "[uptime] dreamforgex.ai is DOWN";
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "uptime-incident",
+              per_page: 5,
+            });
+            const existing = open.data.find((i) => i.title === title);
+            if (!existing) return;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              body: `✅ Recovered at ${new Date().toISOString()} — closing incident.`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              state: "closed",
+            });
+
+      - name: Fail step if probe failed
+        if: steps.probe.outcome == 'failure'
+        run: exit 1

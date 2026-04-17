@@ -1,0 +1,104 @@
+name: Smoke Tests
+
+# Playwright smoke suite — exercises real user journeys (page rendering,
+# auth gating, no broken images, no console errors, API health). Runs:
+#   • against Vercel preview when a PR deploy completes
+#   • nightly against prod (catches drift between deploys)
+#   • on demand
+#
+# Designed to fail loud on regressions Sentry can't see: missing pages,
+# missing assets, broken layouts, console errors that don't throw.
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC = 02:00 EDT — quiet hours
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to test (default: https://dreamforgex.ai)"
+        required: false
+        default: "https://dreamforgex.ai"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    # Skip deployment_status events that aren't successful preview deploys
+    # or successful prod deploys. The expression on the schedule + dispatch
+    # branches always passes; only filters deployment_status events.
+    if: |
+      github.event_name != 'deployment_status' ||
+      github.event.deployment_status.state == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "deployment_status" ]; then
+            echo "url=${{ github.event.deployment_status.target_url }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "url=${{ github.event.inputs.base_url }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://dreamforgex.ai" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Playwright smoke tests
+        env:
+          BASE_URL: ${{ steps.base.outputs.url }}
+          CI: "true"
+        run: |
+          echo "🧪 Smoke testing $BASE_URL"
+          pnpm test:smoke
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Comment on PR if smoke failed
+        if: failure() && github.event_name == 'deployment_status' && github.event.deployment.environment != 'production'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.deployment.sha;
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+            });
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            for (const pr of prs.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: [
+                  `❌ **Smoke tests failed on preview deploy**`,
+                  ``,
+                  `Preview: ${context.payload.deployment_status.target_url}`,
+                  `Run: ${runUrl}`,
+                  ``,
+                  `Download the Playwright report from the run artifacts to see screenshots and traces.`,
+                ].join("\n"),
+              });
+            }
