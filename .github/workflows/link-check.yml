@@ -1,0 +1,41 @@
+name: Link Check
+
+# Runs after Vercel finishes deploying so we check the live build, not source.
+# Catches 404s on internal hrefs that Sentry cannot detect (a 404 is a valid
+# HTTP response, not an exception — Sentry only sees thrown errors).
+
+on:
+  # Run after every push to main (Vercel deploys ~3min after push, so we wait).
+  push:
+    branches: [main]
+  # Allow manual runs.
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to check (default: https://dreamforgex.ai)"
+        required: false
+        default: "https://dreamforgex.ai"
+  # Daily sweep — catches drift even when no commits land.
+  schedule:
+    - cron: "0 14 * * *" # 14:00 UTC = 10:00 AM EDT
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Wait for Vercel to finish deploying the push that triggered us.
+      # Skip the wait on manual / scheduled runs.
+      - name: Wait for Vercel deploy
+        if: github.event_name == 'push'
+        run: sleep 240
+
+      - name: Check internal links
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://dreamforgex.ai' }}
+        run: node scripts/check-links.mjs
