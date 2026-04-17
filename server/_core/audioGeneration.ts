@@ -1,10 +1,11 @@
 /**
- * Audio generation service using Replicate API
+ * Audio generation service — self-hosted on RunPod (MusicGen/AudioGen)
+ * with Replicate API fallback.
  *
  * Supports:
- * - Sound effects (AudioGen)
- * - Music generation (MusicGen)
- * - Voiceover / TTS (Bark)
+ * - Sound effects (AudioGen) — RunPod first, Replicate fallback
+ * - Music generation (MusicGen) — RunPod first, Replicate fallback
+ * - Voiceover / TTS (Bark) — Replicate only (not self-hosted yet)
  * - Ambient audio (MusicGen with ambient prompts)
  * - Audio-video merge (ffmpeg-based via Replicate)
  */
@@ -12,6 +13,7 @@
 import { storagePut } from "../storage";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
+import { isRunPodAvailable, runpodMusicGen, runpodAudioGen } from "./runpod";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,23 @@ export async function generateSoundEffect(
     ? `${request.options.style} style: ${request.prompt}`
     : request.prompt;
 
+  // Try self-hosted AudioGen on RunPod first (~95% cheaper)
+  if (isRunPodAvailable()) {
+    try {
+      const buffer = await runpodAudioGen(prompt, duration);
+      const { url } = await storagePut(`audio/sfx_${Date.now()}.wav`, buffer, "audio/wav");
+      return {
+        audioUrl: url,
+        duration,
+        model: "audiogen-selfhosted",
+        metadata: { type: "sfx", originalPrompt: request.prompt, style: request.options?.style ?? null },
+      };
+    } catch (err: any) {
+      console.warn("[AudioGen] RunPod failed, falling back to Replicate:", err.message);
+    }
+  }
+
+  // Fallback: Replicate API
   const outputUrl = await audioPredict(REPLICATE_MODELS.audiogen, {
     prompt,
     duration,
@@ -102,6 +121,29 @@ export async function generateMusic(
     prompt = `${prompt}. ${request.options.tempo} BPM`;
   }
 
+  // Try self-hosted MusicGen on RunPod first (~85% cheaper)
+  if (isRunPodAvailable()) {
+    try {
+      const buffer = await runpodMusicGen(prompt, duration);
+      const { url } = await storagePut(`audio/music_${Date.now()}.wav`, buffer, "audio/wav");
+      return {
+        audioUrl: url,
+        duration,
+        model: "musicgen-selfhosted",
+        metadata: {
+          type: "music",
+          originalPrompt: request.prompt,
+          mood: request.options?.mood ?? null,
+          style: request.options?.style ?? null,
+          tempo: request.options?.tempo ?? null,
+        },
+      };
+    } catch (err: any) {
+      console.warn("[MusicGen] RunPod failed, falling back to Replicate:", err.message);
+    }
+  }
+
+  // Fallback: Replicate API
   const outputUrl = await audioPredict(REPLICATE_MODELS.musicgen, {
     prompt,
     duration,
@@ -162,16 +204,33 @@ export async function generateAmbient(
   request: AudioGenerationRequest
 ): Promise<AudioGenerationResult> {
   const duration = Math.min(Math.max(request.duration, 10), 300);
+  const effectiveDuration = Math.min(duration, 120); // MusicGen max ~120s
 
   let prompt = `Ambient soundscape: ${request.prompt}. Seamless, loopable, atmospheric.`;
   if (request.options?.mood) {
     prompt = `${request.options.mood} atmosphere. ${prompt}`;
   }
 
-  // Use MusicGen for longer ambient pieces
+  // Try self-hosted MusicGen on RunPod first
+  if (isRunPodAvailable()) {
+    try {
+      const buffer = await runpodMusicGen(prompt, effectiveDuration);
+      const { url } = await storagePut(`audio/ambient_${Date.now()}.wav`, buffer, "audio/wav");
+      return {
+        audioUrl: url,
+        duration,
+        model: "musicgen-selfhosted",
+        metadata: { type: "ambient", originalPrompt: request.prompt, mood: request.options?.mood ?? null, loopable: true },
+      };
+    } catch (err: any) {
+      console.warn("[Ambient] RunPod failed, falling back to Replicate:", err.message);
+    }
+  }
+
+  // Fallback: Replicate API
   const outputUrl = await audioPredict(REPLICATE_MODELS.musicgen, {
     prompt,
-    duration: Math.min(duration, 120), // MusicGen max is ~120s; we generate what we can
+    duration: effectiveDuration,
     model_version: "stereo-large",
     output_format: "wav",
     normalization_strategy: "loudness",

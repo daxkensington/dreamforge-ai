@@ -41,6 +41,8 @@ _rmbg_model = None
 _rmbg_transform = None
 _catvton_pipe = None
 _catvton_masker = None
+_musicgen_model = None
+_audiogen_model = None
 
 
 def get_flux_pipe(model_type="dev"):
@@ -121,6 +123,31 @@ def get_rmbg_model():
     return _rmbg_model, _rmbg_transform
 
 
+def get_musicgen(model_size="large"):
+    """Load Meta MusicGen model (stereo-large by default)."""
+    global _musicgen_model
+    if _musicgen_model is None:
+        from audiocraft.models import MusicGen
+
+        model_id = f"facebook/musicgen-stereo-{model_size}"
+        print(f"[DreamForge] Loading MusicGen ({model_id})...")
+        _musicgen_model = MusicGen.get_pretrained(model_id, device="cuda")
+        print("[DreamForge] MusicGen loaded")
+    return _musicgen_model
+
+
+def get_audiogen():
+    """Load Meta AudioGen model for sound effects."""
+    global _audiogen_model
+    if _audiogen_model is None:
+        from audiocraft.models import AudioGen
+
+        print("[DreamForge] Loading AudioGen...")
+        _audiogen_model = AudioGen.get_pretrained("facebook/audiogen-medium", device="cuda")
+        print("[DreamForge] AudioGen loaded")
+    return _audiogen_model
+
+
 def get_catvton():
     """Load CatVTON virtual try-on pipeline + auto-masker."""
     global _catvton_pipe, _catvton_masker
@@ -155,13 +182,16 @@ def get_catvton():
 # ─── Task Handlers ───────────────────────────────────────────────────────────
 
 def handle_flux(job_input):
-    """Generate image with Flux.1 Dev or Schnell."""
+    """Generate image with Flux.1 Dev or Schnell. Supports LoRA + reproducible seeds."""
     task = job_input.get("task", "flux-dev")
     prompt = job_input.get("prompt", "")
     width = job_input.get("width", 1024)
     height = job_input.get("height", 1024)
     steps = job_input.get("num_inference_steps", 20 if task == "flux-dev" else 4)
     guidance = job_input.get("guidance_scale", 7.5 if task == "flux-dev" else 0.0)
+    seed = job_input.get("seed")
+    lora_id = job_input.get("lora_id")  # HuggingFace LoRA repo ID
+    lora_scale = job_input.get("lora_scale", 0.8)
 
     # Ensure dimensions are multiples of 8
     width = (width // 8) * 8
@@ -170,6 +200,20 @@ def handle_flux(job_input):
     model_type = "dev" if task == "flux-dev" else "schnell"
     pipe = get_flux_pipe(model_type)
 
+    # Load LoRA weights if requested
+    if lora_id:
+        try:
+            pipe.load_lora_weights(lora_id)
+            pipe.fuse_lora(lora_scale=lora_scale)
+            print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
+        except Exception as e:
+            print(f"[DreamForge] LoRA load failed ({lora_id}): {e}")
+
+    # Reproducible seed — use provided seed or generate one
+    if seed is None:
+        seed = int(time.time()) % 2**32
+    generator = torch.Generator("cuda").manual_seed(seed)
+
     start = time.time()
     result = pipe(
         prompt=prompt,
@@ -177,17 +221,25 @@ def handle_flux(job_input):
         height=height,
         num_inference_steps=steps,
         guidance_scale=guidance,
-        generator=torch.Generator("cuda").manual_seed(int(time.time()) % 2**32),
+        generator=generator,
     )
     inference_time = time.time() - start
-    print(f"[DreamForge] Flux {model_type} generated in {inference_time:.1f}s")
+    print(f"[DreamForge] Flux {model_type} generated in {inference_time:.1f}s (seed={seed})")
+
+    # Unload LoRA after generation to keep base model clean for next request
+    if lora_id:
+        try:
+            pipe.unfuse_lora()
+            pipe.unload_lora_weights()
+        except Exception:
+            pass
 
     image = result.images[0]
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    return {"image_b64": image_b64, "inference_time": inference_time}
+    return {"image_b64": image_b64, "inference_time": inference_time, "seed": seed}
 
 
 def handle_esrgan(job_input):
@@ -261,6 +313,59 @@ def handle_rmbg(job_input):
     return {"image_b64": image_b64, "inference_time": inference_time}
 
 
+def handle_musicgen(job_input):
+    """Generate music with Meta MusicGen."""
+    import torchaudio
+
+    prompt = job_input.get("prompt", "")
+    duration = job_input.get("duration", 30)
+    duration = max(1, min(duration, 120))
+
+    if not prompt:
+        raise ValueError("prompt is required for music generation")
+
+    model = get_musicgen()
+    model.set_generation_params(duration=duration)
+
+    start = time.time()
+    wav = model.generate([prompt])
+    inference_time = time.time() - start
+    print(f"[DreamForge] MusicGen generated {duration}s audio in {inference_time:.1f}s")
+
+    # Save to WAV buffer
+    buf = io.BytesIO()
+    torchaudio.save(buf, wav[0].cpu(), sample_rate=model.sample_rate, format="wav")
+    audio_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"audio_b64": audio_b64, "inference_time": inference_time, "duration": duration}
+
+
+def handle_audiogen(job_input):
+    """Generate sound effects with Meta AudioGen."""
+    import torchaudio
+
+    prompt = job_input.get("prompt", "")
+    duration = job_input.get("duration", 5)
+    duration = max(1, min(duration, 30))
+
+    if not prompt:
+        raise ValueError("prompt is required for SFX generation")
+
+    model = get_audiogen()
+    model.set_generation_params(duration=duration)
+
+    start = time.time()
+    wav = model.generate([prompt])
+    inference_time = time.time() - start
+    print(f"[DreamForge] AudioGen generated {duration}s SFX in {inference_time:.1f}s")
+
+    buf = io.BytesIO()
+    torchaudio.save(buf, wav[0].cpu(), sample_rate=model.sample_rate, format="wav")
+    audio_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return {"audio_b64": audio_b64, "inference_time": inference_time, "duration": duration}
+
+
 def handle_tryon(job_input):
     """Virtual try-on with CatVTON — overlay garment onto person."""
     import requests as req_lib
@@ -328,6 +433,10 @@ def handler(job):
             return handle_rmbg(job_input)
         elif task == "tryon":
             return handle_tryon(job_input)
+        elif task == "musicgen":
+            return handle_musicgen(job_input)
+        elif task == "audiogen":
+            return handle_audiogen(job_input)
         else:
             return {"error": f"Unknown task: {task}"}
     except Exception as e:

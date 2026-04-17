@@ -21,7 +21,9 @@ export type RunPodTask =
   | "flux-schnell"
   | "esrgan"
   | "rmbg"
-  | "tryon";
+  | "tryon"
+  | "musicgen"
+  | "audiogen";
 
 export interface RunPodInput {
   task: RunPodTask;
@@ -40,6 +42,14 @@ export interface RunPodInput {
   garment_image_url?: string;
   /** Cloth type for virtual try-on */
   cloth_type?: string;
+  /** Reproducible seed for Flux generation */
+  seed?: number;
+  /** HuggingFace LoRA repo ID for Flux */
+  lora_id?: string;
+  /** LoRA blending scale (0.0-1.0, default 0.8) */
+  lora_scale?: number;
+  /** Audio duration in seconds for musicgen/audiogen */
+  duration?: number;
 }
 
 interface RunPodRunResponse {
@@ -54,8 +64,14 @@ interface RunPodOutput {
   image_b64?: string;
   /** Output image URL (if handler returns URL) */
   image_url?: string;
+  /** Base64-encoded audio output */
+  audio_b64?: string;
   /** Inference time in seconds */
   inference_time?: number;
+  /** Seed used for generation */
+  seed?: number;
+  /** Audio duration generated */
+  duration?: number;
 }
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
@@ -196,9 +212,13 @@ function extractOutput(result: RunPodRunResponse): Buffer {
     throw new Error(`RunPod job not completed (status: ${result.status})`);
   }
 
-  // Prefer base64 output
+  // Prefer base64 output (image or audio)
   if (result.output.image_b64) {
     return Buffer.from(result.output.image_b64, "base64");
+  }
+
+  if (result.output.audio_b64) {
+    return Buffer.from(result.output.audio_b64, "base64");
   }
 
   // URL output requires a follow-up download
@@ -279,6 +299,38 @@ export async function runpodRemoveBackground(
     runpodRun({
       task: "rmbg",
       image_b64: imageB64,
+    }),
+  );
+}
+
+/**
+ * Generate music with MusicGen (stereo-large).
+ */
+export async function runpodMusicGen(
+  prompt: string,
+  duration: number = 30,
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun({
+      task: "musicgen",
+      prompt,
+      duration,
+    }),
+  );
+}
+
+/**
+ * Generate sound effects with AudioGen.
+ */
+export async function runpodAudioGen(
+  prompt: string,
+  duration: number = 5,
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun({
+      task: "audiogen",
+      prompt,
+      duration,
     }),
   );
 }

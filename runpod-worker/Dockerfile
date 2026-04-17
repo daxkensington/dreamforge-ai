@@ -2,14 +2,18 @@ FROM runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2204
 
 WORKDIR /app
 
-# Install system deps
+# Install system deps (ffmpeg/libav needed for audiocraft)
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx libglib2.0-0 wget \
+    libgl1-mesa-glx libglib2.0-0 wget git \
+    ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev \
+    libavdevice-dev libavfilter-dev libswscale-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies (in stages to avoid resolver conflicts)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --no-deps audiocraft && \
+    pip install --no-cache-dir lameenc num2words flashy torchaudio
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1

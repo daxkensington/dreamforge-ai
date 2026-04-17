@@ -900,3 +900,28 @@
 - [x] Credit costs added to shared/creditCosts.ts
 - [x] Build passes — 0 TypeScript errors
 - [x] Deployed to production
+
+## Phase 28 — Self-Hosting Expansion (RunPod Worker v9+)
+
+### Self-hosted MusicGen + AudioGen
+- [x] Add MusicGen stereo-large to RunPod handler (task: musicgen)
+- [x] Add AudioGen medium to RunPod handler (task: audiogen)
+- [x] Add audiocraft + torchaudio to worker requirements
+- [x] Add ffmpeg system deps to Dockerfile
+- [x] Rewire audioGeneration.ts: RunPod first, Replicate fallback
+- [x] Add runpodMusicGen/runpodAudioGen to runpod.ts client
+
+### Self-hosted CatVTON (Virtual Try-On)
+- [x] Add CatVTON to RunPod handler (task: tryon)
+- [x] Clone CatVTON repo in Docker image
+- [x] Add peft/xformers/scikit-image deps
+- [x] Rewire virtualTryOn route: RunPod instead of fal.ai
+
+### Flux Handler Upgrades
+- [x] Add LoRA loading support (lora_id + lora_scale params)
+- [x] Add reproducible seeds (seed param, returned in response)
+- [x] LoRA cleanup after generation (unfuse + unload)
+
+### Still on External APIs
+- [ ] IC-Light v2 (fal.ai) — v2 weights not publicly released
+- [ ] Trellis 3D (fal.ai) — heavy deps, needs dedicated endpoint
