@@ -15,6 +15,13 @@
       "when": 1776413700000,
       "tag": "0001_tool_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776417000000,
+      "tag": "0002_tool_failures",
+      "breakpoints": true
     }
   ]
 }

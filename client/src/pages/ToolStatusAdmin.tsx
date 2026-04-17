@@ -23,6 +23,9 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ToolStatusAdmin() {
   const utils = trpc.useUtils();
   const { data: rows = [], isLoading, refetch } = trpc.toolStatus.listAdmin.useQuery();
+  const { data: failStats = [] } = trpc.toolStatus.failureStats.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
   const [newToolId, setNewToolId] = useState("");
 
   const [providerHealth, setProviderHealth] = useState<any>(null);
@@ -110,6 +113,72 @@ export default function ToolStatusAdmin() {
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Recent failures */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Recent Failures (last 24h)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {failStats.length === 0 ? (
+            <p className="text-sm text-zinc-500">No failures in the last 24 hours.</p>
+          ) : (
+            <div className="space-y-1">
+              <div className="grid grid-cols-[1fr_60px_60px_60px_60px_1fr] gap-3 text-xs text-zinc-500 px-3 py-1 border-b border-zinc-800">
+                <span>Tool</span>
+                <span className="text-right">15m</span>
+                <span className="text-right">1h</span>
+                <span className="text-right">24h</span>
+                <span></span>
+                <span>Last error</span>
+              </div>
+              {failStats.slice(0, 15).map((s: any) => {
+                const hot = s.last15m >= 5;
+                return (
+                  <div
+                    key={s.toolId}
+                    className={`grid grid-cols-[1fr_60px_60px_60px_60px_1fr] gap-3 text-sm px-3 py-2 rounded ${
+                      hot ? "bg-red-500/5 border border-red-500/20" : ""
+                    }`}
+                  >
+                    <code className="font-mono text-zinc-200 text-xs truncate">{s.toolId}</code>
+                    <span className={`text-right ${hot ? "text-red-400 font-semibold" : "text-zinc-400"}`}>
+                      {s.last15m}
+                    </span>
+                    <span className="text-right text-zinc-400">{s.last1h}</span>
+                    <span className="text-right text-zinc-400">{s.last24h}</span>
+                    <span className="text-right">
+                      {hot && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-xs border-yellow-500/40 text-yellow-400"
+                          onClick={() =>
+                            setStatus.mutate({
+                              toolId: s.toolId,
+                              status: "degraded",
+                              message: `${s.last15m} failures in 15 min — investigating.`,
+                            })
+                          }
+                        >
+                          Degrade
+                        </Button>
+                      )}
+                    </span>
+                    <span className="text-xs text-zinc-500 truncate" title={s.lastError ?? ""}>
+                      {s.lastError ?? ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="text-xs text-zinc-500 mt-3">
+            A background job auto-flips a tool to <strong>degraded</strong> when it logs 5+ failures in 10 min. Only
+            active→degraded — never overrides your offline/degraded overrides. Reset here to clear.
+          </p>
         </CardContent>
       </Card>
 

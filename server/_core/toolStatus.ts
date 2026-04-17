@@ -11,8 +11,8 @@
  * memory for TOOL_STATUS_TTL_MS because we hit this on every generation call.
  */
 import { getDb } from "../db";
-import { toolStatus, type ToolStatus } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { toolStatus, toolFailureEvents, type ToolStatus } from "../../drizzle/schema";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 
 const TOOL_STATUS_TTL_MS = 30_000;
 
@@ -114,4 +114,118 @@ export async function clearToolStatus(toolId: string): Promise<void> {
 export function invalidateCache() {
   lastFullLoad = 0;
   cache.clear();
+}
+
+// ─── Failure logging + auto-degrade ─────────────────────────────────────────
+
+/**
+ * Fire-and-forget log of a tool generation failure. Called from every
+ * refund path. Errors are swallowed — logging MUST NOT propagate further
+ * breakage up the request chain.
+ */
+export async function logToolFailure(input: {
+  toolId: string;
+  errorMessage?: string;
+  provider?: string;
+  userId?: number;
+}): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.insert(toolFailureEvents).values({
+      toolId: input.toolId,
+      errorMessage: (input.errorMessage ?? "").slice(0, 500) || null,
+      provider: input.provider ?? null,
+      userId: input.userId ?? null,
+    });
+  } catch {
+    // intentionally silent
+  }
+}
+
+export interface FailureStats {
+  toolId: string;
+  last15m: number;
+  last1h: number;
+  last24h: number;
+  lastError: string | null;
+  lastAt: Date | null;
+}
+
+/** Aggregated failure counts per tool — for admin dashboards. */
+export async function getFailureStats(): Promise<FailureStats[]> {
+  const db = await getDb();
+  if (!db) return [];
+  try {
+    const now = new Date();
+    const rows = await db
+      .select({
+        toolId: toolFailureEvents.toolId,
+        last15m: sql<number>`COUNT(*) FILTER (WHERE ${toolFailureEvents.createdAt} >= NOW() - INTERVAL '15 minutes')`,
+        last1h: sql<number>`COUNT(*) FILTER (WHERE ${toolFailureEvents.createdAt} >= NOW() - INTERVAL '1 hour')`,
+        last24h: sql<number>`COUNT(*) FILTER (WHERE ${toolFailureEvents.createdAt} >= NOW() - INTERVAL '24 hours')`,
+        lastError: sql<string | null>`(array_agg(${toolFailureEvents.errorMessage} ORDER BY ${toolFailureEvents.createdAt} DESC))[1]`,
+        lastAt: sql<Date | null>`MAX(${toolFailureEvents.createdAt})`,
+      })
+      .from(toolFailureEvents)
+      .where(gte(toolFailureEvents.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000)))
+      .groupBy(toolFailureEvents.toolId)
+      .orderBy(desc(sql`COUNT(*) FILTER (WHERE ${toolFailureEvents.createdAt} >= NOW() - INTERVAL '15 minutes')`));
+    return rows.map((r) => ({
+      toolId: r.toolId,
+      last15m: Number(r.last15m ?? 0),
+      last1h: Number(r.last1h ?? 0),
+      last24h: Number(r.last24h ?? 0),
+      lastError: r.lastError,
+      lastAt: r.lastAt,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+const AUTO_DEGRADE_THRESHOLD = 5;
+const AUTO_DEGRADE_WINDOW_MIN = 10;
+
+/**
+ * Scan recent failures and auto-flip tools with concentrated errors to
+ * "degraded" state. Only promotes active → degraded; never touches offline
+ * tools, and never demotes a user-set degraded state. Runs via cron.
+ */
+export async function runAutoDegradeScan(): Promise<{ flipped: string[] }> {
+  const db = await getDb();
+  if (!db) return { flipped: [] };
+  const flipped: string[] = [];
+  try {
+    const rows = await db
+      .select({
+        toolId: toolFailureEvents.toolId,
+        fails: sql<number>`COUNT(*)`,
+      })
+      .from(toolFailureEvents)
+      .where(
+        gte(
+          toolFailureEvents.createdAt,
+          new Date(Date.now() - AUTO_DEGRADE_WINDOW_MIN * 60 * 1000),
+        ),
+      )
+      .groupBy(toolFailureEvents.toolId);
+
+    for (const r of rows) {
+      const fails = Number(r.fails ?? 0);
+      if (fails < AUTO_DEGRADE_THRESHOLD) continue;
+      const current = await getToolStatus(r.toolId);
+      if (current.status !== "active") continue; // don't override operator state
+      await setToolStatus(
+        r.toolId,
+        "degraded",
+        `Auto-degraded: ${fails} failures in the last ${AUTO_DEGRADE_WINDOW_MIN} min.`,
+        null,
+      );
+      flipped.push(r.toolId);
+    }
+  } catch (err: any) {
+    console.warn("[toolStatus.autoDegrade] scan failed:", err?.message ?? err);
+  }
+  return { flipped };
 }

@@ -59,6 +59,26 @@ export const toolStatus = pgTable("tool_status", {
 });
 export type ToolStatus = typeof toolStatus.$inferSelect;
 
+// ─── Tool Failure Events ─────────────────────────────────────────────────────
+// Append-only log of generation failures per tool. Used for ops dashboards
+// ("which tools are actually broken right now?") and for the auto-degrade
+// job that flips a tool's status when failure rate spikes.
+export const toolFailureEvents = pgTable(
+  "tool_failure_events",
+  {
+    id: serial("id").primaryKey(),
+    toolId: varchar("toolId", { length: 100 }).notNull(),
+    errorMessage: text("errorMessage"),
+    provider: varchar("provider", { length: 50 }),
+    userId: integer("userId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => ({
+    toolIdTimeIdx: index("tool_failure_toolid_time_idx").on(t.toolId, t.createdAt),
+  }),
+);
+export type ToolFailureEvent = typeof toolFailureEvents.$inferSelect;
+
 // ─── Users ───────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),

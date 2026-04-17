@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GlobalToolStatusBanner } from "@/components/GlobalToolStatusBanner";
 
 export const metadata: Metadata = {
   title: "Studio — DreamForgeX",
@@ -11,5 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <>
+      <GlobalToolStatusBanner />
+      {children}
+    </>
+  );
 }

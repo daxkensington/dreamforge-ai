@@ -11,6 +11,8 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_
 import {
   clearToolStatus,
   getAllToolStatus,
+  getFailureStats,
+  logToolFailure,
   requireToolActive,
   setToolStatus,
 } from "./_core/toolStatus";
@@ -389,6 +391,10 @@ export const appRouter = router({
     listAdmin: adminProcedure.query(async () => {
       return getAllToolStatus();
     }),
+    // Admin: recent failure counts per tool (last 15m/1h/24h)
+    failureStats: adminProcedure.query(async () => {
+      return getFailureStats();
+    }),
     set: adminProcedure
       .input(
         z.object({
@@ -602,6 +608,12 @@ export const appRouter = router({
             status: "failed",
             errorMessage: error.message || "Generation failed",
           });
+          // Telemetry — drives auto-degrade + admin failure dashboard
+          logToolFailure({
+            toolId: creditTool,
+            errorMessage: error?.message ?? "Generation failed",
+            userId: ctx.user.id,
+          }).catch(() => {});
           // Refund credits on generation failure
           const refundCost = CREDIT_COSTS[creditTool] || 1;
           try {
@@ -888,6 +900,11 @@ export const appRouter = router({
               status: "failed",
               errorMessage: error.message || "Generation failed",
             });
+            logToolFailure({
+              toolId: item.mediaType === "video" ? "text-to-video" : "text-to-image",
+              errorMessage: error?.message ?? "Batch item failed",
+              userId: ctx.user.id,
+            }).catch(() => {});
             // Refund credits for this failed batch item
             const itemCost = CREDIT_COSTS[item.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1;
             try {
