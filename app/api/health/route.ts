@@ -12,10 +12,11 @@ import { getDb } from "../../../server/db";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Minimum env vars the app needs to be functional. Auth + DB only — provider
+// keys are optional (their absence is reported via /api/status/providers).
 const REQUIRED_ENV = [
   "DATABASE_URL",
-  "AUTH_SECRET",
-  "NEXT_PUBLIC_APP_URL",
+  "JWT_SECRET",
 ] as const;
 
 type Check = { name: string; ok: boolean; ms?: number; error?: string };
