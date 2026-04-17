@@ -11,6 +11,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_
 import {
   clearToolStatus,
   getAllToolStatus,
+  requireToolActive,
   setToolStatus,
 } from "./_core/toolStatus";
 import {
@@ -154,6 +155,14 @@ async function getUserTier(userId: number): Promise<string> {
  * For non-model tools, falls back to TOOL_CREDIT_COSTS or LEGACY_CREDIT_COSTS.
  */
 async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string) {
+  // Kill-switch — block offline tools before we touch the wallet. Throws
+  // TRPCError if the tool is in "offline" state; degraded passes through.
+  try {
+    await requireToolActive(tool);
+  } catch (e: any) {
+    throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
+  }
+
   let cost: number;
 
   if (modelId) {
@@ -820,6 +829,13 @@ export const appRouter = router({
           if (item.width > tierConfig.maxImageResolution || item.height > tierConfig.maxImageResolution) {
             throw new TRPCError({ code: "FORBIDDEN", message: `Max resolution for your plan is ${tierConfig.maxImageResolution}x${tierConfig.maxImageResolution}.` });
           }
+        }
+
+        // Kill-switch — block offline tools before batch charge
+        try {
+          await requireToolActive("batch");
+        } catch (e: any) {
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
         }
 
         // Deduct credits for entire batch upfront using actual total cost
@@ -2482,6 +2498,13 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Kill-switch — block offline tools before batch charge
+        try {
+          await requireToolActive("batch-prompts");
+        } catch (e: any) {
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
+        }
+
         // Charge for all images upfront using actual total cost
         const perImageCost = CREDIT_COSTS["text-to-image"] || 1;
         const totalCost = perImageCost * input.prompts.length;

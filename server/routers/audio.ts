@@ -12,6 +12,7 @@ import { SyncLabsProvider } from "../_core/providers/synclabs";
 import { getDb } from "../db";
 import { audioGenerations, audioPresets, videoProjects } from "../../drizzle/schema";
 import { deductCredits, CREDIT_COSTS } from "../stripe";
+import { requireToolActive } from "../_core/toolStatus";
 
 // ─── Credit costs for audio tools ───────────────────────────────────────────
 
@@ -25,6 +26,12 @@ CREDIT_COSTS["audio-stable-audio"] = 8;
 CREDIT_COSTS["video-lipsync"] = 50;
 
 async function tryDeductAudioCredits(userId: number, tool: string, description?: string) {
+  try {
+    await requireToolActive(tool);
+  } catch (e: any) {
+    throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
+  }
+
   const cost = CREDIT_COSTS[tool] || 2;
   try {
     const result = await deductCredits(userId, cost, description ?? `Audio: ${tool}`);

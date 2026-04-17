@@ -16,11 +16,18 @@ import { getVideoProject, getGenerationById, getDb } from "./db";
 import { createNotification } from "./routersPhase15";
 import { createHash, randomBytes } from "crypto";
 import { deductCredits, CREDIT_COSTS } from "./stripe";
+import { requireToolActive } from "./_core/toolStatus";
 import { eq } from "drizzle-orm";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
 async function tryDeductCredits(userId: number, tool: string, description?: string) {
+  try {
+    await requireToolActive(tool);
+  } catch (e: any) {
+    throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
+  }
+
   const cost = CREDIT_COSTS[tool] || 1;
   if (cost === 0) return { success: true, balance: 0, needed: 0 };
   try {
