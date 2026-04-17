@@ -4,6 +4,9 @@ import GitHub from "next-auth/providers/github";
 import Resend from "next-auth/providers/resend";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // NextAuth v5 uses AUTH_SECRET; fall back to NEXTAUTH_SECRET for backward compat
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
