@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -790,3 +791,56 @@ export const projectActivityLogRelations = relations(projectActivityLog, ({ one 
   project: one(videoProjects, { fields: [projectActivityLog.projectId], references: [videoProjects.id] }),
   user: one(users, { fields: [projectActivityLog.userId], references: [users.id] }),
 }));
+
+// ─── Auth.js Drizzle Adapter Tables ──────────────────────────────────────────
+// These are the tables required by @auth/drizzle-adapter to support email
+// magic-link sign-in. They live alongside the app's existing `users` table —
+// the context bridge in server/_core/context.ts continues to find or create
+// the app user row via email, so nothing in the rest of the app has to care
+// about these. See project_dreamforge_magic_link_todo.md for the design note.
+export const authUsers = pgTable("auth_users", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+});
+export type AuthUser = typeof authUsers.$inferSelect;
+
+export const authAccounts = pgTable(
+  "auth_accounts",
+  {
+    userId: text("userId").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.provider, t.providerAccountId] }),
+  }),
+);
+
+export const authSessions = pgTable("auth_sessions", {
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  "verification_tokens",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.identifier, t.token] }),
+  }),
+);

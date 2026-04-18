@@ -2,27 +2,43 @@
 
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SignInPage() {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error("Enter your email");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await signIn("resend", { email: email.trim(), callbackUrl: "/" });
+    } catch (err: any) {
+      toast.error(err?.message || "Sign-in failed");
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-zinc-900/80 p-10 shadow-2xl shadow-purple-500/5 backdrop-blur-sm">
-        {/* Logo / Title */}
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-white">
             Dream<span className="text-purple-400">Forge</span>
           </h1>
-          <p className="mt-3 text-sm text-zinc-400">
-            Sign in to start creating
-          </p>
+          <p className="mt-3 text-sm text-zinc-400">Sign in to start creating</p>
         </div>
 
-        {/* Divider */}
         <div className="h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
 
-        {/* OAuth Buttons */}
         <div className="space-y-4">
-          {/* Google */}
           <Button
             variant="outline"
             className="w-full justify-center gap-3 border-zinc-700 bg-zinc-800/50 py-6 text-sm font-medium text-zinc-200 hover:border-purple-500/50 hover:bg-zinc-800 hover:text-white"
@@ -37,7 +53,6 @@ export default function SignInPage() {
             Continue with Google
           </Button>
 
-          {/* GitHub */}
           <Button
             variant="outline"
             className="w-full justify-center gap-3 border-zinc-700 bg-zinc-800/50 py-6 text-sm font-medium text-zinc-200 hover:border-purple-500/50 hover:bg-zinc-800 hover:text-white"
@@ -50,7 +65,35 @@ export default function SignInPage() {
           </Button>
         </div>
 
-        {/* Footer */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="h-px w-full bg-zinc-800" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-zinc-900/80 px-3 text-xs uppercase tracking-wider text-zinc-500">or magic link</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleEmailSignIn} className="space-y-3">
+          <Input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={submitting}
+            required
+            className="border-zinc-700 bg-zinc-800/50 py-6 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-purple-500/50"
+          />
+          <Button
+            type="submit"
+            disabled={submitting || !email.trim()}
+            className="w-full justify-center gap-2 bg-purple-500 py-6 text-sm font-medium text-white hover:bg-purple-600"
+          >
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+            {submitting ? "Sending..." : "Email me a sign-in link"}
+          </Button>
+        </form>
+
         <p className="text-center text-xs text-zinc-500">
           By signing in, you agree to our Terms of Service and Privacy Policy.
         </p>
