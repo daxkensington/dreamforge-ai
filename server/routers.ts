@@ -2998,7 +2998,26 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
-          return { url: null, status: "failed" as const, error: error.message };
+          // Fallback: Flux img2img with lighting-augmented prompt. Preserves
+          // most of the composition; won't be as physically accurate as
+          // IC-Light v2 but keeps the tool working when fal.ai is down.
+          try {
+            const lightingPrompt = `Same composition and subject, relit with: ${input.prompt}. Preserve all other details — subject, pose, framing, colors where not affected by lighting. Professional relighting, photorealistic.`;
+            const { url } = await generateImage({
+              prompt: lightingPrompt,
+              originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+            });
+            console.warn("[Relight] fal.ai failed, served via Flux img2img fallback:", error.message);
+            return { url, status: "completed" as const, fallback: "flux-img2img" as const };
+          } catch (fallbackErr: any) {
+            logToolFailure({
+              toolId: "relight",
+              errorMessage: `fal.ai: ${error.message}; flux-fallback: ${fallbackErr.message}`,
+              provider: "fal+flux",
+              userId: ctx.user.id,
+            });
+            return { url: null, status: "failed" as const, error: `Relighting failed: ${error.message}` };
+          }
         }
       }),
 
@@ -3069,6 +3088,15 @@ export const appRouter = router({
 
           return { modelUrl, previewUrl, status: "completed" as const };
         } catch (error: any) {
+          // No alternative provider for Trellis right now — log the failure so
+          // the auto-degrade scanner can flip this tool to degraded status
+          // after 5+ failures in 10 minutes.
+          logToolFailure({
+            toolId: "3d-generate",
+            errorMessage: error.message,
+            provider: "fal-ai/trellis",
+            userId: ctx.user.id,
+          });
           return { modelUrl: null, previewUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4608,39 +4636,102 @@ export const appRouter = router({
         // Rate limit: 10 video requests per minute per user
         enforceRateLimit(`video.imageToVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
-        try {
 
+        const motionDescriptions: Record<string, string> = {
+          "subtle": "very subtle gentle motion, slight parallax, breathing effect",
+          "moderate": "moderate natural motion, elements gently moving, ambient animation",
+          "dynamic": "dynamic movement, active motion, energetic camera work",
+          "cinematic-zoom": "slow cinematic zoom with dramatic reveal",
+          "pan-left": "smooth camera pan from right to left, revealing the scene",
+          "pan-right": "smooth camera pan from left to right, revealing the scene",
+          "zoom-in": "gradual zoom in towards the focal point, increasing intimacy",
+          "zoom-out": "gradual zoom out revealing the full scene, establishing shot",
+        };
+        const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
+        const errors: string[] = [];
 
-          const motionDescriptions: Record<string, string> = {
-            "subtle": "very subtle gentle motion, slight parallax, breathing effect",
-            "moderate": "moderate natural motion, elements gently moving, ambient animation",
-            "dynamic": "dynamic movement, active motion, energetic camera work",
-            "cinematic-zoom": "slow cinematic zoom with dramatic reveal",
-            "pan-left": "smooth camera pan from right to left, revealing the scene",
-            "pan-right": "smooth camera pan from left to right, revealing the scene",
-            "zoom-in": "gradual zoom in towards the focal point, increasing intimacy",
-            "zoom-out": "gradual zoom out revealing the full scene, establishing shot",
-          };
-
-          // Fetch the image and convert to base64 for Veo 2
-          const imgResponse = await fetch(input.imageUrl);
-          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-          const imgBase64 = imgBuffer.toString("base64");
-          const mimeType = imgResponse.headers.get("content-type") || "image/jpeg";
-
-          const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
-          const { generateVeo3Video } = await import("./_core/videoGeneration");
-          const videoUrl = await generateVeo3Video({
-            prompt: enhancedPrompt,
-            durationSeconds: parseInt(input.duration),
-            imageBase64: imgBase64,
-            imageMimeType: mimeType,
-          });
-
-          return { videoUrl, status: "completed" as const, duration: input.duration };
-        } catch (error: any) {
-          return { videoUrl: null, status: "failed" as const, error: error.message };
+        // Priority 1: Google Veo 3 (current primary, best quality-to-cost)
+        if (process.env.GEMINI_API_KEY) {
+          try {
+            const imgResponse = await fetch(input.imageUrl);
+            const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+            const imgBase64 = imgBuffer.toString("base64");
+            const mimeType = imgResponse.headers.get("content-type") || "image/jpeg";
+            const { generateVeo3Video } = await import("./_core/videoGeneration");
+            const videoUrl = await generateVeo3Video({
+              prompt: enhancedPrompt,
+              durationSeconds: parseInt(input.duration),
+              imageBase64: imgBase64,
+              imageMimeType: mimeType,
+            });
+            return { videoUrl, status: "completed" as const, duration: input.duration, model: "veo-3" };
+          } catch (err: any) {
+            errors.push(`Veo 3: ${err.message}`);
+            console.warn("[I2V] Veo 3 failed, trying next:", err.message);
+          }
         }
+
+        // Priority 2: Runway Gen-4.5 image-to-video
+        if (process.env.RUNWAY_API_KEY) {
+          try {
+            const { RunwayProvider } = await import("./_core/providers/runway");
+            const provider = new RunwayProvider();
+            const result = await provider.generate({
+              prompt: enhancedPrompt,
+              model: "runway-gen4.5",
+              options: { duration: parseInt(input.duration), imageUrl: input.imageUrl },
+            });
+            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "runway-gen4.5" };
+          } catch (err: any) {
+            errors.push(`Runway: ${err.message}`);
+            console.warn("[I2V] Runway failed, trying next:", err.message);
+          }
+        }
+
+        // Priority 3: Kling image-to-video
+        if (process.env.KLING_ACCESS_KEY) {
+          try {
+            const { KlingProvider } = await import("./_core/providers/kling");
+            const provider = new KlingProvider();
+            const result = await provider.generate({
+              prompt: enhancedPrompt,
+              model: "kling-2.0",
+              options: { duration: parseInt(input.duration), imageUrl: input.imageUrl },
+            });
+            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "kling-2.0" };
+          } catch (err: any) {
+            errors.push(`Kling: ${err.message}`);
+            console.warn("[I2V] Kling failed, trying next:", err.message);
+          }
+        }
+
+        // Priority 4: Minimax via Replicate (final fallback)
+        if (process.env.REPLICATE_API_TOKEN) {
+          try {
+            const { ReplicateProvider } = await import("./_core/providers/replicate");
+            const provider = new ReplicateProvider();
+            const result = await provider.generate({
+              prompt: enhancedPrompt,
+              model: "minimax-video",
+              options: { prompt_optimizer: true, first_frame_image: input.imageUrl },
+            });
+            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "minimax" };
+          } catch (err: any) {
+            errors.push(`Minimax: ${err.message}`);
+          }
+        }
+
+        logToolFailure({
+          toolId: "image-to-video",
+          errorMessage: errors.join("; "),
+          provider: "veo+runway+kling+minimax",
+          userId: ctx.user.id,
+        });
+        return {
+          videoUrl: null,
+          status: "failed" as const,
+          error: `All image-to-video providers failed:\n${errors.join("\n")}`,
+        };
       }),
   }),
 
