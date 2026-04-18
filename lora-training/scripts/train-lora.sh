@@ -148,7 +148,7 @@ echo "=== Training Complete ==="
 echo "LoRA weights saved to: ${OUTPUT_DIR}"
 echo ""
 
-# Upload to HuggingFace if HF_TOKEN is set
+# Upload to HuggingFace if HF_TOKEN is set (write scope required)
 if [ -n "${HF_TOKEN:-}" ]; then
   HF_REPO="daxkensington/${STYLE_ID}"
   echo "Uploading to HuggingFace: ${HF_REPO}"
@@ -159,7 +159,6 @@ api = HfApi()
 try:
     api.create_repo('${HF_REPO}', repo_type='model', exist_ok=True)
 except: pass
-# Upload the final LoRA weights
 output_dir = '${OUTPUT_DIR}'
 for f in os.listdir(output_dir):
     if f.endswith('.safetensors'):
@@ -172,7 +171,29 @@ for f in os.listdir(output_dir):
 print('Done!')
 "
   echo "Uploaded to: https://huggingface.co/${HF_REPO}"
+elif [ -n "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && [ -n "${R2_ENDPOINT:-}" ] && [ -n "${R2_BUCKET_NAME:-}" ]; then
+  # Alternate path: upload to Cloudflare R2 (S3-compatible).
+  # The RunPod handler loads LoRAs from direct URLs — R2 public URLs work.
+  echo "Uploading to R2 bucket: ${R2_BUCKET_NAME}/lora/${STYLE_ID}/"
+  if ! command -v aws &> /dev/null; then
+    pip install awscli --quiet
+  fi
+  export AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}"
+  export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
+  for f in $(find "${OUTPUT_DIR}" -name "*.safetensors" -type f); do
+    FILENAME=$(basename "$f")
+    aws s3 cp "$f" "s3://${R2_BUCKET_NAME}/lora/${STYLE_ID}/${FILENAME}" \
+      --endpoint-url "${R2_ENDPOINT}" \
+      --checksum-algorithm CRC32
+    echo "Uploaded: ${FILENAME}"
+  done
+  R2_PUBLIC="${R2_PUBLIC_URL:-https://cdn.dreamforgex.ai}"
+  echo ""
+  echo "LoRA weights available at: ${R2_PUBLIC}/lora/${STYLE_ID}/<filename>.safetensors"
+  echo "Wire into handler: pass lora_url=\"${R2_PUBLIC}/lora/${STYLE_ID}/...\" to flux task"
 else
-  echo "HF_TOKEN not set — skipping HuggingFace upload"
-  echo "Upload manually: huggingface-cli upload daxkensington/${STYLE_ID} ${OUTPUT_DIR}/"
+  echo "Neither HF_TOKEN nor R2_* env set — leaving LoRA on pod disk"
+  echo "Manual upload options:"
+  echo "  HF:  huggingface-cli upload daxkensington/${STYLE_ID} ${OUTPUT_DIR}/"
+  echo "  R2:  export R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_ENDPOINT=... R2_BUCKET_NAME=... and re-run"
 fi
