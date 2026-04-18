@@ -3811,6 +3811,274 @@ export const appRouter = router({
           return { frontUrl: null, insideUrl: null, status: "failed" as const, error: error.message };
         }
       }),
+
+    // Emoji Creator — single custom emoji/emote
+    emojiCreator: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(200),
+          style: z.enum(["apple", "google", "twitter", "pixel", "hand-drawn", "3d", "meme", "retro"]).default("apple"),
+          variant: z.enum(["discord", "slack", "twitch", "generic"]).default("generic"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "emoji-creator", "Emoji creation");
+        try {
+          const styleDesc: Record<string, string> = {
+            apple: "Apple emoji style, glossy 3D look, rich gradients, rounded forms",
+            google: "Google Noto emoji style, clean flat design, consistent color palette",
+            twitter: "Twemoji style, simplified flat design, bold cheerful colors",
+            pixel: "8-bit pixel emoji, crisp edges, 32x32 retro game style",
+            "hand-drawn": "Doodle hand-drawn emoji, playful line work, casual charm",
+            "3d": "Polished 3D rendered emoji, soft lighting, premium finish",
+            meme: "Meme-inspired reaction emoji, exaggerated expression, viral-worthy",
+            retro: "Retro 80s/90s emoji style, bold colors, vintage aesthetic",
+          };
+          const prompt = `Single custom emoji: ${input.concept}. ${styleDesc[input.style]}. Perfect square composition, centered on transparent/white background, highly readable at small sizes (16x16, 32x32), cheerful and expressive, ${input.variant} chat platform aesthetic.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Brand Style Guide — logo + palette + typography reference
+    brandStyleGuide: protectedProcedure
+      .input(
+        z.object({
+          brandName: z.string().min(1).max(100),
+          industry: z.string().min(1).max(100),
+          vibe: z.enum(["modern-minimalist", "luxury", "playful", "bold-industrial", "organic-natural", "tech-startup", "heritage-vintage", "edgy-punk"]).default("modern-minimalist"),
+          tagline: z.string().max(150).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "brand-style-guide", "Brand style guide");
+        try {
+          const taglineNote = input.tagline ? `Tagline: "${input.tagline}". ` : "";
+          const prompt = `Brand style guide reference sheet for "${input.brandName}" (${input.industry}), ${input.vibe} aesthetic. ${taglineNote}One-page layout showing: primary logo mark (centered top, prominent), color palette swatches with hex codes (5-6 colors), typography pairings (headline + body font samples), logo variations (horizontal, stacked, monochrome), brand pattern/texture element. Professional design system reference, print-ready, designer portfolio quality.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Event Flyer — promotional flyer
+    eventFlyer: protectedProcedure
+      .input(
+        z.object({
+          eventName: z.string().min(1).max(200),
+          eventType: z.enum(["concert", "club-night", "conference", "workshop", "sale", "grand-opening", "fundraiser", "sports", "food", "art-show", "other"]).default("other"),
+          details: z.string().min(1).max(500),
+          style: z.enum(["bold-graphic", "minimal-elegant", "vintage-retro", "neon-club", "watercolor-indie", "corporate-clean", "handdrawn", "typographic"]).default("bold-graphic"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "event-flyer", "Event flyer");
+        try {
+          const prompt = `${input.eventType} event flyer, 8.5x11 portrait print-ready, ${input.style} design. Large headline: "${input.eventName}". Key details: "${input.details.slice(0, 350)}". Hero visual appropriate to ${input.eventType}, strong typographic hierarchy, eye-catching from across a room, QR-code-ready empty space. Professional promotional design, social-share-ready.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1344 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Certificate Designer — awards, diplomas, completions
+    certificate: protectedProcedure
+      .input(
+        z.object({
+          recipientName: z.string().min(1).max(100),
+          awardTitle: z.string().min(1).max(200),
+          issuer: z.string().min(1).max(150),
+          issueDate: z.string().max(50).optional(),
+          style: z.enum(["classical-formal", "modern-minimal", "playful-kids", "corporate", "academic", "creative-art"]).default("classical-formal"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "certificate", "Certificate");
+        try {
+          const dateNote = input.issueDate ? `Date: "${input.issueDate}". ` : "";
+          const prompt = `Certificate of achievement, 11x8.5 landscape print-ready, ${input.style} design. Large ornate title "Certificate of Achievement" or similar. Awarded to: "${input.recipientName}" (large elegant script). For: "${input.awardTitle}". Issued by: "${input.issuer}". ${dateNote}Decorative border and seal appropriate to ${input.style} style, signature lines at bottom, professional diploma/award aesthetic.`;
+          const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Bookmark Designer — literary bookmarks
+    bookmark: protectedProcedure
+      .input(
+        z.object({
+          content: z.string().min(1).max(300),
+          theme: z.enum(["literary-classic", "floral-botanical", "fantasy", "minimalist", "watercolor", "dark-academia", "cute-kawaii", "nature"]).default("literary-classic"),
+          includeQuote: z.boolean().default(true),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "bookmark", "Bookmark design");
+        try {
+          const quoteNote = input.includeQuote ? `Features a quote or short phrase: "${input.content}" rendered beautifully as typography.` : `Hero visual inspired by: "${input.content}".`;
+          const prompt = `Bookmark design, 2x6 inch portrait print-ready with ribbon tassel hole at top, ${input.theme} theme. ${quoteNote} Both sides designed as a matching set (front with visual, back with complementary pattern). Etsy-seller quality print-ready design, readable typography, collectible aesthetic.`;
+          const { url } = await generateImage({ prompt, width: 512, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Zine Spread Designer — multi-page editorial
+    zineSpread: protectedProcedure
+      .input(
+        z.object({
+          topic: z.string().min(1).max(500),
+          pages: z.number().min(2).max(6).default(4),
+          style: z.enum(["punk-cut-paste", "indie-literary", "art-magazine", "photography-portfolio", "manifesto", "sci-fi-pulp"]).default("indie-literary"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "zine-spread", "Zine spread");
+        try {
+          const outline = await invokeLLM({
+            messages: [
+              { role: "system", content: `You edit zines. Given a topic, outline ${input.pages} distinct page spreads in JSON. Each page should have a heading, a short paragraph of editorial copy, and a description of the visual treatment.` },
+              { role: "user", content: `Topic: ${input.topic}. Style: ${input.style}.` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "zine",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    pages: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: { heading: { type: "string" }, body: { type: "string" }, visual: { type: "string" } },
+                        required: ["heading", "body", "visual"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["pages"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = outline.choices[0]?.message?.content;
+          const parsed = typeof content === "string" ? JSON.parse(content) : null;
+          if (!parsed?.pages?.length) throw new Error("Failed to outline zine");
+          const results: { heading: string; body: string; visual: string; url: string }[] = [];
+          for (const p of parsed.pages as Array<{ heading: string; body: string; visual: string }>) {
+            const prompt = `Zine page spread, ${input.style} aesthetic. Heading: "${p.heading}". Body copy: "${p.body}". Visual: ${p.visual}. Editorial layout with strong typography hierarchy, print-ready, hand-made zine feel with intentional design grit, consistent visual system.`;
+            const { url } = await generateImage({ prompt, width: 1024, height: 1344 });
+            results.push({ ...p, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Concert Poster — gig/tour promotional
+    concertPoster: protectedProcedure
+      .input(
+        z.object({
+          artist: z.string().min(1).max(150),
+          genre: z.enum(["rock", "hip-hop", "electronic", "indie", "country", "classical", "jazz", "metal", "folk", "punk", "pop", "reggae"]).default("indie"),
+          details: z.string().min(1).max(400),
+          style: z.enum(["psychedelic-60s", "punk-cut", "modern-gradient", "minimalist-editorial", "heavy-metal", "festival-colorful", "80s-synthwave", "woodblock-print"]).default("modern-gradient"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "concert-poster", "Concert poster");
+        try {
+          const prompt = `Concert / gig poster, 11x17 portrait print-ready, ${input.genre} music, ${input.style} design aesthetic. Massive artist typography: "${input.artist}". Tour/show details: "${input.details.slice(0, 300)}". Iconic hero visual or typography-driven composition, silkscreen-style print-ready artwork, collectible merch-quality design, live music poster tradition.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Architecture Concept — building visualization
+    architectureConcept: protectedProcedure
+      .input(
+        z.object({
+          buildingType: z.enum(["single-family-home", "apartment", "office-tower", "retail", "restaurant", "hotel", "civic", "industrial", "education", "cultural"]).default("single-family-home"),
+          style: z.enum(["modern-minimalist", "mid-century", "traditional", "brutalist", "biophilic-green", "farmhouse", "mediterranean", "japanese", "scandinavian", "futuristic"]).default("modern-minimalist"),
+          setting: z.string().min(1).max(300),
+          view: z.enum(["exterior-hero", "street-view", "aerial", "interior-living", "interior-kitchen", "entry-approach"]).default("exterior-hero"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "architecture-concept", "Architecture concept");
+        try {
+          const prompt = `Architectural concept rendering, photorealistic 3D visualization quality, ${input.buildingType} in ${input.style} style. Setting: ${input.setting}. View: ${input.view.replace(/-/g, " ")}. Professional architectural rendering with natural lighting, landscaping detail, human-scale references, portfolio-quality composition, Archdaily magazine level, material realism.`;
+          const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Cosplay Reference Sheet — costume breakdown
+    cosplayReference: protectedProcedure
+      .input(
+        z.object({
+          character: z.string().min(1).max(300),
+          views: z.number().min(2).max(4).default(3),
+          focus: z.enum(["full-costume", "weapon-props", "hair-makeup", "accessories-detail"]).default("full-costume"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "cosplay-reference", "Cosplay reference");
+        try {
+          const viewLabels = ["front view", "3/4 side view", "side profile", "back view"].slice(0, input.views);
+          const focusNote: Record<string, string> = {
+            "full-costume": "full-body costume reference with every piece visible",
+            "weapon-props": "detailed reference of weapons, props, and accessories",
+            "hair-makeup": "close-up head and shoulders reference emphasizing hair, makeup, and facial details",
+            "accessories-detail": "detailed close-ups of jewelry, buckles, belts, shoes, and small accessories",
+          };
+          const results: { view: string; url: string }[] = [];
+          for (const view of viewLabels) {
+            const prompt = `Cosplay costume reference sheet, ${view}: character is ${input.character}. Focus: ${focusNote[input.focus]}. Clean neutral studio background with grid, professional concept artist reference quality, consistent design across all views, costumer-friendly breakdown with visible seams, fabric textures, and construction details.`;
+            const { url } = await generateImage({ prompt, width: 768, height: 1280 });
+            results.push({ view, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Travel Postcard — vintage postcard style
+    travelPostcard: protectedProcedure
+      .input(
+        z.object({
+          location: z.string().min(1).max(150),
+          era: z.enum(["1920s", "1950s", "1970s", "modern", "retrofuturist"]).default("1950s"),
+          tagline: z.string().max(150).optional(),
+          style: z.enum(["illustrated", "photographic", "watercolor", "linocut", "art-deco"]).default("illustrated"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "travel-postcard", "Travel postcard");
+        try {
+          const taglineNote = input.tagline ? `Tagline or "Greetings from" style text: "${input.tagline}". ` : `Classic "Greetings from ${input.location}" headline text. `;
+          const prompt = `Vintage travel postcard, 6x4 landscape format, ${input.era} era ${input.style} aesthetic. Location: ${input.location}. ${taglineNote}Iconic landmark or scene of the location prominently featured, vintage color palette appropriate to ${input.era}, authentic period typography, printed-postcard feel with slight vignette and paper texture, collectible travel memorabilia.`;
+          const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({

@@ -10,7 +10,8 @@ import {
   Music, Frame, Share2, Users, Laugh, Home, LayoutGrid, Smartphone,
   Shirt, Box, Gamepad2, Pencil, Flame, BookOpen, RotateCw,
   Youtube, Instagram, Sticker, ChefHat, Mail, CreditCard, Cat,
-  Moon, Clapperboard, Gem, UtensilsCrossed, Heart,
+  Moon, Clapperboard, Gem, UtensilsCrossed, Heart, Award,
+  Bookmark as BookmarkIcon, Newspaper, Building2, Plane, Megaphone,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -99,6 +100,16 @@ const creativeTools: GridTool[] = [
   { title: "Trading Card", desc: "TCG-quality custom cards", icon: Gem, href: "/tools/trading-card", img: "/showcase/tool-trading-card.jpg", badge: "New" },
   { title: "Menu Designer", desc: "Restaurant menus, any format", icon: UtensilsCrossed, href: "/tools/menu-design", img: "/showcase/tool-menu-design.jpg", badge: "New" },
   { title: "Greeting Card", desc: "Front + inside matching set", icon: Heart, href: "/tools/greeting-card", img: "/showcase/tool-greeting-card.jpg", badge: "New" },
+  { title: "Emoji Creator", desc: "Discord, Slack, Twitch custom emojis", icon: Smile, href: "/tools/emoji-creator", img: "/showcase/tool-emoji-creator.jpg", badge: "New" },
+  { title: "Brand Style Guide", desc: "Logo + palette + typography system", icon: Palette, href: "/tools/brand-style-guide", img: "/showcase/tool-brand-style-guide.jpg", badge: "New" },
+  { title: "Event Flyer", desc: "Concerts, clubs, sales, conferences", icon: Megaphone, href: "/tools/event-flyer", img: "/showcase/tool-event-flyer.jpg", badge: "New" },
+  { title: "Certificate Designer", desc: "Awards, diplomas, completions", icon: Award, href: "/tools/certificate", img: "/showcase/tool-certificate.jpg", badge: "New" },
+  { title: "Bookmark Designer", desc: "Printable literary bookmarks", icon: BookmarkIcon, href: "/tools/bookmark", img: "/showcase/tool-bookmark.jpg", badge: "New" },
+  { title: "Zine Spread", desc: "Multi-page editorial zines", icon: Newspaper, href: "/tools/zine-spread", img: "/showcase/tool-zine-spread.jpg", badge: "New" },
+  { title: "Concert Poster", desc: "Silkscreen-quality gig posters", icon: Music, href: "/tools/concert-poster", img: "/showcase/tool-concert-poster.jpg", badge: "New" },
+  { title: "Architecture Concept", desc: "Photorealistic building renders", icon: Building2, href: "/tools/architecture-concept", img: "/showcase/tool-architecture-concept.jpg", badge: "New" },
+  { title: "Cosplay Reference", desc: "Multi-view costume breakdowns", icon: Wand2, href: "/tools/cosplay-reference", img: "/showcase/tool-cosplay-reference.jpg", badge: "New" },
+  { title: "Travel Postcard", desc: "Vintage travel postcards, any era", icon: Plane, href: "/tools/travel-postcard", img: "/showcase/tool-travel-postcard.jpg", badge: "New" },
 ];
 
 // ─── Video Generation Tools ──────────────────────────────────────────────────

@@ -38,6 +38,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "yt-thumbnails", "ig-carousel", "sticker-pack", "recipe-card",
     "invitation", "business-card", "pet-portrait", "tarot-card",
     "movie-poster", "trading-card", "menu-design", "greeting-card",
+    "emoji-creator", "brand-style-guide", "event-flyer", "certificate",
+    "bookmark", "zine-spread", "concert-poster", "architecture-concept",
+    "cosplay-reference", "travel-postcard",
   ].map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,

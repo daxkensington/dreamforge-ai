@@ -314,7 +314,7 @@ export async function createCheckoutSession(
       customer_email: userEmail,
       customer_name: userName,
     },
-    success_url: `${origin}/credits?success=true&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/credits?success=true&session_id={CHECKOUT_SESSION_ID}&value=${(pkg.price / 100).toFixed(2)}&currency=usd&credits=${pkg.credits}`,
     cancel_url: `${origin}/credits?canceled=true`,
   });
 
