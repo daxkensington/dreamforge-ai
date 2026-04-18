@@ -3088,9 +3088,58 @@ export const appRouter = router({
 
           return { modelUrl, previewUrl, status: "completed" as const };
         } catch (error: any) {
-          // No alternative provider for Trellis right now — log the failure so
-          // the auto-degrade scanner can flip this tool to degraded status
-          // after 5+ failures in 10 minutes.
+          // Fallback: Replicate firtoz/trellis. Same underlying model,
+          // different host. Only attempted if REPLICATE_API_TOKEN is set.
+          if (process.env.REPLICATE_API_TOKEN) {
+            try {
+              const createRes = await fetch("https://api.replicate.com/v1/predictions", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+                  "Content-Type": "application/json",
+                  Prefer: "wait",
+                },
+                body: JSON.stringify({
+                  model: "firtoz/trellis",
+                  input: { images: [input.imageUrl], generate_model: true },
+                }),
+              });
+              if (!createRes.ok) throw new Error(`Replicate HTTP ${createRes.status}`);
+              let prediction: any = await createRes.json();
+
+              // Poll if not completed in the initial wait
+              for (let i = 0; i < 60 && prediction.status !== "succeeded" && prediction.status !== "failed"; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+                  headers: { Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}` },
+                });
+                prediction = await pollRes.json();
+              }
+              if (prediction.status !== "succeeded") throw new Error(`Replicate Trellis ${prediction.status}: ${prediction.error || "unknown"}`);
+
+              const output = prediction.output || {};
+              const glbUrlFromRep = output.model_file || output.glb || (Array.isArray(output) ? output[0] : null);
+              if (!glbUrlFromRep) throw new Error("No GLB in Replicate Trellis output");
+
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const glbResp = await fetch(glbUrlFromRep);
+              const glbBuffer = Buffer.from(await glbResp.arrayBuffer());
+              const glbKey = generateStorageKey("3d-model", "glb");
+              const { url: modelUrl } = await storagePut(glbKey, glbBuffer, "model/gltf-binary");
+
+              console.warn("[3D] fal.ai failed, served via Replicate firtoz/trellis:", error.message);
+              return { modelUrl, previewUrl: undefined, status: "completed" as const, fallback: "replicate-trellis" as const };
+            } catch (fallbackErr: any) {
+              logToolFailure({
+                toolId: "3d-generate",
+                errorMessage: `fal.ai: ${error.message}; replicate-fallback: ${fallbackErr.message}`,
+                provider: "fal+replicate",
+                userId: ctx.user.id,
+              });
+              return { modelUrl: null, previewUrl: null, status: "failed" as const, error: `3D generation failed: ${error.message}` };
+            }
+          }
+
           logToolFailure({
             toolId: "3d-generate",
             errorMessage: error.message,
