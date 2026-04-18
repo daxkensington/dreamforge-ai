@@ -33,6 +33,19 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "3d-generate": 15,
   "comic-strip": 15,
   "tshirt-design": 10,
+  "pixel-art": 5,
+  "coloring-book": 5,
+  "tattoo-design": 10,
+  "cover-maker": 10,
+  "pose-turnaround": 15,
+  "photo-colorize": 8,
+  "podcast-cover": 8,
+  "listing-photos": 20,
+  "real-estate-twilight": 8,
+  "fashion-lookbook": 20,
+  "meme-template": 5,
+  "yt-thumbnails": 25,
+  "ig-carousel": 35,
 };
 
 // ─── Old flat costs (kept for backward compat) ───────────────────────────

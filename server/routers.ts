@@ -3138,6 +3138,407 @@ export const appRouter = router({
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
+
+    // Pixel Art Generator — 8/16-bit retro game art
+    pixelArt: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(500),
+          bitStyle: z.enum(["8-bit", "16-bit", "32-bit"]).default("16-bit"),
+          subject: z.enum(["character", "item", "environment", "tileset", "sprite-sheet"]).default("character"),
+          palette: z.enum(["gameboy", "nes", "snes", "pico-8", "c64", "full-color"]).default("full-color"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "pixel-art", "Pixel art generation");
+        try {
+          const prompt = `${input.bitStyle} pixel art ${input.subject}: ${input.concept}. ${input.palette} palette, crisp pixel edges, no anti-aliasing, game-ready sprite style, transparent background, centered composition, high contrast, retro video game aesthetic.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Coloring Book Page — clean line art from a concept
+    coloringBook: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(500),
+          difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+          theme: z.enum(["animals", "mandala", "fantasy", "nature", "vehicles", "characters", "seasonal", "custom"]).default("custom"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "coloring-book", "Coloring book page");
+        try {
+          const detailMap: Record<string, string> = {
+            easy: "thick bold outlines, simple shapes, large open areas, minimal detail, suitable for children 4-8",
+            medium: "medium-weight outlines, moderate detail, balanced complexity, suitable for older kids and casual adults",
+            hard: "fine line work, intricate patterns, dense detail, suitable for adult coloring enthusiasts",
+          };
+          const prompt = `Black and white coloring book page, ${input.theme} theme: ${input.concept}. ${detailMap[input.difficulty]}. Pure black outlines on pure white background, NO shading, NO gray tones, NO color, NO fill — only clean line art. Printable 8.5x11 portrait orientation, crisp vector-like lines.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1280 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Tattoo Designer — stencil + full color variants
+    tattooDesign: protectedProcedure
+      .input(
+        z.object({
+          concept: z.string().min(1).max(500),
+          style: z.enum(["traditional", "neo-traditional", "blackwork", "fineline", "realism", "watercolor", "tribal", "japanese", "geometric", "minimalist"]).default("traditional"),
+          placement: z.enum(["arm", "forearm", "back", "chest", "leg", "wrist", "neck", "ribcage", "any"]).default("any"),
+          variant: z.enum(["stencil", "color", "both"]).default("both"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "tattoo-design", "Tattoo design");
+        try {
+          const baseDesc = `${input.style} tattoo design: ${input.concept}. Sized for ${input.placement} placement, clean composition on white background, professional tattoo flash artwork.`;
+          const results: { type: string; url: string }[] = [];
+          if (input.variant === "stencil" || input.variant === "both") {
+            const { url: stencilUrl } = await generateImage({ prompt: `${baseDesc} Pure black ink stencil only, bold outlines, no color, no shading, stencil-ready for tattoo transfer.`, width: 1024, height: 1024 });
+            results.push({ type: "stencil", url: stencilUrl });
+          }
+          if (input.variant === "color" || input.variant === "both") {
+            const { url: colorUrl } = await generateImage({ prompt: `${baseDesc} Full color rendering showing finished tattoo result, rich saturated inks, realistic shading.`, width: 1024, height: 1024 });
+            results.push({ type: "color", url: colorUrl });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Book / Album Cover Maker
+    coverMaker: protectedProcedure
+      .input(
+        z.object({
+          title: z.string().min(1).max(150),
+          subtitle: z.string().max(200).optional(),
+          author: z.string().max(100).optional(),
+          genre: z.string().min(1).max(100),
+          coverType: z.enum(["book", "album", "ebook", "audiobook", "magazine"]).default("book"),
+          mood: z.enum(["mysterious", "romantic", "dark", "uplifting", "minimalist", "dramatic", "whimsical", "futuristic"]).default("dramatic"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "cover-maker", "Cover art");
+        try {
+          const dims = input.coverType === "album" ? { w: 1024, h: 1024 } : { w: 1024, h: 1536 };
+          const typographyNote = input.coverType === "album"
+            ? `"${input.title}"${input.author ? ` by ${input.author}` : ""}`
+            : `"${input.title}"${input.subtitle ? ` (subtitle: ${input.subtitle})` : ""}${input.author ? ` by ${input.author}` : ""}`;
+          const prompt = `Professional ${input.coverType} cover design, ${input.genre} genre, ${input.mood} mood. Title typography reads ${typographyNote}. Eye-catching focal image, genre-appropriate visual language, bestseller-quality commercial artwork, clean readable typography hierarchy, print-ready composition.`;
+          const { url } = await generateImage({ prompt, width: dims.w, height: dims.h });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Pose / Character Turnaround — front / side / back reference sheet
+    poseTurnaround: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1).max(800),
+          style: z.enum(["anime", "realistic", "comic", "3d-render", "sketch", "painterly"]).default("realistic"),
+          views: z.number().min(2).max(4).default(3),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "pose-turnaround", "Character turnaround");
+        try {
+          const viewLabels = ["front view", "3/4 side view", "side profile view", "back view"].slice(0, input.views);
+          const results: { view: string; url: string }[] = [];
+          for (const view of viewLabels) {
+            const prompt = `Character turnaround reference sheet, ${view}: ${input.description}. ${input.style} style, clean neutral background, standing T-pose or A-pose, full-body visible, consistent lighting and proportions, artist reference quality, matching design across all views.`;
+            const { url } = await generateImage({ prompt, width: 768, height: 1280 });
+            results.push({ view, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Old Photo Colorizer — B&W → color (era-aware)
+    photoColorize: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          era: z.enum(["victorian", "1920s", "1940s", "1960s", "1980s", "modern", "auto"]).default("auto"),
+          intensity: z.enum(["subtle", "natural", "vivid"]).default("natural"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "photo-colorize", "Photo colorization");
+        try {
+          const eraNote = input.era === "auto" ? "Infer the era from visual cues and use historically accurate colors for the period." : `Era: ${input.era}. Use historically accurate clothing, skin tone, and environment colors appropriate to the ${input.era} period.`;
+          const intensityNote: Record<string, string> = {
+            subtle: "Gentle desaturated colors, film-like restraint, authentic period feel.",
+            natural: "Balanced realistic colors, natural skin tones, accurate lighting.",
+            vivid: "Rich saturated colors, vibrant but believable, modern color depth.",
+          };
+          const { url } = await generateImage({
+            prompt: `Colorize this black and white photograph. ${eraNote} ${intensityNote[input.intensity]} Preserve original composition, grain, and subjects exactly — only add color. Professional colorization.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Podcast Cover Art — 3000x3000 square, genre/mood presets
+    podcastCover: protectedProcedure
+      .input(
+        z.object({
+          podcastName: z.string().min(1).max(100),
+          tagline: z.string().max(150).optional(),
+          hostName: z.string().max(100).optional(),
+          genre: z.enum(["true-crime", "comedy", "business", "tech", "self-help", "news", "interview", "education", "health", "spirituality", "sports", "music", "other"]).default("other"),
+          vibe: z.enum(["bold", "minimalist", "vintage", "dark", "playful", "professional", "artistic"]).default("bold"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "podcast-cover", "Podcast cover art");
+        try {
+          const title = `"${input.podcastName}"${input.tagline ? ` (tagline: ${input.tagline})` : ""}${input.hostName ? ` hosted by ${input.hostName}` : ""}`;
+          const prompt = `Podcast cover art, square 1:1 composition, ${input.vibe} ${input.genre} aesthetic. Large readable title typography: ${title}. Eye-catching icon or illustration element, genre-appropriate color palette, legible when displayed small in Spotify/Apple Podcasts grid, commercial-quality design, no microphone clichés unless requested.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Etsy Listing Photo Pack — single product → 5 variants
+    listingPhotos: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          productName: z.string().min(1).max(150),
+          style: z.enum(["lifestyle", "studio", "flatlay", "outdoor", "home-decor"]).default("lifestyle"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "listing-photos", "Etsy listing photo pack");
+        try {
+          const angles = [
+            `Hero shot: ${input.productName} centered, ${input.style} context, perfect studio lighting, primary listing photo.`,
+            `Close-up detail shot: ${input.productName} showing texture and craftsmanship, shallow depth of field, macro quality.`,
+            `In-use scene: ${input.productName} being used or worn in a natural ${input.style} setting, authentic moment.`,
+            `Scale reference: ${input.productName} next to common objects showing size, informational composition.`,
+            `Flatlay composition: ${input.productName} arranged with complementary props from above, Pinterest-worthy layout.`,
+          ];
+          const results: { angle: string; url: string }[] = [];
+          for (const angle of angles) {
+            const { url } = await generateImage({
+              prompt: `${angle} Preserve the product exactly as shown in the reference image, only change background, angle, and context. E-commerce quality photography.`,
+              originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+            });
+            results.push({ angle: angle.split(":")[0], url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Real Estate Twilight — daytime exterior → golden hour / twilight
+    realEstateTwilight: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          mode: z.enum(["golden-hour", "twilight", "blue-hour", "dusk"]).default("twilight"),
+          addLights: z.boolean().default(true),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "real-estate-twilight", "Real estate twilight");
+        try {
+          const modeNote: Record<string, string> = {
+            "golden-hour": "Warm golden hour lighting, sun low on the horizon, long soft shadows, honey-toned light on the facade.",
+            "twilight": "Twilight sky with deep blue-purple gradient, balanced exterior/interior light, magic-hour real estate look.",
+            "blue-hour": "Blue hour after sunset, deep cobalt sky, cool tones, professional architectural photography.",
+            "dusk": "Dusk sky with soft pink and orange clouds, ambient warmth, inviting evening atmosphere.",
+          };
+          const windowsNote = input.addLights
+            ? "Turn on all interior lights so windows glow warm yellow from inside, add exterior landscape and path lighting, create welcoming illuminated curb appeal."
+            : "Keep lighting natural, no added artificial lights.";
+          const { url } = await generateImage({
+            prompt: `Convert this daytime real estate exterior to ${modeNote[input.mode]} ${windowsNote} Preserve the house architecture, landscaping, and composition exactly. MLS-quality real estate photography, twilight marketing shot.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Fashion Lookbook — garment concept → N lookbook scenes
+    fashionLookbook: protectedProcedure
+      .input(
+        z.object({
+          garmentDescription: z.string().min(1).max(500),
+          season: z.enum(["spring", "summer", "fall", "winter", "resort", "any"]).default("any"),
+          sceneCount: z.number().min(2).max(6).default(4),
+          vibe: z.enum(["editorial", "streetwear", "luxury", "minimalist", "vintage", "athleisure", "bohemian"]).default("editorial"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "fashion-lookbook", "Fashion lookbook");
+        try {
+          const sceneTemplates = [
+            "urban street scene, natural candid pose, mid-day light",
+            "studio portrait on seamless neutral backdrop, soft strobe lighting",
+            "outdoor natural setting, golden hour lighting, relaxed body language",
+            "architectural minimalist interior, editorial pose, dramatic shadow play",
+            "rooftop or terrace scene, cinematic wide shot, lifestyle atmosphere",
+            "nightlife or indoor venue, moody ambient lighting, fashion-forward pose",
+          ].slice(0, input.sceneCount);
+          const results: { scene: string; url: string }[] = [];
+          for (const scene of sceneTemplates) {
+            const prompt = `${input.vibe} fashion lookbook photograph, ${input.season} season, model wearing: ${input.garmentDescription}. Scene: ${scene}. High-end fashion photography, consistent garment across all scenes, magazine-quality composition, shallow depth of field, authentic styling.`;
+            const { url } = await generateImage({ prompt, width: 896, height: 1280 });
+            results.push({ scene, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Meme Template Filler — classic templates with user captions
+    memeTemplate: protectedProcedure
+      .input(
+        z.object({
+          template: z.enum(["drake", "distracted-boyfriend", "two-buttons", "expanding-brain", "change-my-mind", "is-this-a-pigeon", "woman-yelling-at-cat", "doge", "this-is-fine", "galaxy-brain"]),
+          captions: z.array(z.string().max(200)).min(1).max(6),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "meme-template", "Meme template fill");
+        try {
+          const templateDesc: Record<string, string> = {
+            "drake": `Classic Drake meme format, two stacked panels: top panel shows Drake rejecting with hand up (reject/disapproval pose) with caption "${input.captions[0] ?? ""}", bottom panel shows Drake approving with pointing gesture with caption "${input.captions[1] ?? ""}". Impact font, white text on colored panel backgrounds.`,
+            "distracted-boyfriend": `Distracted boyfriend stock photo meme: boyfriend looking back at woman labeled "${input.captions[0] ?? ""}", girlfriend looking shocked labeled "${input.captions[1] ?? ""}", other woman labeled "${input.captions[2] ?? ""}". Stock photo aesthetic with white label text.`,
+            "two-buttons": `Two buttons meme: sweating man in red shirt deciding between two red buttons — left button says "${input.captions[0] ?? ""}", right button says "${input.captions[1] ?? ""}". Comic panel style.`,
+            "expanding-brain": `Expanding brain meme, ${input.captions.length} vertical panels each with a progressively more glowing brain next to escalating captions: ${input.captions.map((c, i) => `panel ${i + 1}: "${c}"`).join("; ")}. White panel backgrounds with black text, brain glows from dim to galactic.`,
+            "change-my-mind": `Change my mind meme: man at table outdoors on campus with sign reading "${input.captions[0] ?? ""}". Photo-realistic meme aesthetic.`,
+            "is-this-a-pigeon": `Is this a pigeon meme, anime man pointing at butterfly — man labeled "${input.captions[0] ?? ""}", butterfly labeled "${input.captions[1] ?? ""}", caption at bottom reads "Is this ${input.captions[2] ?? "a meme"}?". Classic anime screenshot meme.`,
+            "woman-yelling-at-cat": `Woman yelling at confused white cat at dinner table meme, left panel woman caption "${input.captions[0] ?? ""}", right panel cat caption "${input.captions[1] ?? ""}". Two-panel format.`,
+            "doge": `Classic doge meme, Shiba Inu with scattered Comic Sans captions: ${input.captions.map((c) => `"${c}"`).join(", ")}. Multicolor text, rainbow doge energy.`,
+            "this-is-fine": `This is fine dog in burning room meme, dog holding coffee, caption "${input.captions[0] ?? ""}". Webcomic art style.`,
+            "galaxy-brain": `Galaxy brain meme with ${input.captions.length} panels of progressively more cosmic brains, captions escalating: ${input.captions.map((c, i) => `level ${i + 1}: "${c}"`).join("; ")}.`,
+          };
+          const { url } = await generateImage({ prompt: templateDesc[input.template] + " Classic internet meme composition, shareable, square format.", width: 1024, height: 1024 });
+          return { url, template: input.template, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // YouTube Chapter Thumbnails — batch generate per chapter
+    ytChapterThumbnails: protectedProcedure
+      .input(
+        z.object({
+          videoTitle: z.string().min(1).max(200),
+          chapters: z.array(z.string().min(1).max(200)).min(2).max(10),
+          style: z.enum(["bold-face", "tutorial", "vlog", "gaming", "educational", "reaction", "minimalist"]).default("bold-face"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "yt-thumbnails", "YouTube chapter thumbnails");
+        try {
+          const styleNote: Record<string, string> = {
+            "bold-face": "bold shocked facial expression, massive contrast, saturated colors, MrBeast-style thumbnail",
+            "tutorial": "clear labeled elements, arrows pointing at key item, screenshot-overlay style, educational clarity",
+            "vlog": "authentic lifestyle moment, soft natural lighting, candid feel, subtle text overlay",
+            "gaming": "dramatic in-game action, glowing effects, gamer-aesthetic title treatment, epic composition",
+            "educational": "clean infographic feel, diagrammatic elements, professional edu-channel look",
+            "reaction": "split-screen reaction, expressive face on one side, subject on other side, red circle highlight",
+            "minimalist": "clean single focal element, tons of negative space, elegant typography, underrated-channel vibe",
+          };
+          const results: { chapter: string; url: string }[] = [];
+          for (const chapter of input.chapters) {
+            const prompt = `YouTube thumbnail, 16:9 format, for video "${input.videoTitle}", specifically for chapter: "${chapter}". ${styleNote[input.style]}. Large readable 3-4 word overlay text summarizing this chapter, eye-catching composition optimized for 8%+ CTR, YouTube algorithm friendly.`;
+            const { url } = await generateImage({ prompt, width: 1280, height: 720 });
+            results.push({ chapter, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Instagram Carousel Designer — multi-slide branded carousel
+    igCarousel: protectedProcedure
+      .input(
+        z.object({
+          topic: z.string().min(1).max(500),
+          slideCount: z.number().min(3).max(10).default(7),
+          brandColor: z.string().max(20).optional(),
+          style: z.enum(["educational", "listicle", "storytelling", "quote-pack", "before-after", "tips", "minimalist-editorial"]).default("educational"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "ig-carousel", "Instagram carousel");
+        try {
+          const outline = await invokeLLM({
+            messages: [
+              { role: "system", content: `You are an Instagram content strategist. Given a topic, output a ${input.slideCount}-slide carousel outline in JSON. Slide 1 must be the hook/cover, slide ${input.slideCount} must be the CTA. Middle slides deliver value.` },
+              { role: "user", content: `Topic: ${input.topic}. Style: ${input.style}.` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "carousel",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    slides: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          headline: { type: "string" },
+                          body: { type: "string" },
+                          role: { type: "string", description: "hook | content | cta" },
+                        },
+                        required: ["headline", "body", "role"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["slides"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = outline.choices[0]?.message?.content;
+          const parsed = typeof content === "string" ? JSON.parse(content) : null;
+          if (!parsed?.slides?.length) throw new Error("Failed to generate carousel outline");
+
+          const colorNote = input.brandColor ? `Brand accent color: ${input.brandColor}.` : "Neutral professional palette.";
+          const slides: { headline: string; body: string; role: string; url: string }[] = [];
+          for (const slide of parsed.slides as Array<{ headline: string; body: string; role: string }>) {
+            const prompt = `Instagram carousel slide, 1:1 square format, ${input.style} style. ${colorNote} Headline: "${slide.headline}". Supporting copy: "${slide.body}". Role: ${slide.role}. Clean readable typography hierarchy, Instagram-native design, shareable and swipe-worthy, consistent visual system across deck.`;
+            const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+            slides.push({ ...slide, url });
+          }
+          return { slides, status: "completed" as const };
+        } catch (error: any) {
+          return { slides: [], status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({

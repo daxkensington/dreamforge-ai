@@ -32,6 +32,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "text-to-speech", "audio-enhance", "sound-effects",
     "song-creator", "music-video", "social-templates", "clip-maker",
     "presentations", "templates", "ad-copy", "blog-writer", "caption-writer",
+    "pixel-art", "coloring-book", "tattoo-design", "cover-maker",
+    "pose-turnaround", "photo-colorize", "podcast-cover", "listing-photos",
+    "real-estate-twilight", "fashion-lookbook", "meme-template",
+    "yt-thumbnails", "ig-carousel",
   ].map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,
