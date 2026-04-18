@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { ToolSEOBlock } from "@/components/ToolSEOBlock";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolPageLayoutProps {
@@ -78,6 +79,9 @@ export default function ToolPageLayout({
         <section className="container py-8">
           {children}
         </section>
+
+        {/* Below-fold SEO copy — renders if this slug has entries in shared/toolSeoCopy.ts */}
+        <ToolSEOBlock />
       </div>
     </PageLayout>
   );
