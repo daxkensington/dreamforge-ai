@@ -49,8 +49,8 @@ const imageTools: GridTool[] = [
   { title: "Film & Grain", desc: "Vintage film effects", icon: Film, href: "/tools/film-grain", img: "/showcase/tool-filmgrain.jpg", badge: "New" },
   { title: "Depth Map", desc: "3D depth from 2D images", icon: Layers, href: "/tools/depth-map", img: "/showcase/tool-depthmap.jpg", badge: "New" },
   { title: "AI Relighting", desc: "Change lighting & mood of any photo", icon: Sun, href: "/tools/relight", img: "/showcase/tool-relight.jpg", badge: "New" },
-  { title: "Photo Colorizer", desc: "Era-aware B&W photo colorization", icon: Palette, href: "/tools/photo-colorize", img: "/showcase/tool-restore.jpg", badge: "New" },
-  { title: "Real Estate Twilight", desc: "Daytime exteriors to twilight MLS shots", icon: Home, href: "/tools/real-estate-twilight", img: "/showcase/tool-relight.jpg", badge: "New" },
+  { title: "Photo Colorizer", desc: "Era-aware B&W photo colorization", icon: Palette, href: "/tools/photo-colorize", img: "/showcase/tool-photo-colorize.jpg", badge: "New" },
+  { title: "Real Estate Twilight", desc: "Daytime exteriors to twilight MLS shots", icon: Home, href: "/tools/real-estate-twilight", img: "/showcase/tool-real-estate-twilight.jpg", badge: "New" },
 ];
 
 // ─── Creative Generation Tools ───────────────────────────────────────────────
@@ -77,17 +77,17 @@ const creativeTools: GridTool[] = [
   { title: "3D Model Generator", desc: "Turn any image into a 3D model", icon: Box, href: "/tools/3d-generator", img: "/showcase/tool-3d.jpg", badge: "New" },
   { title: "Comic Strip", desc: "Multi-panel comics from a concept", icon: LayoutGrid, href: "/tools/comic-strip", img: "/showcase/tool-comic.jpg", badge: "New" },
   { title: "T-Shirt Designer", desc: "Print-ready t-shirt designs", icon: Shirt, href: "/tools/tshirt-designer", img: "/showcase/tool-tshirt.jpg", badge: "New" },
-  { title: "Pixel Art", desc: "Game-ready 8/16/32-bit sprites", icon: Gamepad2, href: "/tools/pixel-art", img: "/showcase/tool-texture.jpg", badge: "New" },
-  { title: "Coloring Book Page", desc: "Printable line-art pages", icon: Pencil, href: "/tools/coloring-book", img: "/showcase/tool-sketch.jpg", badge: "New" },
-  { title: "Tattoo Designer", desc: "Stencil + color tattoo designs", icon: Flame, href: "/tools/tattoo-design", img: "/showcase/tool-charsheet.jpg", badge: "New" },
-  { title: "Cover Maker", desc: "Book, album, eBook, audiobook covers", icon: BookOpen, href: "/tools/cover-maker", img: "/showcase/tool-blog.jpg", badge: "New" },
-  { title: "Pose Turnaround", desc: "Multi-view character reference sheets", icon: RotateCw, href: "/tools/pose-turnaround", img: "/showcase/tool-charsheet.jpg", badge: "New" },
-  { title: "Podcast Cover", desc: "Spotify-ready podcast artwork", icon: Mic, href: "/tools/podcast-cover", img: "/showcase/tool-audio.jpg", badge: "New" },
-  { title: "Listing Photo Pack", desc: "5 angles from one product shot", icon: ShoppingBag, href: "/tools/listing-photos", img: "/showcase/tool-product.jpg", badge: "New" },
-  { title: "Fashion Lookbook", desc: "Editorial multi-scene lookbook", icon: Shirt, href: "/tools/fashion-lookbook", img: "/showcase/tool-tryon.jpg", badge: "New" },
-  { title: "Meme Template Filler", desc: "Classic meme formats with your captions", icon: Laugh, href: "/tools/meme-template", img: "/showcase/tool-meme.jpg", badge: "New" },
-  { title: "YouTube Chapter Thumbnails", desc: "Batch per-chapter thumbnails", icon: Youtube, href: "/tools/yt-thumbnails", img: "/showcase/tool-thumbnail.jpg", badge: "New" },
-  { title: "Instagram Carousel", desc: "Branded multi-slide IG carousels", icon: Instagram, href: "/tools/ig-carousel", img: "/showcase/tool-social-templates.jpg", badge: "New" },
+  { title: "Pixel Art", desc: "Game-ready 8/16/32-bit sprites", icon: Gamepad2, href: "/tools/pixel-art", img: "/showcase/tool-pixel-art.jpg", badge: "New" },
+  { title: "Coloring Book Page", desc: "Printable line-art pages", icon: Pencil, href: "/tools/coloring-book", img: "/showcase/tool-coloring-book.jpg", badge: "New" },
+  { title: "Tattoo Designer", desc: "Stencil + color tattoo designs", icon: Flame, href: "/tools/tattoo-design", img: "/showcase/tool-tattoo-design.jpg", badge: "New" },
+  { title: "Cover Maker", desc: "Book, album, eBook, audiobook covers", icon: BookOpen, href: "/tools/cover-maker", img: "/showcase/tool-cover-maker.jpg", badge: "New" },
+  { title: "Pose Turnaround", desc: "Multi-view character reference sheets", icon: RotateCw, href: "/tools/pose-turnaround", img: "/showcase/tool-pose-turnaround.jpg", badge: "New" },
+  { title: "Podcast Cover", desc: "Spotify-ready podcast artwork", icon: Mic, href: "/tools/podcast-cover", img: "/showcase/tool-podcast-cover.jpg", badge: "New" },
+  { title: "Listing Photo Pack", desc: "5 angles from one product shot", icon: ShoppingBag, href: "/tools/listing-photos", img: "/showcase/tool-listing-photos.jpg", badge: "New" },
+  { title: "Fashion Lookbook", desc: "Editorial multi-scene lookbook", icon: Shirt, href: "/tools/fashion-lookbook", img: "/showcase/tool-fashion-lookbook.jpg", badge: "New" },
+  { title: "Meme Template Filler", desc: "Classic meme formats with your captions", icon: Laugh, href: "/tools/meme-template", img: "/showcase/tool-meme-template.jpg", badge: "New" },
+  { title: "YouTube Chapter Thumbnails", desc: "Batch per-chapter thumbnails", icon: Youtube, href: "/tools/yt-thumbnails", img: "/showcase/tool-yt-thumbnails.jpg", badge: "New" },
+  { title: "Instagram Carousel", desc: "Branded multi-slide IG carousels", icon: Instagram, href: "/tools/ig-carousel", img: "/showcase/tool-ig-carousel.jpg", badge: "New" },
 ];
 
 // ─── Video Generation Tools ──────────────────────────────────────────────────
