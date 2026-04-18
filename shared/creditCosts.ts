@@ -46,6 +46,16 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "meme-template": 5,
   "yt-thumbnails": 25,
   "ig-carousel": 35,
+  "sticker-pack": 25,
+  "recipe-card": 8,
+  "invitation": 8,
+  "business-card": 15,
+  "pet-portrait": 10,
+  "tarot-card": 10,
+  "movie-poster": 10,
+  "trading-card": 10,
+  "menu-design": 10,
+  "greeting-card": 15,
 };
 
 // ─── Old flat costs (kept for backward compat) ───────────────────────────

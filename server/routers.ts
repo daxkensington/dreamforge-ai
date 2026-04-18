@@ -3539,6 +3539,278 @@ export const appRouter = router({
           return { slides: [], status: "failed" as const, error: error.message };
         }
       }),
+
+    // Sticker Pack Designer — 6 stickers on transparent background
+    stickerPack: protectedProcedure
+      .input(
+        z.object({
+          theme: z.string().min(1).max(300),
+          count: z.number().min(3).max(8).default(6),
+          style: z.enum(["kawaii", "cartoon", "chibi", "minimal", "retro", "handdrawn", "3d"]).default("cartoon"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "sticker-pack", "Sticker pack");
+        try {
+          const outline = await invokeLLM({
+            messages: [
+              { role: "system", content: `You design sticker packs. Given a theme, output ${input.count} distinct sticker subjects in JSON. Each should be a single noun/expression that fits the theme and works as a die-cut sticker.` },
+              { role: "user", content: `Theme: ${input.theme}. Style: ${input.style}.` },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "stickers",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    stickers: { type: "array", items: { type: "object", properties: { subject: { type: "string" }, caption: { type: "string" } }, required: ["subject", "caption"], additionalProperties: false } },
+                  },
+                  required: ["stickers"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = outline.choices[0]?.message?.content;
+          const parsed = typeof content === "string" ? JSON.parse(content) : null;
+          if (!parsed?.stickers?.length) throw new Error("Failed to outline sticker pack");
+          const results: { subject: string; caption: string; url: string }[] = [];
+          for (const s of parsed.stickers as Array<{ subject: string; caption: string }>) {
+            const prompt = `Die-cut sticker art, ${input.style} style: ${s.subject}${s.caption ? ` with caption "${s.caption}"` : ""}. Thick white border around the shape, fully isolated on pure white background (for easy transparent cutout), centered composition, Telegram/iMessage sticker aesthetic, bold and cheerful.`;
+            const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
+            results.push({ subject: s.subject, caption: s.caption, url });
+          }
+          return { results, status: "completed" as const };
+        } catch (error: any) {
+          return { results: [], status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Recipe Card — Pinterest-ready recipe card
+    recipeCard: protectedProcedure
+      .input(
+        z.object({
+          dishName: z.string().min(1).max(150),
+          ingredients: z.string().min(1).max(1000),
+          steps: z.string().min(1).max(2000),
+          cuisine: z.string().max(100).optional(),
+          style: z.enum(["rustic", "modern", "magazine", "handwritten", "minimalist", "vintage"]).default("rustic"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "recipe-card", "Recipe card");
+        try {
+          const cuisineNote = input.cuisine ? `${input.cuisine} cuisine, ` : "";
+          const prompt = `Pinterest-ready recipe card, 2:3 portrait format, ${input.style} design. Dish: "${input.dishName}". ${cuisineNote}Include a hero food photograph at top (styled shot of the finished dish), title typography "${input.dishName}" in ${input.style} font, ingredients list section with these items: ${input.ingredients.slice(0, 300)}, step-by-step instructions section summarizing: ${input.steps.slice(0, 400)}. Food blog aesthetic, print-ready, shareable. Clear readable hierarchy.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Invitation Designer — weddings, birthdays, events
+    invitation: protectedProcedure
+      .input(
+        z.object({
+          eventType: z.enum(["wedding", "birthday", "babyshower", "graduation", "anniversary", "corporate", "party", "other"]).default("birthday"),
+          headline: z.string().min(1).max(200),
+          details: z.string().min(1).max(500),
+          style: z.enum(["elegant", "playful", "modern", "vintage", "floral", "minimalist", "rustic", "watercolor"]).default("elegant"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "invitation", "Event invitation");
+        try {
+          const prompt = `${input.eventType} invitation card, 5x7 portrait print-ready format, ${input.style} design. Headline typography: "${input.headline}". Supporting details section reads: "${input.details.slice(0, 300)}". Beautiful typography hierarchy, appropriate decorative motifs for ${input.eventType}, refined paper stock feel, professional stationery design, print-safe bleed composition.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Business Card — front and back
+    businessCard: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1).max(100),
+          title: z.string().min(1).max(100),
+          company: z.string().max(100).optional(),
+          contact: z.string().min(1).max(300),
+          style: z.enum(["modern", "minimalist", "bold", "elegant", "creative", "tech", "luxury"]).default("modern"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "business-card", "Business card");
+        try {
+          const companyLine = input.company ? `Company: "${input.company}". ` : "";
+          const frontPrompt = `Business card front, 3.5x2 inch landscape print-ready, ${input.style} design. ${companyLine}Large readable name: "${input.name}". Title below: "${input.title}". Contact block: "${input.contact}". Clean typography hierarchy, logo/mark space, premium cardstock feel, professional brand aesthetic, high-end stationery.`;
+          const backPrompt = `Business card back, 3.5x2 inch landscape, matching ${input.style} design system of the front. Minimal back treatment — brand color block, subtle mark or pattern, optional tagline space, designer cardstock feel.`;
+          const [{ url: frontUrl }, { url: backUrl }] = await Promise.all([
+            generateImage({ prompt: frontPrompt, width: 1344, height: 768 }),
+            generateImage({ prompt: backPrompt, width: 1344, height: 768 }),
+          ]);
+          return { frontUrl, backUrl, status: "completed" as const };
+        } catch (error: any) {
+          return { frontUrl: null, backUrl: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Pet Portrait — royal/renaissance/fantasy pet portraits
+    petPortrait: protectedProcedure
+      .input(
+        z.object({
+          imageUrl: z.string().url(),
+          species: z.enum(["dog", "cat", "bird", "rabbit", "horse", "reptile", "other"]).default("dog"),
+          style: z.enum(["royal-renaissance", "fantasy-knight", "space-captain", "victorian", "steampunk", "oil-painting", "watercolor", "pop-art"]).default("royal-renaissance"),
+          petName: z.string().max(60).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "pet-portrait", "Pet portrait");
+        try {
+          const styleDesc: Record<string, string> = {
+            "royal-renaissance": "Regal Renaissance oil painting, ermine robes, ornate throne, dramatic chiaroscuro lighting, museum-quality brushwork",
+            "fantasy-knight": "Fantasy knight in shining armor, sword and shield, medieval banner backdrop, epic heroic portrait",
+            "space-captain": "Sci-fi starship captain uniform, spacecraft bridge background, cinematic futuristic lighting",
+            "victorian": "Victorian era formal portrait, high collar, sepia tones, ornate wallpaper background, antique photography",
+            "steampunk": "Steampunk aviator with brass goggles, Victorian-industrial clothing, gears and brass, mechanical aesthetic",
+            "oil-painting": "Classical oil painting portrait, master painter style, rich textures, museum gallery aesthetic",
+            "watercolor": "Soft watercolor painting, loose brushwork, pastel palette, artistic portrait",
+            "pop-art": "Bold pop art portrait, Andy Warhol style, saturated colors, graphic design aesthetic",
+          };
+          const nameNote = input.petName ? `Pet name: "${input.petName}", shown on a brass nameplate at the bottom. ` : "";
+          const { url } = await generateImage({
+            prompt: `Transform this ${input.species} photo into a portrait: ${styleDesc[input.style]}. ${nameNote}Preserve the pet's distinctive features, breed characteristics, and coloring exactly — only change the clothing, setting, and artistic treatment. Keep the pet's face recognizable.`,
+            originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
+          });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Tarot Card Designer — major arcana style
+    tarotCard: protectedProcedure
+      .input(
+        z.object({
+          cardName: z.string().min(1).max(100),
+          symbolism: z.string().min(1).max(500),
+          style: z.enum(["rider-waite", "mystical-modern", "art-nouveau", "celestial", "dark-fantasy", "watercolor-bohemian", "minimalist-geometric"]).default("rider-waite"),
+          romanNumeral: z.string().max(10).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "tarot-card", "Tarot card design");
+        try {
+          const numeralNote = input.romanNumeral ? `Roman numeral "${input.romanNumeral}" at the top. ` : "";
+          const prompt = `Tarot card design, 2.75x4.75 inch portrait format with decorative border, ${input.style} style. Card title: "${input.cardName}" in ornate serif at bottom. ${numeralNote}Central illustration depicting: ${input.symbolism}. Rich symbolic imagery, intricate decorative frame, arcane mystical atmosphere, deck-ready composition, high-contrast readability, spiritual/divinatory aesthetic.`;
+          const { url } = await generateImage({ prompt, width: 768, height: 1344 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Movie Poster
+    moviePoster: protectedProcedure
+      .input(
+        z.object({
+          title: z.string().min(1).max(150),
+          tagline: z.string().max(200).optional(),
+          genre: z.enum(["action", "horror", "scifi", "drama", "comedy", "thriller", "romance", "fantasy", "documentary", "animation", "noir", "indie"]).default("scifi"),
+          synopsis: z.string().min(1).max(500),
+          credits: z.string().max(300).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "movie-poster", "Movie poster");
+        try {
+          const taglineNote = input.tagline ? `Tagline above title: "${input.tagline}". ` : "";
+          const creditsNote = input.credits ? `Billing block at the bottom: "${input.credits}". ` : "Small cast/crew billing block at the bottom.";
+          const prompt = `Theatrical movie poster, 24x36 inch portrait format, ${input.genre} genre. Massive title typography: "${input.title}". ${taglineNote}${creditsNote} Hero visual inspired by: ${input.synopsis}. Cinematic composition, commercial theatrical design, genre-appropriate color grading and lighting, bold poster typography hierarchy, one-sheet quality.`;
+          const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Trading Card Designer — TCG-style
+    tradingCard: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1).max(100),
+          artDescription: z.string().min(1).max(500),
+          stats: z.string().min(1).max(300),
+          cardType: z.enum(["creature", "spell", "artifact", "character", "vehicle", "item"]).default("creature"),
+          rarity: z.enum(["common", "uncommon", "rare", "mythic", "legendary"]).default("rare"),
+          theme: z.enum(["fantasy", "scifi", "cyberpunk", "steampunk", "mythic", "horror", "cute"]).default("fantasy"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "trading-card", "Trading card");
+        try {
+          const prompt = `Trading card game (TCG) card, 2.5x3.5 inch portrait format, ${input.theme} theme, ${input.rarity} rarity. Card name at top: "${input.name}". ${input.cardType} type indicator. Central hero art depicting: ${input.artDescription}. Stats/abilities block at the bottom reads: "${input.stats}". Ornate frame appropriate to rarity (${input.rarity === "legendary" || input.rarity === "mythic" ? "foil-effect premium border with gemstone accents" : "clean printed border"}), Magic/Pokemon/Hearthstone-level production quality, collectible game aesthetic, readable typography hierarchy.`;
+          const { url } = await generateImage({ prompt, width: 768, height: 1080 });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Menu Designer — restaurant menu
+    menuDesign: protectedProcedure
+      .input(
+        z.object({
+          restaurantName: z.string().min(1).max(150),
+          cuisine: z.string().min(1).max(100),
+          sections: z.string().min(1).max(2000),
+          style: z.enum(["elegant-fine-dining", "casual-bistro", "rustic-farmhouse", "modern-minimalist", "vintage-diner", "asian-contemporary", "brewpub", "coffeeshop"]).default("casual-bistro"),
+          format: z.enum(["single-page", "bi-fold", "tri-fold"]).default("single-page"),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "menu-design", "Menu design");
+        try {
+          const dims = input.format === "tri-fold" ? { w: 1536, h: 1024 } : { w: 1024, h: 1536 };
+          const prompt = `Restaurant menu, ${input.format} print layout, ${input.style} design aesthetic. Restaurant name masthead: "${input.restaurantName}", ${input.cuisine} cuisine subtitle. Menu sections with pricing, laid out as: ${input.sections.slice(0, 1500)}. Elegant typography hierarchy, appropriate spacing and dividers, print-ready composition, professional restaurant stationery quality.`;
+          const { url } = await generateImage({ prompt, width: dims.w, height: dims.h });
+          return { url, status: "completed" as const };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
+    // Greeting Card — front + inside
+    greetingCard: protectedProcedure
+      .input(
+        z.object({
+          occasion: z.enum(["birthday", "thank-you", "congratulations", "sympathy", "get-well", "holiday", "anniversary", "new-baby", "wedding", "generic"]).default("birthday"),
+          recipient: z.string().max(100).optional(),
+          tone: z.enum(["heartfelt", "funny", "formal", "punny", "minimalist", "whimsical"]).default("heartfelt"),
+          customMessage: z.string().max(500).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "greeting-card", "Greeting card");
+        try {
+          const recipientNote = input.recipient ? `for "${input.recipient}"` : "";
+          const frontPrompt = `${input.occasion} greeting card FRONT, 5x7 portrait print-ready, ${input.tone} tone. Cover visual appropriate to ${input.occasion} ${recipientNote}, minimal headline text. Professional stationery design, premium card quality, inviting composition.`;
+          const msg = input.customMessage || `A thoughtful ${input.tone} ${input.occasion} message`;
+          const insidePrompt = `${input.occasion} greeting card INSIDE, 5x7 portrait, matching design system of the front. Hand-lettered style message area with: "${msg}". Signature space below. Clean readable interior layout, subtle decorative accents, print-ready.`;
+          const [{ url: frontUrl }, { url: insideUrl }] = await Promise.all([
+            generateImage({ prompt: frontPrompt, width: 1024, height: 1536 }),
+            generateImage({ prompt: insidePrompt, width: 1024, height: 1536 }),
+          ]);
+          return { frontUrl, insideUrl, status: "completed" as const };
+        } catch (error: any) {
+          return { frontUrl: null, insideUrl: null, status: "failed" as const, error: error.message };
+        }
+      }),
   }),
 
   video: router({

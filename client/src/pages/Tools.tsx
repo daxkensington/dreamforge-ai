@@ -9,7 +9,8 @@ import {
   Film, Grid3X3, ScanLine, Sun, AppWindow, Paintbrush,
   Music, Frame, Share2, Users, Laugh, Home, LayoutGrid, Smartphone,
   Shirt, Box, Gamepad2, Pencil, Flame, BookOpen, RotateCw,
-  Youtube, Instagram,
+  Youtube, Instagram, Sticker, ChefHat, Mail, CreditCard, Cat,
+  Moon, Clapperboard, Gem, UtensilsCrossed, Heart,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -88,6 +89,16 @@ const creativeTools: GridTool[] = [
   { title: "Meme Template Filler", desc: "Classic meme formats with your captions", icon: Laugh, href: "/tools/meme-template", img: "/showcase/tool-meme-template.jpg", badge: "New" },
   { title: "YouTube Chapter Thumbnails", desc: "Batch per-chapter thumbnails", icon: Youtube, href: "/tools/yt-thumbnails", img: "/showcase/tool-yt-thumbnails.jpg", badge: "New" },
   { title: "Instagram Carousel", desc: "Branded multi-slide IG carousels", icon: Instagram, href: "/tools/ig-carousel", img: "/showcase/tool-ig-carousel.jpg", badge: "New" },
+  { title: "Sticker Pack", desc: "Die-cut chat app sticker packs", icon: Sticker, href: "/tools/sticker-pack", img: "/showcase/tool-sticker-pack.jpg", badge: "New" },
+  { title: "Recipe Card", desc: "Pinterest-ready recipe cards", icon: ChefHat, href: "/tools/recipe-card", img: "/showcase/tool-recipe-card.jpg", badge: "New" },
+  { title: "Invitation Designer", desc: "Print-ready 5x7 invitations", icon: Mail, href: "/tools/invitation", img: "/showcase/tool-invitation.jpg", badge: "New" },
+  { title: "Business Card", desc: "Matching front + back design", icon: CreditCard, href: "/tools/business-card", img: "/showcase/tool-business-card.jpg", badge: "New" },
+  { title: "Pet Portrait", desc: "Royal, fantasy, artistic pet portraits", icon: Cat, href: "/tools/pet-portrait", img: "/showcase/tool-pet-portrait.jpg", badge: "New" },
+  { title: "Tarot Card", desc: "Custom major arcana cards", icon: Moon, href: "/tools/tarot-card", img: "/showcase/tool-tarot-card.jpg", badge: "New" },
+  { title: "Movie Poster", desc: "Theatrical-quality one-sheets", icon: Clapperboard, href: "/tools/movie-poster", img: "/showcase/tool-movie-poster.jpg", badge: "New" },
+  { title: "Trading Card", desc: "TCG-quality custom cards", icon: Gem, href: "/tools/trading-card", img: "/showcase/tool-trading-card.jpg", badge: "New" },
+  { title: "Menu Designer", desc: "Restaurant menus, any format", icon: UtensilsCrossed, href: "/tools/menu-design", img: "/showcase/tool-menu-design.jpg", badge: "New" },
+  { title: "Greeting Card", desc: "Front + inside matching set", icon: Heart, href: "/tools/greeting-card", img: "/showcase/tool-greeting-card.jpg", badge: "New" },
 ];
 
 // ─── Video Generation Tools ──────────────────────────────────────────────────
