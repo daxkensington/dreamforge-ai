@@ -29,6 +29,10 @@ import {
   Server,
   Mic,
   Palette,
+  Cat,
+  Moon,
+  Clapperboard,
+  Gamepad2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -90,44 +94,44 @@ const beforeAfterDemos = [
 
 const whatsNew = [
   {
-    icon: Shirt,
-    title: "Virtual Try-On",
-    desc: "See how any garment looks on you — self-hosted CatVTON",
-    href: "/tools/virtual-tryon",
-    img: "/showcase/tool-tryon.jpg",
+    icon: Cat,
+    title: "Pet Portrait",
+    desc: "Royal, fantasy, and sci-fi portraits of your pet",
+    href: "/tools/pet-portrait",
+    img: "/showcase/tool-pet-portrait.jpg",
     tag: "New tool",
   },
   {
-    icon: Box,
-    title: "3D Model Generator",
-    desc: "Turn any image into a downloadable 3D model",
-    href: "/tools/3d-generator",
-    img: "/showcase/tool-3d.jpg",
+    icon: Moon,
+    title: "Tarot Card Designer",
+    desc: "Custom major arcana decks with rich symbolism",
+    href: "/tools/tarot-card",
+    img: "/showcase/tool-tarot-card.jpg",
     tag: "New tool",
   },
   {
-    icon: LayoutGrid,
-    title: "Comic Strip Studio",
-    desc: "Multi-panel comics from a single concept",
-    href: "/tools/comic-strip",
-    img: "/showcase/tool-comic.jpg",
+    icon: Clapperboard,
+    title: "Movie Poster",
+    desc: "Theatrical-quality one-sheets for any genre",
+    href: "/tools/movie-poster",
+    img: "/showcase/tool-movie-poster.jpg",
     tag: "New tool",
   },
   {
-    icon: Sun,
-    title: "AI Relighting",
-    desc: "Re-light any photo — golden hour, studio, neon",
-    href: "/tools/relight",
-    img: "/showcase/tool-relight.jpg",
+    icon: Gamepad2,
+    title: "Pixel Art Generator",
+    desc: "Game-ready 8/16/32-bit sprites and scenes",
+    href: "/tools/pixel-art",
+    img: "/showcase/tool-pixel-art.jpg",
     tag: "New tool",
   },
   {
     icon: Palette,
-    title: "DreamForge LoRA Styles",
-    desc: "Exclusive trained styles you can't get anywhere else",
-    href: "/workspace",
-    img: "/showcase/tool-lora.jpg",
-    tag: "Exclusive",
+    title: "Brand Style Guide",
+    desc: "Logo + color palette + typography on one page",
+    href: "/tools/brand-style-guide",
+    img: "/showcase/tool-brand-style-guide.jpg",
+    tag: "New tool",
   },
   {
     icon: Server,
@@ -143,7 +147,7 @@ const tools = [
   { icon: Image, title: "Text-to-Image", desc: "30+ models — Flux, DALL-E 3, Gemini, Grok, Seedream", bg: "/showcase/home-tool-txtimg.jpg", href: "/workspace" },
   { icon: Film, title: "AI Video", desc: "Runway, Kling, Veo 3, Wan 2.5 — text or image to video", bg: "/showcase/home-tool-video.jpg", href: "/video-studio" },
   { icon: Music, title: "AI Songs & Audio", desc: "Generate songs, music videos, TTS, and sound effects", bg: "/showcase/home-tool-audio.jpg", href: "/tools/song-creator" },
-  { icon: Wand2, title: "75+ Creative Tools", desc: "Headshots, logos, QR art, upscaling, style transfer & more", bg: "/showcase/home-tool-img2vid.jpg", href: "/tools" },
+  { icon: Wand2, title: "100+ Creative Tools", desc: "Headshots, logos, pet portraits, tarot cards, movie posters, pixel art — pick your niche", bg: "/showcase/home-tool-img2vid.jpg", href: "/tools" },
   { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell prompts, presets, and workflows", bg: "/showcase/home-tool-market.jpg", href: "/marketplace" },
   { icon: Users, title: "Community Gallery", desc: "Discover and share AI-generated artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
 ];
@@ -348,7 +352,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
             >
               <Sparkles className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-white/90">75+ AI Tools — One Platform</span>
+              <span className="text-sm font-medium text-white/90">100+ AI Tools — One Platform</span>
             </motion.div>
 
             <motion.h1
@@ -496,7 +500,7 @@ export default function Home() {
                 className="bg-transparent border-white/20 hover:bg-white/10 gap-2"
               >
                 <Link href="/tools">
-                  Browse all 75+ tools <ArrowRight className="h-4 w-4" />
+                  Browse all 100+ tools <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             </motion.div>

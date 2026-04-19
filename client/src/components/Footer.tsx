@@ -18,7 +18,7 @@ const footerLinks = {
     { label: "Text-to-Video", href: "/tools/text-to-video" },
     { label: "AI Headshots", href: "/tools/headshot" },
     { label: "Logo Maker", href: "/tools/logo-maker" },
-    { label: "All 75+ Tools", href: "/tools" },
+    { label: "All 100+ Tools", href: "/tools" },
   ],
   resources: [
     { label: "Pricing", href: "/pricing" },
@@ -97,7 +97,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm text-white/50 leading-relaxed mb-6 max-w-xs">
-              The all-in-one AI creative studio. 75+ tools for images, video, audio, and design — powered by the world's best AI models.
+              The all-in-one AI creative studio. 100+ tools for images, video, audio, and design — powered by the world's best AI models.
             </p>
 
             {/* Social links */}

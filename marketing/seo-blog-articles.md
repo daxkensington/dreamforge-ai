@@ -32,9 +32,9 @@ A truly free AI image generator should offer:
 
 DreamForgeX stands out because its free tier gives you access to three different image models. You can generate with Google's Gemini Imagen, Flux Schnell via Together AI, or Flux Schnell via Cloudflare Workers AI — all for 2 credits each. With 50 credits per day, that's 25 free images daily.
 
-The platform also includes 75+ other creative tools (video, audio, design) and lets you upgrade to premium models like DALL-E 3, Flux Pro, and Seedream V4 with a paid plan.
+The platform also includes 100+ other creative tools (video, audio, design) and lets you upgrade to premium models like DALL-E 3, Flux Pro, and Seedream V4 with a paid plan.
 
-**Pros:** Multiple free models, 75+ tools, no watermark on free tier
+**Pros:** Multiple free models, 100+ tools, no watermark on free tier
 **Cons:** Free tier limited to standard resolution (1024px)
 
 ### 2. Google Gemini (gemini.google.com)

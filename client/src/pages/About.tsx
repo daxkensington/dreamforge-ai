@@ -43,7 +43,7 @@ const scaleIn = {
 };
 
 const stats = [
-  { value: "75+", label: "Creative Tools" },
+  { value: "100+", label: "Creative Tools" },
   { value: "30+", label: "AI Models" },
   { value: "13", label: "Provider Integrations" },
   { value: "4K", label: "Max Resolution" },
@@ -105,9 +105,10 @@ const techStack = [
 
 const milestones = [
   { phase: "Phase 1", title: "The studio", desc: "Workspace, gallery, marketplace, brand kits, character sheets" },
-  { phase: "Phase 2", title: "75+ tools", desc: "Headshots, logos, upscaling, virtual try-on, comic strips, 3D models" },
+  { phase: "Phase 2", title: "100+ tools", desc: "Headshots, logos, upscaling, virtual try-on, comic strips, 3D models, pet portraits, tarot cards, fashion lookbooks, movie posters, and dozens more" },
   { phase: "Phase 3", title: "Self-hosted GPUs", desc: "Our own RunPod fleet for Flux, video, audio, and exclusive LoRAs" },
   { phase: "Phase 4", title: "Reliability layer", desc: "Provider kill-switch, status banner, auto-degrade, failure telemetry" },
+  { phase: "Phase 5", title: "Multi-provider fallback", desc: "Every external tool has a backup chain — relight, 3D, image-to-video all fall over cleanly when a provider blinks" },
 ];
 
 export default function About() {
@@ -158,7 +159,7 @@ export default function About() {
             className="text-lg md:text-xl text-white/70 mb-12 max-w-2xl mx-auto leading-relaxed"
           >
             DreamForgeX is the creative studio for people who use AI to ship — not just to scroll.
-            Images, video, music, voice, 3D, virtual try-on, and 75+ specialized tools, all in one workspace.
+            Images, video, music, voice, 3D, virtual try-on, and 100+ specialized tools, all in one workspace.
           </motion.p>
 
           <motion.div
@@ -193,7 +194,7 @@ export default function About() {
             >
               <Link href="/tools">
                 <Wand2 className="h-5 w-5" />
-                Browse 75+ Tools
+                Browse 100+ Tools
               </Link>
             </Button>
           </motion.div>
