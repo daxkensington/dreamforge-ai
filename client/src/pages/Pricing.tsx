@@ -24,6 +24,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { CREDIT_PACKS } from "@shared/creditCosts";
+import { CreditCalculator } from "@/components/CreditCalculator";
 
 /* -- Animation variants -- */
 const fadeUp = {
@@ -288,7 +289,7 @@ export default function Pricing() {
       </section>
 
       {/* ======= PLAN CARDS ======= */}
-      <section className="pb-24 relative">
+      <section id="plans" className="pb-24 relative scroll-mt-20">
         <div className="container">
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
             {plans.map((plan, i) => {
@@ -802,6 +803,9 @@ export default function Pricing() {
           </div>
         </div>
       </section>
+
+      {/* ======= CREDIT CALCULATOR ======= */}
+      <CreditCalculator />
 
       {/* ======= FAQ ======= */}
       <section className="py-24 border-t border-border/50 bg-card/20">

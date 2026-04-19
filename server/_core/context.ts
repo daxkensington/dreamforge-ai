@@ -5,10 +5,22 @@ import type { User } from "../../drizzle/schema";
 export type TrpcContext = {
   user: User | null;
   session: any;
+  /** Caller IP (best-effort), used for IP-keyed rate limits on public procedures. */
+  ip: string | null;
 };
+
+function extractIp(req?: Request): string | null {
+  if (!req) return null;
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]!.trim();
+  const xreal = req.headers.get("x-real-ip");
+  if (xreal) return xreal.trim();
+  return null;
+}
 
 export async function createContext(req?: Request): Promise<TrpcContext> {
   let user: User | null = null;
+  const ip = extractIp(req);
 
   try {
     // Get NextAuth session
@@ -36,5 +48,5 @@ export async function createContext(req?: Request): Promise<TrpcContext> {
     user = null;
   }
 
-  return { user, session: null };
+  return { user, session: null, ip };
 }

@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: "/video-studio", priority: 0.7, changeFrequency: "weekly" as const },
     { url: "/api-docs", priority: 0.5, changeFrequency: "monthly" as const },
     { url: "/batch", priority: 0.5, changeFrequency: "monthly" as const },
+    { url: "/demo/text-to-image", priority: 0.9, changeFrequency: "monthly" as const },
   ];
 
   // Tool pages

@@ -52,6 +52,7 @@ import {
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
+import { ShareButton } from "@/components/ShareButton";
 
 const MODEL_OPTIONS = [
   // Image models
@@ -913,6 +914,13 @@ export default function Workspace() {
                                     Open
                                   </a>
                                 </Button>
+                                <ShareButton
+                                  generationId={gen.id}
+                                  shareText={`Check out this AI ${gen.mediaType === "video" ? "video" : "image"} I made on DreamForgeX:`}
+                                  variant="secondary"
+                                  iconOnly
+                                  className="text-xs h-8 px-2"
+                                />
                               </div>
                             )}
                           </div>

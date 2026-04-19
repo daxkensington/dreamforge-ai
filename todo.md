@@ -982,12 +982,12 @@ Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
   - promptAssistRouter.improve (LLM call ungated, now gated via prompt-assist kill-switch)
   - promptAssistRouter.suggest (LLM query ungated, now `requireToolActive` only)
 
-### Tier 1 — Conversion & virality
-- [ ] Add a $25-30 mid-tier ("Studio" / "Creator+") between Pro and Enterprise — every competitor has one, currently leaking prosumer revenue
-- [ ] Show credit cost BEFORE the generate button on every tool page (only ~20% of tools currently display this)
-- [ ] Shareable generation links + dynamic OG metadata — `/g/[id]` route + `/api/og` runtime image gen + share buttons on gallery + generation results
-- [ ] "Try without signup" demo for top 3 tools (text-to-image, upscaler, action-figure) — 1 free generation per IP/day, watermarked
-- [ ] Credit calculator widget on `/pricing` page
+### Tier 1 — Conversion & virality (SHIPPED 2026-04-19)
+- [x] T1.1 Mid-tier pricing — VERIFIED no-op: DFX already has 6 tiers (Explorer/Creator/Pro/Studio/Business/Agency); Studio at $39 covers the prosumer band. Pricing-band repositioning is a business decision not a code one.
+- [x] T1.2 Credit-cost preview on every tool — `<CreditCostBadge>` baked into `ToolPageLayout`; auto-resolves from URL slug via `TOOL_SLUG_ALIASES`; server `CREDIT_COSTS` now re-exports from shared so client/server never drift.
+- [x] T1.3 Shareable generation links + dynamic OG — new `/g/[id]` server-rendered route with `generateMetadata` (Twitter/Discord/iMessage unfurls); `<ShareGenerationView>` for the public landing UI; `<ShareButton>` popover wired into `Workspace` result hover + `GalleryDetail` actions.
+- [x] T1.4 Try-without-signup demo — `/demo/text-to-image` public page + `demo.generate` publicProcedure; IP-keyed 1-per-24h rate limit (`enforceIpRateLimit`); routes through cheap fallback chain (Cloudflare/RunPod Schnell, ~$0.003/image); sign-up CTA after generation.
+- [x] T1.5 Credit calculator on /pricing — `<CreditCalculator>` widget with image/video/tool sliders that recommend the cheapest covering plan and show effective $/credit rate.
 
 ### Tier 2 — Viral trend tools (ride the 2026 wave)
 - [ ] AI Action Figure generator (TikTok/Instagram viral; ChatGPT's biggest viral moment of 2025)

@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions } from "../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
+import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripeClient: Stripe | null = null;
@@ -59,63 +60,10 @@ export const CREDIT_PACKAGES = [
 ] as const;
 
 // ─── Credit Costs per Tool ──────────────────────────────────────────────────
+// Re-exported from shared/creditCosts.ts so server + client can't drift.
 // For model-based generations (text-to-image, text-to-video), the actual cost
-// is determined by the MODEL selected (see MODEL_CREDIT_COSTS in shared/creditCosts.ts).
-// These are fallback/default costs for tool-based operations.
-export const CREDIT_COSTS: Record<string, number> = {
-  "text-to-image": 5,
-  "image-to-image": 5,
-  "text-to-video": 50,
-  "image-to-video": 40,
-  "background-remove": 5,
-  "background-edit": 5,
-  "style-transfer": 10,
-  "face-enhance": 5,
-  "color-grade": 5,
-  "super-resolution": 10,
-  "object-remove": 10,
-  "sketch-to-image": 10,
-  "image-merge": 10,
-  "texture-gen": 5,
-  "panorama": 15,
-  "animate": 40,
-  storyboard: 15,
-  "scene-director": 10,
-  "video-style-transfer": 15,
-  "video-upscaler": 15,
-  "soundtrack-suggest": 5,
-  "text-to-video-script": 5,
-  "prompt-assist": 0,
-  "ai-refine": 5,
-  "model-compare": 15,
-  "photo-restore": 10,
-  "headshot": 10,
-  "logo-maker": 10,
-  "wallpaper": 5,
-  "qr-art": 10,
-  "vectorize": 5,
-  "nl-edit": 5,
-  "avatar": 10,
-  "product-photo": 10,
-  "image-caption": 0,
-  "text-to-speech": 8,
-  "audio-enhance": 5,
-  "sound-effects": 4,
-  "hdr-enhance": 5,
-  "transparent-png": 5,
-  "icon-gen": 5,
-  "batch-prompts": 5,
-  "music-gen": 6,
-  "mockup": 5,
-  "social-resize": 5,
-  "depth-map": 5,
-  "character-sheet": 15,
-  "meme": 5,
-  "interior-design": 10,
-  "thumbnail": 5,
-  "collage": 10,
-  "film-grain": 5,
-};
+// depends on the MODEL selected (see MODEL_CREDIT_COSTS in shared/creditCosts.ts).
+export const CREDIT_COSTS: Record<string, number> = TOOL_CREDIT_COSTS;
 
 // ─── DB Helpers ─────────────────────────────────────────────────────────────
 export async function getOrCreateBalance(userId: number) {

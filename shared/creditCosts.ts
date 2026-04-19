@@ -17,16 +17,34 @@ export const MODEL_CREDIT_COSTS = {
 } as const;
 
 // ─── Tool Credit Costs (non-model operations) ────────────────────────────
+// Single source of truth — also imported by server/stripe.ts CREDIT_COSTS.
 export const TOOL_CREDIT_COSTS: Record<string, number> = {
+  // Free / utility
   "prompt-assist": 0,
   "image-caption": 0,
+
+  // Image edit / restore
   "background-remove": 5,
+  "background-edit": 5,
   "upscale": 5,
   "super-resolution": 10,
   "style-transfer": 10,
+  "face-enhance": 5,
+  "color-grade": 5,
+  "object-remove": 10,
+  "sketch-to-image": 10,
+  "image-merge": 10,
+  "texture-gen": 5,
+  "nl-edit": 5,
+  "hdr-enhance": 5,
+  "transparent-png": 5,
+  "depth-map": 5,
+  "film-grain": 5,
   "panorama": 15,
-  "storyboard": 15,
-  "character-sheet": 15,
+  "photo-restore": 10,
+  "photo-colorize": 8,
+
+  // Generative content
   "animate": 40,
   "virtual-tryon": 10,
   "relight": 10,
@@ -38,13 +56,14 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "tattoo-design": 10,
   "cover-maker": 10,
   "pose-turnaround": 15,
-  "photo-colorize": 8,
   "podcast-cover": 8,
   "listing-photos": 20,
   "real-estate-twilight": 8,
   "fashion-lookbook": 20,
   "meme-template": 5,
+  "meme": 5,
   "yt-thumbnails": 25,
+  "thumbnail": 5,
   "ig-carousel": 35,
   "sticker-pack": 25,
   "recipe-card": 8,
@@ -66,7 +85,60 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "architecture-concept": 10,
   "cosplay-reference": 25,
   "travel-postcard": 5,
+  "headshot": 10,
+  "logo-maker": 10,
+  "wallpaper": 5,
+  "qr-art": 10,
+  "vectorize": 5,
+  "avatar": 10,
+  "product-photo": 10,
+  "icon-gen": 5,
+  "mockup": 5,
+  "social-resize": 5,
+  "interior-design": 10,
+  "collage": 10,
+  "character-sheet": 15,
+  "batch-prompts": 5,
+
+  // Audio / video tools
+  "text-to-image": 5,
+  "image-to-image": 5,
+  "text-to-video": 50,
+  "image-to-video": 40,
+  "storyboard": 15,
+  "scene-director": 10,
+  "video-style-transfer": 15,
+  "video-upscaler": 15,
+  "soundtrack-suggest": 5,
+  "text-to-video-script": 5,
+  "text-to-speech": 8,
+  "audio-enhance": 5,
+  "sound-effects": 4,
+  "music-gen": 6,
+  "ai-refine": 5,
+  "model-compare": 15,
 };
+
+// ─── URL slug → tool key aliases ─────────────────────────────────────────
+// Some routes use slugs that don't match the credit-cost key. Listed here
+// so CreditCostBadge can resolve them via auto-derivation from the URL.
+export const TOOL_SLUG_ALIASES: Record<string, string> = {
+  upscaler: "upscale",
+  background: "background-remove",
+  "face-enhancer": "face-enhance",
+  "color-grading": "color-grade",
+  "object-eraser": "object-remove",
+  "image-blender": "image-merge",
+  inpainting: "image-merge",
+  outpainting: "panorama",
+  variations: "image-to-image",
+};
+
+/** Look up a tool's credit cost from a URL slug, applying known aliases. */
+export function getToolCostFromSlug(slug: string): number | undefined {
+  const key = TOOL_SLUG_ALIASES[slug] ?? slug;
+  return TOOL_CREDIT_COSTS[key];
+}
 
 // ─── Old flat costs (kept for backward compat) ───────────────────────────
 /** @deprecated Use MODEL_CREDIT_COSTS + TOOL_CREDIT_COSTS instead */

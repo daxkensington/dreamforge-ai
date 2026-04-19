@@ -1,12 +1,13 @@
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Lock } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { ToolSEOBlock } from "@/components/ToolSEOBlock";
 import { ToolPageSchemas } from "@/components/ToolPageSchemas";
+import { CreditCostBadge } from "@/components/CreditCostBadge";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolPageLayoutProps {
@@ -15,6 +16,14 @@ interface ToolPageLayoutProps {
   icon: LucideIcon;
   gradient: string;
   children: React.ReactNode;
+  /**
+   * Optional: explicit tool key (e.g. "pixel-art") to look up credit cost.
+   * If omitted, the layout derives it from the URL slug, which works for the
+   * majority of tools whose route slug matches their TOOL_CREDIT_COSTS key.
+   */
+  toolKey?: string;
+  /** Optional: override credit cost when no static key fits. */
+  costCredits?: number;
 }
 
 export default function ToolPageLayout({
@@ -23,8 +32,15 @@ export default function ToolPageLayout({
   icon: Icon,
   gradient,
   children,
+  toolKey,
+  costCredits,
 }: ToolPageLayoutProps) {
   const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  // Auto-derive toolKey from "/tools/<slug>" so we don't have to touch
+  // every individual tool page. CreditCostBadge silently no-ops if the
+  // slug isn't in TOOL_CREDIT_COSTS (e.g., model-tier-aware tools).
+  const derivedKey = toolKey ?? location.match(/^\/tools\/([\w-]+)/)?.[1];
 
   return (
     <PageLayout>
@@ -44,12 +60,15 @@ export default function ToolPageLayout({
                 </Button>
               </Link>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-start gap-4">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
                   <Icon className="h-6 w-6 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold">{title}</h1>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <h1 className="text-2xl font-bold">{title}</h1>
+                    <CreditCostBadge toolKey={derivedKey} costCredits={costCredits} />
+                  </div>
                   <p className="text-sm text-muted-foreground">{description}</p>
                 </div>
               </div>

@@ -23,6 +23,7 @@ import { useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ShareButton } from "@/components/ShareButton";
 
 export default function GalleryDetail() {
   const params = useParams<{ id: string }>();
@@ -305,6 +306,13 @@ export default function GalleryDetail() {
                 <Download className="h-4 w-4" />
                 Download {gen?.mediaType === "video" ? "Video" : "Image"}
               </Button>
+              {gen?.id && (
+                <ShareButton
+                  generationId={gen.id}
+                  shareText={`Check out this AI ${gen.mediaType === "video" ? "video" : "image"} from DreamForgeX:`}
+                  className="w-full justify-center"
+                />
+              )}
               <Button variant="outline" onClick={copyMetadata} className="w-full gap-2 bg-transparent">
                 {copied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <FileJson className="h-4 w-4" />}
                 {copied ? "Copied!" : "Export Metadata (JSON)"}
