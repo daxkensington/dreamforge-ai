@@ -22,7 +22,12 @@ export const ENV = {
   get geminiApiKey() { return process.env.GEMINI_API_KEY ?? ""; },
   get cfAccountId() { return process.env.CF_ACCOUNT_ID ?? process.env.R2_ACCOUNT_ID ?? ""; },
   get cfAiToken() { return process.env.CF_AI_TOKEN ?? ""; },
-  get r2AccountId() { return process.env.R2_ACCOUNT_ID ?? ""; },
+  // Fall back to CF_ACCOUNT_ID — prod deploys only set CF_ACCOUNT_ID, and
+  // the missing fallback was producing a broken `https://.r2.cloudflare...`
+  // endpoint that the S3 SDK munged into `<bucket>..r2.cloudflare...` (double
+  // dot → DNS failure). Every image tool was failing because of this one
+  // missing fallback. Diagnosed 2026-04-19 via direct demo.generate call.
+  get r2AccountId() { return process.env.R2_ACCOUNT_ID ?? process.env.CF_ACCOUNT_ID ?? ""; },
   get r2AccessKeyId() { return process.env.R2_ACCESS_KEY_ID ?? ""; },
   get r2SecretAccessKey() { return process.env.R2_SECRET_ACCESS_KEY ?? ""; },
   get r2BucketName() { return process.env.R2_BUCKET_NAME ?? "dreamforge-assets"; },
