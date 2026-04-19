@@ -398,7 +398,20 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
     throw new Error(`Cloudflare AI failed (${response.status}): ${detail}`);
   }
 
-  // Cloudflare returns raw image bytes
+  // Cloudflare Workers AI returns JSON: { result: { image: "<base64>" }, success: true }
+  // The base64 is a JPEG. Prior comment claimed "raw image bytes" — that
+  // was wrong, and we were saving the whole JSON payload to R2 as the
+  // "image," which broke every Cloudflare-routed generation.
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const json = await response.json();
+    const b64 = json?.result?.image;
+    if (!b64 || typeof b64 !== "string") {
+      throw new Error(`Cloudflare AI response missing result.image: ${JSON.stringify(json).slice(0, 200)}`);
+    }
+    return Buffer.from(b64, "base64");
+  }
+  // Some models return binary directly — keep that path for safety.
   return Buffer.from(await response.arrayBuffer());
 }
 
