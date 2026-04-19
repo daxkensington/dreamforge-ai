@@ -17,6 +17,12 @@ import {
   handleMonthlyReset,
 } from "../../../../server/routers/pricing";
 
+// Stripe retries webhooks for up to 3 days if we don't 200 in time, so
+// failing fast is better than letting an event hang. 30s is plenty for
+// the heaviest handler (charge.refunded does ~3 DB queries + notify).
+export const maxDuration = 30;
+export const runtime = "nodejs";
+
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
 function getStripeClient(): Stripe {

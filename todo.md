@@ -999,7 +999,8 @@ Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
 - [x] T3.1 One-Click Story pipeline (SHIPPED 2026-04-19) — `/story` route + `story.create` mutation that composes existing storyboard LLM + per-scene img-gen with optional character consistency + async MusicGen kickoff. Single text input → illustrated 4-6 scene story with custom soundtrack. `story.getAudioStatus` for client polling. Cost bundled (~30-40 credits).
 - [ ] Real-time canvas mode (Krea-style) — wire SDXL Turbo / Flux Schnell / LCM behind canvas with WebSocket streaming
 - [ ] Vector/SVG output via Recraft API + typography-specialist routing via Ideogram/Nano Banana Pro for text-heavy prompts
-- [ ] Background job queue (Inngest or Vercel Cron + Neon) — needed before next traffic spike, RunPod cold starts (87s) hit Vercel function timeout
+- [x] T3.2 Vercel `maxDuration` caps (SHIPPED 2026-04-19) — tRPC handler set to 300s (covers RunPod cold starts + Replicate 180s polling); Stripe webhook capped at 30s (fast-fail if Stripe event processing hangs). Pragmatic alternative to a full job queue; real queue (Inngest/Neon-worker) still open for cases needing >300s.
+- [ ] Background job queue (Inngest or Vercel Cron + Neon) — only needed for jobs >300s; maxDuration caps cover everything currently
 
 ### Tier 4 — Polish & tech debt
 - [ ] Mobile touch UX for fabric.js tools (inpainting, design-canvas, outpainting) — currently desktop-only
