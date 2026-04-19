@@ -1,77 +1,127 @@
 /**
- * In-memory rate limiter for tRPC procedures.
- * Tracks hits per key within a sliding window and throws TOO_MANY_REQUESTS when exceeded.
- * Includes periodic cleanup to prevent memory leaks.
+ * Postgres-backed rate limiter for tRPC procedures.
+ *
+ * Replaces the previous in-memory limiter, which was effectively a no-op on
+ * Vercel serverless: every cold start spawned a new process with an empty
+ * Map, so attackers (or buggy clients) could simply trigger cold starts to
+ * reset their counters. This implementation persists hits to the
+ * `rate_limit_hits` table and counts within a sliding window.
+ *
+ * Single round-trip per call via a CTE that:
+ *   1. counts existing hits in the window
+ *   2. inserts a new hit ONLY if under the limit
+ *   3. returns the current count + whether the call was allowed
+ *
+ * Failure mode: if the DB is unavailable, the limiter fails OPEN (allows
+ * the request) and logs a warning. The reasoning is that rejecting legit
+ * traffic during a brief DB hiccup hurts more than letting through a few
+ * extra requests during the same window.
  */
 
 import { TRPCError } from "@trpc/server";
-
-interface RateLimitEntry {
-  hits: number[];
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-// Periodic cleanup — remove expired entries every 5 minutes
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-function startCleanup() {
-  if (cleanupTimer) return;
-  cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of store) {
-      // Remove hits older than 2 minutes (covers any reasonable window)
-      entry.hits = entry.hits.filter((t) => now - t < 2 * 60 * 1000);
-      if (entry.hits.length === 0) {
-        store.delete(key);
-      }
-    }
-  }, CLEANUP_INTERVAL_MS);
-  // Allow the process to exit without waiting for this timer
-  if (cleanupTimer && typeof cleanupTimer === "object" && "unref" in cleanupTimer) {
-    cleanupTimer.unref();
-  }
-}
-
-startCleanup();
+import { sql } from "drizzle-orm";
+import { getDb } from "./db";
 
 /**
  * Enforce a rate limit for a given key.
  *
- * @param key      Unique identifier (e.g. `generation.create:${userId}`)
- * @param maxHits  Maximum number of requests allowed in the window
- * @param windowMs Duration of the sliding window in milliseconds
+ * @param key      Unique identifier (e.g. `"generation.create:user:42"`)
+ * @param maxHits  Max requests allowed in the window
+ * @param windowMs Sliding window size in milliseconds
  * @param message  Optional custom error message
  *
- * @throws TRPCError with code TOO_MANY_REQUESTS when the limit is exceeded
+ * @throws TRPCError(TOO_MANY_REQUESTS) when over the limit
  */
-export function enforceRateLimit(
+export async function enforceRateLimit(
   key: string,
   maxHits: number,
   windowMs: number,
   message?: string,
-): void {
-  const now = Date.now();
-
-  let entry = store.get(key);
-  if (!entry) {
-    entry = { hits: [] };
-    store.set(key, entry);
+): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    // No DB → fail open. Caller continues. Logged once per call so it's
+    // visible during outages without spamming.
+    console.warn("[rate-limit] DB unavailable, failing open for key:", key);
+    return;
   }
 
-  // Prune hits outside the current window
-  entry.hits = entry.hits.filter((t) => now - t < windowMs);
+  const intervalSeconds = Math.max(1, Math.ceil(windowMs / 1000));
 
-  if (entry.hits.length >= maxHits) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message:
-        message ??
-        `Rate limit exceeded. Maximum ${maxHits} requests per ${Math.round(windowMs / 1000)}s.`,
-    });
+  try {
+    // CTE: count, conditionally insert, return both. One round-trip.
+    const result: any = await db.execute(sql`
+      WITH counted AS (
+        SELECT COUNT(*)::int AS hits
+        FROM rate_limit_hits
+        WHERE key = ${key}
+          AND ts > NOW() - (${intervalSeconds}::int * INTERVAL '1 second')
+      ),
+      inserted AS (
+        INSERT INTO rate_limit_hits (key)
+        SELECT ${key}
+        WHERE (SELECT hits FROM counted) < ${maxHits}
+        RETURNING 1
+      )
+      SELECT
+        (SELECT hits FROM counted) AS current_hits,
+        EXISTS(SELECT 1 FROM inserted) AS allowed
+    `);
+
+    // Drizzle's neon adapter returns { rows: [...] }; the http adapter
+    // sometimes returns the array directly. Handle both.
+    const row = (result.rows ?? result)[0] as
+      | { current_hits: number; allowed: boolean }
+      | undefined;
+
+    if (!row?.allowed) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message:
+          message ??
+          `Rate limit exceeded. Maximum ${maxHits} requests per ${Math.round(windowMs / 1000)}s.`,
+      });
+    }
+  } catch (err) {
+    if (err instanceof TRPCError) throw err;
+    // DB error → fail open + log. Don't block legit users on infra blips.
+    console.warn("[rate-limit] DB error, failing open for key:", key, err);
   }
+}
 
-  entry.hits.push(now);
+/**
+ * Convenience wrapper for keying by user ID.
+ */
+export async function enforceUserRateLimit(
+  procedureName: string,
+  userId: number | string,
+  maxHits: number,
+  windowMs: number,
+  message?: string,
+): Promise<void> {
+  return enforceRateLimit(
+    `${procedureName}:user:${userId}`,
+    maxHits,
+    windowMs,
+    message,
+  );
+}
+
+/**
+ * Convenience wrapper for keying by IP address. Used as a pre-filter for
+ * abuse from many accounts behind the same IP.
+ */
+export async function enforceIpRateLimit(
+  procedureName: string,
+  ip: string,
+  maxHits: number,
+  windowMs: number,
+  message?: string,
+): Promise<void> {
+  return enforceRateLimit(
+    `${procedureName}:ip:${ip}`,
+    maxHits,
+    windowMs,
+    message,
+  );
 }

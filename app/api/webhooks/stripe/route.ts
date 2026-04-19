@@ -3,8 +3,13 @@ import Stripe from "stripe";
 import { getDb } from "../../../../server/db";
 import { addCredits } from "../../../../server/stripe";
 import { createNotification } from "../../../../server/routersPhase15";
-import { webhookEvents } from "../../../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import {
+  webhookEvents,
+  creditBalances,
+  creditTransactions,
+  userSubscriptions,
+} from "../../../../drizzle/schema";
+import { eq, sql } from "drizzle-orm";
 import {
   activateSubscription,
   handleSubscriptionUpdated,
@@ -231,6 +236,167 @@ export async function POST(req: NextRequest) {
         } else {
           await logWebhookEvent("processed", `Invoice payment succeeded: ${invoice.id}`);
         }
+        break;
+      }
+
+      // ─── Refund Clawback ─────────────────────────────────────────
+      // Fired when a charge is refunded (full or partial) via Stripe Dashboard
+      // or API. We claw back the equivalent credits so users who get refunded
+      // can't keep generating with credits they no longer paid for.
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId =
+          typeof charge.payment_intent === "string"
+            ? charge.payment_intent
+            : charge.payment_intent?.id;
+
+        if (!paymentIntentId) {
+          await logWebhookEvent("ignored", `charge.refunded with no payment_intent: ${charge.id}`);
+          break;
+        }
+        if (!db) {
+          await logWebhookEvent("failed", `charge.refunded: no database (${charge.id})`);
+          break;
+        }
+
+        // Find the original credit purchase by payment intent.
+        const original = await db
+          .select()
+          .from(creditTransactions)
+          .where(eq(creditTransactions.stripePaymentIntentId, paymentIntentId))
+          .limit(1);
+
+        if (original.length === 0) {
+          // Subscription invoice or pre-credits-system purchase — nothing to claw back.
+          await logWebhookEvent(
+            "ignored",
+            `charge.refunded: no matching credit purchase for ${paymentIntentId}`
+          );
+          break;
+        }
+
+        const purchase = original[0];
+        const refundRatio = (charge.amount_refunded || 0) / (charge.amount || 1);
+        const creditsToClawback = Math.round(purchase.amount * refundRatio);
+
+        if (creditsToClawback <= 0) {
+          await logWebhookEvent("ignored", `charge.refunded: zero refund amount (${charge.id})`);
+          break;
+        }
+
+        // Deduct from balance — allow it to go negative if the user already
+        // spent the credits, so they can't simply spend-then-refund.
+        await db
+          .update(creditBalances)
+          .set({
+            balance: sql`${creditBalances.balance} - ${creditsToClawback}`,
+          })
+          .where(eq(creditBalances.userId, purchase.userId));
+
+        await db.insert(creditTransactions).values({
+          userId: purchase.userId,
+          amount: -creditsToClawback,
+          type: "refund",
+          description: `Stripe refund: ${creditsToClawback} credits clawed back`,
+          stripePaymentIntentId: paymentIntentId,
+          metadata: {
+            chargeId: charge.id,
+            refundAmount: charge.amount_refunded,
+            originalPurchaseTransactionId: purchase.id,
+          },
+        });
+
+        try {
+          await createNotification(
+            purchase.userId,
+            "payment",
+            "Refund Processed",
+            `Your refund has been processed and ${creditsToClawback} credit${creditsToClawback === 1 ? "" : "s"} ` +
+              `have been removed from your balance.`,
+            { chargeId: charge.id, creditsRemoved: creditsToClawback }
+          );
+        } catch {}
+
+        console.log(
+          `[Stripe Webhook] Refund clawback: ${creditsToClawback} credits from user ${purchase.userId} (charge ${charge.id})`
+        );
+        await logWebhookEvent(
+          "processed",
+          `Refund clawback: ${creditsToClawback} credits from user ${purchase.userId}`
+        );
+        break;
+      }
+
+      // ─── Subscription Renewal Failure ────────────────────────────
+      // Stripe handles retries automatically (smart retries over ~3 weeks)
+      // and will eventually fire customer.subscription.updated → past_due
+      // → canceled. We just notify the user so they can update their card
+      // before they lose access.
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as any;
+        const subId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+
+        if (!subId) {
+          await logWebhookEvent(
+            "ignored",
+            `invoice.payment_failed: not a subscription invoice (${invoice.id})`
+          );
+          break;
+        }
+        if (!db) {
+          await logWebhookEvent("failed", `invoice.payment_failed: no database (${invoice.id})`);
+          break;
+        }
+
+        const subRows = await db
+          .select({ userId: userSubscriptions.userId })
+          .from(userSubscriptions)
+          .where(eq(userSubscriptions.stripeSubscriptionId, subId))
+          .limit(1);
+        const userId = subRows[0]?.userId;
+
+        if (!userId) {
+          await logWebhookEvent(
+            "ignored",
+            `invoice.payment_failed: no local subscription for ${subId}`
+          );
+          break;
+        }
+
+        const attemptCount = invoice.attempt_count || 1;
+        const nextAttemptUnix = invoice.next_payment_attempt;
+        const nextAttemptText = nextAttemptUnix
+          ? `We'll automatically retry on ${new Date(nextAttemptUnix * 1000).toLocaleDateString()}.`
+          : "Please update your payment method to avoid losing access.";
+
+        try {
+          await createNotification(
+            userId,
+            "payment",
+            attemptCount === 1
+              ? "Subscription Payment Failed"
+              : `Payment Retry Failed (Attempt ${attemptCount})`,
+            `Your subscription renewal couldn't be processed. ${nextAttemptText} ` +
+              `Update your payment method on the Credits page.`,
+            {
+              invoiceId: invoice.id,
+              subscriptionId: subId,
+              attemptCount,
+              amountDue: invoice.amount_due,
+            }
+          );
+        } catch {}
+
+        console.log(
+          `[Stripe Webhook] Invoice payment failed: user ${userId}, sub ${subId}, attempt ${attemptCount}`
+        );
+        await logWebhookEvent(
+          "processed",
+          `Payment failed for user ${userId}, sub ${subId}, attempt ${attemptCount}`
+        );
         break;
       }
 

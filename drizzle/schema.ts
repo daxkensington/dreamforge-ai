@@ -463,6 +463,21 @@ export const notificationPreferences = pgTable("notificationPreferences", {
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
+// ─── Rate Limit Hits ──────────────────────────────────────────────────────
+// One row per request, pruned periodically. Replaces the in-memory limiter
+// that was effectively a no-op on Vercel serverless (every cold start = new
+// process = empty Map). Keys look like "generation.create:user:42" or
+// "video.textToVideo:ip:1.2.3.4".
+export const rateLimitHits = pgTable("rate_limit_hits", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 256 }).notNull(),
+  ts: timestamp("ts").defaultNow().notNull(),
+}, (table) => [
+  index("rate_limit_hits_key_ts_idx").on(table.key, table.ts),
+]);
+
+export type RateLimitHit = typeof rateLimitHits.$inferSelect;
+
 // ─── Webhook Events ──────────────────────────────────────────────────────
 export const webhookEvents = pgTable("webhookEvents", {
   id: serial("id").primaryKey(),

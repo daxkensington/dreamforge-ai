@@ -500,7 +500,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 20 requests per minute per user
-        enforceRateLimit(`generation.create:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
+        await enforceRateLimit(`generation.create:user:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
 
         // Get user tier for watermark decision + enforcement
         const userTier = await getUserTier(ctx.user.id);
@@ -827,7 +827,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 5 batch requests per minute per user
-        enforceRateLimit(`generation.batchCreate:${ctx.user.id}`, 5, 60_000, "Batch generation rate limit exceeded — max 5 per minute.");
+        await enforceRateLimit(`generation.batchCreate:user:${ctx.user.id}`, 5, 60_000, "Batch generation rate limit exceeded — max 5 per minute.");
 
         // Tier enforcement for batch
         const userTier = await getUserTier(ctx.user.id);
@@ -921,7 +921,10 @@ export const appRouter = router({
 
     enhancePrompt: protectedProcedure
       .input(z.object({ prompt: z.string().min(1).max(2000) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // prompt-assist costs 0 credits; tryDeductCredits also runs the
+        // kill-switch + tool-status check.
+        await tryDeductCredits(ctx.user.id, "prompt-assist", "Enhance prompt");
         try {
           const result = await invokeLLM({
             messages: [
@@ -4549,7 +4552,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
-        enforceRateLimit(`video.textToVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
+        await enforceRateLimit(`video.textToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
 
         const styleEnhancers: Record<string, string> = {
@@ -4683,7 +4686,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
-        enforceRateLimit(`video.imageToVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
+        await enforceRateLimit(`video.imageToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
 
         const motionDescriptions: Record<string, string> = {
@@ -5111,6 +5114,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "ai-refine", `Refine project #${input.projectId}`);
         const project = await getVideoProject(input.projectId, ctx.user.id);
         const collabRole = project ? null : await getUserCollaboratorRole(input.projectId, ctx.user.id);
         if (!project && collabRole !== "editor") {
@@ -5291,7 +5295,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        enforceRateLimit(`song.generateLyrics:${ctx.user.id}`, 20, 60_000, "Lyrics generation rate limit exceeded — max 20 per minute.");
+        await enforceRateLimit(`song.generateLyrics:user:${ctx.user.id}`, 20, 60_000, "Lyrics generation rate limit exceeded — max 20 per minute.");
         await tryDeductCredits(ctx.user.id, "prompt-assist", "AI lyrics generation");
         const { generateLyrics } = await import("./_core/songGeneration");
         return generateLyrics(input);
@@ -5310,7 +5314,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        enforceRateLimit(`song.generateSong:${ctx.user.id}`, 10, 60_000, "Song generation rate limit exceeded — max 10 per minute.");
+        await enforceRateLimit(`song.generateSong:user:${ctx.user.id}`, 10, 60_000, "Song generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
         const { generateSong } = await import("./_core/songGeneration");
         const result = await generateSong(input);
@@ -5329,7 +5333,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
-        enforceRateLimit(`song.generateMusicVideo:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
+        await enforceRateLimit(`song.generateMusicVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         await tryDeductCredits(ctx.user.id, "text-to-video", "Music video generation");
 
         // Generate video scenes based on the concept + photo

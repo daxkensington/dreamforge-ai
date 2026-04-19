@@ -291,6 +291,7 @@ export const characterRouter = router({
       prompt: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
+      await tryDeductCredits(ctx.user.id, "image-to-image", `Character #${input.characterId} scene`);
       const char = await getCharacter(input.characterId, ctx.user.id);
       if (!char) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -329,7 +330,8 @@ export const modelRouter = router({
       prompt: z.string().min(1),
       modelIds: z.array(z.string()).min(2).max(4),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await tryDeductCredits(ctx.user.id, "model-compare", `Compare ${input.modelIds.length} models`);
       const results: { modelId: string; url: string | undefined; error?: string }[] = [];
       for (const modelId of input.modelIds) {
         const model = MODEL_REGISTRY.find(m => m.id === modelId);
@@ -359,7 +361,10 @@ export const promptAssistRouter = router({
       style: z.string().optional(),
       mood: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // prompt-assist costs 0 credits but goes through tryDeductCredits
+      // so the kill-switch can disable it during LLM provider outages.
+      await tryDeductCredits(ctx.user.id, "prompt-assist", "Improve prompt");
       const result = await invokeLLM({
         messages: [
           {
@@ -398,6 +403,9 @@ export const promptAssistRouter = router({
       category: z.enum(["style", "mood", "composition", "lighting", "color", "subject"]).optional(),
     }))
     .query(async ({ input }) => {
+      // Queries shouldn't deduct credits (they're cacheable), but we still
+      // gate on the kill-switch so admin can disable during LLM outages.
+      await requireToolActive("prompt-assist");
       const result = await invokeLLM({
         messages: [
           {

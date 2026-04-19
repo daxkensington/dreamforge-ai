@@ -94,7 +94,7 @@ export const audioRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       // Rate limit: 10 audio requests per minute per user
-      enforceRateLimit(`audio.generate:${ctx.user.id}`, 10, 60_000, "Audio generation rate limit exceeded — max 10 per minute.");
+      await enforceRateLimit(`audio.generate:user:${ctx.user.id}`, 10, 60_000, "Audio generation rate limit exceeded — max 10 per minute.");
 
       const creditTool = `audio-${input.type}`;
       await tryDeductAudioCredits(
@@ -410,7 +410,7 @@ export const audioRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      enforceRateLimit(`audio.lipSync:${ctx.user.id}`, 5, 60_000, "Lip sync rate limit exceeded — max 5 per minute.");
+      await enforceRateLimit(`audio.lipSync:user:${ctx.user.id}`, 5, 60_000, "Lip sync rate limit exceeded — max 5 per minute.");
 
       await tryDeductAudioCredits(
         ctx.user.id,

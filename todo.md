@@ -925,3 +925,93 @@
 ### Still on External APIs
 - [ ] IC-Light v2 (fal.ai) — v2 weights not publicly released
 - [ ] Trellis 3D (fal.ai) — heavy deps, needs dedicated endpoint
+
+## Phase 29 — Creator Tools Wave (33 tools across 3 sub-phases)
+- [x] 29.0 — 13 new creator tools (aa0d75e)
+- [x] 29.1 — Grok-generated showcase images for the 13 new tools (956fc69)
+- [x] 29.2 — 10 more tools for commerce + creator niches (bb3db58)
+- [x] 29.3 — 10 more tools + Meta Pixel conversion events wired (be3be28)
+
+## Phase 30 — Magic-link Sign-in via Resend + Drizzle Adapter
+- [x] @auth/drizzle-adapter wired alongside Google + GitHub
+- [x] 4 adapter tables (auth_users / auth_accounts / auth_sessions / verification_tokens)
+- [x] Resend provider gated on AUTH_RESEND_KEY || RESEND_API_KEY
+- [x] /auth/verify-request page + restored email form on /auth/signin
+- [x] Migration 0003_naive_jack_flag.sql applied to prod Neon (idempotent)
+- [x] Resend env vars confirmed live on Vercel (verified 2026-04-19)
+
+## Phase 31 — Provider Resilience for Relight / 3D / Image-to-Video
+- [x] fal.ai IC-Light fallback path
+- [x] Replicate firtoz/trellis fallback for generate3D (454f14a)
+- [x] Image-to-video provider chain hardening
+
+## Phase 32 — Backlog Closeout
+- [x] Close remaining backlog items (628cd33)
+
+## Phase 33 — Long-form SEO Copy for 98 Tool Pages
+- [x] toolSeoCopy.ts data file with FAQ + HowTo + use-case copy per tool
+- [x] Below-fold content blocks rendered on every tool page
+
+## Phase 34 — Site Content Reflects 100+ Tools + Roadmap
+- [x] Tool counts updated across landing + pricing + nav
+- [x] New roadmap section
+- [x] Pricing tier feature label: "All 75+ tools" → "All 100+ tools" (0b07287)
+
+## Phases 35-38 — Schema.org, Use-Case Pages, Changelog, Social Posts
+- [x] Phase 35: JSON-LD on tool pages (SoftwareApplication, FAQPage, HowTo, BreadcrumbList)
+- [x] Phase 36: 8 use-case landing pages (/for/etsy-sellers, /for/podcasters, /for/real-estate-agents, /for/cosplayers, /for/indie-devs, /for/authors, /for/restaurants, /for/tattoo-artists)
+- [x] Phase 37: /whats-new changelog page (9 phase entries grouped by kind)
+- [x] Phase 38: Social post drafts + GSC indexing request batches
+- [x] Playwright-based prod smoke test (`scripts/live-smoke-test.mjs`, d1436b2)
+
+## Phase 39 — Audit Findings + Phase 39+ Roadmap
+
+Synthesized from 4 parallel audits (frontend, backend, competitor sweep, search-intent / GSC).
+Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
+
+### Tier 0 — Unit-economics firewall (SHIPPED 2026-04-19)
+- [x] T0.1 Stripe `charge.refunded` webhook handler — claws back equivalent credits, allows balance to go negative so spend-then-refund is unprofitable
+- [x] T0.2 Stripe `invoice.payment_failed` webhook handler — notifies user with retry-date messaging
+- [x] T0.3 Confirmed only `/api/webhooks/stripe` (Next.js) is live; deleted dead Express plumbing (`api/_source.ts`, `server/_core/index.ts`, `registerStripeWebhook` from `server/stripe.ts`)
+- [x] T0.4 Replaced in-memory rate limiter with Postgres-backed sliding window (`rate_limit_hits` table + single-CTE round-trip + daily cron cleanup); all 9 callsites converted to async `await`; fail-open on DB error
+- [x] T0.5 Audited every mutation for `tryDeductCredits` coverage; patched 6 gaps:
+  - generation.enhancePrompt (LLM call ungated)
+  - refineProject (LLM call ungated, now charges ai-refine 5cr)
+  - generateWithCharacter (image gen ungated, now charges image-to-image 5cr)
+  - modelRouter.compare (multi-image gen ungated, now charges model-compare 15cr)
+  - promptAssistRouter.improve (LLM call ungated, now gated via prompt-assist kill-switch)
+  - promptAssistRouter.suggest (LLM query ungated, now `requireToolActive` only)
+
+### Tier 1 — Conversion & virality
+- [ ] Add a $25-30 mid-tier ("Studio" / "Creator+") between Pro and Enterprise — every competitor has one, currently leaking prosumer revenue
+- [ ] Show credit cost BEFORE the generate button on every tool page (only ~20% of tools currently display this)
+- [ ] Shareable generation links + dynamic OG metadata — `/g/[id]` route + `/api/og` runtime image gen + share buttons on gallery + generation results
+- [ ] "Try without signup" demo for top 3 tools (text-to-image, upscaler, action-figure) — 1 free generation per IP/day, watermarked
+- [ ] Credit calculator widget on `/pricing` page
+
+### Tier 2 — Viral trend tools (ride the 2026 wave)
+- [ ] AI Action Figure generator (TikTok/Instagram viral; ChatGPT's biggest viral moment of 2025)
+- [ ] AI Chibi / Figurine / Funko Pop generators (4 branded landing pages, same backend)
+- [ ] AI Pet-to-Person ("humanize your pet") generator
+- [ ] `/vs/` comparison pages: /vs/midjourney, /vs/leonardo, /vs/runway, /vs/ideogram, /vs/krea — same pattern as `/for/<audience>` Phase 36 pages
+
+### Tier 3 — Differentiating features (real moats)
+- [ ] One-Click Story pipeline — combine character consistency + image-to-video + MusicGen into single "idea → 60s narrated video" flow (OpenArt productized this; DFX has all parts)
+- [ ] Real-time canvas mode (Krea-style) — wire SDXL Turbo / Flux Schnell / LCM behind canvas with WebSocket streaming
+- [ ] Vector/SVG output via Recraft API + typography-specialist routing via Ideogram/Nano Banana Pro for text-heavy prompts
+- [ ] Background job queue (Inngest or Vercel Cron + Neon) — needed before next traffic spike, RunPod cold starts (87s) hit Vercel function timeout
+
+### Tier 4 — Polish & tech debt
+- [ ] Mobile touch UX for fabric.js tools (inpainting, design-canvas, outpainting) — currently desktop-only
+- [ ] Env var validation via Zod in `instrumentation.ts` — currently silent failures on missing DATABASE_URL etc.
+- [ ] Dynamic gallery/marketplace items in sitemap (currently only static routes)
+- [ ] Loading states for /profile, /search, /brand-kits, /characters
+- [ ] Theme toggle in navbar (code exists in ComponentShowcase, just not exposed)
+- [ ] Keyboard shortcut discovery surfacing + Ctrl+Z undo in image editors
+- [ ] Composite index on `creditTransactions(userId, createdAt)` for billing report perf
+
+### Audit references
+- GSC (90d): 30 impressions / 3 clicks → search-invisible, Phase 33-37 too recent to show data
+- Top page is `/api-docs` (15 impressions, 2 clicks, pos 47.5) → developer audience emerging
+- Mobile CTR 28.6% vs desktop 4.3% → mobile traffic converts when seen
+- Competitor pricing reference: $0 / $8-12 / $25-36 (gap) / $60-90 / $120-200 — DFX missing the $25-36 prosumer band
