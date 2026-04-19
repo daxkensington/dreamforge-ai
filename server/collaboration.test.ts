@@ -1,5 +1,16 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
+// Mock credit deduction — refineProject now deducts ai-refine credits
+// (Phase 39 T0.5 patch) so tests need the stripe mock or they'd try the
+// real deductCredits and fail on DB unavailability.
+vi.mock("./stripe", async () => {
+  const actual = await vi.importActual<any>("./stripe");
+  return {
+    ...actual,
+    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 1000, needed: 5 }),
+  };
+});
+
 // Mock the image generation helper
 vi.mock("./_core/imageGeneration", () => ({
   generateImage: vi.fn().mockResolvedValue({ url: "https://cdn.example.com/result.png" }),

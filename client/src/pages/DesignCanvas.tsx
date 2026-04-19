@@ -257,15 +257,36 @@ export default function DesignCanvas() {
                   top: el.y * zoom,
                   width: el.width * zoom,
                   height: el.height * zoom,
+                  touchAction: "none",
                 }}
                 onClick={(e) => { e.stopPropagation(); setSelectedId(el.id); }}
-                draggable
-                onDragEnd={(e) => {
-                  const rect = canvasRef.current?.getBoundingClientRect();
-                  if (!rect) return;
-                  setElements((prev) => prev.map((item) =>
-                    item.id === el.id ? { ...item, x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom } : item
-                  ));
+                // Pointer-event drag (works on mouse + touch). HTML5
+                // native drag is touch-broken on iOS, so we track deltas
+                // manually via pointer events instead.
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setSelectedId(el.id);
+                  const target = e.currentTarget as HTMLDivElement;
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const origX = el.x;
+                  const origY = el.y;
+                  target.setPointerCapture?.(e.pointerId);
+                  const onMove = (ev: PointerEvent) => {
+                    const dx = (ev.clientX - startX) / zoom;
+                    const dy = (ev.clientY - startY) / zoom;
+                    setElements((prev) => prev.map((item) =>
+                      item.id === el.id ? { ...item, x: origX + dx, y: origY + dy } : item
+                    ));
+                  };
+                  const onEnd = () => {
+                    target.removeEventListener("pointermove", onMove);
+                    target.removeEventListener("pointerup", onEnd);
+                    target.removeEventListener("pointercancel", onEnd);
+                  };
+                  target.addEventListener("pointermove", onMove);
+                  target.addEventListener("pointerup", onEnd);
+                  target.addEventListener("pointercancel", onEnd);
                 }}
               >
                 {el.type === "text" ? (

@@ -70,7 +70,10 @@ export default function ToolCanvas() {
     ctx.fillRect(0, 0, 512, 512);
   };
 
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // PointerEvents fire for mouse, pen, AND touch — unlike MouseEvents which
+  // are touch-blind. This is the single-biggest-impact fix for making the
+  // canvas usable on mobile.
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -79,14 +82,18 @@ export default function ToolCanvas() {
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    // Capture so pointer events keep flowing even if the finger drags off
+    // the canvas mid-stroke (common on small mobile screens).
+    (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId);
     saveHistory();
     setIsDrawing(true);
     lastPos.current = getPos(e);
     draw(e);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -176,11 +183,13 @@ export default function ToolCanvas() {
                 </div>
                 <canvas
                   ref={canvasRef}
-                  className="w-full aspect-square rounded-lg cursor-crosshair border border-border/30"
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
+                  className="w-full aspect-square rounded-lg cursor-crosshair border border-border/30 touch-none"
+                  onPointerDown={startDrawing}
+                  onPointerMove={draw}
+                  onPointerUp={stopDrawing}
+                  onPointerCancel={stopDrawing}
+                  onPointerLeave={stopDrawing}
+                  style={{ touchAction: "none" }}
                 />
               </CardContent>
             </Card>

@@ -964,6 +964,21 @@
 - [x] Phase 38: Social post drafts + GSC indexing request batches
 - [x] Playwright-based prod smoke test (`scripts/live-smoke-test.mjs`, d1436b2)
 
+## Phase 40 — Autonomous SEO + Polish Push (2026-04-19)
+
+Autonomous shipping session covering SEO surface expansion, mobile UX, error sanitization, and test coverage for new routers. All typecheck-clean, 460/460 tests passing.
+
+- [x] A1 — 4 more `/vs/` comparison pages (canva-ai, adobe-firefly, playground, nightcafe). Same template, data-only additions.
+- [x] A2 — 4 more `/for/` audience pages (youtubers, shopify-sellers, streamers, small-business).
+- [x] A3 — 3 more viral preset tools (barbie-box, jellycat-plush, pop-mart). Plus cleanup of viralRouter to use each preset's own credit-tool key.
+- [x] A4 — Grok-generated showcase images for all 8 viral tools, wired into Tools.tsx grid + each ToolPage `showcase` prop.
+- [ ] A5 — Neon-backed background job queue — DEFERRED as speculative infra without a current >300s use case. maxDuration=300s covers everything today.
+- [x] A6 — Mobile touch UX via PointerEvents on ToolCanvas (drawing brush) + DesignCanvas (drag-to-move). Replaces touch-broken MouseEvents/HTML5 drag.
+- [x] A7 — Provider-error sanitization. New `server/_core/errorSanitizer.ts` plus a tRPC middleware that recursively scrubs any `error`/`errorMessage` string field on every procedure's return payload. Covers all 130 `error.message` leak sites in one chokepoint. Also wired into tRPC `errorFormatter` for thrown `TRPCError` messages.
+- [x] A8 — Vitest coverage for new routers (viral × 4, demo × 3, story × 3) + errorSanitizer × 9 = **19 new tests**. Plus 4 regression fixes in existing tests (extended, integration, collaboration) that weren't aware of the Phase 39 T0.5 credit-deduction patches.
+
+Sitemap now ~160 URLs. Typecheck clean. `npx vitest run`: 460/460 passing.
+
 ## Phase 39 — Audit Findings + Phase 39+ Roadmap
 
 Synthesized from 4 parallel audits (frontend, backend, competitor sweep, search-intent / GSC).

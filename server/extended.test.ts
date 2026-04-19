@@ -48,6 +48,26 @@ vi.mock("./dbExtended", () => ({
 // Mock db (for getVideoProject)
 vi.mock("./db", () => ({
   getVideoProject: vi.fn().mockResolvedValue({ id: 1, userId: 1, title: "Test Project", type: "storyboard", data: "{}" }),
+  // deductCredits (added in Phase 39 T0.5 for previously-ungated mutations)
+  // calls getDb — provide a permissive mock so tests don't explode when
+  // flowing through the new credit gate.
+  getDb: vi.fn().mockResolvedValue({
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    groupBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([{ balance: 1000, lifetimeSpent: 0, planName: "agency" }]),
+    insert: vi.fn().mockReturnThis(),
+    values: vi.fn().mockResolvedValue([]),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+  }),
+  getGenerationById: vi.fn().mockResolvedValue(null),
 }));
 
 import { generateImage } from "./_core/imageGeneration";

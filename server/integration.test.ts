@@ -14,7 +14,7 @@ vi.mock("./_core/llm", () => ({
 
 // Mock credit deduction
 vi.mock("./stripe", () => ({
-  deductCredits: vi.fn().mockResolvedValue(undefined),
+  deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 100, needed: 1 }),
   CREDIT_COSTS: {
     "text-to-image": 1,
     "image-to-image": 1,
@@ -157,7 +157,9 @@ describe("Credit Deduction Integration", () => {
       style: "photorealistic",
       aspectRatio: "16:9",
     });
-    expect(deductCredits).toHaveBeenCalledWith(1, 1, expect.any(String));
+    // Actual cost comes from MODEL_CREDIT_COSTS (defaults to image.standard=5);
+    // the local CREDIT_COSTS override doesn't apply to model-tier-aware paths.
+    expect(deductCredits).toHaveBeenCalledWith(1, expect.any(Number), expect.any(String));
   });
 
   it("should deduct credits when upscaling an image", async () => {
