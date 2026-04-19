@@ -48,7 +48,21 @@ const socialLinks = [
   { icon: Mail, href: "mailto:support@dreamforgex.ai", label: "Email" },
 ];
 
-const aiModels = ["Grok", "Flux Pro", "DALL-E 3", "Gemini", "Veo 3", "Claude", "Seedream", "Runway", "Kling", "fal.ai", "Groq"];
+// External providers we route to — matches the 13 providers claim in the
+// Home.tsx stat counter and the supportChat system prompt.
+const externalProviders = [
+  "Grok (xAI)", "OpenAI", "Gemini", "Claude", "Stability AI",
+  "Replicate", "fal.ai", "Together AI", "Cloudflare AI", "Groq",
+  "Runway", "Kling", "Sync Labs",
+];
+
+// In-house models running on our own RunPod GPU fleet. This is a
+// genuine differentiator vs every competitor except the hyperscalers —
+// advertising it explicitly in the footer credibility strip.
+const selfHostedModels = [
+  "Flux Pro/Dev/Schnell", "CogVideoX-5B", "MusicGen", "AudioGen",
+  "CatVTON", "Bark TTS", "Real-ESRGAN", "RMBG-2.0", "Exclusive LoRAs",
+];
 
 const galleryStrip = [
   "/showcase/gallery-strip-1.jpg", "/showcase/gallery-strip-2.jpg", "/showcase/gallery-strip-3.jpg",
@@ -124,12 +138,29 @@ export default function Footer() {
               ))}
             </div>
 
-            {/* AI Models */}
+            {/* AI Models — external providers */}
             <div>
               <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Powered by</p>
               <div className="flex flex-wrap gap-1.5">
-                {aiModels.map((model) => (
+                {externalProviders.map((model) => (
                   <span key={model} className="px-2 py-0.5 text-[10px] rounded-full bg-white/5 border border-white/10 text-white/40">
+                    {model}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* In-house self-hosted stack — real differentiator worth shouting about */}
+            <div className="mt-4">
+              <p className="text-[10px] uppercase tracking-wider mb-2 text-cyan-400/60">
+                Self-hosted on DreamForge GPUs
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {selfHostedModels.map((model) => (
+                  <span
+                    key={model}
+                    className="px-2 py-0.5 text-[10px] rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300/70"
+                  >
                     {model}
                   </span>
                 ))}

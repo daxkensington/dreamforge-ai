@@ -433,12 +433,31 @@ export default function Home() {
         </div>
       </section>
 
-      {/* AI Model Marquee */}
+      {/* AI Model Marquee — external providers (matches the "13 providers" stat) */}
       <section className="py-6 overflow-hidden border-b border-white/5">
-        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by the world's best AI models</p>
-        <div className="flex items-center justify-center gap-8 md:gap-12">
-          {["Grok", "OpenAI", "Gemini", "Claude", "Flux Pro", "DALL-E 3", "Veo 3", "Runway", "Kling", "Seedream", "fal.ai", "Groq"].map((model) => (
-            <span key={model} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
+        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by 13 AI providers</p>
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 md:gap-x-12">
+          {[
+            "Grok (xAI)", "OpenAI", "Gemini", "Claude", "Stability AI",
+            "Replicate", "fal.ai", "Together AI", "Cloudflare AI", "Groq",
+            "Runway", "Kling", "Sync Labs",
+          ].map((provider) => (
+            <span key={provider} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
+              {provider}
+            </span>
+          ))}
+        </div>
+
+        {/* In-house self-hosted GPU fleet — genuine differentiator */}
+        <p className="text-center text-[10px] uppercase tracking-[0.3em] mt-6 mb-3 text-cyan-400/50">
+          + Self-hosted on DreamForge GPUs
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 md:gap-x-10">
+          {[
+            "Flux Pro/Dev/Schnell", "CogVideoX-5B", "MusicGen", "AudioGen",
+            "CatVTON", "Bark TTS", "Real-ESRGAN", "Exclusive LoRAs",
+          ].map((model) => (
+            <span key={model} className="text-sm font-medium text-cyan-400/40 hover:text-cyan-300/80 transition-colors whitespace-nowrap">
               {model}
             </span>
           ))}
