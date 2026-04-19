@@ -1,6 +1,8 @@
 import { Wand2, Heart, Twitter, Mail, ExternalLink, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 const footerLinks = {
   create: [
@@ -74,6 +76,13 @@ const galleryStrip = [
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const subscribe = trpc.newsletter.subscribe.useMutation({
+    onSuccess: () => setSubscribed(true),
+    onError: (err) => {
+      // Rate-limit or bad email — show a toast rather than fake-success.
+      toast.error(err.message);
+    },
+  });
 
   return (
     <footer className="relative border-t border-white/5 bg-black">
@@ -176,7 +185,8 @@ export default function Footer() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (email.trim()) setSubscribed(true);
+                    const trimmed = email.trim();
+                    if (trimmed.length > 0) subscribe.mutate({ email: trimmed });
                   }}
                   className="flex gap-2"
                 >

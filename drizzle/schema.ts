@@ -467,6 +467,17 @@ export const notificationPreferences = pgTable("notificationPreferences", {
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
+// ─── Newsletter Signups ───────────────────────────────────────────────────
+// Was a UI-only stub that flipped a "thanks!" state without saving anything;
+// now actually persists emails so the footer signup does real work.
+export const newsletterSignups = pgTable("newsletter_signups", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  ip: varchar("ip", { length: 64 }),
+  source: varchar("source", { length: 64 }).default("footer"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 // ─── Rate Limit Hits ──────────────────────────────────────────────────────
 // One row per request, pruned periodically. Replaces the in-memory limiter
 // that was effectively a no-op on Vercel serverless (every cold start = new
