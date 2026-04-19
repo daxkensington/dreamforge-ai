@@ -1,8 +1,47 @@
 import type { MetadataRoute } from "next";
+import { desc, eq, and, isNotNull } from "drizzle-orm";
+import { getDb } from "../server/db";
+import { galleryItems, generations } from "../drizzle/schema";
 
 const BASE_URL = "https://dreamforgex.ai";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// Cap on how many gallery generations to expose in the sitemap. Keeps the
+// XML payload bounded and within Google's 50k-URL-per-sitemap soft cap.
+const GALLERY_LIMIT = 1000;
+
+/**
+ * Pull the most recently approved gallery items so each `/g/<id>` share
+ * page becomes discoverable to crawlers. If the DB is unavailable at build
+ * time, we silently return an empty list — base sitemap is still valid.
+ */
+async function loadGallerySitemap() {
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db
+      .select({
+        generationId: galleryItems.generationId,
+        approvedAt: galleryItems.approvedAt,
+      })
+      .from(galleryItems)
+      .innerJoin(generations, eq(galleryItems.generationId, generations.id))
+      .where(
+        and(
+          isNotNull(galleryItems.approvedAt),
+          eq(generations.status, "completed"),
+          isNotNull(generations.imageUrl),
+        ),
+      )
+      .orderBy(desc(galleryItems.approvedAt))
+      .limit(GALLERY_LIMIT);
+    return rows;
+  } catch (err) {
+    console.warn("[sitemap] gallery query failed, omitting share URLs:", err);
+    return [];
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   // Core pages
@@ -17,6 +56,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: "/api-docs", priority: 0.5, changeFrequency: "monthly" as const },
     { url: "/batch", priority: 0.5, changeFrequency: "monthly" as const },
     { url: "/demo/text-to-image", priority: 0.9, changeFrequency: "monthly" as const },
+    { url: "/story", priority: 0.8, changeFrequency: "weekly" as const },
   ];
 
   // Tool pages
@@ -79,7 +119,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly" as const,
   }));
 
-  return [
+  const galleryRows = await loadGallerySitemap();
+  const galleryRoutes = galleryRows.map((row) => ({
+    url: `${BASE_URL}/g/${row.generationId}`,
+    lastModified: row.approvedAt ?? now,
+    changeFrequency: "monthly" as const,
+    priority: 0.5,
+  }));
+
+  const staticRoutes = [
     ...coreRoutes,
     { url: "/whats-new", priority: 0.7, changeFrequency: "weekly" as const },
     ...toolRoutes,
@@ -92,4 +140,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
+
+  return [...staticRoutes, ...galleryRoutes];
 }

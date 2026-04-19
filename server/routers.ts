@@ -107,6 +107,7 @@ import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
 import { viralRouter } from "./routers/viral";
+import { storyRouter } from "./routers/story";
 import { collaborationRouter } from "./routers/collaboration";
 import { supportChatRouter } from "./routers/supportChat";
 import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
@@ -5251,6 +5252,7 @@ export const appRouter = router({
   audio: audioRouter,
   demo: demoRouter,
   viral: viralRouter,
+  story: storyRouter,
 
   // ─── Pricing & Subscriptions ─────────────────────────────────────────
   pricing: pricingRouter,

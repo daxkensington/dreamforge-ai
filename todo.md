@@ -996,15 +996,15 @@ Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
 - [x] All 5 viral tools registered in Tools.tsx grid as "🔥 Trending Now" section (placed first); added to TOOL_CREDIT_COSTS + sitemap.
 
 ### Tier 3 — Differentiating features (real moats)
-- [ ] One-Click Story pipeline — combine character consistency + image-to-video + MusicGen into single "idea → 60s narrated video" flow (OpenArt productized this; DFX has all parts)
+- [x] T3.1 One-Click Story pipeline (SHIPPED 2026-04-19) — `/story` route + `story.create` mutation that composes existing storyboard LLM + per-scene img-gen with optional character consistency + async MusicGen kickoff. Single text input → illustrated 4-6 scene story with custom soundtrack. `story.getAudioStatus` for client polling. Cost bundled (~30-40 credits).
 - [ ] Real-time canvas mode (Krea-style) — wire SDXL Turbo / Flux Schnell / LCM behind canvas with WebSocket streaming
 - [ ] Vector/SVG output via Recraft API + typography-specialist routing via Ideogram/Nano Banana Pro for text-heavy prompts
 - [ ] Background job queue (Inngest or Vercel Cron + Neon) — needed before next traffic spike, RunPod cold starts (87s) hit Vercel function timeout
 
 ### Tier 4 — Polish & tech debt
 - [ ] Mobile touch UX for fabric.js tools (inpainting, design-canvas, outpainting) — currently desktop-only
-- [ ] Env var validation via Zod in `instrumentation.ts` — currently silent failures on missing DATABASE_URL etc.
-- [ ] Dynamic gallery/marketplace items in sitemap (currently only static routes)
+- [x] T4.1 Env var validation via Zod in `instrumentation.ts` (SHIPPED 2026-04-19) — `validateEnv()` checks DATABASE_URL, JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, AUTH_SECRET, plus at-least-one AI provider. Hard-fails in prod with which var is missing; warns in dev.
+- [x] T4.2 Dynamic gallery items in sitemap (SHIPPED 2026-04-19) — sitemap.ts now async, queries top 1000 most-recently approved gallery items and emits `/g/<generationId>` URLs so each share page becomes Google-discoverable. Compounds with T1.3 share links.
 - [ ] Loading states for /profile, /search, /brand-kits, /characters
 - [ ] Theme toggle in navbar (code exists in ComponentShowcase, just not exposed)
 - [ ] Keyboard shortcut discovery surfacing + Ctrl+Z undo in image editors
