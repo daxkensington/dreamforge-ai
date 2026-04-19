@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { ToolSEOBlock } from "@/components/ToolSEOBlock";
+import { ToolPageSchemas } from "@/components/ToolPageSchemas";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolPageLayoutProps {
@@ -82,6 +83,9 @@ export default function ToolPageLayout({
 
         {/* Below-fold SEO copy — renders if this slug has entries in shared/toolSeoCopy.ts */}
         <ToolSEOBlock />
+
+        {/* schema.org JSON-LD for rich SERP snippets (FAQ accordion, HowTo steps, SoftwareApplication card) */}
+        <ToolPageSchemas />
       </div>
     </PageLayout>
   );

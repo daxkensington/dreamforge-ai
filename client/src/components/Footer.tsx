@@ -29,9 +29,17 @@ const footerLinks = {
   ],
   company: [
     { label: "About", href: "/about" },
+    { label: "What's new", href: "/whats-new" },
     { label: "Terms of Service", href: "/terms" },
     { label: "Privacy Policy", href: "/privacy" },
     { label: "Contact", href: "mailto:support@dreamforgex.ai" },
+  ],
+  audiences: [
+    { label: "For Etsy sellers", href: "/for/etsy-sellers" },
+    { label: "For podcasters", href: "/for/podcasters" },
+    { label: "For real estate agents", href: "/for/real-estate-agents" },
+    { label: "For authors", href: "/for/authors" },
+    { label: "For indie devs", href: "/for/indie-devs" },
   ],
 };
 

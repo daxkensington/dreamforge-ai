@@ -47,6 +47,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly" as const,
   }));
 
+  // Use-case landing pages (high buyer-intent SEO)
+  const useCaseRoutes = [
+    "etsy-sellers", "podcasters", "real-estate-agents", "cosplayers",
+    "indie-devs", "authors", "restaurants", "tattoo-artists",
+  ].map((s) => ({
+    url: `/for/${s}`,
+    priority: 0.7,
+    changeFrequency: "monthly" as const,
+  }));
+
   // Video Studio sub-pages
   const videoRoutes = [
     "storyboard", "scene-director", "script", "style-transfer",
@@ -57,7 +67,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly" as const,
   }));
 
-  return [...coreRoutes, ...toolRoutes, ...videoRoutes].map((route) => ({
+  return [
+    ...coreRoutes,
+    { url: "/whats-new", priority: 0.7, changeFrequency: "weekly" as const },
+    ...toolRoutes,
+    ...useCaseRoutes,
+    ...videoRoutes,
+  ].map((route) => ({
     url: `${BASE_URL}${route.url}`,
     lastModified: now,
     changeFrequency: route.changeFrequency,
