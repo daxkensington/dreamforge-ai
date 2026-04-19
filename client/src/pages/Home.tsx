@@ -198,7 +198,7 @@ const showcaseItems = [
 ];
 
 const statItems = [
-  { label: "AI Tools", target: 75, suffix: "+" },
+  { label: "AI Tools", target: 100, suffix: "+" },
   { label: "AI Models", target: 30, suffix: "+" },
   { label: "AI Providers", target: 13, suffix: "" },
   { label: "Free to Start", target: 50, suffix: " cr/day" },

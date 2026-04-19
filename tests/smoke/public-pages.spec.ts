@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
 
 const PUBLIC_PAGES = [
   { path: "/", contains: ["Create Stunning", "Start Creating"] },
-  { path: "/about", contains: ["About DreamForgeX", "Browse 75+ Tools"] },
+  { path: "/about", contains: ["About DreamForgeX", "Browse 100+ Tools"] },
   { path: "/terms", contains: ["Terms of Service", "Acceptable Use"] },
   { path: "/privacy", contains: ["Privacy Policy", "AI model training"] },
   { path: "/pricing", contains: ["Pricing", "Creator"] },
