@@ -156,7 +156,7 @@ const translations: Record<string, Record<string, string>> = {
     "nav.pricing": "料金",
     "nav.signin": "ログイン",
     "hero.title": "素晴らしいものを創造しよう",
-    "hero.subtitle": "画像、動画、音楽、デザインのための66以上のAIツール",
+    "hero.subtitle": "画像、動画、音楽、デザインのための100以上のAIツール — 30以上のAIモデル搭載",
     "cta.start_free": "無料で始める",
     "cta.generate": "生成",
     "cta.download": "ダウンロード",
