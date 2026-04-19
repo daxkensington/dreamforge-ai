@@ -11,6 +11,7 @@ export default function ToolPetToPerson() {
       icon={Dog}
       gradient="from-emerald-400 to-teal-500"
       hint="Optionally add personality cues — 'always grumpy in the morning', 'loves the beach', etc."
+      showcase={["/showcase/tool-pet-to-person.jpg"]}
       examplePrompts={[
         "Always playful, loves naps in the sun.",
         "Royal demeanor, slightly judgemental cat energy.",

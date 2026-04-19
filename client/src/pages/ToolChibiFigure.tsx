@@ -11,6 +11,7 @@ export default function ToolChibiFigure() {
       icon={Heart}
       gradient="from-pink-400 to-rose-500"
       hint="Add cute accessories, hairstyle tweaks, or color palette directions."
+      showcase={["/showcase/tool-chibi-figure.jpg"]}
       examplePrompts={[
         "Holding a tiny coffee cup. Pastel pink background with sparkles.",
         "Magical girl version with a star wand and tiny floating hearts.",

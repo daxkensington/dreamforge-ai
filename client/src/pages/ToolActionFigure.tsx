@@ -11,6 +11,7 @@ export default function ToolActionFigure() {
       icon={Package}
       gradient="from-amber-500 to-red-500"
       hint="Add details like a character name, fictional powers, or which accessories to include in the blister pack."
+      showcase={["/showcase/tool-action-figure.jpg"]}
       examplePrompts={[
         'Name banner: "Captain Storm". Accessories: laser sword, jetpack, golden coin.',
         "Character class: cyberpunk hacker. Include holo-keyboard accessory.",

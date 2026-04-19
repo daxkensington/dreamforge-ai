@@ -11,6 +11,7 @@ export default function ToolJellycatPlush() {
       icon={Cat}
       gradient="from-amber-300 to-pink-400"
       hint="Optionally describe pastel color palette, accessories, or plushy texture details."
+      showcase={["/showcase/tool-jellycat-plush.jpg"]}
       examplePrompts={[
         "Dusty sage green fur, tiny embroidered daisy on the chest.",
         "Cream-colored bunny variant, pastel rainbow bowtie.",

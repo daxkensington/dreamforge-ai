@@ -11,6 +11,7 @@ export default function ToolLegoMini() {
       icon={Blocks}
       gradient="from-yellow-400 to-red-500"
       hint="Add details about outfit, accessories (sword, briefcase, etc.), or hair piece."
+      showcase={["/showcase/tool-lego-mini.jpg"]}
       examplePrompts={[
         "Wearing a chef hat and apron, holding a tiny pizza.",
         "Astronaut with helmet and small jetpack accessory.",

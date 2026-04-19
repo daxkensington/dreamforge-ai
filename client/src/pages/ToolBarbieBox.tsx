@@ -11,6 +11,7 @@ export default function ToolBarbieBox() {
       icon={Sparkles}
       gradient="from-pink-400 to-rose-500"
       hint="Optionally add doll details — hair color tweak, signature outfit, or which accessories to include."
+      showcase={["/showcase/tool-barbie-box.jpg"]}
       examplePrompts={[
         'Career edition: "Dream Veterinarian". Accessories: stethoscope, puppy.',
         "Beach edition, pastel yellow bikini, surfboard accessory.",

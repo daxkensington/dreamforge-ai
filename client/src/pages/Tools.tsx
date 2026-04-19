@@ -35,14 +35,14 @@ interface GridTool {
 
 // ─── Viral Trend Tools (Phase 39 Tier 2 — TikTok/IG-driven) ─────────────────
 const viralTools: GridTool[] = [
-  { title: "AI Action Figure", desc: "Become a boxed collectible toy", icon: Package, href: "/tools/action-figure", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
-  { title: "AI Funko Pop", desc: "Window-box vinyl figure of yourself", icon: Box, href: "/tools/funko-pop", img: "/showcase/tool-3d.jpg", badge: "Viral" },
-  { title: "AI Chibi Figure", desc: "Adorable anime collectible figure", icon: Heart, href: "/tools/chibi-figure", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
-  { title: "AI LEGO Mini", desc: "Yourself as a classic LEGO minifig", icon: Blocks, href: "/tools/lego-mini", img: "/showcase/tool-3d.jpg", badge: "Viral" },
-  { title: "Pet-to-Person", desc: "See your pet as a human", icon: Dog, href: "/tools/pet-to-person", img: "/showcase/tool-pet-portrait.jpg", badge: "Viral" },
-  { title: "AI Barbie Box", desc: "Collector-edition fashion doll", icon: Sparkles, href: "/tools/barbie-box", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
-  { title: "AI Jellycat Plush", desc: "Ultra-soft squishy plush toy", icon: Cat, href: "/tools/jellycat-plush", img: "/showcase/tool-pet-portrait.jpg", badge: "Viral" },
-  { title: "AI POP Mart", desc: "Designer art-toy blind box", icon: Gem, href: "/tools/pop-mart", img: "/showcase/tool-3d.jpg", badge: "Viral" },
+  { title: "AI Action Figure", desc: "Become a boxed collectible toy", icon: Package, href: "/tools/action-figure", img: "/showcase/tool-action-figure.jpg", badge: "Viral" },
+  { title: "AI Funko Pop", desc: "Window-box vinyl figure of yourself", icon: Box, href: "/tools/funko-pop", img: "/showcase/tool-funko-pop.jpg", badge: "Viral" },
+  { title: "AI Chibi Figure", desc: "Adorable anime collectible figure", icon: Heart, href: "/tools/chibi-figure", img: "/showcase/tool-chibi-figure.jpg", badge: "Viral" },
+  { title: "AI LEGO Mini", desc: "Yourself as a classic LEGO minifig", icon: Blocks, href: "/tools/lego-mini", img: "/showcase/tool-lego-mini.jpg", badge: "Viral" },
+  { title: "Pet-to-Person", desc: "See your pet as a human", icon: Dog, href: "/tools/pet-to-person", img: "/showcase/tool-pet-to-person.jpg", badge: "Viral" },
+  { title: "AI Barbie Box", desc: "Collector-edition fashion doll", icon: Sparkles, href: "/tools/barbie-box", img: "/showcase/tool-barbie-box.jpg", badge: "Viral" },
+  { title: "AI Jellycat Plush", desc: "Ultra-soft squishy plush toy", icon: Cat, href: "/tools/jellycat-plush", img: "/showcase/tool-jellycat-plush.jpg", badge: "Viral" },
+  { title: "AI POP Mart", desc: "Designer art-toy blind box", icon: Gem, href: "/tools/pop-mart", img: "/showcase/tool-pop-mart.jpg", badge: "Viral" },
 ];
 
 // ─── Image Editing Tools ─────────────────────────────────────────────────────

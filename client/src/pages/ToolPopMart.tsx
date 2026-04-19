@@ -11,6 +11,7 @@ export default function ToolPopMart() {
       icon={Gem}
       gradient="from-fuchsia-500 to-violet-600"
       hint="Optionally specify series theme, hidden rare chase variant, or blind-box illustration style."
+      showcase={["/showcase/tool-pop-mart.jpg"]}
       examplePrompts={[
         'Series: "Cosmic Dreams". Chase variant has glow-in-the-dark hair.',
         "Forest spirits series, holding a tiny acorn.",

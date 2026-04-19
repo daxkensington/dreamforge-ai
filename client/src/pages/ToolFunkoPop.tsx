@@ -11,6 +11,7 @@ export default function ToolFunkoPop() {
       icon={Box}
       gradient="from-orange-500 to-pink-500"
       hint="Optionally specify the character series name, exclusive sticker text, or pop number."
+      showcase={["/showcase/tool-funko-pop.jpg"]}
       examplePrompts={[
         'Series: "Office Heroes". Pop #042. Exclusive Comic-Con 2026 sticker.',
         "Hold a tiny coffee cup accessory. Sticker says CHASE EXCLUSIVE.",
