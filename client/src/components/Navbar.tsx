@@ -43,7 +43,10 @@ import {
   Keyboard,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+// LanguageSwitcher removed 2026-04-19 — the i18n dictionary exists but no
+// component actually reads from it, so picking a language did nothing.
+// Bring back once every string is wired through useTranslation().
+// import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useGlobalShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Link, useLocation } from "wouter";
@@ -444,7 +447,6 @@ export default function Navbar() {
           >
             <Keyboard className="h-4 w-4" />
           </button>
-          <LanguageSwitcher />
 
           {/* Mobile menu toggle */}
           <button
