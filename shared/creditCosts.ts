@@ -121,7 +121,7 @@ export const SUBSCRIPTION_PLANS = [
       "50 credits/day (free models only)",
       "5 songs/day (watermarked)",
       "1 music video/day (480p, watermarked)",
-      "All 75+ tools with limits",
+      "All 100+ tools with limits",
       "Non-commercial use only",
     ],
   },
