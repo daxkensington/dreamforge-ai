@@ -42,7 +42,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider defaultTheme="dark" switchable>
+          {/* Forcing dark-only until we do a proper light-mode style pass.
+               The toggle was enabled in Phase 39 T4.5 without auditing all
+               100+ pages for light-mode readability and it looks broken. */}
+          <ThemeProvider defaultTheme="dark">
             <TooltipProvider>
               {children}
               <Toaster />

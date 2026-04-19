@@ -63,24 +63,86 @@ const MOODS = [
   { value: "aggressive", label: "Aggressive" },
 ];
 
+const ERAS = [
+  { value: "timeless", label: "Timeless" },
+  { value: "60s", label: "60s Retro" },
+  { value: "70s", label: "70s Classic" },
+  { value: "80s", label: "80s Synthwave" },
+  { value: "90s", label: "90s" },
+  { value: "y2k", label: "Y2K" },
+  { value: "modern", label: "Modern" },
+  { value: "retro", label: "Retro Analog" },
+];
+
+const VOCAL_GENDERS = [
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "duet", label: "Duet" },
+  { value: "choir", label: "Choir / Group" },
+  { value: "instrumental", label: "Instrumental (no vocals)" },
+];
+
+const VOCAL_CHARACTERS = [
+  { value: "smooth", label: "Smooth" },
+  { value: "powerful", label: "Powerful" },
+  { value: "raspy", label: "Raspy" },
+  { value: "whisper", label: "Whisper" },
+  { value: "belt", label: "Belt" },
+  { value: "airy", label: "Airy" },
+  { value: "gritty", label: "Gritty" },
+  { value: "soulful", label: "Soulful" },
+];
+
+const INSTRUMENTS = [
+  { value: "piano", label: "Piano" },
+  { value: "acoustic-guitar", label: "Acoustic Guitar" },
+  { value: "electric-guitar", label: "Electric Guitar" },
+  { value: "synth", label: "Synth" },
+  { value: "strings", label: "Strings" },
+  { value: "brass", label: "Brass" },
+  { value: "drums", label: "Drums" },
+  { value: "bass", label: "Bass" },
+  { value: "saxophone", label: "Saxophone" },
+  { value: "violin", label: "Violin" },
+  { value: "organ", label: "Organ" },
+  { value: "harmonica", label: "Harmonica" },
+  { value: "banjo", label: "Banjo" },
+  { value: "808s", label: "808s" },
+];
+
+const TIME_SIGS = ["4/4", "3/4", "6/8", "7/8", "5/4"];
+
 export default function SongCreator() {
   const { user } = useAuth();
   const [step, setStep] = useState<"concept" | "lyrics" | "generate" | "result">("concept");
 
-  // Concept inputs
+  // Concept inputs — multi-select blends (first = primary, rest = accents)
   const [concept, setConcept] = useState("");
-  const [genre, setGenre] = useState("pop");
-  const [mood, setMood] = useState("happy");
+  const [genres, setGenres] = useState<string[]>(["pop"]);
+  const [moods, setMoods] = useState<string[]>(["happy"]);
   const [language, setLanguage] = useState("English");
+  const [era, setEra] = useState<string>("timeless");
 
   // Lyrics
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
   const [suggestedStyle, setSuggestedStyle] = useState("");
 
-  // Song generation
+  // Production settings
   const [tempo, setTempo] = useState("medium");
-  const [vocalStyle, setVocalStyle] = useState("female");
+  const [bpm, setBpm] = useState<number | "">("");
+  const [vocalGender, setVocalGender] = useState("female");
+  const [vocalCharacter, setVocalCharacter] = useState<string>("smooth");
+  const [instrumentFocus, setInstrumentFocus] = useState<string[]>([]);
+  const [instrumentalOnly, setInstrumentalOnly] = useState(false);
+  const [timeSignature, setTimeSignature] = useState("4/4");
+  const [songKey, setSongKey] = useState("");
+  const [referenceArtists, setReferenceArtists] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Single-value conveniences used in the result badges + lyrics call.
+  const primaryGenre = genres[0] ?? "pop";
+  const primaryMood = moods[0] ?? "happy";
 
   // Result
   const [songUrl, setSongUrl] = useState("");
@@ -120,19 +182,63 @@ export default function SongCreator() {
 
   const handleGenerateLyrics = () => {
     if (!concept.trim()) return;
-    lyricsMutation.mutate({ concept, genre: genre as any, mood: mood as any, language });
+    if (!user) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+    lyricsMutation.mutate({
+      concept,
+      genre: primaryGenre as any,
+      genres: genres.length > 1 ? genres : undefined,
+      mood: primaryMood as any,
+      moods: moods.length > 1 ? moods : undefined,
+      language,
+      era: era as any,
+    });
   };
 
   const handleGenerateSong = () => {
     if (!lyrics.trim()) return;
+    if (!user) {
+      window.location.href = getLoginUrl();
+      return;
+    }
     songMutation.mutate({
       lyrics,
-      genre,
-      mood,
+      genre: primaryGenre,
+      genres: genres.length > 1 ? genres : undefined,
+      mood: primaryMood,
+      moods: moods.length > 1 ? moods : undefined,
       tempo: tempo as any,
-      vocalStyle: vocalStyle as any,
+      bpm: bpm === "" ? undefined : Number(bpm),
+      vocalGender: vocalGender as any,
+      vocalCharacter: vocalCharacter as any,
+      instrumentFocus: instrumentFocus.length ? (instrumentFocus as any) : undefined,
+      instrumentalOnly: instrumentalOnly || vocalGender === "instrumental" || undefined,
+      era: era as any,
+      key: songKey.trim() || undefined,
+      timeSignature: timeSignature as any,
+      referenceArtists: referenceArtists.trim() || undefined,
       title,
     });
+  };
+
+  // Toggle an item in a multi-select array, respecting a max count.
+  const toggleInArray = (
+    arr: string[],
+    setter: (v: string[]) => void,
+    value: string,
+    max: number,
+  ) => {
+    if (arr.includes(value)) {
+      // Don't allow removing the last one — array must keep at least 1 item.
+      if (arr.length <= 1) return;
+      setter(arr.filter((v) => v !== value));
+    } else if (arr.length < max) {
+      setter([...arr, value]);
+    } else {
+      toast.error(`Max ${max} selections — remove one first`);
+    }
   };
 
   const togglePlay = () => {
@@ -202,6 +308,39 @@ export default function SongCreator() {
       </div>
 
       <div className="container py-8 max-w-4xl">
+        {/* Anon signup gate — browse freely, but the first step requires login
+             since song-gen is expensive (MiniMax Music 2.5) and lyrics use
+             credits too. Shown as a banner, not a blocker, so users can still
+             browse the UI + see what's possible. */}
+        {!user && step === "concept" && (
+          <Card className="bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-purple-500/10 border-cyan-500/30 mb-6">
+            <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shrink-0">
+                  <Music className="h-5 w-5 text-cyan-300" />
+                </div>
+                <div>
+                  <p className="font-semibold mb-0.5">Sign in free to create songs</p>
+                  <p className="text-sm text-muted-foreground">
+                    Free plan includes 50 credits/day — enough to generate lyrics + one full song. Paid plans unlock unlimited.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  onClick={() => (window.location.href = getLoginUrl())}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white gap-2"
+                >
+                  Sign in free <ArrowRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="bg-transparent" asChild>
+                  <a href="/pricing">See pricing</a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Step 1: Concept */}
         {step === "concept" && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -221,40 +360,88 @@ export default function SongCreator() {
                   className="bg-white/5 border-white/10"
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Genre</label>
-                    <Select value={genre} onValueChange={setGenre}>
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GENRES.map((g) => (
-                          <SelectItem key={g.value} value={g.value}>
-                            {g.emoji} {g.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                {/* Genre — multi-select up to 3 (first = primary, rest blend) */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Genre <span className="opacity-60">— pick up to 3 to blend</span>
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {genres.length}/3 · primary: <span className="text-cyan-300">{GENRES.find((g) => g.value === primaryGenre)?.label}</span>
+                    </span>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Mood</label>
-                    <Select value={mood} onValueChange={setMood}>
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MOODS.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-1 -m-1">
+                    {GENRES.map((g) => {
+                      const selected = genres.includes(g.value);
+                      const isPrimary = selected && g.value === primaryGenre;
+                      return (
+                        <button
+                          key={g.value}
+                          type="button"
+                          onClick={() => toggleInArray(genres, setGenres, g.value, 3)}
+                          className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                            isPrimary
+                              ? "bg-cyan-500/30 border-cyan-400 text-white font-medium"
+                              : selected
+                              ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+                              : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          {g.emoji} {g.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
+                {/* Mood — multi-select up to 2 */}
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Language</label>
-                  <Input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="English" className="bg-white/5 border-white/10" />
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Mood <span className="opacity-60">— blend up to 2</span>
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">{moods.length}/2</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MOODS.map((m) => {
+                      const selected = moods.includes(m.value);
+                      return (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => toggleInArray(moods, setMoods, m.value, 2)}
+                          className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                            selected
+                              ? "bg-purple-500/20 border-purple-500/50 text-purple-200"
+                              : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Era + Language */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Era / Vibe</label>
+                    <Select value={era} onValueChange={setEra}>
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ERAS.map((e) => (
+                          <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Language</label>
+                    <Input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="English" className="bg-white/5 border-white/10" />
+                  </div>
                 </div>
 
                 <Button
@@ -330,35 +517,166 @@ export default function SongCreator() {
                   Production Settings
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
+                {/* Tempo — preset + optional explicit BPM */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                    Tempo <span className="opacity-60">— or set exact BPM below</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {[
+                      { value: "slow", label: "Slow", sub: "60-80 BPM" },
+                      { value: "medium", label: "Medium", sub: "90-120 BPM" },
+                      { value: "fast", label: "Fast", sub: "130-170 BPM" },
+                    ].map((t) => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => { setTempo(t.value); setBpm(""); }}
+                        className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+                          tempo === t.value && bpm === ""
+                            ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-200"
+                            : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="font-medium">{t.label}</div>
+                        <div className="text-[10px] opacity-70">{t.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    type="number"
+                    min={40}
+                    max={220}
+                    value={bpm}
+                    onChange={(e) => setBpm(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="Or enter exact BPM (40-220)"
+                    className="bg-white/5 border-white/10 h-9 text-sm"
+                  />
+                </div>
+
+                {/* Vocals — gender + character OR instrumental-only */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Tempo</label>
-                    <Select value={tempo} onValueChange={setTempo}>
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Vocal Type</label>
+                    <Select value={vocalGender} onValueChange={setVocalGender}>
                       <SelectTrigger className="bg-white/5 border-white/10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="slow">Slow (60-80 BPM)</SelectItem>
-                        <SelectItem value="medium">Medium (90-120 BPM)</SelectItem>
-                        <SelectItem value="fast">Fast (130-170 BPM)</SelectItem>
+                        {VOCAL_GENDERS.map((v) => (
+                          <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Vocal Style</label>
-                    <Select value={vocalStyle} onValueChange={setVocalStyle}>
-                      <SelectTrigger className="bg-white/5 border-white/10">
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                      Vocal Character
+                    </label>
+                    <Select
+                      value={vocalCharacter}
+                      onValueChange={setVocalCharacter}
+                      disabled={vocalGender === "instrumental"}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/10 disabled:opacity-50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="male">Male Vocals</SelectItem>
-                        <SelectItem value="female">Female Vocals</SelectItem>
-                        <SelectItem value="duet">Duet</SelectItem>
-                        <SelectItem value="choir">Choir / Group</SelectItem>
+                        {VOCAL_CHARACTERS.map((v) => (
+                          <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Instrument focus — multi-select */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Instruments to feature <span className="opacity-60">— pick up to 6</span>
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">{instrumentFocus.length}/6</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INSTRUMENTS.map((i) => {
+                      const selected = instrumentFocus.includes(i.value);
+                      return (
+                        <button
+                          key={i.value}
+                          type="button"
+                          onClick={() => {
+                            if (selected) {
+                              setInstrumentFocus(instrumentFocus.filter((v) => v !== i.value));
+                            } else if (instrumentFocus.length < 6) {
+                              setInstrumentFocus([...instrumentFocus, i.value]);
+                            } else {
+                              toast.error("Max 6 instruments — remove one first");
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                            selected
+                              ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
+                              : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          {i.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Advanced toggle — key / time sig / reference artists */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((v) => !v)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    {showAdvanced ? "▾ Hide advanced" : "▸ Show advanced (key, time signature, reference artists)"}
+                  </button>
+                  {showAdvanced && (
+                    <div className="mt-3 p-4 rounded-lg bg-white/[0.02] border border-white/10 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Key (optional)</label>
+                          <Input
+                            value={songKey}
+                            onChange={(e) => setSongKey(e.target.value)}
+                            placeholder="e.g. C major, A minor"
+                            className="bg-white/5 border-white/10 h-9 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Time Signature</label>
+                          <Select value={timeSignature} onValueChange={setTimeSignature}>
+                            <SelectTrigger className="bg-white/5 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_SIGS.map((ts) => (
+                                <SelectItem key={ts} value={ts}>{ts}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                          Reference artists (optional)
+                        </label>
+                        <Input
+                          value={referenceArtists}
+                          onChange={(e) => setReferenceArtists(e.target.value)}
+                          placeholder="e.g. similar to The Weeknd x Daft Punk"
+                          maxLength={300}
+                          className="bg-white/5 border-white/10 h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Preview lyrics */}
@@ -409,10 +727,17 @@ export default function SongCreator() {
                   </button>
                   <div className="flex-1">
                     <p className="font-bold text-lg">{title || "Untitled Song"}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge className="bg-cyan-500/15 text-cyan-400 border-0">{genre}</Badge>
-                      <Badge className="bg-purple-500/15 text-purple-400 border-0">{mood}</Badge>
-                      <Badge className="bg-blue-500/15 text-blue-400 border-0">{vocalStyle} vocals</Badge>
+                    <div className="flex items-center flex-wrap gap-2 mt-1">
+                      {genres.map((g) => (
+                        <Badge key={g} className="bg-cyan-500/15 text-cyan-400 border-0">{g}</Badge>
+                      ))}
+                      {moods.map((m) => (
+                        <Badge key={m} className="bg-purple-500/15 text-purple-400 border-0">{m}</Badge>
+                      ))}
+                      <Badge className="bg-blue-500/15 text-blue-400 border-0">
+                        {vocalGender === "instrumental" ? "instrumental" : `${vocalCharacter} ${vocalGender} vocals`}
+                      </Badge>
+                      {bpm && <Badge className="bg-emerald-500/15 text-emerald-400 border-0">{bpm} BPM</Badge>}
                     </div>
                   </div>
                 </div>

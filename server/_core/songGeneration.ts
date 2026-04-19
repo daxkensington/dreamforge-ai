@@ -16,10 +16,15 @@ import { replicatePredict, downloadBuffer } from "./replicate";
 
 export interface LyricsRequest {
   concept: string;
+  // Multi-value: first genre/mood dominates, others are blended. Keeping
+  // single-value variants for back-compat with older clients.
   genre: string;
+  genres?: string[];
   mood: string;
+  moods?: string[];
   songStructure?: string; // "verse-chorus-verse-chorus-bridge-chorus" etc.
   language?: string;
+  era?: string; // "80s", "90s", "y2k", "modern", "retro"
 }
 
 export interface LyricsResult {
@@ -32,10 +37,21 @@ export interface LyricsResult {
 export interface SongRequest {
   lyrics: string;
   genre: string;
+  genres?: string[];          // optional blend — first = primary
   mood: string;
-  tempo?: string; // "slow", "medium", "fast", or BPM like "120"
-  vocalStyle?: string; // "male", "female", "duet", "choir"
-  instrumentStyle?: string; // additional instrument description
+  moods?: string[];           // optional blend
+  tempo?: string;             // "slow", "medium", "fast", or BPM like "120"
+  bpm?: number;               // explicit BPM override (40-220)
+  vocalGender?: string;       // "male", "female", "duet", "choir", "instrumental"
+  vocalStyle?: string;        // legacy single-field (kept for back-compat)
+  vocalCharacter?: string;    // "smooth", "powerful", "raspy", "whisper", "belt", "airy", "gritty"
+  instrumentFocus?: string[]; // ["piano", "acoustic-guitar", "electric-guitar", "synth", "strings", "brass", "drums", "bass"]
+  instrumentStyle?: string;   // free-text additional instrument description
+  era?: string;               // "80s", "90s", "y2k", "modern", "retro", "timeless"
+  key?: string;               // "C major", "A minor", etc. (optional)
+  timeSignature?: string;     // "4/4", "3/4", "6/8", "7/8"
+  referenceArtists?: string;  // free-text "similar to X, Y influence"
+  instrumentalOnly?: boolean; // skip vocals entirely
 }
 
 export interface SongResult {
@@ -81,14 +97,21 @@ const GENRE_STYLES: Record<string, string> = {
 
 export async function generateLyrics(request: LyricsRequest): Promise<LyricsResult> {
   const structure = request.songStructure || "verse-chorus-verse-chorus-bridge-chorus";
+  // Blend multi-genre/mood when provided (first = primary, others = accents).
+  const genres = request.genres?.length ? request.genres : [request.genre];
+  const moods = request.moods?.length ? request.moods : [request.mood];
+  const genreLine = genres.length > 1
+    ? `${genres[0]} (with ${genres.slice(1).join(" + ")} influences)`
+    : genres[0];
+  const moodLine = moods.length > 1 ? moods.join(" + ") : moods[0];
 
   const prompt = `You are a professional songwriter. Write song lyrics for the following concept:
 
 Concept: ${request.concept}
-Genre: ${request.genre}
-Mood: ${request.mood}
+Genre: ${genreLine}
+Mood: ${moodLine}
 Language: ${request.language || "English"}
-Structure: ${structure}
+${request.era ? `Era / vibe: ${request.era}\n` : ""}Structure: ${structure}
 
 IMPORTANT FORMATTING RULES:
 - Use MiniMax Music structure tags: [verse], [chorus], [bridge], [pre-chorus], [outro], [intro]
@@ -143,19 +166,58 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
     throw new Error("REPLICATE_API_TOKEN is not configured. Required for song generation.");
   }
 
-  // Build the style/reference prompt
-  const genreStyle = GENRE_STYLES[request.genre] || request.genre;
-  const tempoDesc = request.tempo === "slow" ? "60-80 BPM, slow tempo"
+  // Blend multi-genre/mood. First entry dominates; rest are accents.
+  const genres = request.genres?.length ? request.genres : [request.genre];
+  const moods = request.moods?.length ? request.moods : [request.mood];
+  const primaryGenre = genres[0];
+  const genreStyle = GENRE_STYLES[primaryGenre] || primaryGenre;
+  const genreAccents = genres.slice(1).map((g) => GENRE_STYLES[g] || g).filter(Boolean);
+  const genreBlend = genreAccents.length
+    ? `${genreStyle}, blended with ${genreAccents.join(" and ")}`
+    : genreStyle;
+  const moodBlend = moods.length > 1 ? moods.join(" and ") : moods[0];
+
+  // BPM override wins over preset; presets map to ranges.
+  const tempoDesc = request.bpm
+    ? `${request.bpm} BPM, ${request.bpm < 90 ? "relaxed" : request.bpm > 140 ? "energetic" : "steady"} tempo`
+    : request.tempo === "slow" ? "60-80 BPM, slow tempo"
     : request.tempo === "fast" ? "140-170 BPM, fast energetic tempo"
     : request.tempo ? `${request.tempo} BPM` : "medium tempo";
 
-  const vocalDesc = request.vocalStyle === "male" ? "male vocals"
-    : request.vocalStyle === "female" ? "female vocals"
-    : request.vocalStyle === "duet" ? "male and female duet vocals"
-    : request.vocalStyle === "choir" ? "choir/group vocals"
+  // Vocal description: new gender + character fields take precedence.
+  const vocalGender = request.vocalGender || request.vocalStyle;
+  const vocalBase = vocalGender === "male" ? "male vocals"
+    : vocalGender === "female" ? "female vocals"
+    : vocalGender === "duet" ? "male and female duet vocals"
+    : vocalGender === "choir" ? "choir / group vocals"
+    : vocalGender === "instrumental" ? "instrumental only, no vocals"
     : "vocals";
+  const vocalDesc = request.instrumentalOnly || vocalGender === "instrumental"
+    ? "instrumental only, no vocals"
+    : request.vocalCharacter
+      ? `${request.vocalCharacter} ${vocalBase}`
+      : vocalBase;
 
-  const referenceAudio = `${genreStyle}, ${tempoDesc}, ${vocalDesc}, ${request.mood} mood. ${request.instrumentStyle || ""}`.trim();
+  // Build supplementary descriptors
+  const parts = [
+    genreBlend,
+    tempoDesc,
+    vocalDesc,
+    `${moodBlend} mood`,
+  ];
+  if (request.era) parts.push(`${request.era} era production aesthetic`);
+  if (request.instrumentFocus?.length) {
+    const focus = request.instrumentFocus.map((i) => i.replace(/-/g, " "));
+    parts.push(`prominent ${focus.join(", ")}`);
+  }
+  if (request.key) parts.push(`in ${request.key}`);
+  if (request.timeSignature && request.timeSignature !== "4/4") {
+    parts.push(`${request.timeSignature} time signature`);
+  }
+  if (request.referenceArtists) parts.push(`reminiscent of ${request.referenceArtists}`);
+  if (request.instrumentStyle) parts.push(request.instrumentStyle);
+
+  const referenceAudio = parts.filter(Boolean).join(". ");
 
   // Generate via MiniMax Music 2.5 on Replicate (shared utility handles polling)
   const outputUrl = await replicatePredict({
@@ -182,10 +244,18 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
     songUrl: url,
     model: "minimax-music-2.5",
     metadata: {
-      genre: request.genre,
-      mood: request.mood,
+      genres,
+      moods,
       tempo: request.tempo,
-      vocalStyle: request.vocalStyle,
+      bpm: request.bpm,
+      vocalGender,
+      vocalCharacter: request.vocalCharacter,
+      instrumentFocus: request.instrumentFocus,
+      era: request.era,
+      key: request.key,
+      timeSignature: request.timeSignature,
+      referenceArtists: request.referenceArtists,
+      instrumentalOnly: request.instrumentalOnly,
       referenceAudioText: referenceAudio,
     },
   };

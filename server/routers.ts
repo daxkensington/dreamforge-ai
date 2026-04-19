@@ -5295,9 +5295,12 @@ export const appRouter = router({
         z.object({
           concept: z.string().min(1).max(1000),
           genre: z.enum(["pop", "rock", "hiphop", "rnb", "reggae", "dancehall", "afrobeats", "electronic", "house", "techno", "drill", "trap", "lofi", "jazz", "blues", "indie", "country", "latin", "reggaeton", "kpop", "soul", "gospel", "funk", "disco", "metal", "punk", "folk", "classical", "ambient", "phonk"]),
+          genres: z.array(z.string().min(1).max(32)).max(3).optional(),
           mood: z.enum(["happy", "sad", "energetic", "chill", "dark", "romantic", "empowering", "nostalgic", "dreamy", "aggressive"]),
+          moods: z.array(z.string().min(1).max(32)).max(3).optional(),
           songStructure: z.string().max(200).optional(),
           language: z.string().max(50).optional(),
+          era: z.enum(["60s", "70s", "80s", "90s", "y2k", "modern", "retro", "timeless"]).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -5312,10 +5315,25 @@ export const appRouter = router({
         z.object({
           lyrics: z.string().min(1).max(5000),
           genre: z.string().min(1).max(100),
+          genres: z.array(z.string().min(1).max(32)).max(3).optional(),
           mood: z.string().min(1).max(100),
+          moods: z.array(z.string().min(1).max(32)).max(3).optional(),
           tempo: z.enum(["slow", "medium", "fast"]).optional(),
+          bpm: z.number().min(40).max(220).optional(),
+          vocalGender: z.enum(["male", "female", "duet", "choir", "instrumental"]).optional(),
           vocalStyle: z.enum(["male", "female", "duet", "choir"]).optional(),
+          vocalCharacter: z.enum(["smooth", "powerful", "raspy", "whisper", "belt", "airy", "gritty", "soulful"]).optional(),
+          instrumentFocus: z.array(z.enum([
+            "piano", "acoustic-guitar", "electric-guitar", "synth",
+            "strings", "brass", "drums", "bass", "saxophone", "violin",
+            "organ", "harmonica", "banjo", "808s",
+          ])).max(6).optional(),
           instrumentStyle: z.string().max(500).optional(),
+          era: z.enum(["60s", "70s", "80s", "90s", "y2k", "modern", "retro", "timeless"]).optional(),
+          key: z.string().max(50).optional(),
+          timeSignature: z.enum(["4/4", "3/4", "6/8", "7/8", "5/4"]).optional(),
+          referenceArtists: z.string().max(300).optional(),
+          instrumentalOnly: z.boolean().optional(),
           title: z.string().max(200).optional(),
         })
       )

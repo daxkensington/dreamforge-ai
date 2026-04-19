@@ -1,6 +1,6 @@
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, ArrowRight, Eye } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -76,26 +76,56 @@ export default function ToolPageLayout({
           </div>
         </section>
 
-        {/* Sign-in banner for unauthenticated users */}
+        {/* Prominent anon gate — the thin strip that used to live here was
+             easy to miss, so users filled out forms then hit a failed submit.
+             Now it's an unmissable full-width CTA card. Tool content below
+             stays visible so the SEO copy is still crawlable and users see
+             what the tool does — but the gate makes clear it needs login. */}
         {!isAuthenticated && (
-          <div className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/20">
-            <div className="container py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-cyan-400" />
-                <span className="text-sm text-white/80">Sign in to generate — it's free to start</span>
+          <section className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/30">
+            <div className="container py-6">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="h-10 w-10 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+                    <Lock className="h-5 w-5 text-cyan-300" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-base mb-0.5">Sign in free to use this tool</p>
+                    <p className="text-sm text-muted-foreground">
+                      50 credits / day on the free plan — no credit card required. You'll need an account before the Generate button below will work.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0 w-full md:w-auto">
+                  <Button
+                    className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white flex-1 md:flex-initial"
+                    onClick={() => (window.location.href = getLoginUrl())}
+                  >
+                    Sign in free
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="bg-transparent flex-1 md:flex-initial"
+                    asChild
+                  >
+                    <Link href="/pricing">See pricing</Link>
+                  </Button>
+                </div>
               </div>
-              <Button
-                size="sm"
-                className="gap-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs h-8"
-                onClick={() => (window.location.href = getLoginUrl())}
-              >
-                Sign In Free
-              </Button>
+            </div>
+          </section>
+        )}
+
+        {/* Tool Content — preview banner above for anon users */}
+        {!isAuthenticated && (
+          <div className="container pt-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+              <Eye className="h-3 w-3" />
+              Preview mode — sign in to generate
             </div>
           </div>
         )}
-
-        {/* Tool Content — always visible */}
         <section className="container py-8">
           {children}
         </section>
