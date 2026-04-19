@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
+import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -41,13 +42,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider defaultTheme="dark">
+          <ThemeProvider defaultTheme="dark" switchable>
             <TooltipProvider>
               {children}
               <Toaster />
               <PWAInstallPrompt />
               <ServiceWorkerRegistration />
               <SupportChatWidget />
+              <KeyboardShortcutsModal />
             </TooltipProvider>
           </ThemeProvider>
         </QueryClientProvider>

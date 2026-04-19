@@ -38,9 +38,14 @@ import {
   BarChart3,
   ShoppingBag,
   Music,
+  Sun,
+  Moon,
+  Keyboard,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useGlobalShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -63,6 +68,8 @@ const dropdownOnlyLinks = [
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  useGlobalShortcuts();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -415,6 +422,28 @@ export default function Navbar() {
               Sign in
             </Button>
           )}
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              document.dispatchEvent(new CustomEvent("toggle-shortcuts-modal"))
+            }
+            className="hidden md:inline-flex p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (Shift + ?)"
+          >
+            <Keyboard className="h-4 w-4" />
+          </button>
           <LanguageSwitcher />
 
           {/* Mobile menu toggle */}

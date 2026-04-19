@@ -428,6 +428,10 @@ export const creditTransactions = pgTable("creditTransactions", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("creditTransactions_userId_idx").on(table.userId),
+  // Composite (userId, createdAt DESC) for billing reports / audit queries
+  // that list a user's transactions ordered by time. Much faster than the
+  // userId-only index when users have many transactions.
+  index("creditTransactions_user_time_idx").on(table.userId, table.createdAt),
 ]);
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
