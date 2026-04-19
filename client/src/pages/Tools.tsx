@@ -12,6 +12,7 @@ import {
   Youtube, Instagram, Sticker, ChefHat, Mail, CreditCard, Cat,
   Moon, Clapperboard, Gem, UtensilsCrossed, Heart, Award,
   Bookmark as BookmarkIcon, Newspaper, Building2, Plane, Megaphone,
+  Package, Blocks, Dog,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -30,6 +31,15 @@ interface GridTool {
   img: string;
   badge?: string;
 }
+
+// ─── Viral Trend Tools (Phase 39 Tier 2 — TikTok/IG-driven) ─────────────────
+const viralTools: GridTool[] = [
+  { title: "AI Action Figure", desc: "Become a boxed collectible toy", icon: Package, href: "/tools/action-figure", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
+  { title: "AI Funko Pop", desc: "Window-box vinyl figure of yourself", icon: Box, href: "/tools/funko-pop", img: "/showcase/tool-3d.jpg", badge: "Viral" },
+  { title: "AI Chibi Figure", desc: "Adorable anime collectible figure", icon: Heart, href: "/tools/chibi-figure", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
+  { title: "AI LEGO Mini", desc: "Yourself as a classic LEGO minifig", icon: Blocks, href: "/tools/lego-mini", img: "/showcase/tool-3d.jpg", badge: "Viral" },
+  { title: "Pet-to-Person", desc: "See your pet as a human", icon: Dog, href: "/tools/pet-to-person", img: "/showcase/tool-pet-portrait.jpg", badge: "Viral" },
+];
 
 // ─── Image Editing Tools ─────────────────────────────────────────────────────
 const imageTools: GridTool[] = [
@@ -153,7 +163,7 @@ const audioTools: GridTool[] = [
   { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg" },
 ];
 
-const allToolCount = imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
+const allToolCount = viralTools.length + imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
 
 function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
   return (
@@ -328,6 +338,16 @@ export default function Tools() {
               </div>
             </Link>
           </motion.div>
+        </section>
+
+        {/* Viral Trend Tools — placed first because they're the highest-intent traffic */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2 block">🔥 Trending Now</span>
+            <h2 className="text-3xl md:text-4xl font-bold">Viral AI Effects</h2>
+            <p className="text-foreground/50 mt-2">The transformations breaking TikTok and Instagram in 2026</p>
+          </motion.div>
+          <ToolGrid tools={viralTools} />
         </section>
 
         {/* Video Generation */}

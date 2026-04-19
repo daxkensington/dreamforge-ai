@@ -100,6 +100,13 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "character-sheet": 15,
   "batch-prompts": 5,
 
+  // Viral preset tools (Phase 39 Tier 2 — TikTok/IG-driven trends)
+  "action-figure": 10,
+  "funko-pop": 10,
+  "chibi-figure": 10,
+  "lego-mini": 10,
+  "pet-to-person": 10,
+
   // Audio / video tools
   "text-to-image": 5,
   "image-to-image": 5,

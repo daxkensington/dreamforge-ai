@@ -42,9 +42,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "emoji-creator", "brand-style-guide", "event-flyer", "certificate",
     "bookmark", "zine-spread", "concert-poster", "architecture-concept",
     "cosplay-reference", "travel-postcard",
+    // Phase 39 Tier 2 — viral preset tools
+    "action-figure", "funko-pop", "chibi-figure", "lego-mini", "pet-to-person",
   ].map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,
+    changeFrequency: "monthly" as const,
+  }));
+
+  // Competitor comparison pages (high buying-intent SEO — "X alternative")
+  const comparisonRoutes = [
+    "midjourney", "leonardo", "runway", "ideogram", "krea",
+  ].map((s) => ({
+    url: `/vs/${s}`,
+    priority: 0.8,
     changeFrequency: "monthly" as const,
   }));
 
@@ -73,6 +84,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: "/whats-new", priority: 0.7, changeFrequency: "weekly" as const },
     ...toolRoutes,
     ...useCaseRoutes,
+    ...comparisonRoutes,
     ...videoRoutes,
   ].map((route) => ({
     url: `${BASE_URL}${route.url}`,

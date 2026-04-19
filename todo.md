@@ -989,11 +989,11 @@ Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
 - [x] T1.4 Try-without-signup demo — `/demo/text-to-image` public page + `demo.generate` publicProcedure; IP-keyed 1-per-24h rate limit (`enforceIpRateLimit`); routes through cheap fallback chain (Cloudflare/RunPod Schnell, ~$0.003/image); sign-up CTA after generation.
 - [x] T1.5 Credit calculator on /pricing — `<CreditCalculator>` widget with image/video/tool sliders that recommend the cheapest covering plan and show effective $/credit rate.
 
-### Tier 2 — Viral trend tools (ride the 2026 wave)
-- [ ] AI Action Figure generator (TikTok/Instagram viral; ChatGPT's biggest viral moment of 2025)
-- [ ] AI Chibi / Figurine / Funko Pop generators (4 branded landing pages, same backend)
-- [ ] AI Pet-to-Person ("humanize your pet") generator
-- [ ] `/vs/` comparison pages: /vs/midjourney, /vs/leonardo, /vs/runway, /vs/ideogram, /vs/krea — same pattern as `/for/<audience>` Phase 36 pages
+### Tier 2 — Viral trend tools (SHIPPED 2026-04-19)
+- [x] T2.1 Viral preset tool template — single `viral.transform` mutation + `<ViralPresetTool>` component drives 4 trending tools: `/tools/action-figure`, `/tools/funko-pop`, `/tools/chibi-figure`, `/tools/lego-mini`. Each is a one-config wrapper. Server prompts cap at the 10-credit cost band (re-uses tshirt-design key).
+- [x] T2.2 AI Pet-to-Person generator — same template, "humanize your pet" preset (uses headshot 10-credit cost band).
+- [x] T2.3 5 `/vs/<competitor>` comparison pages — `/vs/midjourney`, `/vs/leonardo`, `/vs/runway`, `/vs/ideogram`, `/vs/krea`. Single `<ComparisonPage>` template + `shared/comparisonData.ts` config. Each page has hero, intro paragraphs, feature-by-feature table, "where DFX wins" + honest "where they win" (E-E-A-T trust signal). All linked into sitemap at priority 0.8.
+- [x] All 5 viral tools registered in Tools.tsx grid as "🔥 Trending Now" section (placed first); added to TOOL_CREDIT_COSTS + sitemap.
 
 ### Tier 3 — Differentiating features (real moats)
 - [ ] One-Click Story pipeline — combine character consistency + image-to-video + MusicGen into single "idea → 60s narrated video" flow (OpenArt productized this; DFX has all parts)
