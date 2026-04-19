@@ -106,6 +106,9 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "chibi-figure": 10,
   "lego-mini": 10,
   "pet-to-person": 10,
+  "barbie-box": 10,
+  "jellycat-plush": 10,
+  "pop-mart": 10,
 
   // Audio / video tools
   "text-to-image": 5,

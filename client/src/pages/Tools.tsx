@@ -14,6 +14,7 @@ import {
   Bookmark as BookmarkIcon, Newspaper, Building2, Plane, Megaphone,
   Package, Blocks, Dog,
 } from "lucide-react";
+// lucide Sparkles/Cat/Gem already imported above — reused for Barbie/Jellycat/POP Mart.
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -39,6 +40,9 @@ const viralTools: GridTool[] = [
   { title: "AI Chibi Figure", desc: "Adorable anime collectible figure", icon: Heart, href: "/tools/chibi-figure", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
   { title: "AI LEGO Mini", desc: "Yourself as a classic LEGO minifig", icon: Blocks, href: "/tools/lego-mini", img: "/showcase/tool-3d.jpg", badge: "Viral" },
   { title: "Pet-to-Person", desc: "See your pet as a human", icon: Dog, href: "/tools/pet-to-person", img: "/showcase/tool-pet-portrait.jpg", badge: "Viral" },
+  { title: "AI Barbie Box", desc: "Collector-edition fashion doll", icon: Sparkles, href: "/tools/barbie-box", img: "/showcase/tool-avatar.jpg", badge: "Viral" },
+  { title: "AI Jellycat Plush", desc: "Ultra-soft squishy plush toy", icon: Cat, href: "/tools/jellycat-plush", img: "/showcase/tool-pet-portrait.jpg", badge: "Viral" },
+  { title: "AI POP Mart", desc: "Designer art-toy blind box", icon: Gem, href: "/tools/pop-mart", img: "/showcase/tool-3d.jpg", badge: "Viral" },
 ];
 
 // ─── Image Editing Tools ─────────────────────────────────────────────────────

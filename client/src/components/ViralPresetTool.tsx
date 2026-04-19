@@ -25,7 +25,10 @@ export interface ViralPresetToolProps {
     | "funko-pop"
     | "chibi-figure"
     | "lego-mini"
-    | "pet-to-person";
+    | "pet-to-person"
+    | "barbie-box"
+    | "jellycat-plush"
+    | "pop-mart";
   title: string;
   description: string;
   icon: LucideIcon;

@@ -21,34 +21,52 @@ import { deductCredits, CREDIT_COSTS } from "../stripe";
 // CreditCostBadge shows the right number.
 const PRESETS = {
   "action-figure": {
-    creditTool: "tshirt-design", // reuse existing 10-credit cost band
+    creditTool: "action-figure",
     label: "AI Action Figure",
     promptTemplate: (subject: string) =>
       `Transform the subject from the reference photo into a 6-inch articulated collectible action figure inside transparent plastic blister-pack toy packaging on a white cardboard backer. ${subject ? `Character details: ${subject}. ` : ""}Include a printed character name banner at the top, fictional accessories laid out around the figure (in their own molded blister bays), and small printed character stats on the cardboard. Photorealistic product shot, soft studio lighting, slight reflections on the plastic blister, shot on white background, looks like a real Hasbro / Funko / Marvel Legends boxed toy. Centered composition.`,
   },
   "funko-pop": {
-    creditTool: "tshirt-design",
+    creditTool: "funko-pop",
     label: "AI Funko Pop",
     promptTemplate: (subject: string) =>
       `Transform the subject from the reference photo into a Funko Pop! style vinyl figurine — oversized round head, tiny body, large solid black eyes, simplified colors, classic Funko Pop proportions. ${subject ? `Character details: ${subject}. ` : ""}Display the figure inside its iconic Funko Pop window box packaging with a recognizable character-name label at the top, the character number printed in the corner, and the signature Funko aesthetic. Photorealistic product shot, soft studio lighting, slight reflection on the cellophane window, shot on neutral background.`,
   },
   "chibi-figure": {
-    creditTool: "tshirt-design",
+    creditTool: "chibi-figure",
     label: "AI Chibi Figure",
     promptTemplate: (subject: string) =>
       `Transform the subject from the reference photo into an adorable 3D chibi-style collectible figurine — oversized cute head (about 60% of total height), small rounded body, big sparkly anime eyes, soft pastel anime colors, gentle smile. ${subject ? `Character details: ${subject}. ` : ""}Display on a clean glossy display base. Studio product photography, soft pink/cream gradient backdrop, soft rim lighting, looks like a high-end PVC anime figure from Good Smile Company.`,
   },
   "lego-mini": {
-    creditTool: "tshirt-design",
+    creditTool: "lego-mini",
     label: "AI Lego Mini",
     promptTemplate: (subject: string) =>
       `Transform the subject from the reference photo into a LEGO minifigure — classic blocky LEGO body proportions, rectangular torso, cylindrical head with painted face, claw hands, ABS plastic shine. ${subject ? `Character details: ${subject}. ` : ""}The minifigure stands on a small green LEGO baseplate. Photorealistic product photography, soft studio lighting on white background, slight reflections on the glossy plastic, looks like an authentic LEGO promotional product shot.`,
   },
   "pet-to-person": {
-    creditTool: "headshot",
+    creditTool: "pet-to-person",
     label: "AI Pet-to-Person",
     promptTemplate: (subject: string) =>
       `Imagine the pet from the reference photo as a human person — translate their species traits into matching human features (a fluffy golden retriever becomes a warm blonde person with kind smile, a sleek black cat becomes a sharp dark-haired person with green eyes, etc.). Keep the personality, color palette, and energy of the pet but render as a photorealistic human portrait. ${subject ? `Additional notes: ${subject}. ` : ""}Professional editorial portrait photography, natural lighting, neutral studio background, shoulders-up framing, looks like a real person photo.`,
+  },
+  "barbie-box": {
+    creditTool: "barbie-box",
+    label: "AI Barbie Box",
+    promptTemplate: (subject: string) =>
+      `Transform the subject from the reference photo into a Barbie-style doll inside signature pink-accented collector-edition window box packaging. Preserve the person's face and hair, but render as a high-end fashion doll with glossy plastic sheen and articulated joints. ${subject ? `Doll details: ${subject}. ` : ""}Include the BARBIE-style name banner (use a fictional safe name), a fashion-photo backdrop printed on the box, and one or two accessories in their own molded insert bays (handbag, sunglasses, pet). Photorealistic product shot on white background, soft studio lighting, slight reflection on the cellophane window.`,
+  },
+  "jellycat-plush": {
+    creditTool: "jellycat-plush",
+    label: "AI Jellycat Plush",
+    promptTemplate: (subject: string) =>
+      `Transform the subject from the reference photo into an adorable Jellycat-style soft plush toy — oversized rounded head, simple stitched embroidered features (small dots for eyes, tiny smile), ultra-soft pastel-tone fur, squishy rounded proportions, no hard edges. ${subject ? `Plush details: ${subject}. ` : ""}Studio product photography on a soft cream backdrop, soft warm rim lighting, slight fuzzy texture visible, looks like an authentic Jellycat collector item with matching signature cardboard tag.`,
+  },
+  "pop-mart": {
+    creditTool: "pop-mart",
+    label: "AI POP Mart Blind Box",
+    promptTemplate: (subject: string) =>
+      `Transform the subject from the reference photo into a designer art-toy vinyl figure in the POP Mart / Labubu / Skull Panda aesthetic — stylized blocky body, oversized expressive head with big cute eyes, matte vinyl finish, collectible designer-toy proportions. ${subject ? `Figure details: ${subject}. ` : ""}Display the figure next to its sealed blind-box packaging (featuring colorful illustrated box art). Studio product shot, soft neutral backdrop, designer-toy store aesthetic, looks like an authentic POP Mart release photo.`,
   },
 } as const;
 
@@ -69,6 +87,9 @@ export const viralRouter = router({
           "chibi-figure",
           "lego-mini",
           "pet-to-person",
+          "barbie-box",
+          "jellycat-plush",
+          "pop-mart",
         ]),
         imageUrl: z.string().url().max(2048),
         // Optional creative note — appended to the preset prompt so users

@@ -186,6 +186,153 @@ export const COMPARISONS: Record<string, Comparison> = {
     ctaCopy: "Try DreamForgeX free — see the difference one credit pool makes.",
   },
 
+  "canva-ai": {
+    slug: "canva-ai",
+    competitorName: "Canva Magic Studio",
+    competitorTagline: "Design suite with AI image, text, and template generation baked in.",
+    ourAngle: "Same AI generation quality in a creator-first workspace with 100+ named tools and a public API.",
+    heroSubtext:
+      "Canva Magic Studio is the AI layer inside Canva's design suite — great if you're already doing static design work. DreamForgeX is purpose-built for AI creators: 100+ named tools, full video + audio generation, a public API, character consistency, and niche workflows Canva doesn't ship.",
+    introParagraphs: [
+      "Canva Magic Studio adds AI generation (Magic Design, Dream Lab, Magic Write/Eraser/Expand) to Canva's existing template + design workflow. Pricing: Free, Pro $15/mo (500 shared AI credits), Business $20/seat. Video is capped at 8s × 5/month on Pro.",
+      "If you already live inside Canva for static design, the AI features are a welcome addition. But if your workflow is AI-first (image gen, video gen, character consistency, virtual try-on, branded pipelines for things like Funko figures or action figures), DreamForgeX is the purpose-built tool — 100+ named workflows, 30+ models, full audio stack, and a public API.",
+    ],
+    pricingSummary: "Canva Magic Studio: Free, Pro $15/mo (500 AI credits), Business $20/seat.",
+    comparisonRows: [
+      { feature: "Free tier", competitor: "✓ Very limited AI", dreamforgex: "✓ 50 credits/day + try-without-signup" },
+      { feature: "Cheapest paid tier", competitor: "$15/mo", dreamforgex: "$9/mo" },
+      { feature: "AI image gen", competitor: "Limited (shared pool)", dreamforgex: "✓ Flux / Imagen / DALL-E + more" },
+      { feature: "AI video gen", competitor: "Capped (8s × 5/mo on Pro)", dreamforgex: "✓ Veo 3, Kling, Sora" },
+      { feature: "AI audio / music gen", competitor: "✗", dreamforgex: "✓ MusicGen + TTS" },
+      { feature: "Template library", competitor: "✓ Massive", dreamforgex: "Curated" },
+      { feature: "Public REST API", competitor: "✗", dreamforgex: "✓" },
+      { feature: "Niche workflow tools (Funko, comics, try-on, etc.)", competitor: "✗", dreamforgex: "✓ 100+" },
+      { feature: "Character consistency", competitor: "✗", dreamforgex: "✓" },
+    ],
+    whyDfxWins: [
+      "AI-first workflow instead of AI bolted onto a static-design tool.",
+      "100+ named workflow tools vs Canva's general AI gen.",
+      "Public REST API for embedding — Canva doesn't offer this.",
+      "Full audio + video stack in the same credit pool.",
+      "Try without signup — Canva requires an account to try AI.",
+    ],
+    whereTheyWin: [
+      "Canva's template library is a moat we don't try to compete with.",
+      "If your team already does graphic design in Canva, the integration is seamless.",
+      "Canva Business ($20/seat) has strong multi-seat + brand-management features for agencies.",
+    ],
+    ctaCopy: "Try DreamForgeX free — AI-first, one credit pool for everything.",
+  },
+
+  "adobe-firefly": {
+    slug: "adobe-firefly",
+    competitorName: "Adobe Firefly",
+    competitorTagline: "Adobe's enterprise AI with legal indemnification and CC integration.",
+    ourAngle: "Same broad model access, at 10× less for solo creators and small teams.",
+    heroSubtext:
+      "Adobe Firefly bundles broad AI generation with Photoshop / Express integration and enterprise-friendly legal indemnification. DreamForgeX targets the solo creator and small team — same model breadth, a public API, 100+ niche workflow tools, and Free + $9 pricing that's 10× cheaper than Firefly's enterprise Premium tier.",
+    introParagraphs: [
+      "Adobe Firefly is a model-agnostic AI hub that pulls together Firefly + partner models behind a unified credit system, with deep Creative Cloud integration. Pricing: Standard $9.99 (2k credits), Pro $19.99 (4k), Premium $199.99 (50k). The pitch is enterprise legal indemnification + Adobe's design workflow integration.",
+      "If you're already deep in the Adobe ecosystem and need legal coverage for generative AI use, Firefly is the natural fit. But for solo creators, indie studios, and small teams, DreamForgeX is purpose-built — 100+ named workflow tools, a public REST API, full audio + video gen, and a $9 entry tier that matches Firefly Standard on image credits at similar price but adds video, music, and niche workflows Firefly doesn't ship.",
+    ],
+    pricingSummary: "Firefly: Standard $9.99 (2k credits), Pro $19.99 (4k), Premium $199.99 (50k).",
+    comparisonRows: [
+      { feature: "Free tier", competitor: "Limited Firefly only", dreamforgex: "✓ 50 credits/day + try-without-signup" },
+      { feature: "Cheapest paid tier", competitor: "$9.99/mo", dreamforgex: "$9/mo" },
+      { feature: "Multi-model hub", competitor: "✓ Firefly + partners", dreamforgex: "✓ 30+ models" },
+      { feature: "Video generation", competitor: "✓ Added late 2024", dreamforgex: "✓ Veo 3, Kling, Sora" },
+      { feature: "Audio / music gen", competitor: "✗", dreamforgex: "✓ MusicGen + TTS" },
+      { feature: "Niche workflow tools", competitor: "✗", dreamforgex: "✓ 100+ (Funko, comics, try-on, etc.)" },
+      { feature: "CC integration (Photoshop/Express)", competitor: "✓ Native", dreamforgex: "✗" },
+      { feature: "Enterprise legal indemnification", competitor: "✓", dreamforgex: "✗" },
+      { feature: "Public REST API", competitor: "✓ Enterprise tier", dreamforgex: "✓ from $9 tier" },
+    ],
+    whyDfxWins: [
+      "API from $9/mo — Firefly gates this to Premium / Enterprise ($200+).",
+      "100+ named workflow tools that collapse multi-step jobs into one click.",
+      "Full audio stack (music, TTS, SFX) in the same credit pool.",
+      "No Adobe account tax — works standalone.",
+    ],
+    whereTheyWin: [
+      "Adobe's enterprise legal indemnification is genuinely a differentiator for regulated industries.",
+      "Native Photoshop / Express integration is a real workflow win if you're an Adobe shop.",
+      "Firefly's brand + Adobe sales pipeline gets into Fortune 500s DFX can't reach.",
+    ],
+    ctaCopy: "Try DreamForgeX free — same model breadth, 10× cheaper for solo creators.",
+  },
+
+  playground: {
+    slug: "playground",
+    competitorName: "Playground",
+    competitorTagline: "Cheap multi-model image generation with Nano Banana Pro.",
+    ourAngle: "Same multi-model access plus video, audio, and 100+ named tools.",
+    heroSubtext:
+      "Playground is a budget-friendly multi-model image generator with access to Nano Banana Pro (Gemini 3 Pro Image) — great for straight-up image gen. DreamForgeX matches the multi-model access and adds full video + audio gen, 100+ named tools, and a public API.",
+    introParagraphs: [
+      "Playground.com is an image-focused generation platform aggressively priced: Free 10 images / 3 hours, Pro $12/mo, Pro Plus $36/mo. Pro gives commercial license + Nano Banana Pro (Gemini 3 Pro Image with 94% text accuracy at 4K).",
+      "If your needs are pure image generation with the latest Gemini/Flux frontier models, Playground is genuinely strong. DreamForgeX targets creators who need the broader stack — video, audio, character consistency, virtual try-on, comic strips, Funko-style figures — all in one credit pool with a public REST API.",
+    ],
+    pricingSummary: "Playground: Free 10/3hr, Pro $12/mo, Pro Plus $36/mo.",
+    comparisonRows: [
+      { feature: "Free tier", competitor: "✓ 10 images / 3 hours", dreamforgex: "✓ 50 credits/day + try-without-signup" },
+      { feature: "Cheapest paid tier", competitor: "$12/mo", dreamforgex: "$9/mo" },
+      { feature: "Multi-model image gen", competitor: "✓ Nano Banana Pro + more", dreamforgex: "✓ Flux / Imagen / DALL-E + more" },
+      { feature: "Video generation", competitor: "✗", dreamforgex: "✓ Veo 3, Kling, Sora" },
+      { feature: "Audio / music gen", competitor: "✗", dreamforgex: "✓ MusicGen + TTS" },
+      { feature: "Niche workflow tools", competitor: "✗", dreamforgex: "✓ 100+" },
+      { feature: "Character consistency", competitor: "Limited", dreamforgex: "✓ Character library" },
+      { feature: "Public REST API", competitor: "Limited", dreamforgex: "✓" },
+      { feature: "Commercial license", competitor: "Pro tier+", dreamforgex: "✓ from $9 tier" },
+    ],
+    whyDfxWins: [
+      "Full video + audio gen alongside images in one credit pool.",
+      "100+ named workflow tools instead of a flat image editor.",
+      "Public API from the $9 tier.",
+      "Character library for visual consistency across projects.",
+    ],
+    whereTheyWin: [
+      "Playground's Nano Banana Pro access is a strong image-quality win for text-on-image.",
+      "If you only need image gen and nothing else, Playground's focused pricing is attractive.",
+    ],
+    ctaCopy: "Try DreamForgeX free — same price, broader stack.",
+  },
+
+  nightcafe: {
+    slug: "nightcafe",
+    competitorName: "NightCafe",
+    competitorTagline: "Community-driven AI art platform with gamified challenges.",
+    ourAngle: "Similar breadth of models plus video gen, audio, and public API — without the all-community focus.",
+    heroSubtext:
+      "NightCafe is one of the strongest community-driven AI art platforms — 50+ PRO models, daily challenges, badges, relax-credits you earn by participating. DreamForgeX matches the multi-model breadth and adds full video + audio generation, 100+ named workflow tools, and a public REST API.",
+    introParagraphs: [
+      "NightCafe leans hard into community — daily art challenges, badges, earning relax credits through participation. Pricing: 5 free daily credits, Beginner $5.99, Hobbyist $9.99, Enthusiast $19.99, Artist $49.99/mo. 50+ PRO models across their UI.",
+      "If your workflow is \"make art, join a community, enter challenges,\" NightCafe's gamification is genuinely engaging. DreamForgeX is the tool-first platform — 100+ named workflows, full video + audio gen, a public API, and a marketplace for selling your own prompts and presets (which NightCafe doesn't have). Both platforms coexist well if you want community on one side and production tools on the other.",
+    ],
+    pricingSummary: "NightCafe: Free 5/day, Beginner $5.99, Hobbyist $9.99, Enthusiast $19.99, Artist $49.99.",
+    comparisonRows: [
+      { feature: "Free tier", competitor: "✓ 5/day + community-earned", dreamforgex: "✓ 50/day + try-without-signup" },
+      { feature: "Cheapest paid tier", competitor: "$5.99/mo", dreamforgex: "$9/mo" },
+      { feature: "Multi-model breadth", competitor: "✓ 50+ PRO models", dreamforgex: "✓ 30+ across all media" },
+      { feature: "Video generation", competitor: "Limited", dreamforgex: "✓ Veo 3, Kling, Sora" },
+      { feature: "Audio / music gen", competitor: "✗", dreamforgex: "✓ MusicGen + TTS" },
+      { feature: "Community challenges + badges", competitor: "✓ Mature", dreamforgex: "Basic" },
+      { feature: "Niche workflow tools", competitor: "✗", dreamforgex: "✓ 100+" },
+      { feature: "Public REST API", competitor: "✗", dreamforgex: "✓" },
+      { feature: "Marketplace (sell prompts/presets)", competitor: "✗", dreamforgex: "✓" },
+    ],
+    whyDfxWins: [
+      "Full video + audio generation alongside images.",
+      "Public REST API for embedding DFX into your own products.",
+      "Marketplace where you can sell prompts and presets (85% revenue share).",
+      "100+ branded workflow tools instead of general gen only.",
+    ],
+    whereTheyWin: [
+      "NightCafe's community + gamification is mature and genuinely fun — we're honest that our version is basic.",
+      "At $5.99, the entry tier is cheaper than ours if you're strictly a hobbyist.",
+    ],
+    ctaCopy: "Try DreamForgeX free — production tools alongside your NightCafe community time.",
+  },
+
   krea: {
     slug: "krea",
     competitorName: "Krea.ai",

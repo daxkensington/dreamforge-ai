@@ -84,6 +84,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "cosplay-reference", "travel-postcard",
     // Phase 39 Tier 2 — viral preset tools
     "action-figure", "funko-pop", "chibi-figure", "lego-mini", "pet-to-person",
+    "barbie-box", "jellycat-plush", "pop-mart",
   ].map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,
@@ -93,6 +94,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Competitor comparison pages (high buying-intent SEO — "X alternative")
   const comparisonRoutes = [
     "midjourney", "leonardo", "runway", "ideogram", "krea",
+    "canva-ai", "adobe-firefly", "playground", "nightcafe",
   ].map((s) => ({
     url: `/vs/${s}`,
     priority: 0.8,
@@ -103,6 +105,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const useCaseRoutes = [
     "etsy-sellers", "podcasters", "real-estate-agents", "cosplayers",
     "indie-devs", "authors", "restaurants", "tattoo-artists",
+    "youtubers", "shopify-sellers", "streamers", "small-business",
   ].map((s) => ({
     url: `/for/${s}`,
     priority: 0.7,
