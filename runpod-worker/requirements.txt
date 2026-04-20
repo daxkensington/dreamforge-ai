@@ -19,3 +19,6 @@ xformers>=0.0.27
 scikit-image>=0.22.0
 requests>=2.31.0
 scipy>=1.11.0
+# soundfile — required by audiocraft's MusicGen/AudioGen for WAV encode.
+# Was missing, so every music gen was failing with "No module named 'soundfile'".
+soundfile>=0.12.0
