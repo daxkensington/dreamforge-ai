@@ -149,11 +149,11 @@ async function generateWithDallE(
 }
 
 /**
- * Generate image via Gemini (gemini-2.5-flash-image-preview).
+ * Generate image via Gemini (gemini-2.5-flash-image).
  * Uses the REST API with responseModalities: ["TEXT", "IMAGE"].
  */
 async function generateWithGemini(prompt: string): Promise<Buffer> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${ENV.geminiApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${ENV.geminiApiKey}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -729,8 +729,12 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 2. FREE TIER: Together AI Flux Schnell (free for 3 months)
-  if (ENV.togetherApiKey) {
+  // 2. FREE TIER: Together AI Flux Schnell (free for 3 months) — DISABLED
+  //    The configured TOGETHER_API_KEY returns 401 invalid_api_key in prod
+  //    (confirmed via scripts/prod-tool-sweep.ts on 2026-04-20). Every
+  //    generation was wasting ~200ms on a guaranteed-fail retry. Re-enable
+  //    after rotating the key: delete this `false && ` gate.
+  if (false && ENV.togetherApiKey) {
     const result = await tryProvider("Together AI", () => generateWithTogether(prompt, w, h));
     if (result) return result;
   }

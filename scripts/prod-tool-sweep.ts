@@ -56,7 +56,13 @@ async function runTest(
     const durationMs = Date.now() - start;
     const url = extractUrl(result);
     const status = result?.status;
-    const ok = status === "completed" || (status === undefined && url) || status === "success";
+    // Audio is fire-and-forget — status "generating" with a DB id counts as
+    // successful enqueue (the actual gen happens async and is polled).
+    const ok =
+      status === "completed" ||
+      status === "success" ||
+      (status === "generating" && result?.id !== undefined) ||
+      (status === undefined && !!url);
     if (ok) {
       console.log(`✓ (${Math.round(durationMs / 100) / 10}s)${url ? ` → ${url.slice(0, 80)}...` : ""}`);
     } else {
@@ -127,12 +133,13 @@ async function main() {
   );
 
   // ─── Video path (text-to-video, expensive — 40+ credits) ──────────────
+  // Duration is restricted to "4" or "8" strings per zod schema.
   await runTest(
     "video",
-    "video.textToVideo (3s, auto model)",
+    "video.textToVideo (4s, auto model)",
     () => (caller as any).video.textToVideo({
       prompt: "a cat walking in a garden",
-      duration: 3,
+      duration: "4",
       aspectRatio: "16:9",
       style: "cinematic",
       model: "auto",
