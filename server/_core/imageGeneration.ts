@@ -149,11 +149,11 @@ async function generateWithDallE(
 }
 
 /**
- * Generate image via Gemini (gemini-2.0-flash-preview-image-generation).
+ * Generate image via Gemini (gemini-2.5-flash-image-preview).
  * Uses the REST API with responseModalities: ["TEXT", "IMAGE"].
  */
 async function generateWithGemini(prompt: string): Promise<Buffer> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${ENV.geminiApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${ENV.geminiApiKey}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
