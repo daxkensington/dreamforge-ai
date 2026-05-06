@@ -733,17 +733,11 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 2. FREE TIER: Together AI Flux Schnell (free for 3 months) — DISABLED
-  //    The configured TOGETHER_API_KEY returns 401 invalid_api_key in prod
-  //    (confirmed via scripts/prod-tool-sweep.ts on 2026-04-20). Every
-  //    generation was wasting ~200ms on a guaranteed-fail retry. Re-enable
-  //    after rotating the key: delete this `false && ` gate.
-  if (false && ENV.togetherApiKey) {
-    const result = await tryProvider("Together AI", () => generateWithTogether(prompt, w, h));
-    if (result) return result;
-  }
+  // Together AI Flux Schnell — disabled until TOGETHER_API_KEY is rotated
+  // (confirmed 401 invalid_api_key in prod, scripts/prod-tool-sweep.ts
+  // 2026-04-20). Add the conditional back once a working key is in env.
 
-  // 3. FREE TIER: Cloudflare Workers AI (100K free/day)
+  // FREE TIER: Cloudflare Workers AI (100K free/day)
   if (ENV.cfAiToken) {
     const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(prompt));
     if (result) return result;
