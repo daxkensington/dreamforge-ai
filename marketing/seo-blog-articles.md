@@ -27,10 +27,10 @@ A truly free AI image generator should offer:
 
 ### 1. DreamForgeX (dreamforgex.ai)
 **Free tier:** 50 credits/day (~25 images with free models)
-**Models available for free:** Gemini Imagen, Flux Schnell (Together AI), Flux Schnell (Cloudflare)
+**Models available for free:** Flux Schnell (Together AI), Flux Schnell (Cloudflare), Grok Image Gen
 **Best for:** Users who want access to multiple AI models in one place
 
-DreamForgeX stands out because its free tier gives you access to three different image models. You can generate with Google's Gemini Imagen, Flux Schnell via Together AI, or Flux Schnell via Cloudflare Workers AI — all for 2 credits each. With 50 credits per day, that's 25 free images daily.
+DreamForgeX stands out because its free tier gives you access to three different image models — Flux Schnell via Together AI, Flux Schnell via Cloudflare Workers AI, and Grok Image Gen — all for 2 credits each. With 50 credits per day, that's 25 free images daily.
 
 The platform also includes 100+ other creative tools (video, audio, design) and lets you upgrade to premium models like DALL-E 3, Flux Pro, and Seedream V4 with a paid plan.
 
@@ -148,7 +148,7 @@ Start with the Song Creator tool. Describe the genre, mood, and lyrics you want.
 
 Use Text-to-Video to generate scene clips that match your song's mood. For the best quality:
 - **Runway Gen-4.5** (200 credits) — highest quality, 10-second clips
-- **Veo 3** (10 credits) — great quality, free-tier eligible
+- **Veo 3** (350 credits) — synchronized audio, 1080p, premium tier
 - **Wan 2.5** (40 credits) — good quality 1080p
 
 Generate 6-12 clips of 5-10 seconds each to cover a full song.
@@ -262,11 +262,11 @@ Runway Gen-4.5 produces the most coherent, professional-quality video of any AI 
 
 ## Google Veo 3: The Value Champion
 
-Veo 3 shocked the industry by offering synchronized audio with video — something no other model does. It generates up to 1080p resolution and is available on DreamForgeX's free tier at just 10 credits.
+Veo 3 shocked the industry by offering synchronized audio with video — something no other model does. It generates up to 1080p resolution and is available on DreamForgeX's premium tier at 350 credits per 8-second clip.
 
-**Best for:** Quick iterations, social media content, videos that need built-in audio
+**Best for:** Social media content and videos that need built-in audio without a separate voiceover step
 
-**Drawback:** Slightly less consistent motion than Runway, limited to 8 seconds
+**Drawback:** Slightly less consistent motion than Runway, limited to 8 seconds, premium pricing reflects the underlying API cost
 
 ## When to Use Each
 

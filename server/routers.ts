@@ -4620,17 +4620,22 @@ export const appRouter = router({
           }
         }
 
-        // Priority 2: Google Veo 3
-        if ((input.model === "auto" || input.model === "veo-3") && process.env.GEMINI_API_KEY) {
+        // Veo 3 is gated behind VEO3_ENABLED + GEMINI_API_KEY. It costs ~$3.20
+        // per 8-second video and was previously the silent default for `auto`,
+        // which racked up $6.6k in April 2026. Auto mode now skips it entirely;
+        // explicit selection requires both env flags AND a paid tier check on
+        // the caller side (modelRegistry marks it tier: "premium").
+        if (input.model === "veo-3" && process.env.VEO3_ENABLED === "true" && process.env.GEMINI_API_KEY) {
           try {
             const { generateVeo3Video } = await import("./_core/videoGeneration");
             const videoUrl = await generateVeo3Video({ prompt: enhancedPrompt, aspectRatio: input.aspectRatio, durationSeconds: parseInt(input.duration) });
             return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
           } catch (err: any) {
-            if (input.model === "veo-3") return { videoUrl: null, status: "failed" as const, error: err.message };
-            errors.push(`Veo 3: ${err.message}`);
-            console.warn("[Video] Veo 3 failed, trying next:", err.message);
+            return { videoUrl: null, status: "failed" as const, error: err.message };
           }
+        }
+        if (input.model === "veo-3") {
+          return { videoUrl: null, status: "failed" as const, error: "Veo 3 is currently unavailable on this account." };
         }
 
         // Priority 3: Kling 2.0 (best value)
@@ -4706,8 +4711,10 @@ export const appRouter = router({
         const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
         const errors: string[] = [];
 
-        // Priority 1: Google Veo 3 (current primary, best quality-to-cost)
-        if (process.env.GEMINI_API_KEY) {
+        // Veo 3 image-to-video — gated behind VEO3_ENABLED. See note above the
+        // text-to-video path. Default behavior now skips Veo 3 and goes
+        // straight to Runway / Kling / Minimax.
+        if (process.env.VEO3_ENABLED === "true" && process.env.GEMINI_API_KEY) {
           try {
             const imgResponse = await fetch(input.imageUrl);
             const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());

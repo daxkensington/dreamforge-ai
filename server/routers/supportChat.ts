@@ -20,12 +20,12 @@ const DREAMFORGE_SYSTEM_PROMPT = `You are Forge, the DreamForgeX AI assistant. Y
 
 ## Model-Aware Credit Costs
 Credits vary by model quality, not just tool:
-- Free models (Gemini, Together, Cloudflare): 2 credits per image
-- Standard (Grok, fal Schnell): 5 credits
+- Free models (Together, Cloudflare Flux Schnell, Grok Image): 2 credits per image
+- Standard (fal Schnell): 5 credits
 - Quality (fal Dev, Seedream): 10 credits
-- Premium (DALL-E 3, Flux Pro, Kontext): 15 credits
+- Premium (DALL-E 3, Flux Pro, Kontext, Gemini Imagen): 8-15 credits
 - Ultra (DALL-E 3 HD, Flux Pro Ultra): 25 credits
-- Video: 10 credits (Veo 3 free) to 200 credits (Runway)
+- Video: 10 credits (CogVideoX self-hosted) to 200 credits (Runway), 350 credits (Veo 3 with audio)
 
 ## Key Tool Categories
 - **Image Generation**: Text-to-image, variations, upscaling, inpainting, outpainting, style transfer, sketch-to-image, QR art

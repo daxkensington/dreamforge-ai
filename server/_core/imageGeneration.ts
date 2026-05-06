@@ -657,7 +657,9 @@ async function generateWithExplicitModel(
       if (!ENV.openaiApiKey) throw new Error("OpenAI API key not configured");
       return generateWithDallE(prompt, size, quality, style);
     case "gemini":
-      if (!ENV.geminiApiKey) throw new Error("Gemini API key not configured");
+      if (process.env.IMAGEN_ENABLED !== "true" || !ENV.geminiApiKey) {
+        throw new Error("Gemini Imagen is currently unavailable on this account");
+      }
       return generateWithGemini(prompt);
     case "flux-pro":
       if (!ENV.replicateApiToken) throw new Error("Replicate API token not configured");
@@ -723,8 +725,10 @@ async function generateWithFallback(
     }
   };
 
-  // 1. FREE TIER: Gemini (500 free images/day)
-  if (ENV.geminiApiKey) {
+  // Gemini Imagen — gated. The Gemini image API has NO free quota and bills
+  // ~$0.039/image; the previous "free tier" comment was wrong and helped run
+  // up the April 2026 GCP bill. Enable per-deployment with IMAGEN_ENABLED=true.
+  if (process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
     const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
     if (result) return result;
   }

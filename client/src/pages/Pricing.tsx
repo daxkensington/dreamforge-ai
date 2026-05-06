@@ -186,7 +186,7 @@ const faqs = [
   },
   {
     q: "What models can I use on the free tier?",
-    a: "Free tier includes Gemini Imagen, Together AI, Cloudflare Workers AI for images, Veo 3 for video, and Edge TTS for speech. These are high-quality models that cost us nothing to run.",
+    a: "Free tier includes Flux Schnell via Cloudflare Workers AI and Together AI for images, Grok Image Gen, our self-hosted CogVideoX for video, and Edge TTS for speech — all running on infrastructure where the marginal cost is near zero. Premium models like Veo 3, Gemini Imagen, DALL-E 3, Flux Pro, Runway, Kling, and Minimax are available on Creator and Premium tiers, where the credit cost reflects the underlying API price.",
   },
 ];
 
@@ -441,7 +441,7 @@ export default function Pricing() {
                       {(plan.tier === "free"
                         ? [
                             "50 credits / day (~1,500/mo)",
-                            "Free models only (Gemini, Together, Cloudflare, Veo 3)",
+                            "Free models only (Flux Schnell on Cloudflare/Together, Grok Image, CogVideoX self-hosted)",
                             "5 songs / day (watermarked)",
                             "1 music video / day",
                             "1024px images / 480p video",
@@ -622,11 +622,12 @@ export default function Pricing() {
               <h3 className="text-lg font-bold mb-4">Video Generation</h3>
               <div className="space-y-3">
                 {[
-                  { tier: "Free", models: "Veo 3", credits: 10, color: "text-emerald-400" },
+                  { tier: "Free", models: "CogVideoX (self-hosted)", credits: 10, color: "text-emerald-400" },
                   { tier: "Standard", models: "fal Wan 2.5", credits: 40, color: "text-cyan-400" },
                   { tier: "Quality", models: "Kling 1.6, fal Kling", credits: 50, color: "text-blue-400" },
                   { tier: "Premium", models: "Kling 2.0", credits: 75, color: "text-violet-400" },
                   { tier: "Ultra", models: "Runway Gen-4.5, Gen-4 Turbo", credits: 200, color: "text-fuchsia-400" },
+                  { tier: "Veo 3", models: "Google Veo 3 (with audio)", credits: 350, color: "text-amber-400" },
                 ].map((row) => (
                   <div key={row.tier} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                     <div>

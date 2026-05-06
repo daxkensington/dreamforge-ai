@@ -93,12 +93,12 @@ function geminiImage(): AIModel {
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 2 },
-    isAvailable: !!ENV.geminiApiKey,
-    modelTier: "free",
-    tier: "free",
-    description: "Google Gemini image generation. Generous free tier.",
-    costInfo: "2 credits (Free)",
+    creditCost: { base: 8 },
+    isAvailable: process.env.IMAGEN_ENABLED === "true" && !!ENV.geminiApiKey,
+    modelTier: "creator",
+    tier: "creator",
+    description: "Google Gemini image generation. Premium model — billed at ~$0.039/image.",
+    costInfo: "8 credits (Creator+)",
   };
 }
 
@@ -271,12 +271,12 @@ function veo3Video(): AIModel {
     type: "video",
     capabilities: ["text-to-video", "image-to-video"],
     maxResolution: { width: 1920, height: 1080 },
-    creditCost: { base: 10 },
-    isAvailable: !!ENV.geminiApiKey,
-    modelTier: "free",
-    tier: "free",
-    description: "Google Veo 3 — state-of-the-art video generation with synchronized audio.",
-    costInfo: "10 credits (Free)",
+    creditCost: { base: 350 },
+    isAvailable: process.env.VEO3_ENABLED === "true" && !!ENV.geminiApiKey,
+    modelTier: "premium",
+    tier: "premium",
+    description: "Google Veo 3 — state-of-the-art video generation with synchronized audio. Premium model — billed at ~$3.20 per 8-second clip.",
+    costInfo: "350 credits (Premium) — covers ~$3.20 API cost per 8s clip",
   };
 }
 

@@ -70,9 +70,9 @@ const MODEL_OPTIONS = [
   { value: "flux-schnell", label: "Flux Schnell", desc: "Fast, high-quality iteration", types: ["image"], tier: "free" },
   { value: "dall-e-3", label: "DALL-E 3", desc: "Excellent prompt following by OpenAI", types: ["image"], tier: "creator" },
   { value: "sd3", label: "Stable Diffusion 3", desc: "Great detail and text rendering", types: ["image"], tier: "creator" },
-  { value: "gemini", label: "Gemini Imagen", desc: "Google's image generation", types: ["image"], tier: "free" },
+  { value: "gemini", label: "Gemini Imagen", desc: "Google's image generation", types: ["image"], tier: "creator" },
   // Video models
-  { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "free", badge: "Best" },
+  { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "premium", badge: "Premium" },
   { value: "cogvideo", label: "CogVideoX (Self-Hosted)", desc: "Text-to-video on DreamForge GPUs — 75% cheaper", types: ["video"], tier: "creator" },
   { value: "minimax", label: "Minimax Video", desc: "High-quality short video clips", types: ["video"], tier: "creator" },
 ];

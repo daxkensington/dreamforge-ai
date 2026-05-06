@@ -77,7 +77,7 @@ https://dreamforgex.ai
 DreamForgeX gives you access to 15+ image models from one interface:
 - Flux Pro 1.1 Ultra (best quality)
 - DALL-E 3 / DALL-E 3 HD
-- Gemini Imagen (free tier)
+- Gemini Imagen (Creator tier)
 - Grok Image Gen
 - Seedream V4
 - Stable Diffusion 3
