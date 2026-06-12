@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies (in stages to avoid resolver conflicts)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# audiocraft is installed --no-deps (its setup pins an ancient torch), so its
+# import-time deps must be backfilled by hand. The full set was enumerated
+# empirically 2026-06-12 (runpod-worker/find-missing-deps.sh): missing any of
+# av/julius/spacy/librosa/torchmetrics kills MusicGen/AudioGen with
+# "No module named X" at generation time.
 RUN pip install --no-cache-dir --no-deps audiocraft && \
-    pip install --no-cache-dir lameenc num2words flashy torchaudio imageio-ffmpeg imageio
+    pip install --no-cache-dir lameenc num2words flashy torchaudio imageio-ffmpeg imageio \
+    av julius spacy librosa torchmetrics
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
