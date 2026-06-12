@@ -137,14 +137,11 @@ export async function generateMusic(
     prompt = `${prompt}. ${request.options.tempo} BPM`;
   }
 
-  // Try self-hosted MusicGen on RunPod first (~85% cheaper) — DISABLED
-  //   The RunPod MusicGen worker is missing the `soundfile` Python package
-  //   and fails every call with "No module named 'soundfile'" (confirmed via
-  //   scripts/prod-tool-sweep.ts on 2026-04-20). Every music gen was
-  //   wasting 10-30s on a guaranteed-fail RunPod attempt before falling
-  //   back to Replicate. Re-enable after rebuilding the worker image with
-  //   soundfile in requirements.txt: delete this `false && ` gate.
-  if (false && isRunPodAvailable()) {
+  // Try self-hosted MusicGen on RunPod first (~85% cheaper). Re-enabled
+  // 2026-06-12: the worker image was rebuilt with soundfile (as
+  // dreamforge-worker2 — the original CI build failed on a ghcr package
+  // permission wall) and template 1bsqfwklgh repointed to it.
+  if (isRunPodAvailable()) {
     try {
       const buffer = await runpodMusicGen(prompt, duration);
       const { url } = await storagePut(`audio/music_${Date.now()}.wav`, buffer, "audio/wav");
