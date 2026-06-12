@@ -33,6 +33,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Publishes to dreamforge-worker2, NOT dreamforge-worker: the original
+      # package was created by a manual docker push, so it isn't linked to
+      # this repo and GITHUB_TOKEN gets 403 on it (this is why the 2026-04-20
+      # build failed and the soundfile fix never shipped). A new package name
+      # is auto-created and repo-linked on first push. RunPod's stored ghcr
+      # registry auth is a user PAT, so it can pull the new package too.
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
@@ -40,18 +46,18 @@ jobs:
           file: ./runpod-worker/Dockerfile
           push: true
           tags: |
-            ghcr.io/daxkensington/dreamforge-worker:latest
-            ghcr.io/daxkensington/dreamforge-worker:${{ github.sha }}
+            ghcr.io/daxkensington/dreamforge-worker2:latest
+            ghcr.io/daxkensington/dreamforge-worker2:${{ github.sha }}
           # Build caching keeps rebuild time down on small changes.
-          cache-from: type=registry,ref=ghcr.io/daxkensington/dreamforge-worker:buildcache
-          cache-to: type=registry,ref=ghcr.io/daxkensington/dreamforge-worker:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/daxkensington/dreamforge-worker2:buildcache
+          cache-to: type=registry,ref=ghcr.io/daxkensington/dreamforge-worker2:buildcache,mode=max
           # The image has CUDA bits so linux/amd64 only — RunPod runs on x86 GPUs.
           platforms: linux/amd64
 
       - name: Summary
         run: |
           echo "### RunPod worker image published" >> $GITHUB_STEP_SUMMARY
-          echo "- \`ghcr.io/daxkensington/dreamforge-worker:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`ghcr.io/daxkensington/dreamforge-worker:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/daxkensington/dreamforge-worker2:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/daxkensington/dreamforge-worker2:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Next step:** rolling-restart the RunPod endpoint so live workers pull the new \`:latest\` tag. Or update the endpoint config to pin the SHA-tagged image." >> $GITHUB_STEP_SUMMARY
+          echo "**Next step:** update the RunPod template imageName to \`dreamforge-worker2:latest\` (or the SHA tag) so workers pull the new image." >> $GITHUB_STEP_SUMMARY
