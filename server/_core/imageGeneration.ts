@@ -42,8 +42,7 @@ export type GenerateImageResponse = {
 // ─── Provider Implementations ──────────────────────────────────────────────
 
 /**
- * Generate image via Grok (xAI) API.
- * Tries grok-2-image first, falls back to grok-imagine-image.
+ * Generate image via Grok (xAI) API using grok-imagine-image.
  */
 async function generateWithGrok(prompt: string): Promise<Buffer> {
   // grok-2-image was retired on this account (404 "does not exist or your

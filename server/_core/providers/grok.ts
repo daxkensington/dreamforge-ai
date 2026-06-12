@@ -1,6 +1,7 @@
 /**
  * Grok (xAI) provider adapter — image generation via xAI API.
- * Tries grok-2-image first, falls back to grok-imagine-image.
+ * Uses grok-imagine-image (grok-2-image was retired by xAI — it 404s with
+ * "model does not exist or your team does not have access").
  */
 
 import { storagePut, generateStorageKey } from "../../storage";
@@ -8,7 +9,7 @@ import { ENV } from "../env";
 import type { GenerationRequest, GenerationResult, ProviderAdapter } from "./base";
 
 const GROK_API_BASE = "https://api.x.ai/v1";
-const GROK_IMAGE_MODELS = ["grok-2-image", "grok-imagine-image"];
+const GROK_IMAGE_MODELS = ["grok-imagine-image"];
 
 export class GrokProvider implements ProviderAdapter {
   readonly provider = "grok";
