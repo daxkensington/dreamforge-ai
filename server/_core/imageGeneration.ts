@@ -46,7 +46,9 @@ export type GenerateImageResponse = {
  * Tries grok-2-image first, falls back to grok-imagine-image.
  */
 async function generateWithGrok(prompt: string): Promise<Buffer> {
-  const models = ["grok-2-image", "grok-imagine-image"];
+  // grok-2-image was retired on this account (404 "does not exist or your
+  // team does not have access", confirmed 2026-06-11) — don't waste a call.
+  const models = ["grok-imagine-image"];
   let lastError: Error | null = null;
 
   for (const model of models) {
