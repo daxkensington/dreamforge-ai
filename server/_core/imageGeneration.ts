@@ -45,10 +45,7 @@ export type GenerateImageResponse = {
  * Generate image via Grok (xAI) API.
  * Tries grok-2-image first, falls back to grok-imagine-image.
  */
-async function generateWithGrok(
-  prompt: string,
-  size: string = "1024x1024",
-): Promise<Buffer> {
+async function generateWithGrok(prompt: string): Promise<Buffer> {
   const models = ["grok-2-image", "grok-imagine-image"];
   let lastError: Error | null = null;
 
@@ -62,11 +59,12 @@ async function generateWithGrok(
           "Content-Type": "application/json",
           Authorization: `Bearer ${ENV.grokApiKey}`,
         },
+        // The xAI image API rejects `size` outright (400 "Argument not
+        // supported: size") — output dimensions are not controllable.
         body: JSON.stringify({
           model,
           prompt,
           n: 1,
-          size,
           response_format: "b64_json",
         }),
         signal: controller.signal,
@@ -105,18 +103,24 @@ async function generateWithGrok(
 }
 
 /**
- * Generate image via OpenAI DALL-E 3.
+ * Generate image via OpenAI GPT Image.
+ *
+ * Replaces the old DALL-E 3 integration — OpenAI retired `dall-e-3` on this
+ * account (400 "The model 'dall-e-3' does not exist", confirmed 2026-06-11);
+ * current image models are gpt-image-1 / 1.5 / 2. gpt-image-1 takes
+ * low|medium|high quality, no `style`, no `response_format` (always b64).
  */
-async function generateWithDallE(
+async function generateWithGptImage(
   prompt: string,
   size: string = "1024x1024",
   quality: "standard" | "hd" | "ultra" = "standard",
-  style: "natural" | "vivid" = "vivid",
 ): Promise<Buffer> {
-  const validSize = resolveDallESize(size);
+  const validSize = resolveGptImageSize(size);
+  const gptQuality = quality === "standard" ? "medium" : "high";
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  // gpt-image-1 is slow (20-60s typical) — 30s was guaranteed to abort
+  const timeout = setTimeout(() => controller.abort(), 120000);
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: {
@@ -124,13 +128,11 @@ async function generateWithDallE(
       Authorization: `Bearer ${ENV.openaiApiKey}`,
     },
     body: JSON.stringify({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt,
       n: 1,
       size: validSize,
-      quality,
-      style,
-      response_format: "b64_json",
+      quality: gptQuality,
     }),
     signal: controller.signal,
   });
@@ -138,12 +140,12 @@ async function generateWithDallE(
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`DALL-E 3 failed (${response.status}): ${detail}`);
+    throw new Error(`GPT Image failed (${response.status}): ${detail}`);
   }
 
   const result = (await response.json()) as any;
   const b64 = result.data?.[0]?.b64_json;
-  if (!b64) throw new Error("DALL-E 3 returned no image data");
+  if (!b64) throw new Error("GPT Image returned no image data");
 
   return Buffer.from(b64, "base64");
 }
@@ -228,23 +230,26 @@ async function generateWithSD3(
   width?: number,
   height?: number,
 ): Promise<Buffer> {
-  const body: Record<string, unknown> = {
-    prompt,
-    output_format: "png",
-  };
-  if (width) body.width = width;
-  if (height) body.height = height;
+  // The v2beta endpoint only accepts multipart/form-data (JSON gets a 400
+  // "content-type: must be multipart/form-data") and takes aspect_ratio,
+  // not width/height.
+  const form = new FormData();
+  form.append("prompt", prompt);
+  form.append("output_format", "png");
+  if (width && height) {
+    const ratio = width / height;
+    form.append("aspect_ratio", ratio > 1.3 ? "16:9" : ratio < 0.77 ? "9:16" : "1:1");
+  }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
   const response = await fetch("https://api.stability.ai/v2beta/stable-image/generate/sd3", {
     method: "POST",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
       Authorization: `Bearer ${ENV.stabilityApiKey}`,
     },
-    body: JSON.stringify(body),
+    body: form,
     signal: controller.signal,
   });
   clearTimeout(timeout);
@@ -320,9 +325,9 @@ async function generateUltra(
     }
   }
 
-  // Step 4: Fallback to DALL-E 3 HD
+  // Step 4: Fallback to GPT Image high quality
   if (ENV.openaiApiKey) {
-    return generateWithDallE(enhancedPrompt, "1024x1024", "hd", "vivid");
+    return generateWithGptImage(enhancedPrompt, "1024x1024", "hd");
   }
 
   // Step 5: Last resort — best available model
@@ -448,26 +453,35 @@ async function generateWithFal(
     throw new Error(`fal.ai submit failed (${submitResponse.status}): ${detail}`);
   }
 
-  const { request_id } = (await submitResponse.json()) as { request_id: string };
-  if (!request_id) throw new Error("fal.ai returned no request_id");
+  // Poll the URLs fal returns, never URLs built from the model path: for
+  // subpath models ("fal-ai/flux/schnell") the request endpoints live under
+  // the model ROOT ("fal-ai/flux/requests/…"). Building them from the full
+  // model path 404s on every poll, which the old loop swallowed silently and
+  // then misreported as "generation timed out".
+  const submitted = (await submitResponse.json()) as {
+    request_id?: string;
+    status_url?: string;
+    response_url?: string;
+  };
+  if (!submitted.request_id || !submitted.status_url || !submitted.response_url) {
+    throw new Error("fal.ai returned no request_id/status_url");
+  }
 
   // Poll for result (up to 2 minutes)
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 3000));
 
-    const statusResp = await fetch(
-      `https://queue.fal.run/${falModel}/requests/${request_id}/status`,
-      { headers: { Authorization: `Key ${apiKey}` } },
-    );
+    const statusResp = await fetch(submitted.status_url, {
+      headers: { Authorization: `Key ${apiKey}` },
+    });
     if (!statusResp.ok) continue;
 
     const status = (await statusResp.json()) as { status: string; error?: string };
 
     if (status.status === "COMPLETED") {
-      const resultResp = await fetch(
-        `https://queue.fal.run/${falModel}/requests/${request_id}`,
-        { headers: { Authorization: `Key ${apiKey}` } },
-      );
+      const resultResp = await fetch(submitted.response_url, {
+        headers: { Authorization: `Key ${apiKey}` },
+      });
       if (!resultResp.ok) throw new Error("Failed to fetch fal.ai result");
 
       const result = (await resultResp.json()) as { images?: Array<{ url: string }> };
@@ -489,16 +503,16 @@ async function generateWithFal(
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-/** Map arbitrary size string to closest DALL-E 3 preset. */
-function resolveDallESize(size: string): "1024x1024" | "1792x1024" | "1024x1792" {
-  if (size === "1792x1024" || size === "1024x1792" || size === "1024x1024") {
+/** Map arbitrary size string to closest GPT Image preset. */
+function resolveGptImageSize(size: string): "1024x1024" | "1536x1024" | "1024x1536" {
+  if (size === "1536x1024" || size === "1024x1536" || size === "1024x1024") {
     return size;
   }
   const [w, h] = size.split("x").map(Number);
   if (!w || !h) return "1024x1024";
   const ratio = w / h;
-  if (ratio > 1.3) return "1792x1024";
-  if (ratio < 0.77) return "1024x1792";
+  if (ratio > 1.3) return "1536x1024";
+  if (ratio < 0.77) return "1024x1536";
   return "1024x1024";
 }
 
@@ -652,10 +666,11 @@ async function generateWithExplicitModel(
       return runpodFluxSchnell(prompt, w || 1024, h || 1024);
     case "grok":
       if (!ENV.grokApiKey) throw new Error("Grok API key not configured");
-      return generateWithGrok(prompt, size);
+      return generateWithGrok(prompt);
     case "dall-e-3":
+      // Option key kept for UI/registry compat; routes to GPT Image now.
       if (!ENV.openaiApiKey) throw new Error("OpenAI API key not configured");
-      return generateWithDallE(prompt, size, quality, style);
+      return generateWithGptImage(prompt, size, quality);
     case "gemini":
       if (process.env.IMAGEN_ENABLED !== "true" || !ENV.geminiApiKey) {
         throw new Error("Gemini Imagen is currently unavailable on this account");
@@ -743,23 +758,25 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 4. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image) — cheapest paid option
+  // 4. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
+  // Ahead of RunPod: RunPod is cheaper per image but a Flex cold start takes
+  // 2+ minutes, which is a terrible default for an interactive generation.
+  if (ENV.falApiKey) {
+    const result = await tryProvider("fal.ai Flux Schnell", () =>
+      generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
+    );
+    if (result) return result;
+  }
+
+  // 5. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
   if (isRunPodAvailable()) {
     const result = await tryProvider("RunPod Flux Schnell", () => runpodFluxSchnell(prompt, w, h));
     if (result) return result;
   }
 
-  // 5. CHEAP: Grok
+  // 6. CHEAP: Grok (xAI team must have credits — hit its spending limit 2026-06)
   if (ENV.grokApiKey) {
-    const result = await tryProvider("Grok", () => generateWithGrok(prompt, size));
-    if (result) return result;
-  }
-
-  // 5b. CHEAP: fal.ai Flux Schnell (~$0.008/image)
-  if (ENV.falApiKey) {
-    const result = await tryProvider("fal.ai Flux Schnell", () =>
-      generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
-    );
+    const result = await tryProvider("Grok", () => generateWithGrok(prompt));
     if (result) return result;
   }
 
@@ -769,9 +786,9 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 8. PAID: DALL-E 3
+  // 8. PAID: GPT Image (OpenAI)
   if (ENV.openaiApiKey) {
-    const result = await tryProvider("DALL-E 3", () => generateWithDallE(prompt, size, quality, style));
+    const result = await tryProvider("GPT Image", () => generateWithGptImage(prompt, size, quality));
     if (result) return result;
   }
 

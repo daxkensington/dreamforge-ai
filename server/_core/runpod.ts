@@ -109,45 +109,15 @@ export function isRunPodAvailable(): boolean {
 
 /**
  * Submit a job to RunPod serverless and wait for the result.
- * Uses /runsync for fast jobs (<30s), falls back to /run + polling for longer jobs.
+ *
+ * Always uses /run + status polling. /runsync was abandoned: a Flex-worker
+ * cold start takes 2+ minutes (135s measured 2026-06-11), the 90s client
+ * abort fired as an AbortError that didn't match the old fallback condition,
+ * and every cold-start generation died with "This operation was aborted".
+ * Polling adds ≤2s on a warm worker and survives cold starts up to 5 min.
  */
 export async function runpodRun(input: RunPodInput): Promise<Buffer> {
-  // Try synchronous first (works for most image gen, upscale, bg removal)
-  try {
-    return await runpodRunSync(input);
-  } catch (err: any) {
-    // If it timed out on runsync, fall back to async polling
-    if (err.message?.includes("timed out") || err.message?.includes("408")) {
-      console.warn("[RunPod] Sync timed out, falling back to async polling");
-      return runpodRunAsync(input);
-    }
-    throw err;
-  }
-}
-
-/**
- * Synchronous run — blocks until the job completes (up to 90s).
- * Best for Flux Schnell (4 steps, ~5s) and utility models.
- */
-async function runpodRunSync(input: RunPodInput): Promise<Buffer> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
-
-  const response = await fetch(getEndpointUrl("runsync"), {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ input }),
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`RunPod runsync failed (${response.status}): ${detail}`);
-  }
-
-  const result = (await response.json()) as RunPodRunResponse;
-  return extractOutput(result);
+  return runpodRunAsync(input);
 }
 
 /**
