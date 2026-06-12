@@ -14,6 +14,7 @@ import { storagePut } from "../storage";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
 import { isRunPodAvailable, runpodMusicGen, runpodAudioGen, runpodBarkTTS } from "./runpod";
+import { falRun, isFalAvailable, type FalFile } from "./fal";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,21 @@ const REPLICATE_MODELS = {
 
 async function audioPredict(version: string, input: Record<string, unknown>): Promise<string> {
   return replicatePredict({ version, input, maxAttempts: 120, pollInterval: 5000 });
+}
+
+/**
+ * Instrumental music via fal.ai ACE-Step — middle fallback between RunPod
+ * MusicGen and Replicate MusicGen (the latter dead since the 2026-06 token
+ * expiry). `[inst]` lyrics = instrumental-only, tags carry the style prompt.
+ */
+async function falInstrumentalMusic(prompt: string, duration: number): Promise<string> {
+  const result = await falRun<{ audio: FalFile }>(
+    "fal-ai/ace-step",
+    { tags: prompt, lyrics: "[inst]", duration },
+    { pollInterval: 3000, maxPolls: 100 },
+  );
+  if (!result.audio?.url) throw new Error("fal.ai ace-step returned no audio");
+  return result.audio.url;
 }
 
 async function downloadAndStore(remoteUrl: string, filename: string): Promise<string> {
@@ -146,6 +162,30 @@ export async function generateMusic(
       };
     } catch (err: any) {
       console.warn("[MusicGen] RunPod failed, falling back to Replicate:", err.message);
+    }
+  }
+
+  // Fallback: fal.ai ACE-Step (Replicate MusicGen is unreachable while the
+  // token is dead — this keeps music generation alive in the meantime)
+  if (isFalAvailable()) {
+    try {
+      const outputUrl = await falInstrumentalMusic(prompt, duration);
+      const storedUrl = await downloadAndStore(outputUrl, `music_${Date.now()}.wav`);
+      return {
+        audioUrl: storedUrl,
+        duration,
+        model: "ace-step-fal",
+        metadata: {
+          type: "music",
+          originalPrompt: request.prompt,
+          mood: request.options?.mood ?? null,
+          style: request.options?.style ?? null,
+          tempo: request.options?.tempo ?? null,
+        },
+      };
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[MusicGen] fal.ai ace-step failed, falling back to Replicate:", err.message);
     }
   }
 
@@ -250,6 +290,23 @@ export async function generateAmbient(
     }
   }
 
+  // Fallback: fal.ai ACE-Step (keeps ambient alive while Replicate is dead)
+  if (isFalAvailable()) {
+    try {
+      const outputUrl = await falInstrumentalMusic(prompt, effectiveDuration);
+      const storedUrl = await downloadAndStore(outputUrl, `ambient_${Date.now()}.wav`);
+      return {
+        audioUrl: storedUrl,
+        duration,
+        model: "ace-step-fal",
+        metadata: { type: "ambient", originalPrompt: request.prompt, mood: request.options?.mood ?? null, loopable: true },
+      };
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[Ambient] fal.ai ace-step failed, falling back to Replicate:", err.message);
+    }
+  }
+
   // Fallback: Replicate API
   const outputUrl = await audioPredict(REPLICATE_MODELS.musicgen, {
     prompt,
@@ -281,15 +338,33 @@ export async function syncAudioToVideo(
   audioUrl: string,
   videoUrl: string
 ): Promise<string> {
-  // Use Replicate's ffmpeg model to merge audio and video
-  const outputUrl = await replicatePredict({
-    version: "andreasjansson/ffmpeg:c1e0e2a3f6e0a3e2b4c5d6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7",
-    input: {
-      audio_url: audioUrl,
-      video_url: videoUrl,
-      command: `-i {video} -i {audio} -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest {output}`,
-    },
-  });
+  // fal.ai ffmpeg merge first (Replicate token died 2026-06), Replicate
+  // ffmpeg as fallback for when the token is rotated.
+  let outputUrl: string | undefined;
+  if (isFalAvailable()) {
+    try {
+      const result = await falRun<{ video: FalFile }>(
+        "fal-ai/ffmpeg-api/merge-audio-video",
+        { video_url: videoUrl, audio_url: audioUrl },
+        { pollInterval: 2000, maxPolls: 90 },
+      );
+      if (!result.video?.url) throw new Error("fal.ai merge returned no video");
+      outputUrl = result.video.url;
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[AVSync] fal.ai merge failed, falling back to Replicate:", err.message);
+    }
+  }
+  if (!outputUrl) {
+    outputUrl = await replicatePredict({
+      version: "andreasjansson/ffmpeg:c1e0e2a3f6e0a3e2b4c5d6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7",
+      input: {
+        audio_url: audioUrl,
+        video_url: videoUrl,
+        command: `-i {video} -i {audio} -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest {output}`,
+      },
+    });
+  }
 
   const storedUrl = await downloadAndStore(
     outputUrl,

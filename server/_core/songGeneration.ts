@@ -11,6 +11,7 @@ import { storagePut } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
+import { falRun, isFalAvailable, type FalFile } from "./fal";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -162,8 +163,8 @@ Output ONLY valid JSON with this exact format:
 // ─── Song Generation (MiniMax Music 2.5 via Replicate) ──────────────────────
 
 export async function generateSong(request: SongRequest): Promise<SongResult> {
-  if (!ENV.replicateApiToken) {
-    throw new Error("REPLICATE_API_TOKEN is not configured. Required for song generation.");
+  if (!isFalAvailable() && !ENV.replicateApiToken) {
+    throw new Error("No song generation provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN).");
   }
 
   // Blend multi-genre/mood. First entry dominates; rest are accents.
@@ -219,16 +220,36 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
 
   const referenceAudio = parts.filter(Boolean).join(". ");
 
-  // Generate via MiniMax Music 2.5 on Replicate (shared utility handles polling)
-  const outputUrl = await replicatePredict({
-    model: "minimax/music-2.5",
-    input: {
-      lyrics: request.lyrics,
-      reference_audio_text: referenceAudio,
-    },
-    maxAttempts: 120,
-    pollInterval: 3000,
-  });
+  // MiniMax Music via fal.ai first (Replicate token died 2026-06, fal hosts
+  // the same model), Replicate as fallback for when the token is rotated.
+  let outputUrl: string | undefined;
+  let model = "minimax-music-1.5-fal";
+  if (isFalAvailable()) {
+    try {
+      const result = await falRun<{ audio: FalFile }>(
+        "fal-ai/minimax-music/v1.5",
+        { prompt: referenceAudio, lyrics_prompt: request.lyrics },
+        { pollInterval: 3000, maxPolls: 120 },
+      );
+      if (!result.audio?.url) throw new Error("fal.ai minimax-music returned no audio");
+      outputUrl = result.audio.url;
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[Song] fal.ai minimax-music failed, falling back to Replicate:", err.message);
+    }
+  }
+  if (!outputUrl) {
+    outputUrl = await replicatePredict({
+      model: "minimax/music-2.5",
+      input: {
+        lyrics: request.lyrics,
+        reference_audio_text: referenceAudio,
+      },
+      maxAttempts: 120,
+      pollInterval: 3000,
+    });
+    model = "minimax-music-2.5";
+  }
 
   // Download and store to R2
   const buffer = await downloadBuffer(outputUrl);
@@ -242,7 +263,7 @@ export async function generateSong(request: SongRequest): Promise<SongResult> {
 
   return {
     songUrl: url,
-    model: "minimax-music-2.5",
+    model,
     metadata: {
       genres,
       moods,

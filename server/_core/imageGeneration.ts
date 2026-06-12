@@ -677,11 +677,29 @@ async function generateWithExplicitModel(
         throw new Error("Gemini Imagen is currently unavailable on this account");
       }
       return generateWithGemini(prompt);
+    // Flux via fal.ai first (Replicate token died 2026-06, fal hosts the
+    // same Black Forest Labs models), Replicate as fallback.
     case "flux-pro":
-      if (!ENV.replicateApiToken) throw new Error("Replicate API token not configured");
+      if (ENV.falApiKey) {
+        try {
+          return await generateWithFal(prompt, "fal-ai/flux-pro/v1.1", w, h);
+        } catch (err: any) {
+          if (!ENV.replicateApiToken) throw err;
+          console.warn("[ImageGen] fal.ai flux-pro failed, falling back to Replicate:", err.message);
+        }
+      }
+      if (!ENV.replicateApiToken) throw new Error("No Flux provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN)");
       return generateWithFlux(prompt, "flux-pro", w, h);
     case "flux-schnell":
-      if (!ENV.replicateApiToken) throw new Error("Replicate API token not configured");
+      if (ENV.falApiKey) {
+        try {
+          return await generateWithFal(prompt, "fal-ai/flux/schnell", w, h);
+        } catch (err: any) {
+          if (!ENV.replicateApiToken) throw err;
+          console.warn("[ImageGen] fal.ai flux-schnell failed, falling back to Replicate:", err.message);
+        }
+      }
+      if (!ENV.replicateApiToken) throw new Error("No Flux provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN)");
       return generateWithFlux(prompt, "flux-schnell", w, h);
     case "sd3":
       if (!ENV.stabilityApiKey) throw new Error("Stability API key not configured");

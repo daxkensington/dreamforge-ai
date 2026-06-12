@@ -4587,6 +4587,25 @@ export const appRouter = router({
         }
 
         if (input.model === "minimax") {
+          // fal.ai Hailuo-02 first (Replicate token died 2026-06; fal hosts
+          // MiniMax's current video model), Replicate as fallback.
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (isFalAvailable()) {
+            try {
+              const result = await falRun<{ video: { url: string } }>(
+                "fal-ai/minimax/hailuo-02/standard/text-to-video",
+                { prompt: enhancedPrompt, prompt_optimizer: true, duration: parseInt(input.duration) > 6 ? "10" : "6" },
+                { pollInterval: 5000, maxPolls: 120 },
+              );
+              if (!result.video?.url) throw new Error("fal.ai hailuo returned no video");
+              return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
+            } catch (err: any) {
+              if (!process.env.REPLICATE_API_TOKEN) {
+                return { videoUrl: null, status: "failed" as const, error: `Minimax: ${err.message}` };
+              }
+              console.warn("[Video] fal.ai hailuo failed, falling back to Replicate:", err.message);
+            }
+          }
           const { ReplicateProvider } = await import("./_core/providers/replicate");
           const provider = new ReplicateProvider();
           const result = await provider.generate({ prompt: enhancedPrompt, model: "minimax-video", options: { prompt_optimizer: true } });
@@ -4668,7 +4687,27 @@ export const appRouter = router({
           }
         }
 
-        // Priority 5: Minimax via Replicate (fallback)
+        // Priority 5: Minimax Hailuo-02 via fal.ai (Replicate token died 2026-06)
+        {
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (input.model === "auto" && isFalAvailable()) {
+            try {
+              const result = await falRun<{ video: { url: string } }>(
+                "fal-ai/minimax/hailuo-02/standard/text-to-video",
+                { prompt: enhancedPrompt, prompt_optimizer: true, duration: parseInt(input.duration) > 6 ? "10" : "6" },
+                { pollInterval: 5000, maxPolls: 120 },
+              );
+              if (result.video?.url) {
+                return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
+              }
+              errors.push("Minimax (fal): returned no video");
+            } catch (err: any) {
+              errors.push(`Minimax (fal): ${err.message}`);
+            }
+          }
+        }
+
+        // Priority 6: Minimax via Replicate (fallback)
         if (input.model === "auto" && process.env.REPLICATE_API_TOKEN) {
           try {
             const { ReplicateProvider } = await import("./_core/providers/replicate");
