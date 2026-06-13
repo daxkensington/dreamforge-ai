@@ -98,10 +98,33 @@ export const users = pgTable("users", {
   digestFrequency: digestFrequencyEnum("digestFrequency").default("weekly").notNull(),
   lastDigestSentAt: timestamp("lastDigestSentAt"),
   emailDigestEnabled: boolean("emailDigestEnabled").default(false).notNull(),
+  // Uncensored tier (crypto-paid via BTCPay; Stripe stays SFW-only).
+  // Entitlement is time-boxed; null/past = no access. Age attestation
+  // recorded once, required before purchase or uncensored generation.
+  uncensoredUntil: timestamp("uncensoredUntil"),
+  ageConfirmedAt: timestamp("ageConfirmedAt"),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+// ─── Crypto Invoices (BTCPay) ───────────────────────────────────────────────
+// One row per BTCPay invoice for the uncensored tier. Settlement is claimed
+// atomically by the webhook (status flips new→settled exactly once).
+export const cryptoInvoices = pgTable("cryptoInvoices", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  invoiceId: varchar("invoiceId", { length: 128 }).notNull().unique(),
+  plan: varchar("plan", { length: 64 }).notNull(), // e.g. "uncensored-30d"
+  amountUsdCents: integer("amountUsdCents").notNull(),
+  status: varchar("status", { length: 32 }).default("new").notNull(), // new | settled | expired | invalid
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  settledAt: timestamp("settledAt"),
+}, (table) => [
+  index("cryptoInvoices_userId_idx").on(table.userId),
+]);
+
+export type CryptoInvoice = typeof cryptoInvoices.$inferSelect;
 
 // ─── Tags ────────────────────────────────────────────────────────────────────
 export const tags = pgTable("tags", {

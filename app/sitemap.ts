@@ -57,6 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/batch", priority: 0.5, changeFrequency: "monthly" as const },
     { url: "/demo/text-to-image", priority: 0.9, changeFrequency: "monthly" as const },
     { url: "/story", priority: 0.8, changeFrequency: "weekly" as const },
+    { url: "/uncensored", priority: 0.9, changeFrequency: "monthly" as const },
   ];
 
   // Tool pages

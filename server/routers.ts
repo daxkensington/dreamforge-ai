@@ -106,6 +106,7 @@ import { pricingRouter } from "./routers/pricing";
 import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
+import { uncensoredRouter, getUncensoredEntitlement } from "./routers/uncensored";
 import { viralRouter } from "./routers/viral";
 import { storyRouter } from "./routers/story";
 import { newsletterRouter } from "./routers/newsletter";
@@ -500,11 +501,27 @@ export const appRouter = router({
           duration: z.number().min(2).max(8).default(4),
           modelVersion: z.string().max(128).default("built-in-v1"),
           tagIds: z.array(z.number()).optional(),
+          uncensored: z.boolean().default(false),
         })
       )
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 20 requests per minute per user
         await enforceRateLimit(`generation.create:user:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
+
+        // Uncensored mode requires an active crypto-paid entitlement + age
+        // attestation. Image-only (no uncensored video providers).
+        if (input.uncensored) {
+          if (input.mediaType !== "image") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Uncensored mode is image-only for now." });
+          }
+          const ent = await getUncensoredEntitlement(ctx.user.id);
+          if (!ent.ageConfirmed || !ent.active) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Uncensored mode requires an active Uncensored Pass. Visit /uncensored to activate.",
+            });
+          }
+        }
 
         // Get user tier for watermark decision + enforcement
         const userTier = await getUserTier(ctx.user.id);
@@ -542,6 +559,9 @@ export const appRouter = router({
           duration: input.mediaType === "video" ? input.duration : null,
           status: "generating",
           modelVersion: input.modelVersion,
+          // Uncensored generations are flagged so they can never enter the
+          // public gallery (gallery.submit rejects them).
+          metadata: input.uncensored ? { uncensored: true } : null,
         });
 
         if (input.tagIds && input.tagIds.length > 0) {
@@ -553,6 +573,10 @@ export const appRouter = router({
           let enhancedPrompt: string;
           if (input.mediaType === "video") {
             enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
+          } else if (input.uncensored) {
+            // No style steering beyond quality tokens; the fictional-content
+            // clause stays — it's a liability guard, not a censor.
+            enhancedPrompt = `${input.prompt}. High quality, detailed. 100% fictional synthetic content, no real people depicted.`;
           } else {
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
@@ -588,8 +612,10 @@ export const appRouter = router({
               "flux-schnell": "flux-schnell", "dall-e-3": "dall-e-3", "sd3": "sd3",
               "gemini": "gemini", "ultra": "ultra",
             };
-            const model = modelMap[input.modelVersion] || "auto";
-            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier }));
+            // Uncensored ignores model selection — only the unfiltered chain
+            // (self-hosted RunPod + fal) may serve it.
+            const model = input.uncensored ? "auto" : (modelMap[input.modelVersion] || "auto");
+            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier, unfiltered: input.uncensored }));
           }
 
           await updateGeneration(genId, {
@@ -687,6 +713,14 @@ export const appRouter = router({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Only completed generations can be submitted",
+          });
+        }
+        // Uncensored generations are private-only — the public gallery has
+        // no age gate, so adult content can never enter the moderation queue.
+        if ((gen.metadata as any)?.uncensored) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Uncensored creations are private and can't be shared to the public gallery.",
           });
         }
 
@@ -5301,6 +5335,9 @@ export const appRouter = router({
   viral: viralRouter,
   story: storyRouter,
   newsletter: newsletterRouter,
+
+  // ─── Uncensored Tier (crypto-paid) ────────────────────────────────────
+  uncensored: uncensoredRouter,
 
   // ─── Pricing & Subscriptions ─────────────────────────────────────────
   pricing: pricingRouter,

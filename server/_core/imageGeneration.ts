@@ -28,6 +28,15 @@ export type GenerateImageOptions = {
   style?: "natural" | "vivid";
   /** User tier — free tier gets watermarked output */
   userTier?: string;
+  /**
+   * Uncensored-tier generations. Routes ONLY through providers without
+   * content moderation AND without AUP exposure: self-hosted RunPod Flux
+   * Schnell (our GPUs, Apache-2.0 model) first, fal Flux Schnell fallback.
+   * Cloudflare/OpenAI/Stability/Grok are never used — they hard-reject NSFW
+   * or their terms prohibit it. Callers MUST have verified entitlement +
+   * age attestation before setting this.
+   */
+  unfiltered?: boolean;
   originalImages?: Array<{
     url?: string;
     b64Json?: string;
@@ -430,6 +439,7 @@ async function generateWithFal(
   falModel: string = "fal-ai/flux/dev",
   width?: number,
   height?: number,
+  extraInput?: Record<string, unknown>,
 ): Promise<Buffer> {
   const apiKey = ENV.falApiKey;
   if (!apiKey) throw new Error("fal.ai API key not configured");
@@ -437,6 +447,7 @@ async function generateWithFal(
   const body: Record<string, unknown> = {
     prompt,
     image_size: { width: width || 1024, height: height || 1024 },
+    ...extraInput,
   };
 
   // Submit to queue
@@ -626,7 +637,9 @@ export async function generateImage(
       }
     }
 
-    if (model !== "auto") {
+    if (options.unfiltered) {
+      imageBuffer = await generateUnfiltered(prompt, size);
+    } else if (model !== "auto") {
       imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
     } else {
       imageBuffer = await generateWithFallback(prompt, size, quality, style);
@@ -644,6 +657,45 @@ export async function generateImage(
   const { url } = await storagePut(key, imageBuffer, "image/png");
 
   return { url };
+}
+
+/**
+ * Uncensored-tier chain. Two providers only:
+ *   1. Self-hosted RunPod Flux Schnell — our GPUs, Apache-2.0 weights, no
+ *      third-party AUP exposure. Primary on purpose, not just for cost.
+ *   2. fal Flux Schnell with the safety checker disabled — fallback for
+ *      RunPod cold-start latency or outage.
+ * Never touches Cloudflare / OpenAI / Stability / Grok — they hard-reject
+ * NSFW or prohibit it in their terms.
+ */
+async function generateUnfiltered(prompt: string, size: string): Promise<Buffer> {
+  const [w, h] = size.split("x").map(Number);
+  const errors: string[] = [];
+
+  if (isRunPodAvailable()) {
+    try {
+      return await runpodFluxSchnell(prompt, w || 1024, h || 1024);
+    } catch (err: any) {
+      errors.push(`RunPod: ${err.message}`);
+      console.warn("[ImageGen] Unfiltered RunPod failed, trying fal:", err.message);
+    }
+  }
+
+  if (ENV.falApiKey) {
+    try {
+      return await generateWithFal(prompt, "fal-ai/flux/schnell", w, h, {
+        enable_safety_checker: false,
+      });
+    } catch (err: any) {
+      errors.push(`fal: ${err.message}`);
+    }
+  }
+
+  throw new Error(
+    errors.length
+      ? `Uncensored providers failed:\n${errors.map((e) => `  - ${e}`).join("\n")}`
+      : "No uncensored-capable provider configured.",
+  );
 }
 
 /**

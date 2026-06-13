@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +49,7 @@ import {
   ArrowRight,
   Clapperboard,
   Link2,
+  Flame,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -127,6 +129,14 @@ export default function Workspace() {
   const [animateGenId, setAnimateGenId] = useState<number | null>(null);
   const [animateDuration, setAnimateDuration] = useState(4);
   const [animateStyle, setAnimateStyle] = useState<string>("smooth-pan");
+  const [uncensored, setUncensored] = useState(false);
+
+  // Uncensored entitlement (crypto-paid tier). Drives the toggle's enabled
+  // state + the "activate" CTA.
+  const { data: uncensoredStatus } = trpc.uncensored.status.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const uncensoredActive = !!uncensoredStatus?.active;
 
   const { data: tags } = trpc.tags.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: generations, refetch: refetchGens } = trpc.generation.list.useQuery(
@@ -231,6 +241,7 @@ export default function Workspace() {
       duration: mediaType === "video" ? duration : undefined,
       modelVersion,
       tagIds: selectedTags.length > 0 ? selectedTags : undefined,
+      uncensored: uncensored && uncensoredActive && mediaType === "image",
     });
   };
 
@@ -715,6 +726,38 @@ export default function Workspace() {
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Uncensored mode (crypto-paid tier, image-only) */}
+                {mediaType === "image" && uncensoredStatus?.available && (
+                  uncensoredActive ? (
+                    <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Flame className="h-4 w-4 text-rose-500" />
+                        <div>
+                          <Label htmlFor="uncensored-toggle" className="text-sm font-medium cursor-pointer">
+                            Uncensored mode
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground">No content filter · unfiltered models · private only</p>
+                        </div>
+                      </div>
+                      <Switch id="uncensored-toggle" checked={uncensored} onCheckedChange={setUncensored} />
+                    </div>
+                  ) : (
+                    <a
+                      href="/uncensored"
+                      className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2.5 transition-colors hover:bg-rose-500/10"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Flame className="h-4 w-4 text-rose-500" />
+                        <div>
+                          <span className="text-sm font-medium">Unlock Uncensored mode</span>
+                          <p className="text-[11px] text-muted-foreground">No content filter · pay with crypto · 18+</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-rose-500" />
+                    </a>
+                  )
                 )}
 
                 {/* Generate Button */}

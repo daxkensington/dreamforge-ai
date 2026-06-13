@@ -31,6 +31,9 @@ async function loadGeneration(rawId: string) {
     const gen = await getGenerationById(id);
     if (!gen) return null;
     if (gen.status !== "completed" || !gen.imageUrl) return null;
+    // Uncensored generations are private-only — never publicly shareable
+    // (this page has no age gate and gets indexed via the sitemap).
+    if ((gen.metadata as any)?.uncensored) return null;
     return gen;
   } catch (err) {
     console.error("[/g/:id] DB lookup failed:", err);
