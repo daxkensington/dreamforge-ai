@@ -705,6 +705,12 @@ async function generateWithExplicitModel(
       if (!ENV.stabilityApiKey) throw new Error("Stability API key not configured");
       return generateWithSD3(prompt, w, h);
     case "together":
+      // Together's key has been 401-dead since April 2026. The option key is
+      // kept for UI/back-compat but routes to the same Flux Schnell on fal —
+      // identical underlying model, so users selecting it still get images.
+      if (ENV.falApiKey) {
+        return generateWithFal(prompt, "fal-ai/flux/schnell", w, h);
+      }
       if (!ENV.togetherApiKey) throw new Error("Together AI API key not configured");
       return generateWithTogether(prompt, w, h);
     case "cloudflare":

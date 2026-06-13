@@ -1,12 +1,22 @@
 /**
- * Custom Model Training — LoRA fine-tuning via Replicate.
+ * Custom Model Training — LoRA fine-tuning via fal.ai (primary) or Replicate.
  *
  * Users upload 5-20 images of a subject (face, product, style).
- * Replicate trains a LoRA adapter on Flux or SDXL.
- * The trained model can then be used for consistent generation.
+ * fal-ai/flux-lora-fast-training trains a Flux LoRA from a zip of the images;
+ * the trained safetensors URL is then usable with fal-ai/flux-lora.
+ * Replicate (ostris/flux-dev-lora-trainer) is kept as the fallback path for
+ * when its token is rotated — fal IDs are namespaced "fal:<request_id>" so
+ * status polling routes to the right provider.
+ *
+ * NOTE: not yet wired to any router — Agency-tier copy promises custom LoRAs
+ * but the feature was never exposed. This module is provider-ready for when
+ * it is.
  */
 
+import JSZip from "jszip";
 import { ENV } from "./env";
+import { storagePut } from "../storage";
+import { falRun, isFalAvailable, type FalFile } from "./fal";
 
 export interface TrainingRequest {
   /** User-provided name for this model */
@@ -31,14 +41,15 @@ export interface TrainingResult {
 }
 
 const REPLICATE_API = "https://api.replicate.com/v1";
+const FAL_TRAINER = "fal-ai/flux-lora-fast-training";
 
 /**
- * Start a LoRA training job on Replicate.
+ * Start a LoRA training job. fal.ai first, Replicate fallback.
  * Returns the training ID for status polling.
  */
 export async function startTraining(request: TrainingRequest): Promise<TrainingResult> {
-  if (!ENV.replicateApiToken) {
-    throw new Error("REPLICATE_API_TOKEN required for model training");
+  if (!isFalAvailable() && !ENV.replicateApiToken) {
+    throw new Error("No training provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN)");
   }
 
   if (request.imageUrls.length < 5) {
@@ -48,6 +59,50 @@ export async function startTraining(request: TrainingRequest): Promise<TrainingR
     throw new Error("Maximum 20 training images allowed");
   }
 
+  if (isFalAvailable()) {
+    return startFalTraining(request);
+  }
+  return startReplicateTraining(request);
+}
+
+/** fal trainer needs ONE zip archive URL, not a list of image URLs. */
+async function startFalTraining(request: TrainingRequest): Promise<TrainingResult> {
+  const zip = new JSZip();
+  for (let i = 0; i < request.imageUrls.length; i++) {
+    const resp = await fetch(request.imageUrls[i]);
+    if (!resp.ok) throw new Error(`Failed to fetch training image ${i + 1} (${resp.status})`);
+    const ext = (resp.headers.get("content-type") ?? "").includes("png") ? "png" : "jpg";
+    zip.file(`image_${String(i + 1).padStart(2, "0")}.${ext}`, await resp.arrayBuffer());
+  }
+  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  const { url: archiveUrl } = await storagePut(
+    `training/archive_${Date.now()}.zip`,
+    zipBuffer,
+    "application/zip",
+  );
+
+  const submitResponse = await fetch(`https://queue.fal.run/${FAL_TRAINER}`, {
+    method: "POST",
+    headers: { Authorization: `Key ${ENV.falApiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      images_data_url: archiveUrl,
+      trigger_word: request.triggerWord,
+      steps: request.steps || (request.type === "face" ? 1200 : 800),
+      is_style: request.type === "style",
+      create_masks: request.type === "face",
+    }),
+  });
+  if (!submitResponse.ok) {
+    const detail = await submitResponse.text().catch(() => "");
+    throw new Error(`Training failed to start: ${detail}`);
+  }
+  const submitted = (await submitResponse.json()) as { request_id?: string };
+  if (!submitted.request_id) throw new Error("fal.ai returned no request_id");
+
+  return { id: `fal:${submitted.request_id}`, status: "starting" };
+}
+
+async function startReplicateTraining(request: TrainingRequest): Promise<TrainingResult> {
   const steps = request.steps || (request.type === "face" ? 1200 : 800);
 
   // Use Replicate's Flux LoRA training
@@ -104,9 +159,14 @@ export async function startTraining(request: TrainingRequest): Promise<TrainingR
 }
 
 /**
- * Check training status.
+ * Check training status. Routes by ID namespace: "fal:<id>" → fal queue,
+ * anything else → Replicate.
  */
 export async function getTrainingStatus(trainingId: string): Promise<TrainingResult> {
+  if (trainingId.startsWith("fal:")) {
+    return getFalTrainingStatus(trainingId);
+  }
+
   if (!ENV.replicateApiToken) {
     throw new Error("REPLICATE_API_TOKEN required");
   }
@@ -131,22 +191,70 @@ export async function getTrainingStatus(trainingId: string): Promise<TrainingRes
   };
 }
 
+async function getFalTrainingStatus(trainingId: string): Promise<TrainingResult> {
+  const requestId = trainingId.slice(4);
+  const headers = { Authorization: `Key ${ENV.falApiKey}` };
+  // FAL_TRAINER is a root model path (no subpath), so building request URLs
+  // from it is safe — unlike subpath models such as fal-ai/flux/schnell.
+  const base = `https://queue.fal.run/${FAL_TRAINER}/requests/${requestId}`;
+
+  const statusResp = await fetch(`${base}/status`, { headers });
+  if (!statusResp.ok) throw new Error(`Failed to fetch training status (${statusResp.status})`);
+  const status = (await statusResp.json()) as { status: string; error?: string };
+
+  if (status.status === "COMPLETED") {
+    const resultResp = await fetch(base, { headers });
+    if (!resultResp.ok) throw new Error("Failed to fetch training result");
+    const result = (await resultResp.json()) as { diffusers_lora_file?: FalFile };
+    const loraUrl = result.diffusers_lora_file?.url;
+    return {
+      id: trainingId,
+      status: loraUrl ? "succeeded" : "failed",
+      modelUrl: loraUrl,
+      version: loraUrl,
+      error: loraUrl ? undefined : "Training completed but returned no LoRA file",
+    };
+  }
+  if (status.status === "FAILED") {
+    return { id: trainingId, status: "failed", error: status.error || "Training failed" };
+  }
+  return { id: trainingId, status: status.status === "IN_QUEUE" ? "starting" : "processing" };
+}
+
 /**
- * Generate an image using a trained LoRA model.
+ * Generate an image using a trained LoRA model. A modelVersion that is a URL
+ * is a fal-trained safetensors file (use fal-ai/flux-lora); otherwise it's a
+ * Replicate model version.
  */
 export async function generateWithLoRA(
   modelVersion: string,
   prompt: string,
   triggerWord: string,
 ): Promise<string> {
+  // Ensure trigger word is in the prompt
+  const fullPrompt = prompt.includes(triggerWord) ? prompt : `${triggerWord} ${prompt}`;
+
+  if (modelVersion.startsWith("http")) {
+    const result = await falRun<{ images?: Array<{ url: string }> }>(
+      "fal-ai/flux-lora",
+      {
+        prompt: fullPrompt,
+        loras: [{ path: modelVersion, scale: 1 }],
+        num_inference_steps: 28,
+        guidance_scale: 7.5,
+      },
+      { pollInterval: 2000, maxPolls: 60 },
+    );
+    const url = result.images?.[0]?.url;
+    if (!url) throw new Error("fal.ai flux-lora returned no image");
+    return url;
+  }
+
   if (!ENV.replicateApiToken) {
     throw new Error("REPLICATE_API_TOKEN required");
   }
 
   const { replicatePredict } = await import("./replicate");
-
-  // Ensure trigger word is in the prompt
-  const fullPrompt = prompt.includes(triggerWord) ? prompt : `${triggerWord} ${prompt}`;
 
   return replicatePredict({
     version: modelVersion,
