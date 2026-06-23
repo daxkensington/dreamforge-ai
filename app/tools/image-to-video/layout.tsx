@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Image to Video — DreamForgeX",
-  description: "Animate still images into video clips with AI",
+  title: "CogVideoX Image to Video — Free Online AI | DreamForgeX",
+  description: "Animate still images into video clips with CogVideoX, self-hosted on our own GPUs. Free online AI image-to-video generator.",
   openGraph: {
-    title: "AI Image to Video — DreamForgeX",
-    description: "Animate still images into video clips with AI",
+    title: "CogVideoX Image to Video — Free Online AI | DreamForgeX",
+    description: "Animate still images into video clips with CogVideoX, self-hosted on our own GPUs. Free online AI image-to-video generator.",
   },
 };
 

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Text to Speech — DreamForgeX",
-  description: "Convert text to natural speech with 400+ free voices",
+  title: "Bark TTS Voice Generator — Free Online AI | DreamForgeX",
+  description: "Convert text to natural speech with Bark TTS, self-hosted on our own GPUs, plus 400+ free voices. Free online AI text-to-speech, no install.",
   openGraph: {
-    title: "AI Text to Speech — DreamForgeX",
-    description: "Convert text to natural speech with 400+ free voices",
+    title: "Bark TTS Voice Generator — Free Online AI | DreamForgeX",
+    description: "Convert text to natural speech with Bark TTS, self-hosted on our own GPUs, plus 400+ free voices. Free online AI text-to-speech, no install.",
   },
 };
 

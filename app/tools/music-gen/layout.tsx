@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Music Composer — DreamForgeX",
-  description: "Generate original instrumental music and scores",
+  title: "MusicGen Online — Free AI Music Generator | DreamForgeX",
+  description: "Generate original instrumental music with MusicGen, self-hosted on our own GPUs. Free online AI music generator — no install, royalty-free output.",
   openGraph: {
-    title: "AI Music Composer — DreamForgeX",
-    description: "Generate original instrumental music and scores",
+    title: "MusicGen Online — Free AI Music Generator | DreamForgeX",
+    description: "Generate original instrumental music with MusicGen, self-hosted on our own GPUs. Free online AI music generator — no install, royalty-free output.",
   },
 };
 
