@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { desc, eq, and, isNotNull } from "drizzle-orm";
 import { getDb } from "../server/db";
 import { galleryItems, generations } from "../drizzle/schema";
+import { USE_CASE_SLUGS } from "../shared/useCaseData";
 
 const BASE_URL = "https://dreamforgex.ai";
 
@@ -58,6 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/demo/text-to-image", priority: 0.9, changeFrequency: "monthly" as const },
     { url: "/story", priority: 0.8, changeFrequency: "weekly" as const },
     { url: "/uncensored", priority: 0.9, changeFrequency: "monthly" as const },
+    { url: "/for", priority: 0.7, changeFrequency: "monthly" as const },
   ];
 
   // Tool pages
@@ -102,12 +104,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
   }));
 
-  // Use-case landing pages (high buyer-intent SEO)
-  const useCaseRoutes = [
-    "etsy-sellers", "podcasters", "real-estate-agents", "cosplayers",
-    "indie-devs", "authors", "restaurants", "tattoo-artists",
-    "youtubers", "shopify-sellers", "streamers", "small-business",
-  ].map((s) => ({
+  // Use-case landing pages (high buyer-intent SEO). Driven from the registry
+  // so new audiences in useCaseData.ts appear here automatically.
+  const useCaseRoutes = USE_CASE_SLUGS.map((s) => ({
     url: `/for/${s}`,
     priority: 0.7,
     changeFrequency: "monthly" as const,
