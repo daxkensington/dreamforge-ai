@@ -49,23 +49,11 @@ export const metadata: Metadata = {
     site: "@dreamforgex_ai",
   },
   metadataBase: new URL("https://dreamforgex.ai"),
-  alternates: {
-    languages: {
-      "en": "https://dreamforgex.ai",
-      "es": "https://dreamforgex.ai",
-      "fr": "https://dreamforgex.ai",
-      "de": "https://dreamforgex.ai",
-      "pt": "https://dreamforgex.ai",
-      "zh": "https://dreamforgex.ai",
-      "ja": "https://dreamforgex.ai",
-      "ko": "https://dreamforgex.ai",
-      "ar": "https://dreamforgex.ai",
-      "hi": "https://dreamforgex.ai",
-      "ru": "https://dreamforgex.ai",
-      "tr": "https://dreamforgex.ai",
-      "it": "https://dreamforgex.ai",
-    },
-  },
+  // NOTE: no root-level `alternates` here on purpose. A previous version
+  // declared 13 hreflang language versions all pointing at the homepage —
+  // the site is English-only, so that advertised non-existent translations
+  // and (being inherited by every page) muddied canonicalization. Each page
+  // sets its own self-referential canonical via its own `alternates`.
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
