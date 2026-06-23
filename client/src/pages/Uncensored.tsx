@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet, QrCode, Zap } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
+import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -76,11 +77,12 @@ export default function Uncensored() {
             <Flame className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Uncensored AI Image Generation
+            Uncensored AI Image Generator
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-            No content filter. Unfiltered open-source models. Your generations stay
-            private — never shown in the public gallery or shared anywhere.
+            No content filter. Unfiltered open-source models running on our own GPUs.
+            Pay anonymously with crypto, and your generations stay private — never
+            shown in the public gallery or shared anywhere.
           </p>
         </motion.div>
 
@@ -163,7 +165,44 @@ export default function Uncensored() {
               </p>
             </div>
 
-            <p className="mt-8 text-center text-xs text-muted-foreground">
+            {/* How crypto payment works — kills the "I don't know how to pay" objection */}
+            <div className="mt-14">
+              <h2 className="text-center text-xl font-semibold">Pay with crypto in about 2 minutes</h2>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                {[
+                  { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, or an exchange you already use." },
+                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap the crypto button and we generate a BTCPay invoice with a QR code. Pay on-chain or over Lightning." },
+                  { icon: Zap, step: "3", title: "Unlock automatically", body: "Once the payment confirms, this page unlocks on its own — usually within minutes. No waiting on support." },
+                ].map((s) => (
+                  <div key={s.step} className="relative rounded-xl border border-border/60 bg-card/40 p-5">
+                    <div className="absolute -top-3 left-5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-xs font-bold text-white">
+                      {s.step}
+                    </div>
+                    <s.icon className="mt-2 h-6 w-6 text-rose-500" />
+                    <h3 className="mt-3 font-semibold">{s.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* FAQ — same content is emitted as FAQPage JSON-LD from app/uncensored/page.tsx */}
+            <div className="mt-14">
+              <h2 className="text-center text-xl font-semibold">Frequently asked questions</h2>
+              <div className="mx-auto mt-6 max-w-2xl space-y-3">
+                {UNCENSORED_FAQ.map((f) => (
+                  <details key={f.q} className="group rounded-xl border border-border/60 bg-card/40 p-4">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium">
+                      {f.q}
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                    </summary>
+                    <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+
+            <p className="mt-12 text-center text-xs text-muted-foreground">
               All content is AI-generated and fictional. No real individuals are depicted.
               You are responsible for complying with the laws of your jurisdiction.
             </p>

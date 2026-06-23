@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Sparkles,
@@ -54,6 +54,23 @@ export default function DemoTextToImage() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  // Continuity from the homepage "Try It Now" box: if it handed us a prompt
+  // via ?prompt=, prefill it and fire one generation immediately so the
+  // "I typed → it generated" illusion survives the page hop.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current) return;
+    const incoming = new URLSearchParams(window.location.search).get("prompt");
+    const trimmed = (incoming ?? "").trim().slice(0, 500);
+    if (trimmed.length >= 3) {
+      autoRan.current = true;
+      setPrompt(trimmed);
+      setResultUrl(null);
+      generate.mutate({ prompt: trimmed });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isLoading = generate.isPending;
   const handleGenerate = () => {
@@ -233,6 +250,19 @@ export default function DemoTextToImage() {
             </div>
           ))}
         </div>
+
+        {/* Discreet 18+ entry — captures unfiltered intent without putting
+            adult positioning in front of SFW visitors, and gives /uncensored
+            an internal inbound link. */}
+        <p className="mt-10 text-center text-xs text-muted-foreground/70">
+          Looking for unfiltered generation?{" "}
+          <a
+            href="/uncensored"
+            className="underline underline-offset-2 hover:text-rose-400 transition-colors"
+          >
+            Uncensored mode (18+)
+          </a>
+        </p>
       </div>
     </PageLayout>
   );

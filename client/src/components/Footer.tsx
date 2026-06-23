@@ -20,6 +20,7 @@ const footerLinks = {
     { label: "Text-to-Video", href: "/tools/text-to-video" },
     { label: "AI Headshots", href: "/tools/headshot" },
     { label: "Logo Maker", href: "/tools/logo-maker" },
+    { label: "Uncensored (18+)", href: "/uncensored" },
     { label: "All 100+ Tools", href: "/tools" },
   ],
   resources: [

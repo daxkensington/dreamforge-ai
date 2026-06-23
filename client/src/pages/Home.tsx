@@ -304,8 +304,13 @@ export default function Home() {
   }, []);
 
   const handleGenerate = useCallback(() => {
-    window.location.href = "/workspace";
-  }, []);
+    // Don't wall cold visitors at signup — hand the typed prompt to the
+    // no-signup demo so they get a real generation before any account.
+    const trimmed = promptText.trim();
+    window.location.href = trimmed
+      ? `/demo/text-to-image?prompt=${encodeURIComponent(trimmed)}`
+      : "/demo/text-to-image";
+  }, [promptText]);
 
   return (
     <PageLayout>
@@ -394,10 +399,10 @@ export default function Home() {
                 <Button
                   size="lg"
                   className="font-medium gap-2 px-8 h-13 text-base glow-primary"
-                  onClick={() => (window.location.href = getLoginUrl())}
+                  onClick={() => (window.location.href = "/demo/text-to-image")}
                 >
                   <Zap className="h-5 w-5" />
-                  Start Creating Free
+                  Try It Free — No Signup
                 </Button>
               )}
               <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-transparent border-white/20 hover:bg-white/10">
