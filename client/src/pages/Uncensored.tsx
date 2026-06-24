@@ -6,6 +6,7 @@ import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
@@ -55,10 +56,45 @@ export default function Uncensored() {
     onError: (e) => toast.error(e.message),
   });
 
+  const [freePrompt, setFreePrompt] = useState("");
+  const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
+  const freeGen = trpc.uncensored.freeGenerate.useMutation({
+    onSuccess: (data) => {
+      if (data.url) setFreeResultUrl(data.url);
+      refetch();
+      toast.success("Done — that's a free preview.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const plans = status?.plans ?? FALLBACK_PLANS;
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? plans[plans.length - 1];
   const active = !!status?.active;
   const ageConfirmed = !!status?.ageConfirmed;
+  const freeLimit = status?.freeLimit ?? 3;
+  const freeRemaining = status ? status.freeRemaining : freeLimit;
+
+  const handleAgeConfirm = async () => {
+    if (!isAuthed) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+    if (!ageChecked) {
+      toast.error("Please confirm you are 18 or older.");
+      return;
+    }
+    await confirmAge.mutateAsync({ confirmed: true });
+  };
+
+  const handleFreeGenerate = () => {
+    const p = freePrompt.trim();
+    if (p.length < 3) {
+      toast.error("Describe what you want to create.");
+      return;
+    }
+    setFreeResultUrl(null);
+    freeGen.mutate({ prompt: p });
+  };
 
   const handleStart = async () => {
     if (!isAuthed) {
@@ -117,6 +153,86 @@ export default function Uncensored() {
           </motion.div>
         ) : (
           <>
+            {/* ── Free taste — the conversion hook ──────────────────────────── */}
+            <div className="mt-10">
+              {!ageConfirmed ? (
+                <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6 text-center">
+                  <h2 className="text-lg font-semibold">Try it free — {freeLimit} uncensored previews</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Watermarked &amp; private. Confirm you&apos;re an adult to unlock.
+                  </p>
+                  <label className="mt-4 flex items-center justify-center gap-2 text-sm">
+                    <Checkbox checked={ageChecked} onCheckedChange={(v) => setAgeChecked(!!v)} />
+                    I confirm I am 18 years of age or older.
+                  </label>
+                  <Button
+                    onClick={handleAgeConfirm}
+                    disabled={confirmAge.isPending || meLoading}
+                    className="mt-4 bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
+                  >
+                    {confirmAge.isPending ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Unlocking…</>
+                    ) : isAuthed ? (
+                      "Unlock free previews"
+                    ) : (
+                      <><Lock className="mr-2 h-4 w-4" /> Sign in to start free</>
+                    )}
+                  </Button>
+                </div>
+              ) : freeRemaining > 0 ? (
+                <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Free uncensored preview</h2>
+                    <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
+                  </div>
+                  <Textarea
+                    value={freePrompt}
+                    onChange={(e) => setFreePrompt(e.target.value)}
+                    placeholder="Describe what you want to create…"
+                    rows={3}
+                    maxLength={1000}
+                    disabled={freeGen.isPending}
+                    className="mt-3 resize-none"
+                  />
+                  <Button
+                    onClick={handleFreeGenerate}
+                    disabled={freeGen.isPending || freePrompt.trim().length < 3}
+                    className="mt-3 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
+                  >
+                    {freeGen.isPending ? (
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating…</>
+                    ) : (
+                      <><Flame className="mr-2 h-5 w-5" /> Generate (free)</>
+                    )}
+                  </Button>
+                  {freeResultUrl && (
+                    <div className="mt-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={freeResultUrl}
+                        alt="Your uncensored preview"
+                        className="mx-auto max-h-[420px] rounded-xl border border-border/60"
+                      />
+                      <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Watermarked preview · private. Get a pass below for full resolution, no watermark.
+                      </p>
+                    </div>
+                  )}
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    No filter · private · watermarked. A pass unlocks unlimited, full-resolution, no-watermark generation.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 text-center">
+                  <Flame className="mx-auto h-8 w-8 text-rose-500" />
+                  <h2 className="mt-2 text-lg font-semibold">You&apos;ve used your free previews</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Grab a pass below for unlimited, full-resolution, watermark-free generation.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Feature row */}
             <div className="mt-12 grid gap-4 sm:grid-cols-3">
               {[
