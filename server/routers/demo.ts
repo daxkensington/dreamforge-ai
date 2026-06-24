@@ -18,6 +18,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { enforceIpRateLimit } from "../rate-limit";
 import { requireToolActive } from "../_core/toolStatus";
+import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -35,6 +36,23 @@ export const demoRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Tool kill-switch — same gate paid generations honor.
       await requireToolActive("text-to-image");
+
+      // Content-safety gate — refuse illegal content before the rate limit (so
+      // a blocked prompt doesn't burn the visitor's one free generation) and
+      // before the GPU call. The demo's "auto" chain can reach a no-safety
+      // self-hosted model, so the CSAM/deepfake gate applies here too.
+      {
+        const verdict = checkPrompt(input.prompt);
+        if (!verdict.allowed) {
+          logModerationBlock({
+            category: verdict.category,
+            promptLen: input.prompt.length,
+            ip: ctx.ip,
+            surface: "demo.generate",
+          });
+          return { status: "failed" as const, error: verdict.userMessage };
+        }
+      }
 
       // Hard cap: 1 generation / 24h / IP. If we can't read IP, deny rather
       // than serve unlimited free generations to a single bad actor.

@@ -18,6 +18,7 @@ import { storagePut, generateStorageKey } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
+import { assertPromptAllowed } from "./promptModeration";
 import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
 
 export type GenerateImageOptions = {
@@ -669,6 +670,10 @@ export async function generateImage(
  * NSFW or prohibit it in their terms.
  */
 async function generateUnfiltered(prompt: string, size: string): Promise<Buffer> {
+  // Defense-in-depth: the no-safety chain refuses illegal content even if a
+  // higher-level gate was missed. Throws PromptBlockedError (CSAM / minor /
+  // real-person deepfake) before any GPU call.
+  assertPromptAllowed(prompt, { strictMinors: true });
   const [w, h] = size.split("x").map(Number);
   const errors: string[] = [];
 

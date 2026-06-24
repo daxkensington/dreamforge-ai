@@ -64,6 +64,7 @@ const sections = [
       "• promotes terrorism, mass violence, or illegal activity;",
       "• infringes a third party's intellectual property, trademark, or right of publicity;",
       "• circumvents safety filters, rate limits, or technical protections on the Service.",
+      "These prohibitions apply in full to the Uncensored tier. Removing content filters NEVER permits any of the above: every prompt is screened before generation regardless of plan, and prompts depicting minors or real, identifiable people in a sexual context are refused and logged.",
       "We use automated and human moderation. Violations may result in content removal, account suspension, account termination, forfeiture of unused credits, and referral to law enforcement.",
     ],
   },

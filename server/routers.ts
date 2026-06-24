@@ -107,6 +107,7 @@ import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
 import { uncensoredRouter, getUncensoredEntitlement } from "./routers/uncensored";
+import { checkPrompt, logModerationBlock } from "./_core/promptModeration";
 import { viralRouter } from "./routers/viral";
 import { storyRouter } from "./routers/story";
 import { newsletterRouter } from "./routers/newsletter";
@@ -520,6 +521,27 @@ export const appRouter = router({
               code: "FORBIDDEN",
               message: "Uncensored mode requires an active Uncensored Pass. Visit /uncensored to activate.",
             });
+          }
+        }
+
+        // ── Content-safety gate (illegal-content refusal) ──────────────────
+        // Refuse CSAM + non-consensual real-person sexual content BEFORE any
+        // billing or GPU call. Strict (any minor reference) for the unfiltered
+        // path; standard (minor+sexual / deepfake) elsewhere, since the auto
+        // chain can still reach a no-safety self-hosted model.
+        {
+          const verdict = checkPrompt(input.prompt, {
+            strictMinors: input.uncensored,
+            negativePrompt: input.negativePrompt ?? null,
+          });
+          if (!verdict.allowed) {
+            logModerationBlock({
+              category: verdict.category,
+              promptLen: input.prompt.length,
+              userId: ctx.user.id,
+              surface: input.uncensored ? "generation.create:uncensored" : "generation.create",
+            });
+            throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
           }
         }
 
