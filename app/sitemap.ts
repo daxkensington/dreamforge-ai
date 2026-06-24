@@ -3,6 +3,7 @@ import { desc, eq, and, isNotNull } from "drizzle-orm";
 import { getDb } from "../server/db";
 import { galleryItems, generations } from "../drizzle/schema";
 import { USE_CASE_SLUGS } from "../shared/useCaseData";
+import { UNCENSORED_LANDING_SLUGS } from "../shared/uncensoredLanding";
 
 const BASE_URL = "https://dreamforgex.ai";
 
@@ -112,6 +113,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
   }));
 
+  // Uncensored SEO silo — one landing page per winnable uncensored-AI query.
+  const uncensoredSiloRoutes = UNCENSORED_LANDING_SLUGS.map((s) => ({
+    url: `/uncensored/${s}`,
+    priority: 0.7,
+    changeFrequency: "monthly" as const,
+  }));
+
   // Video Studio sub-pages
   const videoRoutes = [
     "storyboard", "scene-director", "script", "style-transfer",
@@ -135,6 +143,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/whats-new", priority: 0.7, changeFrequency: "weekly" as const },
     ...toolRoutes,
     ...useCaseRoutes,
+    ...uncensoredSiloRoutes,
     ...comparisonRoutes,
     ...videoRoutes,
   ].map((route) => ({

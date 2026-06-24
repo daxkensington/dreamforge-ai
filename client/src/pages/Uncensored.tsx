@@ -202,6 +202,36 @@ export default function Uncensored() {
               </div>
             </div>
 
+            {/* SEO silo internal links — give the /uncensored/* landers crawl
+                equity from this indexed page (descriptive anchor text). */}
+            <div className="mt-14">
+              <h2 className="text-center text-xl font-semibold">Explore uncensored generators</h2>
+              <div className="mx-auto mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
+                {[
+                  { slug: "no-filter", label: "AI image generator — no filter" },
+                  { slug: "unfiltered", label: "Unfiltered AI image generator" },
+                  { slug: "no-restrictions", label: "No restrictions" },
+                  { slug: "private-crypto", label: "Private — pay with crypto" },
+                  { slug: "flux-uncensored", label: "Flux uncensored online" },
+                  { slug: "realistic", label: "Realistic" },
+                  { slug: "anime", label: "Anime" },
+                  { slug: "fantasy", label: "Fantasy" },
+                  { slug: "cyberpunk", label: "Cyberpunk" },
+                  { slug: "midjourney-nsfw-alternative", label: "Midjourney NSFW alternative" },
+                  { slug: "civitai-alternative-online", label: "Civitai alternative (online)" },
+                  { slug: "stable-diffusion-no-filter-online", label: "Stable Diffusion no filter online" },
+                ].map((l) => (
+                  <a
+                    key={l.slug}
+                    href={`/uncensored/${l.slug}`}
+                    className="rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-rose-300"
+                  >
+                    {l.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+
             <p className="mt-12 text-center text-xs text-muted-foreground">
               All content is AI-generated and fictional. No real individuals are depicted.
               You are responsible for complying with the laws of your jurisdiction.
