@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "../../../../server/db";
-import { verifyBTCPayWebhook, UNCENSORED_PLAN } from "../../../../server/_core/btcpay";
+import { verifyBTCPayWebhook, getUncensoredPlanById } from "../../../../server/_core/btcpay";
 import { cryptoInvoices, creditBalances, creditTransactions } from "../../../../drizzle/schema";
 import { and, eq, ne, sql } from "drizzle-orm";
 
@@ -59,27 +59,31 @@ export async function POST(req: NextRequest) {
   const invoice = claimed[0];
   if (!invoice) return NextResponse.json({ ok: true, note: "already settled or unknown invoice" });
 
+  // Grant the plan that was actually purchased (stored per-invoice), so the
+  // pricing ladder credits the right duration + bonus credits.
+  const plan = getUncensoredPlanById(invoice.plan);
+
   // Extend entitlement: stack on top of remaining time if still active.
   await db.execute(sql`
     UPDATE users SET "uncensoredUntil" =
-      GREATEST(COALESCE("uncensoredUntil", now()), now()) + interval '${sql.raw(String(UNCENSORED_PLAN.durationDays))} days'
+      GREATEST(COALESCE("uncensoredUntil", now()), now()) + interval '${sql.raw(String(plan.durationDays))} days'
     WHERE id = ${invoice.userId}`);
 
   // Bonus credits
   await db
     .insert(creditBalances)
-    .values({ userId: invoice.userId, balance: UNCENSORED_PLAN.bonusCredits, lifetimeSpent: 0 })
+    .values({ userId: invoice.userId, balance: plan.bonusCredits, lifetimeSpent: 0 })
     .onConflictDoUpdate({
       target: creditBalances.userId,
-      set: { balance: sql`${creditBalances.balance} + ${UNCENSORED_PLAN.bonusCredits}` },
+      set: { balance: sql`${creditBalances.balance} + ${plan.bonusCredits}` },
     });
   await db.insert(creditTransactions).values({
     userId: invoice.userId,
-    amount: UNCENSORED_PLAN.bonusCredits,
+    amount: plan.bonusCredits,
     type: "purchase",
-    description: `Uncensored Pass (${UNCENSORED_PLAN.durationDays}d) — BTCPay ${invoice.invoiceId}`,
+    description: `Uncensored Pass (${plan.durationDays}d) — BTCPay ${invoice.invoiceId}`,
   });
 
-  console.log(`[BTCPay] Settled ${invoice.invoiceId}: user ${invoice.userId} uncensored +${UNCENSORED_PLAN.durationDays}d, +${UNCENSORED_PLAN.bonusCredits}cr`);
+  console.log(`[BTCPay] Settled ${invoice.invoiceId}: user ${invoice.userId} uncensored +${plan.durationDays}d, +${plan.bonusCredits}cr`);
   return NextResponse.json({ ok: true });
 }

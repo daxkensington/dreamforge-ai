@@ -10,13 +10,33 @@
  */
 import crypto from "crypto";
 
-export const UNCENSORED_PLAN = {
-  id: "uncensored-30d",
-  label: "Uncensored Pass — 30 days",
-  priceUsd: 19,
-  bonusCredits: 500,
-  durationDays: 30,
-} as const;
+export interface UncensoredPlan {
+  id: string;
+  label: string;
+  priceUsd: number;
+  bonusCredits: number;
+  durationDays: number;
+  tagline: string;
+  highlight?: boolean;
+}
+
+// Pricing ladder. A cheap day-pass captures the impulse buy; the week pass
+// suits bursty users; the 30-day pass is the "best value" anchor (and the
+// back-compat default for any caller that doesn't pass a planId). All are
+// one-time, no auto-renew. Durations stack via the webhook's GREATEST(...).
+export const UNCENSORED_PLANS: UncensoredPlan[] = [
+  { id: "uncensored-day", label: "Day Pass", priceUsd: 4.99, bonusCredits: 60, durationDays: 1, tagline: "Dip in for 24 hours" },
+  { id: "uncensored-week", label: "Week Pass", priceUsd: 12, bonusCredits: 250, durationDays: 7, tagline: "A week, no commitment" },
+  { id: "uncensored-30d", label: "30-Day Pass", priceUsd: 19, bonusCredits: 500, durationDays: 30, tagline: "Best value", highlight: true },
+];
+
+// Default / back-compat plan = the 30-day anchor (id "uncensored-30d").
+export const UNCENSORED_PLAN: UncensoredPlan =
+  UNCENSORED_PLANS.find((p) => p.id === "uncensored-30d")!;
+
+export function getUncensoredPlanById(id: string | null | undefined): UncensoredPlan {
+  return UNCENSORED_PLANS.find((p) => p.id === id) ?? UNCENSORED_PLAN;
+}
 
 export function isBtcpayConfigured(): boolean {
   return !!(process.env.BTCPAY_URL && process.env.BTCPAY_API_KEY && process.env.BTCPAY_STORE_ID);
@@ -31,6 +51,7 @@ export async function createUncensoredInvoice(params: {
   userId: number;
   email: string | null;
   redirectUrl: string;
+  planId?: string;
 }): Promise<BTCPayInvoice> {
   const url = process.env.BTCPAY_URL;
   const apiKey = process.env.BTCPAY_API_KEY;
@@ -39,12 +60,13 @@ export async function createUncensoredInvoice(params: {
     throw new Error("BTCPay Server credentials not configured");
   }
 
+  const plan = getUncensoredPlanById(params.planId);
   const body = {
-    amount: UNCENSORED_PLAN.priceUsd.toFixed(2),
+    amount: plan.priceUsd.toFixed(2),
     currency: "USD",
     metadata: {
       userId: String(params.userId),
-      plan: UNCENSORED_PLAN.id,
+      plan: plan.id,
       buyerEmail: params.email ?? undefined,
     },
     checkout: {

@@ -12,7 +12,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { users, cryptoInvoices } from "../../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
-import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN } from "../_core/btcpay";
+import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 
 async function requireDb() {
   const db = await getDb();
@@ -44,7 +44,7 @@ export const uncensoredRouter = router({
   /** Current entitlement + plan info for the signed-in user. */
   status: protectedProcedure.query(async ({ ctx }) => {
     const ent = await getUncensoredEntitlement(ctx.user.id);
-    return { ...ent, plan: UNCENSORED_PLAN, available: isBtcpayConfigured() };
+    return { ...ent, plan: UNCENSORED_PLAN, plans: UNCENSORED_PLANS, available: isBtcpayConfigured() };
   }),
 
   /** One-time 18+ attestation. Required before purchase or generation. */
@@ -57,32 +57,36 @@ export const uncensoredRouter = router({
     }),
 
   /** Create a BTCPay invoice for the Uncensored Pass; returns checkout URL. */
-  createCheckout: protectedProcedure.mutation(async ({ ctx }) => {
-    if (!isBtcpayConfigured()) {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Crypto payments are temporarily unavailable." });
-    }
-    const ent = await getUncensoredEntitlement(ctx.user.id);
-    if (!ent.ageConfirmed) {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Age confirmation required first." });
-    }
+  createCheckout: protectedProcedure
+    .input(z.object({ planId: z.string().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      if (!isBtcpayConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Crypto payments are temporarily unavailable." });
+      }
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Age confirmation required first." });
+      }
 
-    const { invoiceId, checkoutLink } = await createUncensoredInvoice({
-      userId: ctx.user.id,
-      email: ctx.user.email ?? null,
-      redirectUrl: "https://dreamforgex.ai/uncensored?paid=1",
-    });
+      const plan = getUncensoredPlanById(input?.planId);
+      const { invoiceId, checkoutLink } = await createUncensoredInvoice({
+        userId: ctx.user.id,
+        email: ctx.user.email ?? null,
+        redirectUrl: "https://dreamforgex.ai/uncensored?paid=1",
+        planId: plan.id,
+      });
 
-    const db = await requireDb();
-    await db.insert(cryptoInvoices).values({
-      userId: ctx.user.id,
-      invoiceId,
-      plan: UNCENSORED_PLAN.id,
-      amountUsdCents: UNCENSORED_PLAN.priceUsd * 100,
-      status: "new",
-    });
+      const db = await requireDb();
+      await db.insert(cryptoInvoices).values({
+        userId: ctx.user.id,
+        invoiceId,
+        plan: plan.id,
+        amountUsdCents: Math.round(plan.priceUsd * 100),
+        status: "new",
+      });
 
-    return { checkoutLink };
-  }),
+      return { checkoutLink };
+    }),
 
   /** Invoice history for the signed-in user (purchase status polling). */
   myInvoices: protectedProcedure.query(async ({ ctx }) => {

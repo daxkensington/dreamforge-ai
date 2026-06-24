@@ -22,8 +22,17 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
  * Flow: 18+ attestation → "Pay with crypto" → BTCPay invoice (new tab) →
  * webhook settles → entitlement live → toggle unlocks in Workspace.
  */
+// Fallback so the ladder renders before the status query resolves; the server
+// (server/_core/btcpay.ts UNCENSORED_PLANS) is the source of truth at checkout.
+const FALLBACK_PLANS = [
+  { id: "uncensored-day", label: "Day Pass", priceUsd: 4.99, bonusCredits: 60, durationDays: 1, tagline: "Dip in for 24 hours", highlight: false },
+  { id: "uncensored-week", label: "Week Pass", priceUsd: 12, bonusCredits: 250, durationDays: 7, tagline: "A week, no commitment", highlight: false },
+  { id: "uncensored-30d", label: "30-Day Pass", priceUsd: 19, bonusCredits: 500, durationDays: 30, tagline: "Best value", highlight: true },
+];
+
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState("uncensored-30d");
 
   const { data: me, isLoading: meLoading } = trpc.auth.me.useQuery();
   const isAuthed = !!me;
@@ -46,7 +55,8 @@ export default function Uncensored() {
     onError: (e) => toast.error(e.message),
   });
 
-  const plan = status?.plan;
+  const plans = status?.plans ?? FALLBACK_PLANS;
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? plans[plans.length - 1];
   const active = !!status?.active;
   const ageConfirmed = !!status?.ageConfirmed;
 
@@ -62,7 +72,7 @@ export default function Uncensored() {
       }
       await confirmAge.mutateAsync({ confirmed: true });
     }
-    checkout.mutate();
+    checkout.mutate({ planId: selectedPlanId });
   };
 
   return (
@@ -112,7 +122,7 @@ export default function Uncensored() {
               {[
                 { icon: Flame, title: "No filter", body: "Prompts the standard models reject just work." },
                 { icon: Shield, title: "Private by default", body: "Uncensored creations can't enter the gallery or share links." },
-                { icon: Bitcoin, title: "Pay with crypto", body: "Bitcoin / Lightning via BTCPay. No card, discreet billing." },
+                { icon: Bitcoin, title: "Pay with crypto", body: "Bitcoin via BTCPay. No card, no name on a statement, discreet billing." },
               ].map((f) => (
                 <div key={f.title} className="rounded-xl border border-border/60 bg-card/40 p-5">
                   <f.icon className="h-6 w-6 text-rose-500" />
@@ -122,19 +132,43 @@ export default function Uncensored() {
               ))}
             </div>
 
-            {/* Pricing / CTA */}
-            <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-8">
-              <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold">${plan?.priceUsd ?? 19}</span>
-                <span className="text-muted-foreground">/ {plan?.durationDays ?? 30} days</span>
+            {/* Pricing ladder + CTA */}
+            <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 sm:p-8">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {plans.map((p) => {
+                  const isSelected = p.id === selectedPlanId;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPlanId(p.id)}
+                      className={`relative rounded-xl border p-4 text-left transition-colors ${
+                        isSelected
+                          ? "border-rose-500 bg-rose-500/10 ring-1 ring-rose-500/40"
+                          : "border-border/60 bg-card/40 hover:border-rose-500/40"
+                      }`}
+                    >
+                      {p.highlight && (
+                        <span className="absolute -top-2 right-3 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                          Best value
+                        </span>
+                      )}
+                      <div className="text-2xl font-bold">${p.priceUsd}</div>
+                      <div className="mt-1 text-sm font-medium">{p.label}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {p.durationDays} day{p.durationDays > 1 ? "s" : ""} · {p.bonusCredits} credits
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground/80">{p.tagline}</div>
+                    </button>
+                  );
+                })}
               </div>
-              <p className="mt-2 text-center text-sm text-muted-foreground">
-                Includes <strong>{plan?.bonusCredits ?? 500} bonus credits</strong>. One-time
-                payment, no auto-renew.
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                One-time payment, no auto-renew. Pay anonymously with Bitcoin.
               </p>
 
               {!active && !ageConfirmed && (
-                <label className="mt-6 flex items-center justify-center gap-2 text-sm">
+                <label className="mt-5 flex items-center justify-center gap-2 text-sm">
                   <Checkbox checked={ageChecked} onCheckedChange={(v) => setAgeChecked(!!v)} />
                   I confirm I am 18 years of age or older.
                 </label>
@@ -144,14 +178,14 @@ export default function Uncensored() {
                 onClick={handleStart}
                 disabled={checkout.isPending || confirmAge.isPending || meLoading || status?.available === false}
                 size="lg"
-                className="mt-6 w-full bg-gradient-to-r from-rose-500 to-orange-500 text-base font-semibold hover:opacity-90"
+                className="mt-5 w-full bg-gradient-to-r from-rose-500 to-orange-500 text-base font-semibold hover:opacity-90"
               >
                 {checkout.isPending || confirmAge.isPending ? (
                   <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating invoice…</>
                 ) : !isAuthed ? (
                   <><Lock className="mr-2 h-5 w-5" /> Sign in to continue</>
                 ) : (
-                  <><Bitcoin className="mr-2 h-5 w-5" /> Pay with crypto</>
+                  <><Bitcoin className="mr-2 h-5 w-5" /> Pay ${selectedPlan?.priceUsd ?? 19} with crypto</>
                 )}
               </Button>
 

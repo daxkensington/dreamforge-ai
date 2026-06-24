@@ -17,7 +17,7 @@ export const UNCENSORED_FAQ: UncensoredFaqItem[] = [
   },
   {
     q: "How do I pay? Do I need a credit card?",
-    a: "No card and no account with us beyond a sign-in. You pay anonymously with Bitcoin or Lightning through a BTCPay invoice — it takes about two minutes. The pass is $19 for 30 days as a one-time payment, with no auto-renew.",
+    a: "No card and no account with us beyond a sign-in. You pay anonymously with Bitcoin through a BTCPay invoice — it takes a few minutes. Passes start at $4.99 for a day, $12 for a week, or $19 for 30 days, each a one-time payment with no auto-renew.",
   },
   {
     q: "Why crypto only and not a card?",
