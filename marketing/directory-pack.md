@@ -6,7 +6,22 @@ All copy below is 100% SFW / mainstream-channel safe. Do **not** mention the adu
 
 ---
 
-## 1. The directories (live, accept submissions)
+## ⚑ VERIFIED STATUS — 2026-06-23 (checked live via automation)
+
+The AI-directory landscape monetized hard. What I actually found when submitting:
+
+| Directory | Reality 2026-06-23 | Action |
+|---|---|---|
+| **SaaSHub** (DR~74) | **FREE, no login** ✅ | **SUBMITTED** — in approval queue; DreamForgeX listed as a verified alternative on 13 product pages (DALL-E, Craiyon, Ideogram, Veo 3, PixVerse, Diffusion Bee…) + 8 categories. Approval notice → support@dreamforgex.ai. To *claim/manage/verify* the listing (speeds approval), log in once at saashub.com. |
+| Futurepedia | Free "Basic" tier shows **Sold Out → $247–$497 only** | skip unless paying |
+| Toolify | **$99** (no free queue shown) | skip unless paying |
+| TopAI.tools | **$47–$229** | skip unless paying |
+| There's An AI For That | Free but **requires Google sign-in** | needs a logged-in Google session in the automation browser |
+| AlternativeTo | Free but new accounts wait ~1 week + login | needs an aged logged-in account |
+
+**Takeaway:** free + no-login directory backlinks are now rare; SaaSHub was the best one and it's done. The remaining high-DR options need either a small payment (your call) or a one-time login in the automation browser profile (Google for TAAFT, an account for AlternativeTo), after which I can drive the rest. The launch article (dev.to/Medium) + community posts are the higher-leverage remaining backlinks — both also need a one-time login.
+
+## 1. The directories (original research — re-verify pricing/login per the table above)
 
 Listed roughly best-first by domain authority / referral value. "Free?" = is there a genuine free tier (paid express/featured upgrades usually also exist).
 
