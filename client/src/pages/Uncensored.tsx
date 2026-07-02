@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet, QrCode, Zap } from "lucide-react";
+import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,8 +20,9 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
  * demand on crypto rails ONLY — Stripe's AUP bans adult content, so the SFW
  * plans keep Stripe and this never touches it.
  *
- * Flow: 18+ attestation → "Pay with crypto" → BTCPay invoice (new tab) →
- * webhook settles → entitlement live → toggle unlocks in Workspace.
+ * Flow: 18+ attestation → "Pay with crypto" → BTCPay invoice embedded INLINE
+ * (iframe — no new tab, no popup blocker, QR right on the page) → webhook
+ * settles → entitlement live → toggle unlocks in Workspace.
  */
 // Fallback so the ladder renders before the status query resolves; the server
 // (server/_core/btcpay.ts UNCENSORED_PLANS) is the source of truth at checkout.
@@ -48,13 +49,39 @@ export default function Uncensored() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Inline embedded BTCPay invoice (iframe). Replaces the old new-tab
+  // window.open flow — popup blockers ate it and mobile users lost the page.
+  const [inlineInvoice, setInlineInvoice] = useState<{ checkoutLink: string; invoiceId: string } | null>(null);
+
   const checkout = trpc.uncensored.createCheckout.useMutation({
     onSuccess: (data) => {
-      window.open(data.checkoutLink, "_blank", "noopener");
-      toast.success("Invoice opened in a new tab. This page updates once payment confirms.");
+      setInlineInvoice({ checkoutLink: data.checkoutLink, invoiceId: data.invoiceId });
+      toast.success("Invoice ready — pay below. This page unlocks once payment confirms.");
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // BTCPay's embedded checkout posts status messages to the parent window
+  // (same protocol its official modal uses). Use them to refetch entitlement
+  // immediately on payment instead of waiting for the next 8s poll tick.
+  useEffect(() => {
+    if (!inlineInvoice) return;
+    let origin = "";
+    try {
+      origin = new URL(inlineInvoice.checkoutLink).origin;
+    } catch {
+      return;
+    }
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.origin !== origin) return;
+      const status = typeof ev.data === "string" ? ev.data : ev.data?.status;
+      if (status === "complete" || status === "paid" || status === "confirmed" || status === "processing") {
+        refetch();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [inlineInvoice, refetch]);
 
   const [freePrompt, setFreePrompt] = useState("");
   const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
@@ -248,8 +275,47 @@ export default function Uncensored() {
               ))}
             </div>
 
-            {/* Pricing ladder + CTA */}
+            {/* Pricing ladder + CTA — swaps to the inline embedded invoice
+                once checkout starts (BTCPay checkout is iframe-embeddable;
+                same mechanism as its official modal). */}
             <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 sm:p-8">
+              {inlineInvoice ? (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">Complete your payment</h2>
+                    <button
+                      type="button"
+                      onClick={() => setInlineInvoice(null)}
+                      className="flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground"
+                      aria-label="Close invoice and go back to plans"
+                    >
+                      <X className="h-3.5 w-3.5" /> Back to plans
+                    </button>
+                  </div>
+                  <iframe
+                    src={inlineInvoice.checkoutLink}
+                    title="BTCPay crypto invoice"
+                    allow="clipboard-write"
+                    className="mt-4 h-[660px] w-full rounded-xl border border-border/60 bg-white"
+                  />
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    Scan the QR or copy the address from the invoice above. After the
+                    payment confirms on-chain, this page unlocks automatically.
+                  </p>
+                  <p className="mt-2 text-center text-xs">
+                    <a
+                      href={inlineInvoice.checkoutLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-muted-foreground underline-offset-2 hover:text-rose-300 hover:underline"
+                    >
+                      Trouble seeing the invoice? Open it in a new tab
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <>
               <div className="grid gap-3 sm:grid-cols-3">
                 {plans.map((p) => {
                   const isSelected = p.id === selectedPlanId;
@@ -313,6 +379,8 @@ export default function Uncensored() {
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 After payment confirms on-chain, this page unlocks automatically.
               </p>
+                </>
+              )}
             </div>
 
             {/* How crypto payment works — kills the "I don't know how to pay" objection */}
@@ -321,7 +389,7 @@ export default function Uncensored() {
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {[
                   { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, or an exchange you already use." },
-                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap the crypto button and we generate a BTCPay invoice with a QR code. Pay on-chain or over Lightning." },
+                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap the crypto button and the invoice appears right here with a QR code. Scan it or copy the Bitcoin address into your wallet." },
                   { icon: Zap, step: "3", title: "Unlock automatically", body: "Once the payment confirms, this page unlocks on its own — usually within minutes. No waiting on support." },
                 ].map((s) => (
                   <div key={s.step} className="relative rounded-xl border border-border/60 bg-card/40 p-5">
@@ -384,7 +452,11 @@ export default function Uncensored() {
 
             <p className="mt-12 text-center text-xs text-muted-foreground">
               All content is AI-generated and fictional. No real individuals are depicted.
-              You are responsible for complying with the laws of your jurisdiction.
+              You are responsible for complying with the laws of your jurisdiction.{" "}
+              <a href="/takedown" className="underline underline-offset-2 hover:text-foreground">
+                Report content
+              </a>
+              .
             </p>
           </>
         )}

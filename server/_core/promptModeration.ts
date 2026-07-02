@@ -26,6 +26,8 @@
  *     evasions (l0li, j4ilbait) still trip the minor checks.
  */
 
+import crypto from "crypto";
+
 export type ModerationCategory = "csam" | "minor" | "deepfake";
 
 export type ModerationVerdict =
@@ -156,17 +158,23 @@ export function assertPromptAllowed(
 }
 
 /**
- * Structured, greppable audit line for a refusal. Console-based for now (shows
- * up in Vercel logs); a persistent generation_moderation_log table is the
- * compliance fast-follow. Never throws — logging must not break the refusal.
+ * Persistent audit trail for a refusal: console line (greppable in Vercel
+ * logs) + a moderation_log DB row (the compliance record safe-harbor expects).
+ * Prompt CONTENT is never stored — only length + SHA-256, so refusals can be
+ * counted/correlated without retaining the text itself.
+ *
+ * Never throws — logging must not break the refusal. Callers MUST await it
+ * (un-awaited promises die at Vercel lambda freeze and the row is lost).
  */
-export function logModerationBlock(entry: {
+export async function logModerationBlock(entry: {
   category: ModerationCategory;
   promptLen: number;
   userId?: number | null;
   ip?: string | null;
   surface: string;
-}): void {
+  /** Raw prompt — hashed (SHA-256) for the DB row, never stored verbatim. */
+  prompt?: string;
+}): Promise<void> {
   try {
     console.warn(
       "[moderation] BLOCK " +
@@ -180,5 +188,29 @@ export function logModerationBlock(entry: {
     );
   } catch {
     /* never throw from logging */
+  }
+  try {
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (!db) return;
+    const { moderationLog } = await import("../../drizzle/schema");
+    await db.insert(moderationLog).values({
+      category: entry.category,
+      surface: entry.surface,
+      userId: entry.userId ?? null,
+      ip: entry.ip ?? null,
+      promptLen: entry.promptLen,
+      promptSha256:
+        typeof entry.prompt === "string"
+          ? crypto.createHash("sha256").update(entry.prompt, "utf8").digest("hex")
+          : null,
+    });
+  } catch (err) {
+    // DB write is best-effort; the console line above is the fallback trail.
+    try {
+      console.warn("[moderation] moderation_log write failed:", err);
+    } catch {
+      /* never throw from logging */
+    }
   }
 }

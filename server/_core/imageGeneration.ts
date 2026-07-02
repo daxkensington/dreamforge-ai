@@ -18,7 +18,7 @@ import { storagePut, generateStorageKey } from "../storage";
 import { invokeLLM } from "./llm";
 import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
-import { assertPromptAllowed } from "./promptModeration";
+import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
 
 export type GenerateImageOptions = {
@@ -672,8 +672,20 @@ export async function generateImage(
 async function generateUnfiltered(prompt: string, size: string): Promise<Buffer> {
   // Defense-in-depth: the no-safety chain refuses illegal content even if a
   // higher-level gate was missed. Throws PromptBlockedError (CSAM / minor /
-  // real-person deepfake) before any GPU call.
-  assertPromptAllowed(prompt, { strictMinors: true });
+  // real-person deepfake) before any GPU call. A refusal HERE means a surface
+  // gate was bypassed — log it to moderation_log so it's visible in review.
+  {
+    const verdict = checkPrompt(prompt, { strictMinors: true });
+    if (!verdict.allowed) {
+      await logModerationBlock({
+        category: verdict.category,
+        promptLen: prompt.length,
+        surface: "backstop:generateUnfiltered",
+        prompt,
+      });
+      throw new PromptBlockedError(verdict);
+    }
+  }
   const [w, h] = size.split("x").map(Number);
   const errors: string[] = [];
 

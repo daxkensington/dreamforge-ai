@@ -391,7 +391,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "No content filter, period — the artistic and mature prompts Midjourney bounces render here without word-swaps, mutes, or warnings",
       "Self-hosted GPUs running open-source Flux — no Midjourney AUP, no Discord moderation, no third-party processor deciding what you're allowed to make",
       "Private by default — unlike Midjourney's public Discord-first gallery, your generations are never posted, indexed, or shared anywhere",
-      "Pay anonymously with Bitcoin or Lightning via BTCPay — no card, no subscription tied to your name, no awkward 'AI image' line item",
+      "Pay anonymously with Bitcoin via BTCPay — no card, no subscription tied to your name, no awkward 'AI image' line item",
       "$19 for 30 days plus 500 bonus credits — one-time, no auto-renew, cheaper than a Midjourney Standard plan that still won't do this"
     ],
     "sampleConcepts": [
@@ -417,7 +417,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Why pay with crypto instead of a card like Midjourney uses?",
-        "a": "Card networks and processors prohibit adult content in their terms, which is why Midjourney can't offer it. Paying with Bitcoin or Lightning through a BTCPay invoice keeps this tier available and keeps your billing private and discreet — no card, no recurring charge with your name on it."
+        "a": "Card networks and processors prohibit adult content in their terms, which is why Midjourney can't offer it. Paying with Bitcoin through a BTCPay invoice keeps this tier available and keeps your billing private and discreet — no card, no recurring charge with your name on it."
       },
       {
         "q": "What's allowed, and what isn't?",
@@ -434,7 +434,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "bullets": [
       "No GPU required — hosted generation on our own self-hosted GPUs; skip the 4090 rental, the ComfyUI setup, and the broken-LoRA hunt entirely",
       "No content filter — the unfiltered Flux models render mature and artistic prompts that Civitai's post-2025 restrictions now block",
-      "Crypto-paid and processor-proof — pay anonymously with Bitcoin or Lightning, so no card processor can pull the plug on adult content",
+      "Crypto-paid and processor-proof — pay anonymously with Bitcoin, so no card processor can pull the plug on adult content",
       "Private by default — your generations are never posted to a public feed, model page, or gallery the way Civitai uploads are",
       "Uncensored Pass is $19 for 30 days — flat access, no per-image surge, no card on file, no real-name account"
     ],
@@ -453,7 +453,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Why did Civitai restrict adult content, and how is DreamForgeX different?",
-        "a": "In May 2025 Civitai lost its card payment processor and removed or restricted a large amount of adult material to keep operating, because card networks impose strict content rules on the businesses they fund. DreamForgeX sidesteps that dependency entirely: payment is anonymous crypto (Bitcoin or Lightning), so there's no processor whose content policy can force us to censor or shut down. Crypto survives where cards ban adult."
+        "a": "In May 2025 Civitai lost its card payment processor and removed or restricted a large amount of adult material to keep operating, because card networks impose strict content rules on the businesses they fund. DreamForgeX sidesteps that dependency entirely: payment is anonymous crypto (Bitcoin), so there's no processor whose content policy can force us to censor or shut down. Crypto survives where cards ban adult."
       },
       {
         "q": "Is it really uncensored?",
@@ -465,7 +465,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "What does it cost and how do I pay?",
-        "a": "The Uncensored Pass is $19 for 30 days of access plus bonus credits — flat, with no per-image surge pricing and no card stored on file. You pay anonymously with Bitcoin or Lightning. Because there's no card processor in the loop, your payment can't be used to throttle or ban the content you generate."
+        "a": "The Uncensored Pass is $19 for 30 days of access plus bonus credits — flat, with no per-image surge pricing and no card stored on file. You pay anonymously with Bitcoin. Because there's no card processor in the loop, your payment can't be used to throttle or ban the content you generate."
       }
     ]
   },

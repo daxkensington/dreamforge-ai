@@ -126,6 +126,50 @@ export const cryptoInvoices = pgTable("cryptoInvoices", {
 
 export type CryptoInvoice = typeof cryptoInvoices.$inferSelect;
 
+// ─── Moderation Log (compliance audit trail) ────────────────────────────────
+// One row per refused generation prompt (CSAM / minor / real-person deepfake).
+// This is the persistent audit trail safe-harbor expects — previously refusals
+// only went to console (Vercel logs, 30-day retention). Prompt CONTENT is
+// deliberately not stored (matches the Privacy policy's "we strip prompt
+// content" posture); a SHA-256 hash allows correlation/dedup without content.
+export const moderationLog = pgTable("moderation_log", {
+  id: serial("id").primaryKey(),
+  category: varchar("category", { length: 32 }).notNull(), // csam | minor | deepfake
+  surface: varchar("surface", { length: 64 }).notNull(), // e.g. "generation.create", "demo.generate"
+  userId: integer("userId"), // null on unauthenticated surfaces (demo)
+  ip: varchar("ip", { length: 64 }),
+  promptLen: integer("promptLen").notNull(),
+  promptSha256: varchar("promptSha256", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("moderation_log_createdAt_idx").on(table.createdAt),
+  index("moderation_log_category_idx").on(table.category),
+]);
+
+export type ModerationLogEntry = typeof moderationLog.$inferSelect;
+
+// ─── Takedown Requests ──────────────────────────────────────────────────────
+// Public content-removal reports (/takedown → POST /api/takedown). Each report
+// gets a human-referenceable ticket id. status: open | actioned | rejected |
+// test (test = synthetic row from deploy verification, ignore in review).
+export const takedownRequests = pgTable("takedown_requests", {
+  id: serial("id").primaryKey(),
+  ticket: varchar("ticket", { length: 24 }).notNull().unique(), // "TD-XXXXXXXX"
+  url: text("url").notNull(),
+  reason: text("reason").notNull(),
+  contact: varchar("contact", { length: 320 }),
+  ip: varchar("ip", { length: 64 }),
+  status: varchar("status", { length: 32 }).default("open").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+}, (table) => [
+  index("takedown_requests_createdAt_idx").on(table.createdAt),
+  index("takedown_requests_status_idx").on(table.status),
+]);
+
+export type TakedownRequest = typeof takedownRequests.$inferSelect;
+
 // ─── Tags ────────────────────────────────────────────────────────────────────
 export const tags = pgTable("tags", {
   id: serial("id").primaryKey(),

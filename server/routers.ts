@@ -535,11 +535,12 @@ export const appRouter = router({
             negativePrompt: input.negativePrompt ?? null,
           });
           if (!verdict.allowed) {
-            logModerationBlock({
+            await logModerationBlock({
               category: verdict.category,
               promptLen: input.prompt.length,
               userId: ctx.user.id,
               surface: input.uncensored ? "generation.create:uncensored" : "generation.create",
+              prompt: input.prompt,
             });
             throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
           }

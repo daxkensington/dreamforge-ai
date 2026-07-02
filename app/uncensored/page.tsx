@@ -27,7 +27,7 @@ const jsonLd = {
       "@type": "Product",
       name: "DreamForgeX Uncensored Pass",
       description:
-        "Uncensored AI image generation with no content filter — 30 days of access plus 500 bonus credits, paid anonymously with Bitcoin or Lightning. 18+ only.",
+        "Uncensored AI image generation with no content filter — 30 days of access plus 500 bonus credits, paid anonymously with Bitcoin. 18+ only.",
       brand: { "@type": "Brand", name: "DreamForgeX" },
       url: "https://dreamforgex.ai/uncensored",
       offers: {

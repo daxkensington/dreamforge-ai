@@ -102,7 +102,7 @@ export const uncensoredRouter = router({
       // Illegal-content refusal BEFORE any quota burn or GPU call.
       const verdict = checkPrompt(input.prompt, { strictMinors: true });
       if (!verdict.allowed) {
-        logModerationBlock({ category: verdict.category, promptLen: input.prompt.length, userId: ctx.user.id, surface: "uncensored.freeGenerate" });
+        await logModerationBlock({ category: verdict.category, promptLen: input.prompt.length, userId: ctx.user.id, surface: "uncensored.freeGenerate", prompt: input.prompt });
         throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
       }
 
@@ -186,7 +186,9 @@ export const uncensoredRouter = router({
         status: "new",
       });
 
-      return { checkoutLink };
+      // invoiceId lets the client listen for BTCPay's postMessage status
+      // events from the embedded checkout iframe (faster than polling).
+      return { checkoutLink, invoiceId };
     }),
 
   /** Invoice history for the signed-in user (purchase status polling). */

@@ -44,11 +44,12 @@ export const demoRouter = router({
       {
         const verdict = checkPrompt(input.prompt);
         if (!verdict.allowed) {
-          logModerationBlock({
+          await logModerationBlock({
             category: verdict.category,
             promptLen: input.prompt.length,
             ip: ctx.ip,
             surface: "demo.generate",
+            prompt: input.prompt,
           });
           return { status: "failed" as const, error: verdict.userMessage };
         }
