@@ -51,10 +51,19 @@ _bark_processor = None
 _bark_model = None
 
 # Wan 2.2 TI2V-5B: a single 5B model serves BOTH text-to-video and
-# image-to-video at up to 720p24. Chosen over the A14B MoE variants because it
-# fits a single 48GB GPU (A40/L40/ADA_48) with model-cpu-offload — the right
-# tier for a self-hosted uncensored video path (external APIs all reject NSFW).
+# image-to-video at up to 720p24. The "fast" tier — fits a single 48GB GPU with
+# model-cpu-offload, ~90s/clip.
 WAN_MODEL_ID = os.environ.get("WAN_MODEL_ID", "Wan-AI/Wan2.2-TI2V-5B-Diffusers")
+
+# Wan 2.2 A14B: the "hd" tier for top-quality adult video. Two-expert MoE
+# (27B total / 14B active), 480p+720p, uncensored (no built-in content filter).
+# Only 14B is active per step, so model-cpu-offload keeps it within 48GB (the
+# inactive expert offloads to CPU RAM) — slower than 5B (~4-8min/clip) but a
+# large quality jump. Separate T2V / I2V checkpoints.
+WAN_HD_T2V_MODEL = os.environ.get("WAN_HD_T2V_MODEL", "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
+WAN_HD_I2V_MODEL = os.environ.get("WAN_HD_I2V_MODEL", "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
+_wan_hd_t2v_pipe = None
+_wan_hd_i2v_pipe = None
 
 
 def get_flux_pipe(model_type="dev"):
@@ -235,6 +244,34 @@ def get_wan_i2v_pipe():
         _wan_i2v_pipe.enable_model_cpu_offload()
         print("[DreamForge] Wan 2.2 I2V loaded")
     return _wan_i2v_pipe
+
+
+def get_wan_hd_t2v_pipe():
+    """Load Wan 2.2 A14B text-to-video (HD tier). MoE two-expert, cpu-offloaded."""
+    global _wan_hd_t2v_pipe
+    if _wan_hd_t2v_pipe is None:
+        from diffusers import WanPipeline, AutoencoderKLWan
+
+        print(f"[DreamForge] Loading Wan 2.2 HD T2V ({WAN_HD_T2V_MODEL})...")
+        vae = AutoencoderKLWan.from_pretrained(WAN_HD_T2V_MODEL, subfolder="vae", torch_dtype=torch.float32)
+        _wan_hd_t2v_pipe = WanPipeline.from_pretrained(WAN_HD_T2V_MODEL, vae=vae, torch_dtype=torch.bfloat16)
+        _wan_hd_t2v_pipe.enable_model_cpu_offload()
+        print("[DreamForge] Wan 2.2 HD T2V loaded")
+    return _wan_hd_t2v_pipe
+
+
+def get_wan_hd_i2v_pipe():
+    """Load Wan 2.2 A14B image-to-video (HD tier) — the top-quality path."""
+    global _wan_hd_i2v_pipe
+    if _wan_hd_i2v_pipe is None:
+        from diffusers import WanImageToVideoPipeline, AutoencoderKLWan
+
+        print(f"[DreamForge] Loading Wan 2.2 HD I2V ({WAN_HD_I2V_MODEL})...")
+        vae = AutoencoderKLWan.from_pretrained(WAN_HD_I2V_MODEL, subfolder="vae", torch_dtype=torch.float32)
+        _wan_hd_i2v_pipe = WanImageToVideoPipeline.from_pretrained(WAN_HD_I2V_MODEL, vae=vae, torch_dtype=torch.bfloat16)
+        _wan_hd_i2v_pipe.enable_model_cpu_offload()
+        print("[DreamForge] Wan 2.2 HD I2V loaded")
+    return _wan_hd_i2v_pipe
 
 
 def get_musicgen(model_size="large"):
@@ -620,6 +657,7 @@ def handle_wan(job_input):
     from diffusers.utils import export_to_video
 
     task = job_input.get("task", "wan-t2v")
+    tier = job_input.get("tier", "fast")  # "fast" = 5B TI2V, "hd" = A14B
     prompt = job_input.get("prompt", "")
     negative_prompt = job_input.get("negative_prompt") or (
         "低质量, 模糊, 变形, 多余的肢体, blurry, low quality, distorted, deformed, extra limbs, watermark, text"
@@ -667,16 +705,16 @@ def handle_wan(job_input):
         src = Image.open(io.BytesIO(base64.b64decode(image_b64))).convert("RGB")
         # Fit the source to the target frame so the first frame lines up.
         src = src.resize((width, height))
-        pipe = get_wan_i2v_pipe()
+        pipe = get_wan_hd_i2v_pipe() if tier == "hd" else get_wan_i2v_pipe()
         _load_wan_lora(pipe, lora_id, lora_scale)
         video = pipe(image=src, **common).frames[0]
     else:
-        pipe = get_wan_t2v_pipe()
+        pipe = get_wan_hd_t2v_pipe() if tier == "hd" else get_wan_t2v_pipe()
         _load_wan_lora(pipe, lora_id, lora_scale)
         video = pipe(**common).frames[0]
 
     inference_time = time.time() - start
-    print(f"[DreamForge] Wan {task} {num_frames}f {width}x{height} in {inference_time:.1f}s (seed={seed})")
+    print(f"[DreamForge] Wan {task} tier={tier} {num_frames}f {width}x{height} in {inference_time:.1f}s (seed={seed})")
 
     video_path = f"/tmp/wan_{int(time.time())}.mp4"
     export_to_video(video, video_path, fps=fps)
