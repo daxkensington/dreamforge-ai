@@ -246,8 +246,24 @@ def get_wan_i2v_pipe():
     return _wan_i2v_pipe
 
 
+def _place_hd_pipe(pipe):
+    """Put an A14B pipe on the GPU. On an 80GB card the two 14B experts + VAE +
+    text encoder (~69GB) fit resident, so keep everything on-GPU (no CPU-offload
+    swap) — ~2x faster than enable_model_cpu_offload. Falls back to offload if
+    VRAM is smaller than expected (OOM), or force it with WAN_HD_OFFLOAD=1."""
+    if os.environ.get("WAN_HD_OFFLOAD", "0") == "1":
+        pipe.enable_model_cpu_offload()
+        return
+    try:
+        pipe.to("cuda")
+    except Exception as e:
+        print(f"[DreamForge] HD full-GPU load failed ({e}); falling back to cpu-offload")
+        torch.cuda.empty_cache()
+        pipe.enable_model_cpu_offload()
+
+
 def get_wan_hd_t2v_pipe():
-    """Load Wan 2.2 A14B text-to-video (HD tier). MoE two-expert, cpu-offloaded."""
+    """Load Wan 2.2 A14B text-to-video (HD tier). Full-GPU on 80GB for speed."""
     global _wan_hd_t2v_pipe
     if _wan_hd_t2v_pipe is None:
         from diffusers import WanPipeline, AutoencoderKLWan
@@ -255,7 +271,7 @@ def get_wan_hd_t2v_pipe():
         print(f"[DreamForge] Loading Wan 2.2 HD T2V ({WAN_HD_T2V_MODEL})...")
         vae = AutoencoderKLWan.from_pretrained(WAN_HD_T2V_MODEL, subfolder="vae", torch_dtype=torch.float32)
         _wan_hd_t2v_pipe = WanPipeline.from_pretrained(WAN_HD_T2V_MODEL, vae=vae, torch_dtype=torch.bfloat16)
-        _wan_hd_t2v_pipe.enable_model_cpu_offload()
+        _place_hd_pipe(_wan_hd_t2v_pipe)
         print("[DreamForge] Wan 2.2 HD T2V loaded")
     return _wan_hd_t2v_pipe
 
@@ -269,7 +285,7 @@ def get_wan_hd_i2v_pipe():
         print(f"[DreamForge] Loading Wan 2.2 HD I2V ({WAN_HD_I2V_MODEL})...")
         vae = AutoencoderKLWan.from_pretrained(WAN_HD_I2V_MODEL, subfolder="vae", torch_dtype=torch.float32)
         _wan_hd_i2v_pipe = WanImageToVideoPipeline.from_pretrained(WAN_HD_I2V_MODEL, vae=vae, torch_dtype=torch.bfloat16)
-        _wan_hd_i2v_pipe.enable_model_cpu_offload()
+        _place_hd_pipe(_wan_hd_i2v_pipe)
         print("[DreamForge] Wan 2.2 HD I2V loaded")
     return _wan_hd_i2v_pipe
 
