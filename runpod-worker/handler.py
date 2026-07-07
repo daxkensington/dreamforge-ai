@@ -215,26 +215,24 @@ def get_wan_t2v_pipe():
 def get_wan_i2v_pipe():
     """Load Wan 2.2 TI2V-5B image-to-video pipeline (lazy, cached).
 
-    Built from the T2V pipeline's components via from_pipe when possible so the
-    5B transformer/VAE/text-encoder weights are shared, not duplicated in VRAM.
+    Loaded standalone — NOT via from_pipe(t2v). from_pipe on the TI2V-5B produced
+    a pipeline that ran effectively on CPU (a 49-frame clip stalled past 19 min
+    vs ~90s for T2V). A clean from_pretrained load with model-cpu-offload mirrors
+    the working T2V path. Weights come from the on-disk HF cache the T2V load
+    already populated, so this is a fast local re-instantiation, not a re-download.
     """
     global _wan_i2v_pipe
     if _wan_i2v_pipe is None:
         from diffusers import WanImageToVideoPipeline, AutoencoderKLWan
 
         print(f"[DreamForge] Loading Wan 2.2 I2V ({WAN_MODEL_ID})...")
-        try:
-            base = get_wan_t2v_pipe()
-            _wan_i2v_pipe = WanImageToVideoPipeline.from_pipe(base)
-        except Exception as e:
-            print(f"[DreamForge] I2V from_pipe reuse failed ({e}); loading standalone")
-            vae = AutoencoderKLWan.from_pretrained(
-                WAN_MODEL_ID, subfolder="vae", torch_dtype=torch.float32
-            )
-            _wan_i2v_pipe = WanImageToVideoPipeline.from_pretrained(
-                WAN_MODEL_ID, vae=vae, torch_dtype=torch.bfloat16
-            )
-            _wan_i2v_pipe.enable_model_cpu_offload()
+        vae = AutoencoderKLWan.from_pretrained(
+            WAN_MODEL_ID, subfolder="vae", torch_dtype=torch.float32
+        )
+        _wan_i2v_pipe = WanImageToVideoPipeline.from_pretrained(
+            WAN_MODEL_ID, vae=vae, torch_dtype=torch.bfloat16
+        )
+        _wan_i2v_pipe.enable_model_cpu_offload()
         print("[DreamForge] Wan 2.2 I2V loaded")
     return _wan_i2v_pipe
 
