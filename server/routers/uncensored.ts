@@ -14,7 +14,7 @@ import { users, cryptoInvoices, generations } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 import { generateImage } from "../_core/imageGeneration";
-import { generateUncensoredVideo } from "../_core/videoGenerationUncensored";
+import { submitUncensoredVideoJob, collectUncensoredVideoJob } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable } from "../_core/runpod";
@@ -182,27 +182,79 @@ export const uncensoredRouter = router({
         modelVersion: "uncensored-wan-2.2",
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
-        metadata: { uncensored: true, video: true, mode: input.mode },
+        thumbnailUrl: sourceImageUrl,
+        metadata: { uncensored: true, video: true, mode: input.mode, cost },
       });
 
+      // Submit the job and return immediately — video outlasts a serverless
+      // function, so the client polls uncensored.videoStatus(generationId).
       try {
-        const { url, key } = await generateUncensoredVideo({
+        const { jobId } = await submitUncensoredVideoJob({
           prompt: input.prompt,
           userId: ctx.user.id,
           sourceImageUrl,
           width: dims.w,
           height: dims.h,
         });
-        await updateGeneration(genId, { status: "completed", imageUrl: url, fileKey: key, thumbnailUrl: sourceImageUrl });
-        return { url, generationId: genId, creditsRemaining: debit.balance };
+        await updateGeneration(genId, {
+          metadata: { uncensored: true, video: true, mode: input.mode, cost, runpodJobId: jobId },
+        });
+        return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored video generation failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored video submit failed");
         await logToolFailure({ toolId: "uncensored-video", errorMessage: err?.message, userId: ctx.user.id });
-        // PromptBlockedError (backstop) carries a safe userMessage.
-        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Video generation failed — your credits were refunded. Please try again.";
+        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the video — your credits were refunded. Please try again.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
       }
+    }),
+
+  /**
+   * Poll a submitted video generation. Idempotent: the first poll that sees the
+   * RunPod job COMPLETED uploads the mp4 to R2 and atomically claims the
+   * generating→completed transition; a FAILED job atomically claims
+   * generating→failed and refunds exactly once. Concurrent polls can't
+   * double-grant or double-refund.
+   */
+  videoStatus: protectedProcedure
+    .input(z.object({ generationId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const gen = await getGenerationById(input.generationId);
+      if (!gen || gen.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Generation not found." });
+      }
+      if (gen.status === "completed") return { status: "completed" as const, url: gen.imageUrl };
+      if (gen.status === "failed") return { status: "failed" as const, url: null };
+
+      const meta = (gen.metadata as any) ?? {};
+      const jobId: string | undefined = meta.runpodJobId;
+      if (!jobId) return { status: "processing" as const, url: null }; // submit not yet recorded
+
+      const result = await collectUncensoredVideoJob(jobId);
+      const db = await requireDb();
+
+      if (result.status === "completed") {
+        // Claim the transition; if another poll already did, the mp4 we just
+        // stored is a harmless orphan.
+        await db
+          .update(generations)
+          .set({ status: "completed", imageUrl: result.url, fileKey: result.key })
+          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
+        return { status: "completed" as const, url: result.url };
+      }
+      if (result.status === "failed") {
+        const claimed = await db
+          .update(generations)
+          .set({ status: "failed" })
+          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
+          .returning({ id: generations.id });
+        if (claimed.length) {
+          await refundCredits(ctx.user.id, Number(meta.cost) || 0, "Uncensored video generation failed");
+          await logToolFailure({ toolId: "uncensored-video", errorMessage: result.error, userId: ctx.user.id });
+        }
+        return { status: "failed" as const, url: null };
+      }
+      return { status: "processing" as const, url: null };
     }),
 
   /**

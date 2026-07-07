@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,16 +35,43 @@ export default function UncensoredVideoStudio() {
 
   const cost = mode === "i2v" ? status?.videoCost?.i2v ?? 40 : status?.videoCost?.t2v ?? 50;
 
+  // Async job: submit returns a generationId, then we poll videoStatus until the
+  // clip lands (video routinely outlasts a single request).
+  const [pendingId, setPendingId] = useState<number | null>(null);
+
   const gen = trpc.uncensored.generateVideo.useMutation({
     onSuccess: (data) => {
-      if (data.url) setVideoUrl(data.url);
-      toast.success("Video ready.");
+      setPendingId(data.generationId);
+      toast.success("Generating your video — this can take a few minutes.");
     },
     onError: (e) => toast.error(e.message),
   });
 
+  const statusQuery = trpc.uncensored.videoStatus.useQuery(
+    { generationId: pendingId ?? 0 },
+    {
+      enabled: pendingId != null,
+      refetchInterval: (q) => (q.state.data && q.state.data.status !== "processing" ? false : 5000),
+    },
+  );
+
+  // react-query v5 removed useQuery onSuccess — react to the polled data here.
+  useEffect(() => {
+    const data = statusQuery.data;
+    if (!data || pendingId == null) return;
+    if (data.status === "completed" && data.url) {
+      setVideoUrl(data.url);
+      setPendingId(null);
+      toast.success("Video ready.");
+    } else if (data.status === "failed") {
+      setPendingId(null);
+      toast.error("Video generation failed — your credits were refunded.");
+    }
+  }, [statusQuery.data, pendingId]);
+
+  const isBusy = gen.isPending || pendingId != null;
   const canGenerate =
-    prompt.trim().length >= 3 && !gen.isPending && (mode === "t2v" || !!sourceId);
+    prompt.trim().length >= 3 && !isBusy && (mode === "t2v" || !!sourceId);
 
   const handleGenerate = () => {
     if (mode === "i2v" && !sourceId) {
@@ -138,7 +165,7 @@ export default function UncensoredVideoStudio() {
         placeholder={mode === "i2v" ? "Describe the motion… (e.g. slow turn toward camera, hair blowing)" : "Describe the video you want…"}
         rows={3}
         maxLength={1000}
-        disabled={gen.isPending}
+        disabled={isBusy}
         className="mt-4 resize-none"
       />
 
@@ -162,7 +189,7 @@ export default function UncensoredVideoStudio() {
         disabled={!canGenerate}
         className="mt-4 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
       >
-        {gen.isPending ? (
+        {isBusy ? (
           <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating video… (this can take a few minutes)</>
         ) : (
           <><Sparkles className="mr-2 h-5 w-5" /> Generate video · {cost} credits</>

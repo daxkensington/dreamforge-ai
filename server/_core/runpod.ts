@@ -373,6 +373,91 @@ export async function runpodCogVideo(
   return handleRunpodResult(runpodRun(input));
 }
 
+/** Endpoint id used for Wan video jobs (exported for async status polling). */
+export function getVideoEndpointId(): string {
+  return videoEndpointId();
+}
+
+/**
+ * Submit a job to RunPod and return its id immediately WITHOUT polling. For
+ * long jobs (video) that can outlast a serverless function: submit here, then
+ * poll runpodJobStatus() from a separate short request.
+ */
+export async function runpodSubmit(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const res = await fetch(getEndpointUrl("run", opts.endpointId), {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ input }),
+    signal: controller.signal,
+  });
+  clearTimeout(timeout);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`RunPod submit failed (${res.status}): ${detail}`);
+  }
+  const job = (await res.json()) as RunPodRunResponse;
+  if (job.status === "FAILED") throw new Error(`RunPod job failed: ${job.error ?? "Unknown error"}`);
+  return job.id;
+}
+
+export interface RunPodJobState {
+  status: RunPodRunResponse["status"];
+  videoB64?: string;
+  error?: string;
+}
+
+/** Poll a submitted job's status. Transient HTTP errors read as still-running. */
+export async function runpodJobStatus(jobId: string, endpointId?: string): Promise<RunPodJobState> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  let res: Response;
+  try {
+    res = await fetch(getEndpointUrl(`status/${jobId}`, endpointId), { headers: getHeaders(), signal: controller.signal });
+  } catch {
+    return { status: "IN_PROGRESS" };
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!res.ok) return { status: "IN_PROGRESS" };
+  const s = (await res.json()) as RunPodRunResponse;
+  return { status: s.status, videoB64: s.output?.video_b64, error: s.error };
+}
+
+/** Submit a Wan video job (T2V or I2V) and return the job id (no wait). */
+export async function runpodWanSubmit(params: {
+  prompt: string;
+  imageB64?: string;
+  negativePrompt?: string;
+  width?: number;
+  height?: number;
+  numFrames?: number;
+  steps?: number;
+  guidanceScale?: number;
+  fps?: number;
+  seed?: number;
+  loraId?: string;
+  loraScale?: number;
+}): Promise<string> {
+  const input: RunPodInput = {
+    task: params.imageB64 ? "wan-i2v" : "wan-t2v",
+    prompt: params.prompt,
+    negative_prompt: params.negativePrompt,
+    width: params.width,
+    height: params.height,
+    num_frames: params.numFrames,
+    num_inference_steps: params.steps,
+    guidance_scale: params.guidanceScale,
+    fps: params.fps,
+    seed: params.seed,
+    lora_id: params.loraId,
+    lora_scale: params.loraScale,
+    ...(params.imageB64 ? { image_b64: params.imageB64 } : {}),
+  };
+  return runpodSubmit(input, { endpointId: videoEndpointId() });
+}
+
 /**
  * Generate an uncensored video with Wan 2.2 TI2V-5B (self-hosted).
  *

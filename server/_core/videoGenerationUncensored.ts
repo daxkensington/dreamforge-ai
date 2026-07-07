@@ -17,7 +17,7 @@
  * this layer means a surface gate was bypassed and is logged to moderation_log.
  */
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
-import { isRunPodAvailable, runpodWanVideo } from "./runpod";
+import { isRunPodAvailable, runpodWanSubmit, runpodJobStatus, getVideoEndpointId } from "./runpod";
 import { storagePut, generateStorageKey } from "../storage";
 
 export interface UncensoredVideoParams {
@@ -34,11 +34,10 @@ export interface UncensoredVideoParams {
   loraId?: string;
 }
 
-export interface UncensoredVideoResult {
-  url: string;
-  key: string;
-  contentType: "video/mp4";
-}
+export type UncensoredVideoJobResult =
+  | { status: "processing" }
+  | { status: "completed"; url: string; key: string }
+  | { status: "failed"; error?: string };
 
 async function fetchAsBase64(url: string): Promise<string> {
   const controller = new AbortController();
@@ -53,12 +52,15 @@ async function fetchAsBase64(url: string): Promise<string> {
 }
 
 /**
- * Produce an uncensored video and store it in R2. Throws PromptBlockedError if
- * the prompt is refused, or a plain Error if the GPU path is unavailable/fails.
+ * Phase 1 — moderate, then SUBMIT the Wan job and return its id immediately.
+ * Video generation (cold start + inference) routinely outlasts a serverless
+ * function's ceiling, so we never await it inline; the caller polls with
+ * collectUncensoredVideoJob(). Throws PromptBlockedError if the prompt is
+ * refused, or a plain Error if the GPU path is unavailable / submit fails.
  */
-export async function generateUncensoredVideo(
+export async function submitUncensoredVideoJob(
   params: UncensoredVideoParams,
-): Promise<UncensoredVideoResult> {
+): Promise<{ jobId: string }> {
   // Backstop moderation — strict (any minor reference blocks on the NSFW path).
   const verdict = checkPrompt(params.prompt, { strictMinors: true });
   if (!verdict.allowed) {
@@ -82,7 +84,7 @@ export async function generateUncensoredVideo(
     ? await fetchAsBase64(params.sourceImageUrl)
     : undefined;
 
-  const mp4 = await runpodWanVideo({
+  const jobId = await runpodWanSubmit({
     prompt: enhancedPrompt,
     imageB64,
     width: params.width,
@@ -92,8 +94,24 @@ export async function generateUncensoredVideo(
     seed: params.seed,
     loraId: params.loraId,
   });
+  return { jobId };
+}
 
-  const key = generateStorageKey("generations", "mp4");
-  const { url } = await storagePut(key, mp4, "video/mp4");
-  return { url, key, contentType: "video/mp4" };
+/**
+ * Phase 2 — poll a submitted Wan job. On completion, download the mp4 and store
+ * it in R2 (fast, comfortably inside a request), returning the URL. Safe to call
+ * repeatedly; the caller owns the atomic generation-row transition + refund.
+ */
+export async function collectUncensoredVideoJob(jobId: string): Promise<UncensoredVideoJobResult> {
+  const st = await runpodJobStatus(jobId, getVideoEndpointId());
+  if (st.status === "COMPLETED") {
+    if (!st.videoB64) return { status: "failed", error: "GPU returned no video" };
+    const key = generateStorageKey("generations", "mp4");
+    const { url } = await storagePut(key, Buffer.from(st.videoB64, "base64"), "video/mp4");
+    return { status: "completed", url, key };
+  }
+  if (st.status === "FAILED" || st.status === "CANCELLED") {
+    return { status: "failed", error: st.error };
+  }
+  return { status: "processing" };
 }
