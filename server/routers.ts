@@ -108,6 +108,8 @@ import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
 import { uncensoredRouter, getUncensoredEntitlement } from "./routers/uncensored";
 import { checkPrompt, logModerationBlock } from "./_core/promptModeration";
+import { applyUncensoredStyle } from "../shared/uncensoredStyles";
+import { resolveUncensoredLora } from "./_core/uncensoredStyleLora";
 import { viralRouter } from "./routers/viral";
 import { storyRouter } from "./routers/story";
 import { newsletterRouter } from "./routers/newsletter";
@@ -503,6 +505,7 @@ export const appRouter = router({
           modelVersion: z.string().max(128).default("built-in-v1"),
           tagIds: z.array(z.number()).optional(),
           uncensored: z.boolean().default(false),
+          uncensoredStyle: z.string().max(32).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -584,7 +587,7 @@ export const appRouter = router({
           modelVersion: input.modelVersion,
           // Uncensored generations are flagged so they can never enter the
           // public gallery (gallery.submit rejects them).
-          metadata: input.uncensored ? { uncensored: true } : null,
+          metadata: input.uncensored ? { uncensored: true, style: input.uncensoredStyle ?? null } : null,
         });
 
         if (input.tagIds && input.tagIds.length > 0) {
@@ -597,9 +600,9 @@ export const appRouter = router({
           if (input.mediaType === "video") {
             enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
           } else if (input.uncensored) {
-            // No style steering beyond quality tokens; the fictional-content
-            // clause stays — it's a liability guard, not a censor.
-            enhancedPrompt = `${input.prompt}. High quality, detailed. 100% fictional synthetic content, no real people depicted.`;
+            // Style steering (realistic/anime/fantasy/…) + the fictional-content
+            // liability clause. applyUncensoredStyle keeps both in one place.
+            enhancedPrompt = applyUncensoredStyle(input.prompt, input.uncensoredStyle);
           } else {
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
@@ -638,7 +641,7 @@ export const appRouter = router({
             // Uncensored ignores model selection — only the unfiltered chain
             // (self-hosted RunPod + fal) may serve it.
             const model = input.uncensored ? "auto" : (modelMap[input.modelVersion] || "auto");
-            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier, unfiltered: input.uncensored }));
+            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier, unfiltered: input.uncensored, loraId: input.uncensored ? resolveUncensoredLora(input.uncensoredStyle) : undefined }));
           }
 
           await updateGeneration(genId, {

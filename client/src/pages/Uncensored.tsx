@@ -85,6 +85,7 @@ export default function Uncensored() {
   }, [inlineInvoice, refetch]);
 
   const [freePrompt, setFreePrompt] = useState("");
+  const [freeStyle, setFreeStyle] = useState("realistic");
   const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
   const freeGen = trpc.uncensored.freeGenerate.useMutation({
     onSuccess: (data) => {
@@ -121,7 +122,7 @@ export default function Uncensored() {
       return;
     }
     setFreeResultUrl(null);
-    freeGen.mutate({ prompt: p });
+    freeGen.mutate({ prompt: p, style: freeStyle });
   };
 
   const handleStart = async () => {
@@ -225,6 +226,22 @@ export default function Uncensored() {
                     disabled={freeGen.isPending}
                     className="mt-3 resize-none"
                   />
+                  {(status?.styles?.length ?? 0) > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Style:</span>
+                      {status!.styles.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setFreeStyle(s.id)}
+                          disabled={freeGen.isPending}
+                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeStyle === s.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <Button
                     onClick={handleFreeGenerate}
                     disabled={freeGen.isPending || freePrompt.trim().length < 3}

@@ -266,6 +266,7 @@ export async function runpodFluxSchnell(
   prompt: string,
   width: number = 1024,
   height: number = 1024,
+  loraId?: string,
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -274,6 +275,7 @@ export async function runpodFluxSchnell(
       width,
       height,
       num_inference_steps: 4,
+      ...(loraId ? { lora_id: loraId } : {}),
     }),
   );
 }

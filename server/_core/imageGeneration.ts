@@ -38,6 +38,12 @@ export type GenerateImageOptions = {
    * age attestation before setting this.
    */
   unfiltered?: boolean;
+  /**
+   * Optional NSFW-style LoRA (HF repo id or .safetensors URL) applied on the
+   * unfiltered self-hosted path only. Resolved from env per style — see
+   * uncensoredStyleLora.ts. Ignored unless `unfiltered` is set.
+   */
+  loraId?: string;
   originalImages?: Array<{
     url?: string;
     b64Json?: string;
@@ -639,7 +645,7 @@ export async function generateImage(
     }
 
     if (options.unfiltered) {
-      imageBuffer = await generateUnfiltered(prompt, size);
+      imageBuffer = await generateUnfiltered(prompt, size, options.loraId);
     } else if (model !== "auto") {
       imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
     } else {
@@ -669,7 +675,7 @@ export async function generateImage(
  * Never touches Cloudflare / OpenAI / Stability / Grok — they hard-reject
  * NSFW or prohibit it in their terms.
  */
-async function generateUnfiltered(prompt: string, size: string): Promise<Buffer> {
+async function generateUnfiltered(prompt: string, size: string, loraId?: string): Promise<Buffer> {
   // Defense-in-depth: the no-safety chain refuses illegal content even if a
   // higher-level gate was missed. Throws PromptBlockedError (CSAM / minor /
   // real-person deepfake) before any GPU call. A refusal HERE means a surface
@@ -691,7 +697,7 @@ async function generateUnfiltered(prompt: string, size: string): Promise<Buffer>
 
   if (isRunPodAvailable()) {
     try {
-      return await runpodFluxSchnell(prompt, w || 1024, h || 1024);
+      return await runpodFluxSchnell(prompt, w || 1024, h || 1024, loraId);
     } catch (err: any) {
       errors.push(`RunPod: ${err.message}`);
       console.warn("[ImageGen] Unfiltered RunPod failed, trying fal:", err.message);

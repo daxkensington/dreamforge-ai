@@ -14,6 +14,8 @@ import { users, cryptoInvoices, generations } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 import { generateImage } from "../_core/imageGeneration";
+import { applyUncensoredStyle, UNCENSORED_STYLES } from "../../shared/uncensoredStyles";
+import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
@@ -104,6 +106,7 @@ export const uncensoredRouter = router({
       freeRemaining: Math.max(0, FREE_UNCENSORED_LIMIT - freeUsed),
       videoCost: UNCENSORED_VIDEO_COST,
       videoAvailable,
+      styles: UNCENSORED_STYLES,
     };
   }),
 
@@ -264,7 +267,7 @@ export const uncensoredRouter = router({
    * generateUnfiltered backstop) before any GPU call.
    */
   freeGenerate: protectedProcedure
-    .input(z.object({ prompt: z.string().min(3).max(1000) }))
+    .input(z.object({ prompt: z.string().min(3).max(1000), style: z.string().max(32).optional() }))
     .mutation(async ({ ctx, input }) => {
       await requireToolActive("text-to-image");
 
@@ -293,7 +296,8 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "You've used your free previews. Unlock a pass to keep generating uncensored." });
       }
 
-      const enhancedPrompt = `${input.prompt}. High quality, detailed. 100% fictional synthetic content, no real people depicted.`;
+      const enhancedPrompt = applyUncensoredStyle(input.prompt, input.style);
+      const loraId = resolveUncensoredLora(input.style);
       const genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
@@ -304,7 +308,7 @@ export const uncensoredRouter = router({
         duration: null,
         status: "generating",
         modelVersion: "uncensored-free",
-        metadata: { uncensored: true, free: true },
+        metadata: { uncensored: true, free: true, style: input.style ?? null },
       });
 
       try {
@@ -314,6 +318,7 @@ export const uncensoredRouter = router({
           size: "768x768",
           userTier: "free",
           unfiltered: true,
+          loraId,
         });
         await updateGeneration(genId, { status: "completed", imageUrl: url ?? null, thumbnailUrl: url ?? null });
         return { url, remaining: Math.max(0, FREE_UNCENSORED_LIMIT - used - 1) };
