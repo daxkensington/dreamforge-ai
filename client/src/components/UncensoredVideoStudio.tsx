@@ -52,6 +52,9 @@ export default function UncensoredVideoStudio() {
     {
       enabled: pendingId != null,
       refetchInterval: (q) => (q.state.data && q.state.data.status !== "processing" ? false : 5000),
+      // Video takes minutes — keep polling even if the user tabs away, else the
+      // clip silently never appears until they refocus the tab.
+      refetchIntervalInBackground: true,
     },
   );
 
