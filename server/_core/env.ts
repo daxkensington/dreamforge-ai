@@ -35,6 +35,9 @@ export const ENV = {
   // RunPod Self-Hosted
   get runpodApiKey() { return process.env.RUNPOD_API_KEY ?? ""; },
   get runpodFluxEndpointId() { return process.env.RUNPOD_FLUX_ENDPOINT_ID ?? ""; },
+  // Optional dedicated endpoint (bigger GPU) for Wan video. Falls back to the
+  // flux endpoint if unset so a single-endpoint deploy still works.
+  get runpodVideoEndpointId() { return process.env.RUNPOD_VIDEO_ENDPOINT_ID ?? ""; },
   // fal.ai
   get falApiKey() { return process.env.FAL_API_KEY ?? ""; },
   // Video Providers

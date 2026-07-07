@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
+import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -177,6 +178,9 @@ export default function Uncensored() {
                 Open Studio <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
+            <div className="mt-2 text-left">
+              <UncensoredVideoStudio />
+            </div>
           </motion.div>
         ) : (
           <>
@@ -438,6 +442,9 @@ export default function Uncensored() {
                   { slug: "midjourney-nsfw-alternative", label: "Midjourney NSFW alternative" },
                   { slug: "civitai-alternative-online", label: "Civitai alternative (online)" },
                   { slug: "stable-diffusion-no-filter-online", label: "Stable Diffusion no filter online" },
+                  { slug: "ai-video-generator-uncensored", label: "Uncensored AI video generator" },
+                  { slug: "nsfw-ai-video-generator", label: "NSFW AI video generator" },
+                  { slug: "image-to-video-nsfw", label: "Image to video (NSFW)" },
                 ].map((l) => (
                   <a
                     key={l.slug}

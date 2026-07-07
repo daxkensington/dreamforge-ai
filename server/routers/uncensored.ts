@@ -9,14 +9,30 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getDb, createGeneration, updateGeneration } from "../db";
+import { getDb, createGeneration, updateGeneration, getGenerationById } from "../db";
 import { users, cryptoInvoices, generations } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 import { generateImage } from "../_core/imageGeneration";
+import { generateUncensoredVideo } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
-import { requireToolActive } from "../_core/toolStatus";
+import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
+import { isRunPodAvailable } from "../_core/runpod";
+import { deductCredits, refundCredits } from "../stripe";
+import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
+
+// Uncensored video is GPU-expensive (Wan 2.2, minutes/clip) → pass-gated, no
+// free tier. T2V ≈ a 5s clip; I2V animates one of the user's own generations.
+const UNCENSORED_VIDEO_COST = {
+  t2v: CREDIT_COSTS.videoGeneration.short5s, // 50
+  i2v: CREDIT_COSTS.imageToVideo.basic, // 40
+} as const;
+const VIDEO_ASPECTS = {
+  portrait: { w: 480, h: 832 },
+  landscape: { w: 832, h: 480 },
+  square: { w: 640, h: 640 },
+} as const;
 
 // Free uncensored previews — the conversion hook. Lifetime cap per user
 // (tracked via generation metadata, no schema change) + a global daily cap so
@@ -69,6 +85,15 @@ export const uncensoredRouter = router({
     } catch {
       /* counting failure must not break the page */
     }
+    // Video is behind its own kill-switch + needs a GPU worker. Ships OFF and
+    // flips ON once the Wan endpoint is live (setToolStatus uncensored-video).
+    let videoAvailable = false;
+    try {
+      const vs = await getToolStatus("uncensored-video");
+      videoAvailable = vs.status !== "offline" && isRunPodAvailable();
+    } catch {
+      /* default to unavailable */
+    }
     return {
       ...ent,
       plan: UNCENSORED_PLAN,
@@ -77,8 +102,108 @@ export const uncensoredRouter = router({
       freeUsed,
       freeLimit: FREE_UNCENSORED_LIMIT,
       freeRemaining: Math.max(0, FREE_UNCENSORED_LIMIT - freeUsed),
+      videoCost: UNCENSORED_VIDEO_COST,
+      videoAvailable,
     };
   }),
+
+  /**
+   * Uncensored video generation — Wan 2.2 on self-hosted GPU (no free tier).
+   * Requires an active pass; text-to-video, or image-to-video that animates one
+   * of the caller's OWN prior uncensored generations. Prompt is moderated
+   * before any credit debit or GPU call; a failure refunds the credits.
+   */
+  generateVideo: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(3).max(1000),
+        mode: z.enum(["t2v", "i2v"]).default("t2v"),
+        sourceGenerationId: z.number().int().positive().optional(),
+        aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("uncensored-video");
+
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required for video. Grab a pass to unlock it." });
+      }
+
+      // Illegal-content refusal BEFORE credits or GPU.
+      const verdict = checkPrompt(input.prompt, { strictMinors: true });
+      if (!verdict.allowed) {
+        await logModerationBlock({ category: verdict.category, promptLen: input.prompt.length, userId: ctx.user.id, surface: "uncensored.generateVideo", prompt: input.prompt });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+
+      // Resolve the image-to-video source: it MUST be the caller's own completed
+      // uncensored image generation. We never animate arbitrary uploads (v1) —
+      // that sidesteps real-person / minor liability on unknown images.
+      let sourceImageUrl: string | null = null;
+      let parentGenerationId: number | null = null;
+      if (input.mode === "i2v") {
+        if (!input.sourceGenerationId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Pick one of your generations to animate." });
+        }
+        const src = await getGenerationById(input.sourceGenerationId);
+        if (!src || src.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available to animate." });
+        }
+        if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can be animated." });
+        }
+        if (!(src.metadata as any)?.uncensored) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be animated here." });
+        }
+        sourceImageUrl = src.imageUrl;
+        parentGenerationId = src.id;
+      }
+
+      const cost = input.mode === "i2v" ? UNCENSORED_VIDEO_COST.i2v : UNCENSORED_VIDEO_COST.t2v;
+      const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.mode === "i2v" ? "image-to-video" : "video"}`, "usage", { uncensored: true, video: true, mode: input.mode });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+
+      const dims = VIDEO_ASPECTS[input.aspect];
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: input.prompt,
+        negativePrompt: null,
+        mediaType: "video",
+        width: dims.w,
+        height: dims.h,
+        duration: 5,
+        status: "generating",
+        modelVersion: "uncensored-wan-2.2",
+        parentGenerationId,
+        animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
+        metadata: { uncensored: true, video: true, mode: input.mode },
+      });
+
+      try {
+        const { url, key } = await generateUncensoredVideo({
+          prompt: input.prompt,
+          userId: ctx.user.id,
+          sourceImageUrl,
+          width: dims.w,
+          height: dims.h,
+        });
+        await updateGeneration(genId, { status: "completed", imageUrl: url, fileKey: key, thumbnailUrl: sourceImageUrl });
+        return { url, generationId: genId, creditsRemaining: debit.balance };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored video generation failed");
+        await logToolFailure({ toolId: "uncensored-video", errorMessage: err?.message, userId: ctx.user.id });
+        // PromptBlockedError (backstop) carries a safe userMessage.
+        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Video generation failed — your credits were refunded. Please try again.";
+        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+      }
+    }),
 
   /**
    * Free uncensored preview — the conversion hook. Age-gated, watermarked,
@@ -190,6 +315,24 @@ export const uncensoredRouter = router({
       // events from the embedded checkout iframe (faster than polling).
       return { checkoutLink, invoiceId };
     }),
+
+  /** The caller's recent completed uncensored images — the I2V "animate" picker. */
+  myUncensoredImages: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    return db
+      .select({ id: generations.id, imageUrl: generations.imageUrl, prompt: generations.prompt, createdAt: generations.createdAt })
+      .from(generations)
+      .where(
+        and(
+          eq(generations.userId, ctx.user.id),
+          eq(generations.mediaType, "image"),
+          eq(generations.status, "completed"),
+          sql`${generations.metadata}->>'uncensored' = 'true'`,
+        ),
+      )
+      .orderBy(desc(generations.createdAt))
+      .limit(24);
+  }),
 
   /** Invoice history for the signed-in user (purchase status polling). */
   myInvoices: protectedProcedure.query(async ({ ctx }) => {

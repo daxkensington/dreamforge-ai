@@ -45,8 +45,16 @@ _catvton_masker = None
 _musicgen_model = None
 _audiogen_model = None
 _cogvideo_pipe = None
+_wan_t2v_pipe = None
+_wan_i2v_pipe = None
 _bark_processor = None
 _bark_model = None
+
+# Wan 2.2 TI2V-5B: a single 5B model serves BOTH text-to-video and
+# image-to-video at up to 720p24. Chosen over the A14B MoE variants because it
+# fits a single 48GB GPU (A40/L40/ADA_48) with model-cpu-offload — the right
+# tier for a self-hosted uncensored video path (external APIs all reject NSFW).
+WAN_MODEL_ID = os.environ.get("WAN_MODEL_ID", "Wan-AI/Wan2.2-TI2V-5B-Diffusers")
 
 
 def get_flux_pipe(model_type="dev"):
@@ -181,6 +189,54 @@ def get_cogvideo_pipe():
         _cogvideo_pipe.vae.enable_tiling()
         print("[DreamForge] CogVideoX-5B loaded")
     return _cogvideo_pipe
+
+
+def get_wan_t2v_pipe():
+    """Load Wan 2.2 TI2V-5B text-to-video pipeline (lazy, cached)."""
+    global _wan_t2v_pipe
+    if _wan_t2v_pipe is None:
+        from diffusers import WanPipeline, AutoencoderKLWan
+
+        print(f"[DreamForge] Loading Wan 2.2 T2V ({WAN_MODEL_ID})...")
+        # Wan ships a bespoke VAE that must stay in fp32 for stable decode.
+        vae = AutoencoderKLWan.from_pretrained(
+            WAN_MODEL_ID, subfolder="vae", torch_dtype=torch.float32
+        )
+        _wan_t2v_pipe = WanPipeline.from_pretrained(
+            WAN_MODEL_ID, vae=vae, torch_dtype=torch.bfloat16
+        )
+        # Offload keeps the 5B transformer + VAE within a 48GB budget alongside
+        # the other lazily-loaded models on this shared worker.
+        _wan_t2v_pipe.enable_model_cpu_offload()
+        print("[DreamForge] Wan 2.2 T2V loaded")
+    return _wan_t2v_pipe
+
+
+def get_wan_i2v_pipe():
+    """Load Wan 2.2 TI2V-5B image-to-video pipeline (lazy, cached).
+
+    Built from the T2V pipeline's components via from_pipe when possible so the
+    5B transformer/VAE/text-encoder weights are shared, not duplicated in VRAM.
+    """
+    global _wan_i2v_pipe
+    if _wan_i2v_pipe is None:
+        from diffusers import WanImageToVideoPipeline, AutoencoderKLWan
+
+        print(f"[DreamForge] Loading Wan 2.2 I2V ({WAN_MODEL_ID})...")
+        try:
+            base = get_wan_t2v_pipe()
+            _wan_i2v_pipe = WanImageToVideoPipeline.from_pipe(base)
+        except Exception as e:
+            print(f"[DreamForge] I2V from_pipe reuse failed ({e}); loading standalone")
+            vae = AutoencoderKLWan.from_pretrained(
+                WAN_MODEL_ID, subfolder="vae", torch_dtype=torch.float32
+            )
+            _wan_i2v_pipe = WanImageToVideoPipeline.from_pretrained(
+                WAN_MODEL_ID, vae=vae, torch_dtype=torch.bfloat16
+            )
+            _wan_i2v_pipe.enable_model_cpu_offload()
+        print("[DreamForge] Wan 2.2 I2V loaded")
+    return _wan_i2v_pipe
 
 
 def get_musicgen(model_size="large"):
@@ -531,6 +587,116 @@ def handle_cogvideo(job_input):
     return {"video_b64": video_b64, "inference_time": inference_time, "seed": seed, "num_frames": num_frames}
 
 
+def _load_wan_lora(pipe, lora_id, lora_scale):
+    """Load an optional Wan LoRA (HF repo id or direct .safetensors URL)."""
+    if not lora_id:
+        return
+    try:
+        if lora_id.startswith("http://") or lora_id.startswith("https://"):
+            import requests as req_lib
+            lora_path = f"/tmp/wanlora_{hash(lora_id) % 10**8}.safetensors"
+            if not os.path.exists(lora_path):
+                print(f"[DreamForge] Downloading Wan LoRA: {lora_id}")
+                resp = req_lib.get(lora_id, timeout=180)
+                resp.raise_for_status()
+                with open(lora_path, "wb") as f:
+                    f.write(resp.content)
+            pipe.load_lora_weights(lora_path)
+        else:
+            pipe.load_lora_weights(lora_id)
+        pipe.fuse_lora(lora_scale=lora_scale)
+        print(f"[DreamForge] Wan LoRA loaded: {lora_id} (scale={lora_scale})")
+    except Exception as e:
+        print(f"[DreamForge] Wan LoRA load failed ({lora_id}): {e}")
+
+
+def handle_wan(job_input):
+    """Generate video with Wan 2.2 TI2V-5B.
+
+    task=wan-t2v  -> text-to-video
+    task=wan-i2v  -> image-to-video (animate a source frame passed as image_b64)
+
+    Uncensored path: the app already runs prompt (and source-image) moderation
+    before this is ever called; this worker just produces frames.
+    """
+    from diffusers.utils import export_to_video
+
+    task = job_input.get("task", "wan-t2v")
+    prompt = job_input.get("prompt", "")
+    negative_prompt = job_input.get("negative_prompt") or (
+        "低质量, 模糊, 变形, 多余的肢体, blurry, low quality, distorted, deformed, extra limbs, watermark, text"
+    )
+    width = int(job_input.get("width", 480))
+    height = int(job_input.get("height", 832))
+    num_frames = int(job_input.get("num_frames", 81))
+    steps = int(job_input.get("num_inference_steps", 40))
+    guidance = float(job_input.get("guidance_scale", 5.0))
+    fps = int(job_input.get("fps", 16))
+    seed = job_input.get("seed")
+    lora_id = job_input.get("lora_id")
+    lora_scale = float(job_input.get("lora_scale", 0.8))
+
+    if not prompt:
+        raise ValueError("prompt is required for video generation")
+
+    # Wan wants spatial dims on a 16-grid and num_frames = 4k+1 (4x temporal VAE).
+    width = max(320, min(width, 1280)) // 16 * 16
+    height = max(320, min(height, 1280)) // 16 * 16
+    num_frames = max(49, min(num_frames, 121))
+    num_frames = ((num_frames - 1) // 4) * 4 + 1
+    fps = max(8, min(fps, 24))
+
+    if seed is None:
+        seed = int(time.time()) % 2**32
+    generator = torch.Generator("cuda").manual_seed(seed)
+
+    common = dict(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        height=height,
+        width=width,
+        num_frames=num_frames,
+        num_inference_steps=steps,
+        guidance_scale=guidance,
+        generator=generator,
+    )
+
+    start = time.time()
+    if task == "wan-i2v":
+        image_b64 = job_input.get("image_b64")
+        if not image_b64:
+            raise ValueError("image_b64 (source frame) is required for wan-i2v")
+        src = Image.open(io.BytesIO(base64.b64decode(image_b64))).convert("RGB")
+        # Fit the source to the target frame so the first frame lines up.
+        src = src.resize((width, height))
+        pipe = get_wan_i2v_pipe()
+        _load_wan_lora(pipe, lora_id, lora_scale)
+        video = pipe(image=src, **common).frames[0]
+    else:
+        pipe = get_wan_t2v_pipe()
+        _load_wan_lora(pipe, lora_id, lora_scale)
+        video = pipe(**common).frames[0]
+
+    inference_time = time.time() - start
+    print(f"[DreamForge] Wan {task} {num_frames}f {width}x{height} in {inference_time:.1f}s (seed={seed})")
+
+    video_path = f"/tmp/wan_{int(time.time())}.mp4"
+    export_to_video(video, video_path, fps=fps)
+    with open(video_path, "rb") as f:
+        video_b64 = base64.b64encode(f.read()).decode("utf-8")
+    os.remove(video_path)
+
+    return {
+        "video_b64": video_b64,
+        "inference_time": inference_time,
+        "seed": seed,
+        "num_frames": num_frames,
+        "fps": fps,
+        "width": width,
+        "height": height,
+    }
+
+
 def handle_musicgen(job_input):
     """Generate music with Meta MusicGen."""
     import torchaudio
@@ -657,6 +823,8 @@ def handler(job):
             return handle_bark_tts(job_input)
         elif task == "cogvideo":
             return handle_cogvideo(job_input)
+        elif task in ("wan-t2v", "wan-i2v"):
+            return handle_wan(job_input)
         elif task == "musicgen":
             return handle_musicgen(job_input)
         elif task == "audiogen":

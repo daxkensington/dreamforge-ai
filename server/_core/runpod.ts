@@ -25,6 +25,8 @@ export type RunPodTask =
   | "tryon"
   | "bark-tts"
   | "cogvideo"
+  | "wan-t2v"
+  | "wan-i2v"
   | "musicgen"
   | "audiogen";
 
@@ -57,6 +59,12 @@ export interface RunPodInput {
   strength?: number;
   /** Bark TTS voice preset */
   voice_preset?: string;
+  /** Negative prompt (Wan video) */
+  negative_prompt?: string;
+  /** Frame count for Wan video (4k+1, clamped 49-121 in the worker) */
+  num_frames?: number;
+  /** Output frames-per-second for Wan video export */
+  fps?: number;
 }
 
 interface RunPodRunResponse {
@@ -85,10 +93,22 @@ interface RunPodOutput {
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
-function getEndpointUrl(path: string): string {
-  const endpointId = ENV.runpodFluxEndpointId;
-  if (!endpointId) throw new Error("RUNPOD_FLUX_ENDPOINT_ID not configured");
-  return `${RUNPOD_API_BASE}/${endpointId}/${path}`;
+function getEndpointUrl(path: string, endpointId?: string): string {
+  const id = endpointId || ENV.runpodFluxEndpointId;
+  if (!id) throw new Error("RUNPOD endpoint not configured");
+  return `${RUNPOD_API_BASE}/${id}/${path}`;
+}
+
+/** Endpoint id to use for Wan video (dedicated if set, else the flux endpoint). */
+function videoEndpointId(): string {
+  return ENV.runpodVideoEndpointId || ENV.runpodFluxEndpointId;
+}
+
+export interface RunPodRunOpts {
+  /** Override the endpoint (e.g. a bigger GPU pool for video). */
+  endpointId?: string;
+  /** Poll attempts (×2s). Video needs a longer ceiling than image. */
+  maxAttempts?: number;
 }
 
 function getHeaders(): Record<string, string> {
@@ -116,19 +136,21 @@ export function isRunPodAvailable(): boolean {
  * and every cold-start generation died with "This operation was aborted".
  * Polling adds ≤2s on a warm worker and survives cold starts up to 5 min.
  */
-export async function runpodRun(input: RunPodInput): Promise<Buffer> {
-  return runpodRunAsync(input);
+export async function runpodRun(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<Buffer> {
+  return runpodRunAsync(input, opts);
 }
 
 /**
- * Async run with polling — for longer jobs like Flux Dev (20 steps, ~15-20s).
+ * Async run with polling — for longer jobs like Flux Dev (20 steps, ~15-20s)
+ * and Wan video (minutes, incl. cold start — pass a larger maxAttempts).
  */
-async function runpodRunAsync(input: RunPodInput): Promise<Buffer> {
+async function runpodRunAsync(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<Buffer> {
+  const endpointId = opts.endpointId;
   // Submit job
   const submitController = new AbortController();
   const submitTimeout = setTimeout(() => submitController.abort(), 30_000);
 
-  const submitResponse = await fetch(getEndpointUrl("run"), {
+  const submitResponse = await fetch(getEndpointUrl("run", endpointId), {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ input }),
@@ -147,8 +169,8 @@ async function runpodRunAsync(input: RunPodInput): Promise<Buffer> {
     throw new Error(`RunPod job failed: ${job.error ?? "Unknown error"}`);
   }
 
-  // Poll for result (max 5 min, poll every 2s)
-  const maxAttempts = 150;
+  // Poll for result (default 5 min; callers override for video). Poll every 2s.
+  const maxAttempts = opts.maxAttempts ?? 150;
   const pollInterval = 2000;
 
   for (let i = 0; i < maxAttempts; i++) {
@@ -157,7 +179,7 @@ async function runpodRunAsync(input: RunPodInput): Promise<Buffer> {
     const pollController = new AbortController();
     const pollTimeout = setTimeout(() => pollController.abort(), 15_000);
 
-    const statusResponse = await fetch(getEndpointUrl(`status/${job.id}`), {
+    const statusResponse = await fetch(getEndpointUrl(`status/${job.id}`, endpointId), {
       headers: getHeaders(),
       signal: pollController.signal,
     });
@@ -349,6 +371,47 @@ export async function runpodCogVideo(
   // Add num_frames to the input (handler reads it from job_input)
   (input as any).num_frames = numFrames;
   return handleRunpodResult(runpodRun(input));
+}
+
+/**
+ * Generate an uncensored video with Wan 2.2 TI2V-5B (self-hosted).
+ *
+ * Text-to-video when `imageB64` is omitted, image-to-video (animate a source
+ * frame) when provided. Runs on the dedicated video endpoint if configured,
+ * else the flux endpoint. Returns raw mp4 bytes. No API fallback exists — every
+ * external video provider rejects NSFW, so this is self-hosted-only by design.
+ */
+export async function runpodWanVideo(params: {
+  prompt: string;
+  imageB64?: string;
+  negativePrompt?: string;
+  width?: number;
+  height?: number;
+  numFrames?: number;
+  steps?: number;
+  guidanceScale?: number;
+  fps?: number;
+  seed?: number;
+  loraId?: string;
+  loraScale?: number;
+}): Promise<Buffer> {
+  const input: RunPodInput = {
+    task: params.imageB64 ? "wan-i2v" : "wan-t2v",
+    prompt: params.prompt,
+    negative_prompt: params.negativePrompt,
+    width: params.width,
+    height: params.height,
+    num_frames: params.numFrames,
+    num_inference_steps: params.steps,
+    guidance_scale: params.guidanceScale,
+    fps: params.fps,
+    seed: params.seed,
+    lora_id: params.loraId,
+    lora_scale: params.loraScale,
+    ...(params.imageB64 ? { image_b64: params.imageB64 } : {}),
+  };
+  // Video is minutes-long incl. cold start — 450×2s = 15 min ceiling.
+  return handleRunpodResult(runpodRun(input, { endpointId: videoEndpointId(), maxAttempts: 450 }));
 }
 
 /**

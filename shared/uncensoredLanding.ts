@@ -508,6 +508,87 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
         "a": "Your generations are private by default and never shown publicly — no community feed, no shared gallery. The Uncensored Pass is $19 for 30 days, paid anonymously with crypto, so there's no card and no real name required. You get local-style privacy without keeping any files on your own machine."
       }
     ]
+  },
+  "ai-video-generator-uncensored": {
+    "slug": "ai-video-generator-uncensored",
+    "title": "Uncensored AI Video Generator | DreamForgeX",
+    "metaDescription": "An uncensored AI video generator running open-source Wan 2.2 on our own GPUs. Text-to-video with no content filter, private by default, paid anonymously with crypto. 18+.",
+    "h1": "The Uncensored AI Video Generator",
+    "intro": "Image generators finally have an uncensored option — video is where everyone else still slams the door. Runway, Kling, Google Veo, and every hosted API reject mature prompts outright, because they rent compute under acceptable-use policies that forbid it. DreamForgeX runs the open-source Wan 2.2 video model on our own self-hosted GPUs, so there is no upstream provider to override your prompt or ban your account. You describe the scene and get a short clip, with no content filter in the pipeline.\n\nThis is genuine text-to-video, not a slideshow: real generated motion from a single prompt, in portrait, landscape, or square. Everything you make is private by default — never posted to a public feed and never used as training data — and video is included with the same Uncensored Pass that unlocks images, drawn from your credit balance. One compliance note: every clip is 100% AI-generated, strictly 18+, depicts fictional characters only, and never real, identifiable individuals or any illegal subject matter.",
+    "bullets": [
+      "Text-to-video with no content filter — prompts that Runway, Kling, and Veo reject render here, on open-source Wan 2.2.",
+      "Runs on our own self-hosted GPUs, so no third-party acceptable-use policy can override your prompt or ban your account.",
+      "Choose portrait, landscape, or square, with real generated motion from a single prompt.",
+      "Private by default: clips are yours alone, never posted to a public gallery, never used as training data.",
+      "Included with the Uncensored Pass and paid anonymously with crypto — no card, no billing name, no paper trail."
+    ],
+    "sampleConcepts": [
+      "A neon-drenched cyberpunk dancer moving under flickering holograms, slow motion",
+      "A cinematic slow push-in on a lone figure at a rain-soaked window at night",
+      "A fantasy sorceress conjuring embers that swirl around her, hair drifting in the wind",
+      "A retro-VHS style bedroom scene lit by a glowing television, gentle camera drift",
+      "A sultry film-noir silhouette turning toward camera through cigarette smoke"
+    ],
+    "faq": [
+      { "q": "Can it really generate uncensored video?", "a": "Yes. We run the open-source Wan 2.2 model on our own GPUs with no content filter in the pipeline, so mature prompts that hosted APIs reject are processed as written. The only limits are legal: every clip is fictional, fully AI-generated, and 18+, with real people and minors categorically excluded." },
+      { "q": "How long are the clips?", "a": "Clips are short — a few seconds of generated motion — which is the sweet spot for open video models today. Each generation draws from your credit balance; the Uncensored Pass includes a monthly allotment that covers roughly ten clips." },
+      { "q": "Why can't Runway or Veo do this?", "a": "Those tools run on rented cloud compute whose acceptable-use policies forbid mature content, so the filter is imposed from above. We host our own GPUs and run open-source models, so no upstream provider can override your prompt or close your account for allowed adult-oriented work." },
+      { "q": "Are my videos private?", "a": "Yes. Every video is private by default — never posted to a public feed or gallery, never shared, and never used to train models. Uncensored generations are explicitly excluded from any public surface on the site." }
+    ]
+  },
+  "image-to-video-nsfw": {
+    "slug": "image-to-video-nsfw",
+    "title": "Image to Video NSFW — Animate Your AI Images | DreamForgeX",
+    "metaDescription": "Turn your uncensored AI images into short videos. NSFW image-to-video on self-hosted Wan 2.2 GPUs, no content filter, private by default, crypto pay. 18+.",
+    "h1": "NSFW Image-to-Video: Animate Your Own Generations",
+    "intro": "You generated the perfect uncensored image — now make it move. DreamForgeX image-to-video takes a still you created here and animates it into a short clip using the open-source Wan 2.2 model on our own GPUs. Because you're animating your own AI-generated, fully synthetic image, there's no real-person or upload ambiguity: you describe the motion you want, and the model brings the frame to life.\n\nEvery hosted video API refuses this, so it only exists on infrastructure we own and operate. You pick one of your uncensored generations, describe the movement — a slow turn, drifting hair, a gentle camera push — and get a private clip back in a few minutes. It's included with the Uncensored Pass and drawn from your credits. Compliance, as always: 100% AI-generated, 18+, fictional characters only, never real or identifiable individuals.",
+    "bullets": [
+      "Animate the uncensored images you already made here into short, private video clips.",
+      "Runs the open-source Wan 2.2 image-to-video model on our own self-hosted GPUs — no hosted API will do this.",
+      "You animate your own fully-synthetic generations only, so there's no upload or real-person ambiguity.",
+      "Describe the motion — a slow turn, drifting hair, a camera push — in portrait, landscape, or square.",
+      "Private by default and included with the Uncensored Pass, paid anonymously with crypto."
+    ],
+    "sampleConcepts": [
+      "Slow turn toward the camera with a soft smile",
+      "Hair and fabric drifting in a gentle breeze",
+      "A slow cinematic push-in on the subject",
+      "Subtle breathing and a slow blink for a lifelike still",
+      "A slow pan across the scene revealing the background"
+    ],
+    "faq": [
+      { "q": "What can I animate?", "a": "You animate the uncensored images you've generated on DreamForgeX. Because the source is your own fully AI-generated, synthetic image, there's no question of real people or uploaded photos — you're bringing a fictional frame you already created to life." },
+      { "q": "Can I upload my own photo to animate?", "a": "No. To keep everything fictional and lawful, image-to-video only works on images you generated here. We do not animate arbitrary uploads, which keeps real, identifiable individuals out of the pipeline entirely." },
+      { "q": "How long does it take and what does it cost?", "a": "A clip takes a few minutes on our GPUs and draws from your credit balance. The Uncensored Pass includes a monthly credit allotment that covers roughly a dozen image-to-video clips." },
+      { "q": "Is it private?", "a": "Yes — every clip is private by default, never posted to a public feed or gallery, and never used to train models. Uncensored generations are excluded from all public surfaces." }
+    ]
+  },
+  "nsfw-ai-video-generator": {
+    "slug": "nsfw-ai-video-generator",
+    "title": "NSFW AI Video Generator | DreamForgeX",
+    "metaDescription": "A NSFW AI video generator with no content filter — open-source Wan 2.2 on self-hosted GPUs, text-to-video and image-to-video, private, crypto pay. 18+.",
+    "h1": "NSFW AI Video Generator — No Filter",
+    "intro": "The mainstream AI video tools all draw the same line: no mature content, no exceptions, enforced by the cloud providers they rent from. DreamForgeX is built for the other side of that line. We run the open-source Wan 2.2 model on hardware we own, with no content filter between your prompt and the render — both text-to-video and image-to-video, so you can generate a clip from scratch or animate an uncensored still you made here.\n\nThere's no account to get banned by an upstream provider, no silent prompt rewriting, and no public exposure: every clip is private by default and never enters a gallery or feed. Video is included with the Uncensored Pass alongside images and drawn from your credits, and you pay anonymously with crypto. Standard compliance applies without exception: everything is 100% AI-generated, strictly 18+, depicts fictional characters only, and never involves real, identifiable people or any illegal material.",
+    "bullets": [
+      "No content filter on either text-to-video or image-to-video — mature prompts render as written.",
+      "Open-source Wan 2.2 on our own GPUs; no hosted provider can override or ban your work.",
+      "Generate a clip from a prompt, or animate an uncensored image you already made here.",
+      "Private by default — never shown in any public gallery, feed, or share page.",
+      "Included with the Uncensored Pass, paid anonymously with crypto — no card, no real name."
+    ],
+    "sampleConcepts": [
+      "A moody boudoir scene lit by candlelight with a slow camera drift",
+      "A cyberpunk club dancer under strobing neon, slow motion",
+      "A fantasy figure with glowing tattoos as embers swirl around her",
+      "A rain-streaked window with a silhouette turning toward the camera",
+      "A retro film-grain bedroom scene with a gentle push-in"
+    ],
+    "faq": [
+      { "q": "Does it do both text-to-video and image-to-video?", "a": "Yes. You can generate a clip from a text prompt, or animate one of the uncensored images you created here (image-to-video). Both run on the open-source Wan 2.2 model on our own GPUs with no content filter." },
+      { "q": "What are the limits?", "a": "Only legal ones. Every clip is fully AI-generated, fictional, and 18+. We categorically exclude minors and never generate real, identifiable individuals — a strict moderation gate refuses those prompts before anything renders." },
+      { "q": "How do I pay and stay anonymous?", "a": "Video is part of the Uncensored Pass — $19 for 30 days, paid with crypto, so there's no card number and no real name on a statement. Video draws from the credits the pass includes." },
+      { "q": "Will anyone see what I make?", "a": "No. Every generation is private by default. Uncensored images and videos are explicitly barred from the public gallery, explore feed, and share links." }
+    ]
   }
 };
 
