@@ -25,10 +25,17 @@ import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
 
 // Uncensored video is GPU-expensive (Wan 2.2, minutes/clip) → pass-gated, no
-// free tier. T2V ≈ a 5s clip; I2V animates one of the user's own generations.
+// free tier. Two quality tiers: "fast" = 5B TI2V (~90s, 48GB); "hd" = 14B A14B
+// top-quality on the dedicated 80GB endpoint (~2-4min, ~3× the GPU time → priced up).
 const UNCENSORED_VIDEO_COST = {
-  t2v: CREDIT_COSTS.videoGeneration.short5s, // 50
-  i2v: CREDIT_COSTS.imageToVideo.basic, // 40
+  fast: {
+    t2v: CREDIT_COSTS.videoGeneration.short5s, // 50
+    i2v: CREDIT_COSTS.imageToVideo.basic, // 40
+  },
+  hd: {
+    t2v: 120,
+    i2v: 100,
+  },
 } as const;
 const VIDEO_ASPECTS = {
   portrait: { w: 480, h: 832 },
@@ -121,6 +128,7 @@ export const uncensoredRouter = router({
       z.object({
         prompt: z.string().min(3).max(1000),
         mode: z.enum(["t2v", "i2v"]).default("t2v"),
+        quality: z.enum(["fast", "hd"]).default("fast"),
         sourceGenerationId: z.number().int().positive().optional(),
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
       }),
@@ -166,8 +174,8 @@ export const uncensoredRouter = router({
         parentGenerationId = src.id;
       }
 
-      const cost = input.mode === "i2v" ? UNCENSORED_VIDEO_COST.i2v : UNCENSORED_VIDEO_COST.t2v;
-      const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.mode === "i2v" ? "image-to-video" : "video"}`, "usage", { uncensored: true, video: true, mode: input.mode });
+      const cost = UNCENSORED_VIDEO_COST[input.quality][input.mode];
+      const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality });
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
@@ -186,7 +194,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -198,9 +206,11 @@ export const uncensoredRouter = router({
           sourceImageUrl,
           width: dims.w,
           height: dims.h,
+          tier: input.quality,
+          loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {

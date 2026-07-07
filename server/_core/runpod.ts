@@ -65,6 +65,8 @@ export interface RunPodInput {
   num_frames?: number;
   /** Output frames-per-second for Wan video export */
   fps?: number;
+  /** Wan quality tier: "fast" = 5B TI2V, "hd" = 14B A14B */
+  tier?: "fast" | "hd";
 }
 
 interface RunPodRunResponse {
@@ -441,9 +443,11 @@ export async function runpodWanSubmit(params: {
   seed?: number;
   loraId?: string;
   loraScale?: number;
+  tier?: "fast" | "hd";
 }): Promise<string> {
   const input: RunPodInput = {
     task: params.imageB64 ? "wan-i2v" : "wan-t2v",
+    tier: params.tier ?? "fast",
     prompt: params.prompt,
     negative_prompt: params.negativePrompt,
     width: params.width,

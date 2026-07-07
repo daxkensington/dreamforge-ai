@@ -24,6 +24,7 @@ const ASPECTS: { id: Aspect; label: string }[] = [
 
 export default function UncensoredVideoStudio() {
   const [mode, setMode] = useState<Mode>("t2v");
+  const [quality, setQuality] = useState<"fast" | "hd">("fast");
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState<Aspect>("portrait");
   const [sourceId, setSourceId] = useState<number | null>(null);
@@ -33,7 +34,8 @@ export default function UncensoredVideoStudio() {
   const videoAvailable = status?.videoAvailable ?? false;
   const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" && videoAvailable });
 
-  const cost = mode === "i2v" ? status?.videoCost?.i2v ?? 40 : status?.videoCost?.t2v ?? 50;
+  const fallbackCost = { fast: { t2v: 50, i2v: 40 }, hd: { t2v: 120, i2v: 100 } };
+  const cost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];
 
   // Async job: submit returns a generationId, then we poll videoStatus until the
   // clip lands (video routinely outlasts a single request).
@@ -85,6 +87,7 @@ export default function UncensoredVideoStudio() {
     gen.mutate({
       prompt: prompt.trim(),
       mode,
+      quality,
       aspect,
       ...(mode === "i2v" && sourceId ? { sourceGenerationId: sourceId } : {}),
     });
@@ -171,6 +174,25 @@ export default function UncensoredVideoStudio() {
         disabled={isBusy}
         className="mt-4 resize-none"
       />
+
+      {/* Quality tier */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Quality:</span>
+        {([
+          { id: "fast", label: "Fast", note: "~90s" },
+          { id: "hd", label: "HD · Top quality", note: "~2-4 min" },
+        ] as const).map((q) => (
+          <button
+            key={q.id}
+            type="button"
+            onClick={() => setQuality(q.id)}
+            disabled={isBusy}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${quality === q.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+          >
+            {q.label} <span className="opacity-60">· {q.note}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Aspect */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
