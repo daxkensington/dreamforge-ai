@@ -13,9 +13,14 @@
  *   UNCENSORED_LORA_ARTISTIC=...
  *   UNCENSORED_LORA_DEFAULT=...   (applied to any style with no specific LoRA)
  */
+import { DEFAULT_UNCENSORED_STYLE } from "../../shared/uncensoredStyles";
+
 export function resolveUncensoredLora(styleId: string | null | undefined): string | undefined {
-  const key = (styleId || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const specific = key ? process.env[`UNCENSORED_LORA_${key}`] : undefined;
+  // Empty/unspecified style is treated as the default aesthetic (realistic), so
+  // the LoRA matches the prompt styling applyUncensoredStyle() already applies.
+  const id = (styleId && styleId.trim()) || DEFAULT_UNCENSORED_STYLE;
+  const key = id.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const specific = process.env[`UNCENSORED_LORA_${key}`];
   const lora = (specific || process.env.UNCENSORED_LORA_DEFAULT || "").trim();
   return lora || undefined;
 }
