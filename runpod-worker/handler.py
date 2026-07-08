@@ -381,8 +381,13 @@ def handle_flux(job_input):
                     with open(lora_path, "wb") as f:
                         f.write(resp.content)
                 pipe.load_lora_weights(lora_path)
+            elif "::" in lora_id:
+                # "repo::weight_file.safetensors" — needed when a repo ships
+                # multiple LoRA files (e.g. the schnell-realism v1 + v2.3).
+                repo, weight_name = lora_id.split("::", 1)
+                pipe.load_lora_weights(repo, weight_name=weight_name)
             else:
-                # HuggingFace repo ID
+                # HuggingFace repo ID (single default LoRA file)
                 pipe.load_lora_weights(lora_id)
             pipe.fuse_lora(lora_scale=lora_scale)
             print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
