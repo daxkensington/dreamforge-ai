@@ -57,6 +57,26 @@ export async function storagePut(
 }
 
 /**
+ * Fetch an object's bytes + content type for proxy serving (the /img route).
+ * Returns null if the key doesn't exist. Buffers fully — fine for images/short
+ * clips; the /img route sets immutable caching so R2 is hit once per asset.
+ */
+export async function storageGetObject(
+  key: string,
+): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+  const finalKey = key.startsWith("/") ? key.slice(1) : key;
+  try {
+    const res = await getS3().send(new GetObjectCommand({ Bucket: BUCKET(), Key: finalKey }));
+    const bytes = await res.Body!.transformToByteArray();
+    return { bytes, contentType: res.ContentType ?? "application/octet-stream" };
+  } catch (err: any) {
+    if (err?.$metadata?.httpStatusCode === 404 || err?.name === "NoSuchKey") return null;
+    console.error(`[Storage] R2 get failed for "${finalKey}":`, err?.message ?? err);
+    return null;
+  }
+}
+
+/**
  * Get a download URL for a stored file
  * @param key - Storage key
  * @returns Public or signed URL
