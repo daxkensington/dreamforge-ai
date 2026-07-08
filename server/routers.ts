@@ -19,6 +19,7 @@ import {
 import {
   createGeneration,
   createModerationItem,
+  publishGalleryItem,
   createTag,
   getAllTags,
   getChildGenerations,
@@ -742,7 +743,7 @@ export const appRouter = router({
           });
         }
         // Uncensored generations are private-only — the public gallery has
-        // no age gate, so adult content can never enter the moderation queue.
+        // no age gate, so adult content can never enter it.
         if ((gen.metadata as any)?.uncensored) {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -750,14 +751,27 @@ export const appRouter = router({
           });
         }
 
-        const modId = await createModerationItem({
+        // Re-screen the prompt + title/description with the safety gate. The
+        // prompt already passed at generation time, but the user-supplied
+        // title/description are new free-text and could carry disallowed content.
+        const modVerdict = checkPrompt(`${input.title} ${input.description ?? ""} ${gen.prompt}`, { strictMinors: false });
+        if (!modVerdict.allowed) {
+          await logModerationBlock({ category: modVerdict.category, promptLen: input.title.length, userId: ctx.user.id, surface: "gallery.submitToGallery" });
+          throw new TRPCError({ code: "BAD_REQUEST", message: modVerdict.userMessage });
+        }
+
+        // Auto-publish clean SFW so the growth loop actually flows (a manual
+        // approval queue with no reviewer = a permanently empty gallery). The
+        // admin moderation queue + /takedown remain the safety backstop for
+        // anything reported after the fact.
+        await publishGalleryItem({
           generationId: input.generationId,
           userId: ctx.user.id,
           title: input.title,
           description: input.description ?? null,
         });
 
-        return { moderationId: modId };
+        return { published: true };
       }),
 
     animateImage: protectedProcedure

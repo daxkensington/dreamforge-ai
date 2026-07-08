@@ -28,7 +28,7 @@ const footerLinks = {
     { label: "Tools by profession", href: "/for" },
     { label: "API Documentation", href: "/api-docs" },
     { label: "Prompt Guide", href: "/tools/prompt-builder" },
-    { label: "Community Gallery", href: "/gallery" },
+    { label: "Explore AI Art", href: "/explore" },
     { label: "Character Studio", href: "/tools/character-sheet" },
   ],
   company: [

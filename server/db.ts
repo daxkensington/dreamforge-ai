@@ -389,6 +389,40 @@ export async function createModerationItem(data: InsertModerationItem) {
   return result[0].id;
 }
 
+/**
+ * Publish a generation straight to the public gallery (auto-approved). Used by
+ * the growth loop so clean SFW submissions flow without a manual review step.
+ * Idempotent-ish: skips if this generation is already in the gallery.
+ */
+export async function publishGalleryItem(data: {
+  generationId: number;
+  userId: number;
+  title: string;
+  description?: string | null;
+  approvedBy?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db
+    .select({ id: galleryItems.id })
+    .from(galleryItems)
+    .where(eq(galleryItems.generationId, data.generationId))
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+  const result = await db
+    .insert(galleryItems)
+    .values({
+      generationId: data.generationId,
+      userId: data.userId,
+      title: data.title,
+      description: data.description ?? null,
+      approvedBy: data.approvedBy ?? null,
+      approvedAt: new Date(),
+    })
+    .returning({ id: galleryItems.id });
+  return result[0].id;
+}
+
 export async function getModerationQueue(
   status: "pending" | "approved" | "rejected" = "pending",
   limit = 50,
