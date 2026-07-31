@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { UNCENSORED_PLANS, UNCENSORED_PLAN, getUncensoredPlanById } from "./_core/btcpay";
+import {
+  UNCENSORED_PLANS as SharedPlans,
+  UNCENSORED_PLAN as SharedPlan,
+} from "../shared/uncensoredPlans";
 
 describe("uncensored pricing ladder", () => {
+  it("server re-export matches shared source of truth", () => {
+    expect(UNCENSORED_PLANS).toEqual(SharedPlans);
+    expect(UNCENSORED_PLAN).toEqual(SharedPlan);
+  });
+
   it("exposes the 3 expected SKUs + prices in order", () => {
     expect(UNCENSORED_PLANS.map((p) => p.id)).toEqual([
       "uncensored-day",

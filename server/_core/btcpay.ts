@@ -7,36 +7,26 @@
  *
  * Store "DreamForgeX" provisioned 2026-06-12 via Greenfield API.
  * Ported from the golden-climax integration (HMAC verify pattern).
+ *
+ * Live payment methods (verified 2026-07-31): BTC-CHAIN only.
+ * Lightning / USDC require operator enablement on the BTCPay store —
+ * see marketing/OPERATOR-BATCH.md.
  */
 import crypto from "crypto";
+import {
+  UNCENSORED_PLAN,
+  UNCENSORED_PLANS,
+  getUncensoredPlanById,
+  type UncensoredPlan,
+} from "../../shared/uncensoredPlans";
 
-export interface UncensoredPlan {
-  id: string;
-  label: string;
-  priceUsd: number;
-  bonusCredits: number;
-  durationDays: number;
-  tagline: string;
-  highlight?: boolean;
-}
+export type { UncensoredPlan };
+export { UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById };
 
-// Pricing ladder. A cheap day-pass captures the impulse buy; the week pass
-// suits bursty users; the 30-day pass is the "best value" anchor (and the
-// back-compat default for any caller that doesn't pass a planId). All are
-// one-time, no auto-renew. Durations stack via the webhook's GREATEST(...).
-export const UNCENSORED_PLANS: UncensoredPlan[] = [
-  { id: "uncensored-day", label: "Day Pass", priceUsd: 4.99, bonusCredits: 60, durationDays: 1, tagline: "Dip in for 24 hours" },
-  { id: "uncensored-week", label: "Week Pass", priceUsd: 12, bonusCredits: 250, durationDays: 7, tagline: "A week, no commitment" },
-  { id: "uncensored-30d", label: "30-Day Pass", priceUsd: 19, bonusCredits: 500, durationDays: 30, tagline: "Best value", highlight: true },
-];
-
-// Default / back-compat plan = the 30-day anchor (id "uncensored-30d").
-export const UNCENSORED_PLAN: UncensoredPlan =
-  UNCENSORED_PLANS.find((p) => p.id === "uncensored-30d")!;
-
-export function getUncensoredPlanById(id: string | null | undefined): UncensoredPlan {
-  return UNCENSORED_PLANS.find((p) => p.id === id) ?? UNCENSORED_PLAN;
-}
+// On-chain BTC confirmations can take >60 min under congestion. Store default
+// is 60 min; we extend so impulse day-pass buyers don't lose the invoice mid-mempool.
+const INVOICE_EXPIRATION_MINUTES = 180;
+const INVOICE_MONITORING_MINUTES = 24 * 60;
 
 export function isBtcpayConfigured(): boolean {
   return !!(process.env.BTCPAY_URL && process.env.BTCPAY_API_KEY && process.env.BTCPAY_STORE_ID);
@@ -73,6 +63,13 @@ export async function createUncensoredInvoice(params: {
       redirectURL: params.redirectUrl,
       redirectAutomatically: true,
       defaultLanguage: "en",
+      // On-chain BTC needs headroom; Lightning (when enabled) settles instantly
+      // but still benefits from a long window if the buyer pauses mid-flow.
+      expirationMinutes: INVOICE_EXPIRATION_MINUTES,
+      monitoringExpiration: INVOICE_MONITORING_MINUTES,
+      // Accept after 1 confirmation — balances speed vs double-spend risk for
+      // low-ticket digital goods ($5–$19). Store default may be stricter.
+      speedPolicy: "MediumSpeed",
     },
     receipt: { enabled: true, showQR: true, showPayments: true },
   };

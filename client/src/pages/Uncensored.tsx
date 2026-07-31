@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
+import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
 
 /**
@@ -25,13 +26,8 @@ import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
  * (iframe — no new tab, no popup blocker, QR right on the page) → webhook
  * settles → entitlement live → toggle unlocks in Workspace.
  */
-// Fallback so the ladder renders before the status query resolves; the server
-// (server/_core/btcpay.ts UNCENSORED_PLANS) is the source of truth at checkout.
-const FALLBACK_PLANS = [
-  { id: "uncensored-day", label: "Day Pass", priceUsd: 4.99, bonusCredits: 60, durationDays: 1, tagline: "Dip in for 24 hours", highlight: false },
-  { id: "uncensored-week", label: "Week Pass", priceUsd: 12, bonusCredits: 250, durationDays: 7, tagline: "A week, no commitment", highlight: false },
-  { id: "uncensored-30d", label: "30-Day Pass", priceUsd: 19, bonusCredits: 500, durationDays: 30, tagline: "Best value", highlight: true },
-];
+// Shared ladder (shared/uncensoredPlans.ts) — same IDs/prices the server bills.
+const FALLBACK_PLANS = UNCENSORED_PLANS;
 
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
@@ -191,7 +187,7 @@ export default function Uncensored() {
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6 text-center">
                   <h2 className="text-lg font-semibold">Try it free — {freeLimit} uncensored previews</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Watermarked &amp; private. Confirm you&apos;re an adult to unlock.
+                    Free account · no card · watermarked &amp; private. Confirm you&apos;re 18+ to unlock.
                   </p>
                   <label className="mt-4 flex items-center justify-center gap-2 text-sm">
                     <Checkbox checked={ageChecked} onCheckedChange={(v) => setAgeChecked(!!v)} />
@@ -286,7 +282,7 @@ export default function Uncensored() {
               {[
                 { icon: Flame, title: "No filter", body: "Prompts the standard models reject just work." },
                 { icon: Shield, title: "Private by default", body: "Uncensored creations can't enter the gallery or share links." },
-                { icon: Bitcoin, title: "Pay with crypto", body: "Bitcoin via BTCPay. No card, no name on a statement, discreet billing." },
+                { icon: Bitcoin, title: "Pay with crypto", body: "Bitcoin via self-hosted BTCPay. No card, no name on a statement, discreet billing." },
               ].map((f) => (
                 <div key={f.title} className="rounded-xl border border-border/60 bg-card/40 p-5">
                   <f.icon className="h-6 w-6 text-rose-500" />
@@ -320,8 +316,9 @@ export default function Uncensored() {
                     className="mt-4 h-[660px] w-full rounded-xl border border-border/60 bg-white"
                   />
                   <p className="mt-3 text-center text-xs text-muted-foreground">
-                    Scan the QR or copy the address from the invoice above. After the
-                    payment confirms on-chain, this page unlocks automatically.
+                    Scan the QR or copy the Bitcoin address. On-chain confirmations usually
+                    take a few minutes (sometimes longer under network congestion). This
+                    invoice stays open for 3 hours — the page unlocks automatically after settle.
                   </p>
                   <p className="mt-2 text-center text-xs">
                     <a
@@ -367,7 +364,8 @@ export default function Uncensored() {
                 })}
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                One-time payment, no auto-renew. Pay anonymously with Bitcoin.
+                One-time payment, no auto-renew. Pay anonymously with Bitcoin (on-chain).
+                Invoice stays open 3 hours so the confirmation can land.
               </p>
 
               {!active && !ageConfirmed && (
@@ -409,9 +407,9 @@ export default function Uncensored() {
               <h2 className="text-center text-xl font-semibold">Pay with crypto in about 2 minutes</h2>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {[
-                  { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, or an exchange you already use." },
-                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap the crypto button and the invoice appears right here with a QR code. Scan it or copy the Bitcoin address into your wallet." },
-                  { icon: Zap, step: "3", title: "Unlock automatically", body: "Once the payment confirms, this page unlocks on its own — usually within minutes. No waiting on support." },
+                  { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, River, or an exchange you already use. Buy ~$5–$20 of BTC." },
+                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap Pay with crypto — the invoice appears right here with a QR code. Scan it or paste the Bitcoin address into your wallet. Send the exact amount shown." },
+                  { icon: Zap, step: "3", title: "Unlock automatically", body: "After ~1 network confirmation (usually a few minutes), this page unlocks on its own. No waiting on support. Invoice window is 3 hours." },
                 ].map((s) => (
                   <div key={s.step} className="relative rounded-xl border border-border/60 bg-card/40 p-5">
                     <div className="absolute -top-3 left-5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-xs font-bold text-white">

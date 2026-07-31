@@ -48,7 +48,7 @@ Reddit periodically nukes NSFW Stable Diffusion subs with little warning (this i
 >
 > Disclosure so I'm not being sneaky: I got tired of hosted tools rejecting prompts that are completely legal fictional content, so I built my own — **DreamForgeX**. It's 18+, fictional-only, self-hosted on my own GPUs (so there's no provider yanking the model out from under it), and there's genuinely **no content filter** on legal fictional prompts. It's private by default, and you can pay anonymously with crypto if you ever upgrade.
 >
-> If you just want to test whether your prompt that "the other tools" keep refusing will actually run: there are **3 free previews, no card, no signup wall** — at dreamforgex.ai/uncensored. Even if you never pay, the prompt-splitting tip above works in any SDXL setup. Happy to answer workflow questions in the comments.
+> If you just want to test whether your prompt that "the other tools" keep refusing will actually run: there are **3 free previews, no card** (free Google/GitHub sign-in for the age gate) — at dreamforgex.ai/uncensored. Even if you never pay, the prompt-splitting tip above works in any SDXL setup. Happy to answer workflow questions in the comments.
 
 ---
 
@@ -73,7 +73,7 @@ Reddit periodically nukes NSFW Stable Diffusion subs with little warning (this i
 >
 > Quick tip even if you never touch it: when a face comes out "off," it's usually the negative prompt doing too much — try pulling generic descriptors *out* of the negative and let the checkpoint cook; over-stuffed negatives flatten faces.
 >
-> Free to try the claim: **3 previews, no card, no signup** → dreamforgex.ai/uncensored. (I made it — feedback welcome, roast the outputs.)
+> Free to try the claim: **3 previews, no card \(free account for age gate\)** → dreamforgex.ai/uncensored. (I made it — feedback welcome, roast the outputs.)
 
 ---
 
@@ -352,7 +352,7 @@ All copy below is tasteful/professional. It describes the *capability* (uncensor
 `DreamForgeX is an uncensored, 18+ AI image generator for fictional art. Prompts that mainstream tools silently reject just work here — self-hosted GPUs mean no provider bans, and generations stay private by default. Pay anonymously with crypto. Try 3 free previews, no card. AI-generated, fictional characters only.`
 
 **Long description (~500 chars):**
-`DreamForgeX is an uncensored, 18+ AI image generator built for adult fictional art — the kind of prompts mainstream generators silently reject or downgrade. Because it runs on self-hosted GPUs instead of third-party APIs, there are no provider content bans and no surprise account suspensions. Privacy is the default: generations aren't mined or resold, and you can pay anonymously with crypto — no card, no identity trail. Test the engine first with 3 free previews (no signup, no card), then unlock a one-time pass from $4.99. Strictly AI-generated, fictional characters only — no real people, no minors, no illegal content. Explore the uncensored gallery and prompt guides at dreamforgex.ai/uncensored.`
+`DreamForgeX is an uncensored, 18+ AI image generator built for adult fictional art — the kind of prompts mainstream generators silently reject or downgrade. Because it runs on self-hosted GPUs instead of third-party APIs, there are no provider content bans and no surprise account suspensions. Privacy is the default: generations aren't mined or resold, and you can pay anonymously with crypto — no card, no identity trail. Test the engine first with 3 free previews (free account for age gate, no card), then unlock a one-time pass from $4.99. Strictly AI-generated, fictional characters only — no real people, no minors, no illegal content. Explore the uncensored gallery and prompt guides at dreamforgex.ai/uncensored.`
 
 **Primary URL:** `https://dreamforgex.ai/uncensored`
 **Pricing line:** `Free: 3 previews (no card). Passes: $4.99 / $12 / $19.`

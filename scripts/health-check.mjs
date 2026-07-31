@@ -30,8 +30,15 @@ const PROBES = [
   { path: "/privacy", expect: "Privacy", method: "GET", maxMs: 8000, critical: true },
   { path: "/pricing", expect: "Pricing", method: "GET", maxMs: 8000, critical: true },
   { path: "/tools", expect: null, method: "HEAD", maxMs: 8000, critical: true },
+  // Revenue-critical funnels — free demo + uncensored paywall
+  { path: "/demo/text-to-image", expect: "demo", method: "GET", maxMs: 8000, critical: true },
+  { path: "/uncensored", expect: "Uncensored", method: "GET", maxMs: 8000, critical: true },
+  { path: "/uncensored/no-filter", expect: "filter", method: "GET", maxMs: 10000, critical: false },
+  { path: "/explore", expect: null, method: "HEAD", maxMs: 8000, critical: false },
   { path: "/api/health", expect: '"ok":true', method: "GET", maxMs: 8000, critical: true },
-  { path: "/api/status/providers", expect: null, method: "HEAD", maxMs: 10000, critical: false },
+  { path: "/api/status/providers", expect: '"summary"', method: "GET", maxMs: 12000, critical: false },
+  // IndexNow ownership key (SEO pipeline)
+  { path: "/23c418b9ade7560f.txt", expect: "23c418b9ade7560f", method: "GET", maxMs: 5000, critical: false },
 ];
 
 async function probe(p) {

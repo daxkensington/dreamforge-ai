@@ -19,15 +19,22 @@ the only thing missing is a human login per channel.
 | `community-posts.md` | Reddit/Discord community map (rules + risk) + 3 value-first post drafts. | an **aged, active** Reddit/Discord account (not a fresh one) |
 | `fb-posts.md` | 8 SFW Facebook posts for facebook.com/dreamforgex. | page-admin login (Quintin Weed) |
 
+## Operator batch (read this first)
+
+**→ [`OPERATOR-BATCH.md`](./OPERATOR-BATCH.md)** — the 3-hour fork: Lightning, accounts,
+directories, NSFW distribution, winback email, 90-day keep/park gates. Product is done;
+this is the revenue path.
+
 ## Suggested order (highest ROI first)
 
-1. **Directories** — TAAFT, Futurepedia, SaaSHub, AlternativeTo first (high-DR; these are
-   what actually move "Discovered → Indexed"). Register AlternativeTo now (it enforces a
-   ~1-week wait before you can submit).
-2. **Launch article** — publish on dev.to/Medium/Hashnode; cross-post with a canonical URL.
-3. **Community posts** — follow the 9:1 rule and always disclose; lead with the free
-   no-signup demo, never the signup page.
-4. **FB batch** — one post every 2–3 days, each paired with a real generated visual.
+1. **Operator batch** — finish `OPERATOR-BATCH.md` (Lightning + accounts + winback).
+2. **Directories** — Insidr / DropYourAI / AI-Hunter / SubmitAITool (live free forms), then
+   TAAFT + AlternativeTo (login). SaaSHub already submitted — claim it.
+3. **Launch article** — publish on dev.to/Medium/Hashnode; cross-post with a canonical URL.
+4. **Community posts** — follow the 9:1 rule and always disclose; lead with the free
+   no-signup **SFW** demo (`/demo/text-to-image`), never the signup page. For uncensored
+   channels use `uncensored-distribution.md` (free account + no card, not "no signup").
+5. **FB batch** — one post every 2–3 days, each paired with a real generated visual. SFW only.
 
 ## Caveats baked into the research
 - **CatVTON** model license is non-commercial — keep virtual try-on framed as a free demo,
