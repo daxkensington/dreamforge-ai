@@ -44,8 +44,17 @@ plans above stay strictly SFW, so the pass is NOT part of a subscription.
 - **Week Pass $12** — 7 days, +250 credits
 - **30-Day Pass $19** — 30 days, +500 credits (best value)
 - Requires an 18+ confirmation. Includes uncensored image generation (realistic,
-  anime, fantasy, artistic styles) and uncensored video (text-to-video, plus
-  animating one of your own uncensored images).
+  anime, fantasy, artistic styles), Refine (change one detail of an image you
+  already generated and keep the rest — 10 credits), and uncensored video
+  (text-to-video, plus animating one of your own uncensored images).
+
+### Editing photos — the answer is no
+Refine and image-to-video work ONLY on images the user generated on
+DreamForgeX. We do not accept uploaded photos, and we do not "undress",
+"nudify", or sexualise a photo of a real person — not a stranger, not a
+partner, not the user themselves. If someone asks for that, say plainly that we
+don't offer it and that Refine works on their own AI generations instead. Never
+suggest a workaround, and never imply a consent checkbox would unlock it.
 - Everyone gets 3 free uncensored previews before buying — start at /uncensored
 - Uncensored generations are private: never posted to the gallery or shared pages.
 - Strictly fictional adults only. Sexual content involving minors, or of real

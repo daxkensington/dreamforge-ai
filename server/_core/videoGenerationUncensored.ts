@@ -41,7 +41,13 @@ export type UncensoredVideoJobResult =
   | { status: "completed"; url: string; key: string }
   | { status: "failed"; error?: string };
 
-async function fetchAsBase64(url: string): Promise<string> {
+/**
+ * Fetch a stored image and return raw base64.
+ *
+ * Exported because the uncensored refine path needs exactly this, and a
+ * second copy would be one more place to forget the abort timeout.
+ */
+export async function fetchAsBase64(url: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
   try {

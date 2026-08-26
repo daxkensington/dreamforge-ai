@@ -722,6 +722,50 @@ async function generateUnfiltered(prompt: string, size: string, loraId?: string)
 }
 
 /**
+ * Refine an existing uncensored image — img2img on the self-hosted GPU.
+ *
+ * This answers the most-repeated request in our own generation logs: "change
+ * this one thing and leave the rest alone". That request is only safe to serve
+ * because the CALLER supplies a generation id, not a file — the router resolves
+ * it to an image this user already generated here, so the subject is always a
+ * fictional character we produced. Editing arbitrary uploads is the "nudify"
+ * pattern and is categorically not built: a self-attested "it's my own photo"
+ * cannot be verified and is exactly how non-consensual intimate imagery gets
+ * laundered.
+ *
+ * RunPod only — no fal fallback. fal's img2img runs a safety checker we can't
+ * disable on this route, so a fallback would silently return a refusal or a
+ * sanitised frame; failing loudly is better than a confusing half-result.
+ */
+export async function refineUnfiltered(
+  imageB64: string,
+  prompt: string,
+  opts?: { strength?: number; loraId?: string },
+): Promise<Buffer> {
+  // Same backstop as generateUnfiltered: the no-safety chain refuses illegal
+  // content even if a surface gate was missed.
+  const verdict = checkPrompt(prompt, { strictMinors: true });
+  if (!verdict.allowed) {
+    await logModerationBlock({
+      category: verdict.category,
+      promptLen: prompt.length,
+      surface: "backstop:refineUnfiltered",
+      prompt,
+    });
+    throw new PromptBlockedError(verdict);
+  }
+
+  if (!isRunPodAvailable()) {
+    throw new Error("The refine GPU is unavailable right now — please try again shortly.");
+  }
+
+  // Clamp: below ~0.2 nothing visibly changes and the credit is wasted; at 1.0
+  // the source is discarded entirely, which is just text-to-image.
+  const strength = Math.min(Math.max(opts?.strength ?? 0.6, 0.2), 0.9);
+  return runpodFluxImg2Img(imageB64, prompt, strength, 20, 7.5, opts?.loraId);
+}
+
+/**
  * Generate with an explicitly selected model (no fallback).
  */
 async function generateWithExplicitModel(

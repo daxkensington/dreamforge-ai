@@ -13,6 +13,7 @@ import { getLoginUrl } from "@/const";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
+import UncensoredRefineStudio from "@/components/UncensoredRefineStudio";
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -225,6 +226,7 @@ export default function Uncensored() {
               </a>
             </Button>
             <div className="mt-2 text-left">
+              <UncensoredRefineStudio />
               <UncensoredVideoStudio />
             </div>
           </motion.div>

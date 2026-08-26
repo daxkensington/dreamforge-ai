@@ -338,6 +338,7 @@ export async function runpodFluxImg2Img(
   strength: number = 0.7,
   steps: number = 20,
   guidanceScale: number = 7.5,
+  loraId?: string,
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -347,6 +348,10 @@ export async function runpodFluxImg2Img(
       strength,
       num_inference_steps: steps,
       guidance_scale: guidanceScale,
+      // handle_flux_img2img already loads a LoRA per request; the app just
+      // never passed one, so uncensored refines lost the realism LoRA that
+      // text-to-image gets.
+      ...(loraId ? { lora_id: loraId } : {}),
     }),
   );
 }

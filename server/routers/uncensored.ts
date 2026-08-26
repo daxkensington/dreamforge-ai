@@ -13,11 +13,12 @@ import { getDb, createGeneration, updateGeneration, getGenerationById } from "..
 import { users, cryptoInvoices, generations } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
-import { generateImage } from "../_core/imageGeneration";
+import { generateImage, refineUnfiltered } from "../_core/imageGeneration";
+import { storagePut, generateStorageKey } from "../storage";
 import { applyUncensoredStyle, UNCENSORED_STYLES } from "../../shared/uncensoredStyles";
 import { FREE_UNCENSORED_PREVIEWS } from "../../shared/uncensoredPlans";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
-import { submitUncensoredVideoJob, collectUncensoredVideoJob } from "../_core/videoGenerationUncensored";
+import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable } from "../_core/runpod";
@@ -38,6 +39,10 @@ const UNCENSORED_VIDEO_COST = {
     i2v: 100,
   },
 } as const;
+// Refining costs a full generation on the GPU (same 20-step Flux pass), so it
+// is priced like a quality image rather than as a cheap tweak.
+const UNCENSORED_REFINE_COST = 10;
+
 const VIDEO_ASPECTS = {
   portrait: { w: 480, h: 832 },
   landscape: { w: 832, h: 480 },
@@ -115,6 +120,7 @@ export const uncensoredRouter = router({
       freeRemaining: Math.max(0, FREE_UNCENSORED_LIMIT - freeUsed),
       videoCost: UNCENSORED_VIDEO_COST,
       videoAvailable,
+      refineCost: UNCENSORED_REFINE_COST,
       styles: UNCENSORED_STYLES,
     };
   }),
@@ -270,6 +276,135 @@ export const uncensoredRouter = router({
         return { status: "failed" as const, url: null };
       }
       return { status: "processing" as const, url: null };
+    }),
+
+  /**
+   * Refine an uncensored image — img2img on one of the caller's OWN generations.
+   *
+   * This is the most-requested workflow in our own logs, phrased over and over
+   * as "change this one thing and leave the rest alone". Serving it against
+   * uploaded photos would make this a nudify service — the archetypal vector
+   * for non-consensual intimate imagery — so uploads are not accepted at all.
+   * The input is a generation id, resolved to an image this user already made
+   * here, which means the subject is always a fictional character we generated.
+   * A self-attested "it's my own photo" checkbox would be unverifiable theatre;
+   * the type signature is the control.
+   *
+   * Pass-gated with no free tier: this is the paid iteration loop.
+   */
+  refineImage: protectedProcedure
+    .input(
+      z.object({
+        sourceGenerationId: z.number().int().positive(),
+        prompt: z.string().min(3).max(1000),
+        // How far from the source to travel. Low keeps the character and
+        // changes a detail; high re-imagines the scene.
+        strength: z.number().min(0.2).max(0.9).default(0.6),
+        style: z.string().max(32).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "An active Uncensored Pass is required to refine images. Grab a pass to unlock it.",
+        });
+      }
+
+      // Illegal-content refusal BEFORE credits or GPU.
+      const verdict = checkPrompt(input.prompt, { strictMinors: true });
+      if (!verdict.allowed) {
+        await logModerationBlock({
+          category: verdict.category,
+          promptLen: input.prompt.length,
+          userId: ctx.user.id,
+          surface: "uncensored.refineImage",
+          prompt: input.prompt,
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+
+      // Ownership gate — the whole legal basis for this feature. Same rule the
+      // image-to-video path enforces: the caller's own completed uncensored
+      // image, never anything else.
+      const src = await getGenerationById(input.sourceGenerationId);
+      if (!src || src.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available to refine." });
+      }
+      if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can be refined." });
+      }
+      if (!(src.metadata as any)?.uncensored) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be refined here." });
+      }
+
+      await enforceRateLimit(`uncensored.refine:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between refines.");
+
+      const debit = await deductCredits(
+        ctx.user.id,
+        UNCENSORED_REFINE_COST,
+        "Uncensored image refine",
+        "usage",
+        { uncensored: true, refine: true },
+      );
+      if (!debit.success) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not enough credits — this needs ${UNCENSORED_REFINE_COST}, you have ${debit.balance}.`,
+        });
+      }
+
+      const style = input.style ?? (src.metadata as any)?.style ?? undefined;
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: input.prompt,
+        negativePrompt: null,
+        mediaType: "image",
+        width: src.width ?? 768,
+        height: src.height ?? 768,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-refine",
+        parentGenerationId: src.id,
+        metadata: {
+          uncensored: true,
+          refine: true,
+          style: style ?? null,
+          strength: input.strength,
+          cost: UNCENSORED_REFINE_COST,
+        },
+      });
+
+      try {
+        const imageB64 = await fetchAsBase64(src.imageUrl);
+        const buffer = await refineUnfiltered(imageB64, applyUncensoredStyle(input.prompt, style), {
+          strength: input.strength,
+          loraId: resolveUncensoredLora(style),
+        });
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, buffer, "image/png");
+        await updateGeneration(genId, {
+          status: "completed",
+          imageUrl: url,
+          thumbnailUrl: url,
+          fileKey: key,
+        });
+        return { generationId: genId, url, cost: UNCENSORED_REFINE_COST };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        // The credit is refunded on every failure path — a refine that produced
+        // nothing must never be billable.
+        await refundCredits(ctx.user.id, UNCENSORED_REFINE_COST, "Uncensored refine failed");
+        await logToolFailure({ toolId: "uncensored-refine", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Refine failed — your credits were returned.";
+        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+      }
     }),
 
   /**
