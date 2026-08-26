@@ -66,6 +66,9 @@ vi.mock("./db", () => ({
     set: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+    // Raw SQL — the daily free-credit top-up in getOrCreateBalance runs as a
+    // single statement, so anything flowing through the credit gate needs it.
+    execute: vi.fn().mockResolvedValue({ rows: [] }),
   }),
   getGenerationById: vi.fn().mockResolvedValue(null),
 }));

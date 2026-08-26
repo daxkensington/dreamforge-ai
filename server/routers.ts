@@ -108,7 +108,8 @@ import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
 import { uncensoredRouter, getUncensoredEntitlement } from "./routers/uncensored";
-import { checkPrompt, logModerationBlock } from "./_core/promptModeration";
+import { checkPrompt, isSexualPrompt, logModerationBlock } from "./_core/promptModeration";
+import { ADULT_REDIRECT_MESSAGE } from "../shared/adultRouting";
 import { applyUncensoredStyle } from "../shared/uncensoredStyles";
 import { resolveUncensoredLora } from "./_core/uncensoredStyleLora";
 import { viralRouter } from "./routers/viral";
@@ -547,6 +548,22 @@ export const appRouter = router({
               prompt: input.prompt,
             });
             throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+          }
+        }
+
+        // ── Adult-content routing ──────────────────────────────────────────
+        // Explicit prompts belong in the metered uncensored funnel, not the
+        // standard chain — which can fall through to a self-hosted model with
+        // no safety checker and was handing the paid tier's product away free.
+        // Runs AFTER the illegal-content gate above, so a refusal still wins;
+        // this only redirects requests that are legal but adult.
+        //
+        // Pass-holders are untouched: they have already paid, so an explicit
+        // prompt without the toggle set is just a UI slip, not a bypass.
+        if (!input.uncensored && isSexualPrompt(input.prompt, input.negativePrompt ?? null)) {
+          const ent = await getUncensoredEntitlement(ctx.user.id);
+          if (!ent.active) {
+            throw new TRPCError({ code: "FORBIDDEN", message: ADULT_REDIRECT_MESSAGE });
           }
         }
 

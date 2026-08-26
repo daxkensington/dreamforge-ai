@@ -112,6 +112,10 @@ export default function Uncensored() {
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
+    // A prompt handed over from the Workspace or demo (see shared/adultRouting)
+    // — carry it in so they don't retype what they already wrote.
+    const carried = params.get("prompt");
+    if (carried) setFreePrompt(carried.slice(0, 1000));
     if (params.get("start") === "1") setReturnIntent("free");
     else if (plan) setReturnIntent("buy");
   }, []);
@@ -130,9 +134,22 @@ export default function Uncensored() {
     }
   }, [returnIntent, isAuthed, status, active, ageConfirmed]);
 
+  /**
+   * Sign-in URL that comes back to THIS page with everything intact.
+   *
+   * Keeps whatever is already in the query — above all a `prompt` handed over
+   * from the Workspace or demo — so a visitor who has to authenticate first
+   * doesn't lose what they typed on the way in.
+   */
+  const loginUrlKeepingIntent = (extra?: Record<string, string>) => {
+    const params = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(extra ?? {})) params.set(k, v);
+    return getLoginUrl(`/uncensored?${params.toString()}`);
+  };
+
   const handleAgeConfirm = async () => {
     if (!isAuthed) {
-      window.location.href = getLoginUrl("/uncensored?start=1");
+      window.location.href = loginUrlKeepingIntent({ start: "1" });
       return;
     }
     if (!ageChecked) {
@@ -155,7 +172,7 @@ export default function Uncensored() {
   const handleStart = async () => {
     if (!isAuthed) {
       // Carry the chosen plan through auth so they return to the same offer.
-      window.location.href = getLoginUrl(`/uncensored?plan=${encodeURIComponent(selectedPlanId)}`);
+      window.location.href = loginUrlKeepingIntent({ plan: selectedPlanId });
       return;
     }
     if (!ageConfirmed) {

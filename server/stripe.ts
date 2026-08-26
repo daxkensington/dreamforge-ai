@@ -3,6 +3,7 @@ import { getDb } from "./db";
 import { creditBalances, creditTransactions } from "../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
+import { TIERS } from "../shared/tiers";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripeClient: Stripe | null = null;
@@ -65,19 +66,81 @@ export const CREDIT_PACKAGES = [
 // depends on the MODEL selected (see MODEL_CREDIT_COSTS in shared/creditCosts.ts).
 export const CREDIT_COSTS: Record<string, number> = TOOL_CREDIT_COSTS;
 
+// ─── Daily free credits ─────────────────────────────────────────────────────
+/** What the free tier is entitled to each day — the number /pricing advertises. */
+export const DAILY_FREE_CREDITS = TIERS.free.dailyCreditsForFree;
+
+/**
+ * Top a free user back up to their daily allowance.
+ *
+ * `dailyCreditsForFree: 50` had been declared in shared/tiers.ts and advertised
+ * on /pricing as "50 credits / day (~1,500/mo)" since launch, but nothing ever
+ * read it and no reset job existed: `lastResetAt` was NULL on all 73 balances,
+ * so a free account got 50 credits ONCE — about ten images — and then hit a
+ * permanent wall. The users who hit it were, by definition, the engaged ones.
+ *
+ * Done as a lazy top-up at the balance choke point rather than a cron: it needs
+ * no schedule, costs nothing for dormant accounts, and a returning user is
+ * current the moment they ask — no waiting for the next tick.
+ *
+ * One idempotent statement, so concurrent requests can't double-grant:
+ *   - GREATEST(...) tops UP to the allowance and never takes credits away, so
+ *     purchased packs, winback bonuses and pass credits above it are preserved.
+ *   - The date comparison is done entirely in SQL and pinned to UTC on both
+ *     sides. `lastResetAt` is a naive `timestamp`, and comparing one of those
+ *     against a JS Date reads it in the caller's zone — which would hand a
+ *     second grant to anyone west of UTC.
+ *   - Paid subscribers are excluded: they draw on monthlyAllocation instead.
+ */
+async function applyDailyFreeCredits(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  if (DAILY_FREE_CREDITS <= 0) return;
+
+  await db.execute(sql`
+    UPDATE "creditBalances" cb
+       SET balance = GREATEST(cb.balance, ${DAILY_FREE_CREDITS}),
+           "lastResetAt" = (now() AT TIME ZONE 'UTC')
+     WHERE cb."userId" = ${userId}
+       AND (
+         cb."lastResetAt" IS NULL
+         OR cb."lastResetAt" < date_trunc('day', now() AT TIME ZONE 'UTC')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM "userSubscriptions" us
+          WHERE us."userId" = cb."userId"
+            AND us."subStatus" IN ('active', 'trialing')
+       )
+  `);
+}
+
 // ─── DB Helpers ─────────────────────────────────────────────────────────────
 export async function getOrCreateBalance(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
   const existing = await db
     .select()
     .from(creditBalances)
     .where(eq(creditBalances.userId, userId))
     .limit(1);
 
-  if (existing.length > 0) return existing[0];
+  if (existing.length > 0) {
+    // Refill before anyone reads or spends this balance.
+    await applyDailyFreeCredits(userId);
+    const refreshed = await db
+      .select()
+      .from(creditBalances)
+      .where(eq(creditBalances.userId, userId))
+      .limit(1);
+    return refreshed[0] ?? existing[0];
+  }
 
-  await db.insert(creditBalances).values({ userId, balance: 50 });
+  await db.insert(creditBalances).values({
+    userId,
+    balance: DAILY_FREE_CREDITS,
+    lastResetAt: sql`(now() AT TIME ZONE 'UTC')` as any,
+  });
   const created = await db
     .select()
     .from(creditBalances)

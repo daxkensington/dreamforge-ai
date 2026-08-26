@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
 
 const DEMO_PROMPTS = [
@@ -49,10 +50,24 @@ export default function DemoTextToImage() {
         setResultPrompt(data.prompt ?? prompt);
         toast.success("Done! Sign up to make more.");
       } else {
-        toast.error(("error" in data && data.error) || "Generation failed");
+        const err = ("error" in data && data.error) || "";
+        // Adult prompt — hand it to the uncensored funnel rather than serving
+        // it free and anonymously on the demo's no-safety chain.
+        if (isAdultRedirect(err)) {
+          toast.info("That one needs Uncensored mode — taking you there…");
+          window.location.href = buildAdultRedirectUrl(prompt);
+          return;
+        }
+        toast.error(err || "Generation failed");
       }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => {
+      if (isAdultRedirect(err.message)) {
+        window.location.href = buildAdultRedirectUrl(prompt);
+        return;
+      }
+      toast.error(err.message);
+    },
   });
 
   // Continuity from the homepage "Try It Now" box: if it handed us a prompt

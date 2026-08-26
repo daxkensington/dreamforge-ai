@@ -55,6 +55,7 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
 import { ShareButton } from "@/components/ShareButton";
+import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 
 const MODEL_OPTIONS = [
   // Image models
@@ -171,7 +172,16 @@ export default function Workspace() {
       }
       refetchGens();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => {
+      // Adult prompt on the standard chain — send them to the metered funnel
+      // with the prompt intact rather than making them retype it.
+      if (isAdultRedirect(err.message)) {
+        toast.info("Taking you to Uncensored mode for that one…");
+        window.location.href = buildAdultRedirectUrl(prompt);
+        return;
+      }
+      toast.error(err.message);
+    },
   });
 
   const enhanceMutation = trpc.generation.enhancePrompt.useMutation({

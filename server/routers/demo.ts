@@ -18,7 +18,8 @@ import { publicProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { enforceIpRateLimit } from "../rate-limit";
 import { requireToolActive } from "../_core/toolStatus";
-import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
+import { checkPrompt, isSexualPrompt, logModerationBlock } from "../_core/promptModeration";
+import { ADULT_REDIRECT_MESSAGE } from "../../shared/adultRouting";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -53,6 +54,14 @@ export const demoRouter = router({
           });
           return { status: "failed" as const, error: verdict.userMessage };
         }
+      }
+
+      // Adult prompts go to the metered uncensored funnel instead of the demo's
+      // "auto" chain, which can fall through to a model with no safety checker
+      // and was serving adult content free and anonymously. Checked before the
+      // rate limit so being redirected doesn't burn their one free generation.
+      if (isSexualPrompt(input.prompt)) {
+        return { status: "failed" as const, error: ADULT_REDIRECT_MESSAGE };
       }
 
       // Hard cap: 1 generation / 24h / IP. If we can't read IP, deny rather

@@ -132,6 +132,26 @@ export function checkPrompt(
   return { allowed: true };
 }
 
+/**
+ * Is this prompt asking for adult content?
+ *
+ * Distinct from checkPrompt: that refuses ILLEGAL content outright, whereas
+ * this only asks "is it explicit", so legal adult requests can be steered into
+ * the metered uncensored funnel instead of quietly generating on the standard
+ * chain. Deliberately reuses the same SEXUAL vocabulary — a second, separate
+ * word list would drift out of sync with the safety gate.
+ *
+ * Only a routing signal: never let it stand in for the safety gate, which must
+ * still run and still wins.
+ */
+export function isSexualPrompt(
+  rawPrompt: string,
+  negativePrompt?: string | null,
+): boolean {
+  const combined = `${rawPrompt ?? ""} ${negativePrompt ?? ""}`;
+  return SEXUAL.test(norm(combined)) || SEXUAL.test(norm(deleet(combined)));
+}
+
 export class PromptBlockedError extends Error {
   category: ModerationCategory;
   userMessage: string;
