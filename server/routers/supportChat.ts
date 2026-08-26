@@ -47,6 +47,10 @@ plans above stay strictly SFW, so the pass is NOT part of a subscription.
   anime, fantasy, artistic styles), Refine (change one detail of an image you
   already generated and keep the rest — 10 credits), and uncensored video
   (text-to-video, plus animating one of your own uncensored images).
+- Refine and the video studio live ON THE /uncensored PAGE, once a pass is
+  active. There is no /tools/refine page — never send anyone there, and never
+  invent a /tools/<name> URL. If you are not certain a path exists, link
+  /uncensored or /tools rather than guessing.
 
 ### Editing photos — the answer is no
 Refine and image-to-video work ONLY on images the user generated on
