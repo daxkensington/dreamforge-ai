@@ -14,8 +14,11 @@ export const runtime = "nodejs";
  *  - HMAC (BTCPay-Sig) verified against the RAW body before any parsing.
  *  - Settlement is claimed atomically: UPDATE ... WHERE status != 'settled'
  *    returning the row — a replayed/duplicate event can never double-grant.
- *  - 0-conf events (InvoiceProcessing) cause no side effects; only
- *    InvoiceSettled grants the entitlement.
+ *  - Invoices are created with speedPolicy HighSpeed, so InvoiceSettled fires
+ *    on the mempool broadcast rather than after a confirmation. InvoiceSettled
+ *    is still the ONLY event that grants; InvoiceProcessing has no side
+ *    effects. The trade is that a settled invoice can later go invalid, so
+ *    InvoiceInvalid reverses the grant (atomically, once).
  */
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -37,11 +40,60 @@ export async function POST(req: NextRequest) {
   // 200-ing would drop the settlement and the user would pay without access.
   if (!db) return NextResponse.json({ error: "DB unavailable" }, { status: 503 });
 
-  if (event.type === "InvoiceExpired" || event.type === "InvoiceInvalid") {
+  if (event.type === "InvoiceExpired") {
     await db
       .update(cryptoInvoices)
-      .set({ status: event.type === "InvoiceExpired" ? "expired" : "invalid" })
+      .set({ status: "expired" })
       .where(and(eq(cryptoInvoices.invoiceId, event.invoiceId), ne(cryptoInvoices.status, "settled")));
+    return NextResponse.json({ ok: true });
+  }
+
+  if (event.type === "InvoiceInvalid") {
+    // Invoices settle at 0-conf (see speedPolicy in server/_core/btcpay.ts), so
+    // an already-settled invoice CAN still turn invalid — the broadcast tx was
+    // double-spent or never confirmed. That is the whole risk 0-conf takes on,
+    // and leaving the entitlement in place is what would make it unbounded.
+    // Claim the reversal atomically so a redelivered event can't revoke twice.
+    const reversed = await db
+      .update(cryptoInvoices)
+      .set({ status: "invalid" })
+      .where(and(eq(cryptoInvoices.invoiceId, event.invoiceId), eq(cryptoInvoices.status, "settled")))
+      .returning();
+
+    const invoice = reversed[0];
+    if (invoice) {
+      const plan = getUncensoredPlanById(invoice.plan);
+
+      // Give back exactly what was granted. GREATEST(now(), …) floors the
+      // result at "expired now" rather than pushing it into the past, and
+      // leaves any time the user bought separately untouched.
+      await db.execute(sql`
+        UPDATE users SET "uncensoredUntil" = GREATEST(
+          now(),
+          COALESCE("uncensoredUntil", now()) - interval '${sql.raw(String(plan.durationDays))} days')
+        WHERE id = ${invoice.userId}`);
+
+      await db.execute(sql`
+        UPDATE "creditBalances" SET balance = GREATEST(0, balance - ${plan.bonusCredits})
+        WHERE "userId" = ${invoice.userId}`);
+
+      await db.insert(creditTransactions).values({
+        userId: invoice.userId,
+        amount: -plan.bonusCredits,
+        type: "refund",
+        description: `Reversed — BTCPay ${invoice.invoiceId} settled at 0-conf but never confirmed`,
+      });
+
+      console.warn(
+        `[BTCPay] REVERSED ${invoice.invoiceId}: user ${invoice.userId} uncensored -${plan.durationDays}d, -${plan.bonusCredits}cr (0-conf payment went invalid)`,
+      );
+      return NextResponse.json({ ok: true, reversed: true });
+    }
+
+    await db
+      .update(cryptoInvoices)
+      .set({ status: "invalid" })
+      .where(and(eq(cryptoInvoices.invoiceId, event.invoiceId), ne(cryptoInvoices.status, "invalid")));
     return NextResponse.json({ ok: true });
   }
 

@@ -67,9 +67,21 @@ export async function createUncensoredInvoice(params: {
       // but still benefits from a long window if the buyer pauses mid-flow.
       expirationMinutes: INVOICE_EXPIRATION_MINUTES,
       monitoringExpiration: INVOICE_MONITORING_MINUTES,
-      // Accept after 1 confirmation — balances speed vs double-spend risk for
-      // low-ticket digital goods ($5–$19). Store default may be stricter.
-      speedPolicy: "MediumSpeed",
+      // Settle at 0-conf (mempool), not after a block.
+      //
+      // Measured on the two real settlements to date (2026-08-06 $12,
+      // 2026-08-15 $4.99): both buyers broadcast within 28s–4min of the
+      // invoice opening — this audience holds BTC and pays immediately — then
+      // sat through a 7m09s / 6m45s dead wait for the first confirmation
+      // before access unlocked. That wait is p50; under congestion the tail
+      // runs past an hour. For an instant-delivery digital good it is the
+      // single largest source of drop-off, and it is pure loss: the money is
+      // already broadcast.
+      //
+      // Double-spend exposure is bounded ($4.99–$19 of generation credit) and
+      // no longer silent: the InvoiceInvalid branch of the webhook now revokes
+      // the entitlement and the bonus credits if the payment never confirms.
+      speedPolicy: "HighSpeed",
     },
     receipt: { enabled: true, showQR: true, showPayments: true },
   };
