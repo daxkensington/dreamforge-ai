@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
@@ -32,6 +32,14 @@ const FALLBACK_PLANS = UNCENSORED_PLANS;
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState("uncensored-30d");
+
+  // Intent carried back through sign-in (see shared/returnTo.ts). Visitors used
+  // to authenticate from this page and land in the SFW studio, losing the thing
+  // they came for; now they return here, to the exact card they clicked.
+  const conversionCardRef = useRef<HTMLDivElement | null>(null);
+  const freePromptRef = useRef<HTMLTextAreaElement | null>(null);
+  const [returnIntent, setReturnIntent] = useState<"free" | "buy" | null>(null);
+  const restoredIntent = useRef(false);
 
   const { data: me, isLoading: meLoading } = trpc.auth.me.useQuery();
   const isAuthed = !!me;
@@ -99,9 +107,32 @@ export default function Uncensored() {
   const freeLimit = status?.freeLimit ?? 3;
   const freeRemaining = status ? status.freeRemaining : freeLimit;
 
+  // Read the intent the sign-in round-trip carried back.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
+    if (params.get("start") === "1") setReturnIntent("free");
+    else if (plan) setReturnIntent("buy");
+  }, []);
+
+  // Once entitlement has loaded, put the returning visitor ON the thing they
+  // clicked: the free-taste card, focused and ready to type. Runs once — it
+  // must not fight the user's own scrolling on later status polls.
+  useEffect(() => {
+    if (!returnIntent || restoredIntent.current) return;
+    if (!isAuthed || !status || active) return;
+    restoredIntent.current = true;
+    conversionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (returnIntent === "free" && ageConfirmed) {
+      // Age already attested on a previous visit — go straight to the prompt.
+      window.setTimeout(() => freePromptRef.current?.focus(), 400);
+    }
+  }, [returnIntent, isAuthed, status, active, ageConfirmed]);
+
   const handleAgeConfirm = async () => {
     if (!isAuthed) {
-      window.location.href = getLoginUrl();
+      window.location.href = getLoginUrl("/uncensored?start=1");
       return;
     }
     if (!ageChecked) {
@@ -123,7 +154,8 @@ export default function Uncensored() {
 
   const handleStart = async () => {
     if (!isAuthed) {
-      window.location.href = getLoginUrl();
+      // Carry the chosen plan through auth so they return to the same offer.
+      window.location.href = getLoginUrl(`/uncensored?plan=${encodeURIComponent(selectedPlanId)}`);
       return;
     }
     if (!ageConfirmed) {
@@ -182,7 +214,7 @@ export default function Uncensored() {
         ) : (
           <>
             {/* ── Free taste — the conversion hook ──────────────────────────── */}
-            <div className="mt-10">
+            <div className="mt-10" ref={conversionCardRef}>
               {!ageConfirmed ? (
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6 text-center">
                   <h2 className="text-lg font-semibold">Try it free — {freeLimit} uncensored previews</h2>
@@ -214,6 +246,7 @@ export default function Uncensored() {
                     <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
                   </div>
                   <Textarea
+                    ref={freePromptRef}
                     value={freePrompt}
                     onChange={(e) => setFreePrompt(e.target.value)}
                     placeholder="Describe what you want to create…"

@@ -728,21 +728,43 @@ export default function Workspace() {
                   </div>
                 )}
 
-                {/* Uncensored mode (crypto-paid tier, image-only) */}
-                {mediaType === "image" && uncensoredStatus?.available && (
+                {/* Uncensored mode (crypto-paid tier).
+                    The in-place toggle is image-only — uncensored video runs on
+                    the self-hosted GPU path and lives in the /uncensored studio.
+                    The CTA itself shows for BOTH media types on purpose: video
+                    is where the intent (and the bigger ticket) actually is, and
+                    gating the card to images hid the tier from exactly those
+                    users. */}
+                {uncensoredStatus?.available && (
                   uncensoredActive ? (
-                    <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <Flame className="h-4 w-4 text-rose-500" />
-                        <div>
-                          <Label htmlFor="uncensored-toggle" className="text-sm font-medium cursor-pointer">
-                            Uncensored mode
-                          </Label>
-                          <p className="text-[11px] text-muted-foreground">No content filter · unfiltered models · private only</p>
+                    mediaType === "image" ? (
+                      <div className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <Flame className="h-4 w-4 text-rose-500" />
+                          <div>
+                            <Label htmlFor="uncensored-toggle" className="text-sm font-medium cursor-pointer">
+                              Uncensored mode
+                            </Label>
+                            <p className="text-[11px] text-muted-foreground">No content filter · unfiltered models · private only</p>
+                          </div>
                         </div>
+                        <Switch id="uncensored-toggle" checked={uncensored} onCheckedChange={setUncensored} />
                       </div>
-                      <Switch id="uncensored-toggle" checked={uncensored} onCheckedChange={setUncensored} />
-                    </div>
+                    ) : uncensoredStatus?.videoAvailable ? (
+                      <a
+                        href="/uncensored"
+                        className="flex items-center justify-between rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2.5 transition-colors hover:bg-rose-500/10"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Flame className="h-4 w-4 text-rose-500" />
+                          <div>
+                            <span className="text-sm font-medium">Uncensored video studio</span>
+                            <p className="text-[11px] text-muted-foreground">Your pass is active · text-to-video &amp; animate an image</p>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-rose-500" />
+                      </a>
+                    ) : null
                   ) : (
                     <a
                       href="/uncensored"
@@ -751,8 +773,14 @@ export default function Workspace() {
                       <div className="flex items-center gap-2">
                         <Flame className="h-4 w-4 text-rose-500" />
                         <div>
-                          <span className="text-sm font-medium">Unlock Uncensored mode</span>
-                          <p className="text-[11px] text-muted-foreground">No content filter · pay with crypto · 18+</p>
+                          <span className="text-sm font-medium">
+                            {mediaType === "video" ? "Unlock uncensored video" : "Unlock Uncensored mode"}
+                          </span>
+                          <p className="text-[11px] text-muted-foreground">
+                            {mediaType === "video"
+                              ? "No content filter · self-hosted GPU · 18+"
+                              : "No content filter · pay with crypto · 18+"}
+                          </p>
                         </div>
                       </div>
                       <ArrowRight className="h-4 w-4 text-rose-500" />

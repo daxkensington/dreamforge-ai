@@ -14,6 +14,14 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    // shared/ is included too — code there ships to both the server and the
+    // browser, so a test that lives beside it must actually run rather than be
+    // silently filtered out.
+    include: [
+      "server/**/*.test.ts",
+      "server/**/*.spec.ts",
+      "shared/**/*.test.ts",
+      "shared/**/*.spec.ts",
+    ],
   },
 });
