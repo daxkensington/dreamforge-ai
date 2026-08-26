@@ -43,6 +43,21 @@ export const UNCENSORED_PLANS: UncensoredPlan[] = [
   },
 ];
 
+/**
+ * Free uncensored previews per account, lifetime — the taste before the pass.
+ *
+ * Shared because the marketing pages advertise this number and the router
+ * enforces it; two copies would drift, and the one users see is the one that
+ * would be wrong.
+ */
+export const FREE_UNCENSORED_PREVIEWS = 3;
+
+/** The cheapest way in — what the landing pages should lead with. */
+export const UNCENSORED_ENTRY_PLAN: UncensoredPlan = UNCENSORED_PLANS.reduce(
+  (cheapest, p) => (p.priceUsd < cheapest.priceUsd ? p : cheapest),
+  UNCENSORED_PLANS[0],
+);
+
 /** Default / back-compat plan = the 30-day anchor. */
 export const UNCENSORED_PLAN: UncensoredPlan =
   UNCENSORED_PLANS.find((p) => p.id === "uncensored-30d")!;

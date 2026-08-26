@@ -26,12 +26,12 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "AI Image Generator No Filter | DreamForgeX",
     "metaDescription": "An AI image generator with no content filter. Prompts other tools reject just work, on our own GPUs, private by default, paid anonymously with crypto. 18+.",
     "h1": "The AI Image Generator With No Content Filter",
-    "intro": "If you have ever pasted a prompt into Midjourney, DALL-E, or Adobe Firefly and gotten slapped with \"this request violates our content policy,\" you already know the problem. The big platforms run aggressive filters that reject not just genuinely off-limits material but a huge swath of legitimate creative work: mature themes, edgy concept art, bold figure studies, gritty editorial scenes. DreamForgeX is built for everyone tired of fighting that wall. There is no content filter standing between your prompt and your image.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there is no third-party acceptable-use policy quietly overruling what you generate. Your prompts are processed exactly as written, with no silent rewrites and no refusals. Everything you make is private by default, never posted to a public gallery and never used to train anyone's model, and you can keep your billing anonymous by paying with crypto. The Uncensored Pass is $19 for 30 days. All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
+    "intro": "If you have ever pasted a prompt into Midjourney, DALL-E, or Adobe Firefly and gotten slapped with \"this request violates our content policy,\" you already know the problem. The big platforms run aggressive filters that reject not just genuinely off-limits material but a huge swath of legitimate creative work: mature themes, edgy concept art, bold figure studies, gritty editorial scenes. DreamForgeX is built for everyone tired of fighting that wall. There is no content filter standing between your prompt and your image.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there is no third-party acceptable-use policy quietly overruling what you generate. Your prompts are processed exactly as written, with no silent rewrites and no refusals. Everything you make is private by default, never posted to a public gallery and never used to train anyone's model, and you can keep your billing anonymous by paying with crypto. Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days. All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
     "bullets": [
       "No content filter, period. Prompts that trip a policy-violation error elsewhere are processed exactly as you wrote them, with no silent rewrites and no refusals.",
       "Runs on our own self-hosted GPUs instead of a rented API, so there is no third-party acceptable-use policy that can ban your account or override your prompt mid-render.",
       "Private by default: every image is yours alone, never published to a public feed, never used as training data, never shared.",
-      "Pay anonymously with crypto. No credit card, no real name on a statement. The Uncensored Pass is a flat $19 for 30 days of unlimited filter-free generation.",
+      "Pay anonymously with crypto. No credit card, no real name on a statement. Uncensored Passes start at $4.99 for a day; $19 covers 30 days and includes 500 credits.",
       "Built on uncensored open-source Flux models that follow your wording instead of a hidden safety prompt, so style, mood, and detail come out the way you actually described them."
     ],
     "sampleConcepts": [
@@ -57,7 +57,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay anonymous?",
-        "a": "The Uncensored Pass is $19 for 30 days and is paid with crypto, so there is no card number and no real name tied to a billing statement. You unlock filter-free generation immediately after payment confirms."
+        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days and is paid with crypto, so there is no card number and no real name tied to a billing statement. You unlock filter-free generation immediately after payment confirms."
       }
     ]
   },
@@ -66,13 +66,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Unfiltered AI Image Generator | DreamForgeX",
     "metaDescription": "An unfiltered AI image generator with the safety checker off. Open-source Flux models, no content filter, private by default, pay anonymously with crypto. 18+.",
     "h1": "The Unfiltered AI Image Generator That Doesn't Reject Your Prompt",
-    "intro": "Most AI art tools run a hidden safety checker that silently rewrites or rejects anything mature, edgy, or artistically risky. DreamForgeX takes a different path: we run raw open-source Flux models with the safety checker switched off, so the prompt that triggered a \"this request violates our policy\" wall elsewhere simply renders here. No prompt-laundering, no euphemisms, no guessing which word tripped the filter. You describe the image you actually want, and the model generates it.\n\nThis is genuinely unfiltered generation, not a relaxed setting. Because we own and operate the GPUs, there's no third-party provider waiting to ban your account over its acceptable-use policy. Everything you create is private by default and never shown publicly, and you can unlock the Uncensored Pass for $19 / 30 days paying anonymously with crypto, no card required. One compliance note: every image is 100% AI-generated, strictly 18+, and depicts fictional characters only. We do not allow content involving real, identifiable individuals or any illegal subject matter, full stop.",
+    "intro": "Most AI art tools run a hidden safety checker that silently rewrites or rejects anything mature, edgy, or artistically risky. DreamForgeX takes a different path: we run raw open-source Flux models with the safety checker switched off, so the prompt that triggered a \"this request violates our policy\" wall elsewhere simply renders here. No prompt-laundering, no euphemisms, no guessing which word tripped the filter. You describe the image you actually want, and the model generates it.\n\nThis is genuinely unfiltered generation, not a relaxed setting. Because we own and operate the GPUs, there's no third-party provider waiting to ban your account over its acceptable-use policy. Everything you create is private by default and never shown publicly, and you can unlock an Uncensored Pass from $4.99 a day, or $19 / 30 days paying anonymously with crypto, no card required. One compliance note: every image is 100% AI-generated, strictly 18+, and depicts fictional characters only. We do not allow content involving real, identifiable individuals or any illegal subject matter, full stop.",
     "bullets": [
       "Safety checker OFF on raw open-source Flux models, the censorship layer most platforms hard-wire is simply not in the pipeline here",
       "Prompts that get rejected, blurred, or auto-rewritten on Midjourney, DALL-E, and Adobe just work, no keyword games required",
       "Self-hosted GPUs mean no third-party acceptable-use policy and no account bans handed down from an upstream provider",
       "Private by default: your generations are never posted to a public feed, gallery, or 'explore' page, ever",
-      "Anonymous crypto checkout, $19 for a 30-day Uncensored Pass with no card, no billing name, no paper trail"
+      "Anonymous crypto checkout, from $4.99 for a day pass or $19 for a 30-day Uncensored Pass with no card, no billing name, no paper trail"
     ],
     "sampleConcepts": [
       "a moody chiaroscuro figure study lit by a single candle, oil-painting texture",
@@ -97,7 +97,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How private is this, and can I really pay without a card?",
-        "a": "Your generations are private by default and are never published to any public gallery or feed. Billing is handled in crypto, so the $19 Uncensored Pass for 30 days can be purchased anonymously with no credit card, no billing name, and no statement entry tying the purchase back to you."
+        "a": "Your generations are private by default and are never published to any public gallery or feed. Billing is handled in crypto, so an Uncensored Pass (from $4.99 a day, or $19 for 30 days) can be purchased anonymously with no credit card, no billing name, and no statement entry tying the purchase back to you."
       }
     ]
   },
@@ -112,7 +112,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "Unfiltered open-source Flux models run raw, with none of the post-training censorship baked into the consumer apps",
       "Self-hosted on GPUs we own — no third-party cloud AUP to suspend your account or kill your prompt mid-render",
       "Private by default: every image is yours alone, never posted to a public feed, gallery, or training set",
-      "Pay anonymously with crypto — the $19 / 30-day Uncensored Pass needs no card, no billing name, no identity"
+      "Pay anonymously with crypto — the Uncensored Pass — from $4.99 a day, or $19 / 30 days — needs no card, no billing name, no identity"
     ],
     "sampleConcepts": [
       "a sword-and-sorcery battlefield at dusk, blood-red sky, fallen banners",
@@ -137,7 +137,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Is it private, and can I pay without my name?",
-        "a": "Yes to both. Every image you generate is private by default — never shown in a public feed, gallery, or shared dataset. The Uncensored Pass is $19 for 30 days and is paid anonymously with crypto, so there's no card number, billing address, or real name attached to your account."
+        "a": "Yes to both. Every image you generate is private by default — never shown in a public feed, gallery, or shared dataset. Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days and is paid anonymously with crypto, so there's no card number, billing address, or real name attached to your account."
       }
     ]
   },
@@ -146,13 +146,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Private AI Image Generator, Pay With Crypto | DreamForgeX",
     "metaDescription": "A private, uncensored AI image generator you pay for anonymously with crypto. No card, no name, no trace. Every generation stays private by default. 18+.",
     "h1": "Private AI Image Generator You Pay For With Crypto",
-    "intro": "Most \"AI image generators\" want your credit card, your email, and your trust that they won't log every prompt to your name. DreamForgeX is built for the opposite. This is a private AI image generator you pay for with crypto, so there's no card on file, no billing address, and no real identity tied to what you create. You buy an Uncensored Pass with Bitcoin, Litecoin, Monero, or USDT, and you're in. No bank statement line item, no payment processor watching your prompts.\n\nPrivacy isn't a toggle here, it's the default. Your generations are never posted to a public feed, never used to train models you didn't agree to, and never surfaced in a community gallery. It's just you and your own private workspace, running on our self-hosted GPUs so no third-party platform can flag, throttle, or ban your account over a prompt. Everything is 100% AI-generated and limited to fictional characters only. Mature and NSFW artistic themes are allowed; depictions of real, identifiable people are not.",
+    "intro": "Most \"AI image generators\" want your credit card, your email, and your trust that they won't log every prompt to your name. DreamForgeX is built for the opposite. This is a private AI image generator you pay for with crypto, so there's no card on file, no billing address, and no real identity tied to what you create. You buy an Uncensored Pass with Bitcoin, and you're in. No bank statement line item, no payment processor watching your prompts.\n\nPrivacy isn't a toggle here, it's the default. Your generations are never posted to a public feed, never used to train models you didn't agree to, and never surfaced in a community gallery. It's just you and your own private workspace, running on our self-hosted GPUs so no third-party platform can flag, throttle, or ban your account over a prompt. Everything is 100% AI-generated and limited to fictional characters only. Mature and NSFW artistic themes are allowed; depictions of real, identifiable people are not.",
     "bullets": [
       "Pay anonymously with crypto, no credit card, no name, no billing address, no statement footprint",
       "Generations are private by default, never published to a public feed or community gallery",
       "Runs on our own self-hosted GPUs, so there's no third-party processor or platform watching your prompts",
       "No content filter blocking mature, artistic, or NSFW concepts that other tools silently reject",
-      "Uncensored Pass is a flat $19 for 30 days, paid in BTC, LTC, XMR, or USDT, no subscription trap"
+      "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, paid in Bitcoin, no subscription trap"
     ],
     "sampleConcepts": [
       "a moody noir boudoir portrait lit by a single window slat",
@@ -165,11 +165,11 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "faq": [
       {
         "q": "How do I pay with crypto, and which coins work?",
-        "a": "At checkout you pick a coin, we show you a one-time deposit address and amount, and once the network confirms, your Uncensored Pass activates automatically. We accept Bitcoin, Litecoin, USDT, and Monero (XMR) for the most private option. There's no card form, no name field, and nothing for a bank to itemize."
+        "a": "At checkout we show you a one-time Bitcoin deposit address and amount, and once the network confirms, your Uncensored Pass activates automatically. We accept Bitcoin (on-chain). There's no card form, no name field, and nothing for a bank to itemize."
       },
       {
         "q": "Is it actually anonymous, or do you still track me?",
-        "a": "There's no credit card and no real-name requirement, so payment itself carries no identity. We don't sell data or run third-party ad trackers on your workspace. If you want maximum separation, pay with Monero and use a throwaway login email. The less you give us, the less there is to tie back to you."
+        "a": "There's no credit card and no real-name requirement, so payment itself carries no identity. We don't sell data or run third-party ad trackers on your workspace. If you want maximum separation, use a throwaway login email and a fresh Bitcoin address. The less you give us, the less there is to tie back to you."
       },
       {
         "q": "Are my generations ever shown publicly or used for training?",
@@ -191,7 +191,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "Full uncensored Flux pipeline running in your browser — no 24GB GPU, no CUDA, no model downloads, no ComfyUI setup",
       "Hosted on our own self-hosted GPUs, so there's no safety checker and no third-party cloud AUP silently rejecting prompts",
       "Identical creative range to a local Flux install — artistic, mature and NSFW themes that Midjourney, DALL-E and Adobe refuse",
-      "Private by default: your generations are never shown publicly, and the Uncensored Pass is just $19 for 30 days",
+      "Private by default: your generations are never shown publicly, and Uncensored Passes start at just $4.99 for a day pass, or $19 for 30 days",
       "Pay anonymously with crypto — no credit card, no billing name, no account tied to your real identity"
     ],
     "sampleConcepts": [
@@ -226,13 +226,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Realistic Uncensored AI Image Generator | DreamForgeX",
     "metaDescription": "Generate photorealistic uncensored AI images with no content filter. Self-hosted GPUs, private by default, anonymous crypto pay. 18+, fictional characters only.",
     "h1": "Realistic Uncensored AI Image Generator",
-    "intro": "Most \"realistic\" AI image tools quietly cap how far you can push. The moment a prompt drifts toward mature, sensual, or simply adult subject matter, the big platforms blur it, swap it, or refuse outright. DreamForgeX takes the opposite approach: a genuinely photorealistic engine with no content filter, tuned for true-to-life skin texture, natural lighting, believable anatomy, and the kind of cinematic depth that makes an image read as a real photograph rather than obvious AI art.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there's no third-party acceptable-use policy waiting to reject your prompt. Generations are private by default and never shown publicly, and you can unlock the Uncensored Pass anonymously with crypto for $19 / 30 days. Every image is 100% AI-generated and depicts fictional characters only. We do not create or allow images of real, identifiable people, and all content is strictly 18+.",
+    "intro": "Most \"realistic\" AI image tools quietly cap how far you can push. The moment a prompt drifts toward mature, sensual, or simply adult subject matter, the big platforms blur it, swap it, or refuse outright. DreamForgeX takes the opposite approach: a genuinely photorealistic engine with no content filter, tuned for true-to-life skin texture, natural lighting, believable anatomy, and the kind of cinematic depth that makes an image read as a real photograph rather than obvious AI art.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there's no third-party acceptable-use policy waiting to reject your prompt. Generations are private by default and never shown publicly, and you can unlock an Uncensored Pass anonymously with crypto from $4.99 a day, or $19 / 30 days. Every image is 100% AI-generated and depicts fictional characters only. We do not create or allow images of real, identifiable people, and all content is strictly 18+.",
     "bullets": [
       "Photoreal output engineered for lifelike skin, pores, natural light, and lens-accurate depth of field, not the plastic, over-smoothed look filtered tools produce",
       "No content filter: mature, sensual, and adult-themed photorealistic prompts that Midjourney, DALL-E, and Adobe reject simply render here",
       "Runs entirely on our own self-hosted GPUs, so there's no third-party AUP that can ban your prompts or your account mid-session",
       "Private by default: your realistic renders are never published, shared to a public feed, or shown to anyone but you",
-      "Anonymous crypto checkout, $19 for a 30-day Uncensored Pass, no credit card and no real name required"
+      "Anonymous crypto checkout, from $4.99 for a day pass or $19 for a 30-day Uncensored Pass, no credit card and no real name required"
     ],
     "sampleConcepts": [
       "A cinematic golden-hour portrait of a fictional woman on a balcony, shot on 85mm with shallow depth of field",
@@ -266,13 +266,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Anime Uncensored AI Generator | DreamForgeX",
     "metaDescription": "Generate uncensored anime art with no content filter. Mature illustrated characters, fictional only, private by default, crypto-paid. 18+ AI image generator.",
     "h1": "Anime Uncensored AI Generator — Illustrated Art With No Content Filter",
-    "intro": "Most \"anime AI\" tools quietly cap how far you can push a character. Ask for anything mature, edgy, or even mildly suggestive and the prompt gets silently rewritten, blurred, or rejected. DreamForgeX is built differently. Our anime engine runs on uncensored, open-source Flux and anime-tuned diffusion models hosted on our own GPUs — so the prompts other generators refuse simply render. Clean linework, expressive faces, painterly shading, and full creative control over mature and NSFW themes, all in the styles you'd recognize from manga panels, cel-shaded keyframes, and modern illustrated splash art.\n\nEverything here is 100% AI-generated and limited to fictional, original characters — no real people, no likeness of any actual individual. Every account is 18+. Your generations are private by default and never published to a public feed, and you can unlock the Uncensored Pass anonymously with crypto for $19 per 30 days — no card, no name, no third-party AUP looking over your shoulder.",
+    "intro": "Most \"anime AI\" tools quietly cap how far you can push a character. Ask for anything mature, edgy, or even mildly suggestive and the prompt gets silently rewritten, blurred, or rejected. DreamForgeX is built differently. Our anime engine runs on uncensored, open-source Flux and anime-tuned diffusion models hosted on our own GPUs — so the prompts other generators refuse simply render. Clean linework, expressive faces, painterly shading, and full creative control over mature and NSFW themes, all in the styles you'd recognize from manga panels, cel-shaded keyframes, and modern illustrated splash art.\n\nEverything here is 100% AI-generated and limited to fictional, original characters — no real people, no likeness of any actual individual. Every account is 18+. Your generations are private by default and never published to a public feed, and you can unlock an Uncensored Pass anonymously with crypto from $4.99 a day, or $19 per 30 days — no card, no name, no third-party AUP looking over your shoulder.",
     "bullets": [
       "No content filter on anime prompts — mature, suggestive, and NSFW illustrated themes render instead of getting blocked or auto-rewritten",
       "Anime-tuned open-source models (Flux + illustrated diffusion checkpoints) for clean lineart, cel shading, and painterly splash-art looks",
       "Runs entirely on our self-hosted GPUs — no third-party provider AUP to ban your style or flag your prompts",
       "Private by default: nothing you create is posted to a public gallery or visible to anyone but you",
-      "Pay anonymously with crypto — Uncensored Pass is $19 / 30 days, no card or real name required"
+      "Pay anonymously with crypto — Uncensored Passes start at $4.99 a day, or $19 / 30 days, no card or real name required"
     ],
     "sampleConcepts": [
       "A silver-haired sword maiden in glowing cel-shaded armor under a blood-red moon",
@@ -297,7 +297,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and is it private?",
-        "a": "You unlock the Uncensored Pass anonymously with crypto for $19 per 30 days — no credit card, no name, no billing trail. Your generations are private by default and never appear in a public feed. Because we run our own GPUs, there's no outside payment processor or model provider attaching an AUP to what you make."
+        "a": "You unlock an Uncensored Pass anonymously with crypto from $4.99 a day, or $19 per 30 days — no credit card, no name, no billing trail. Your generations are private by default and never appear in a public feed. Because we run our own GPUs, there's no outside payment processor or model provider attaching an AUP to what you make."
       }
     ]
   },
@@ -306,13 +306,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Fantasy Uncensored AI Art Generator | DreamForgeX",
     "metaDescription": "Create fantasy uncensored AI art with no content filter. Open-source Flux models on our own GPUs, private by default, pay anonymously with crypto. 18+.",
     "h1": "Fantasy Uncensored AI Art Generator",
-    "intro": "High fantasy was never meant to be sanitized. Yet the mainstream generators flatten your sorceresses into Sunday-school illustrations, refuse half your dark-elf prompts, and quietly strip the menace out of every demon lord. DreamForgeX runs unfiltered open-source Flux models on our own self-hosted GPUs, so the mature, mythical, and macabre corners of the genre render exactly as you imagine them — battle-scarred valkyries, seductive succubi, blood-soaked barbarian queens, and eldritch horrors that would trip any corporate safety filter.\n\nBecause there's no content filter in the pipeline, prompts that Midjourney, DALL-E, and Adobe reject simply work here. Everything is private by default and never displayed publicly, and you can unlock the Uncensored Pass for $19 / 30 days paying anonymously with crypto — no card, no name attached. All output is 100% AI-generated depicting fictional characters only; nothing here references real individuals. Conjure the worlds the giants are too timid to render, with the depth, atmosphere, and adult edge that epic fantasy has always demanded.",
+    "intro": "High fantasy was never meant to be sanitized. Yet the mainstream generators flatten your sorceresses into Sunday-school illustrations, refuse half your dark-elf prompts, and quietly strip the menace out of every demon lord. DreamForgeX runs unfiltered open-source Flux models on our own self-hosted GPUs, so the mature, mythical, and macabre corners of the genre render exactly as you imagine them — battle-scarred valkyries, seductive succubi, blood-soaked barbarian queens, and eldritch horrors that would trip any corporate safety filter.\n\nBecause there's no content filter in the pipeline, prompts that Midjourney, DALL-E, and Adobe reject simply work here. Everything is private by default and never displayed publicly, and you can unlock an Uncensored Pass from $4.99 a day, or $19 / 30 days paying anonymously with crypto — no card, no name attached. All output is 100% AI-generated depicting fictional characters only; nothing here references real individuals. Conjure the worlds the giants are too timid to render, with the depth, atmosphere, and adult edge that epic fantasy has always demanded.",
     "bullets": [
       "No content filter on fantasy themes — succubi, demon lords, war-torn warrior queens and dark-elf scenes that mainstream tools auto-reject render without a fight",
       "Unfiltered open-source Flux models tuned for painterly fantasy detail: glowing runes, ornate armor, dragon scales, ethereal lighting and cinematic atmosphere",
       "Runs entirely on our own self-hosted GPUs, so no third-party AUP can ban your mythical or mature prompts mid-generation",
       "Private by default — every enchantress, beast and battlefield you create is yours alone and never shown publicly",
-      "Pay anonymously with crypto: the Uncensored Pass is $19 for 30 days, no card and no real name required"
+      "Pay anonymously with crypto: Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, no card and no real name required"
     ],
     "sampleConcepts": [
       "a battle-scarred valkyrie in cracked obsidian armor standing over a frozen battlefield at dusk",
@@ -337,14 +337,14 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can I stay anonymous?",
-        "a": "The Uncensored Pass is $19 for 30 days and you pay anonymously with crypto — no credit card and no real name needed. Combined with our self-hosted infrastructure, that keeps your fantasy art creation private end to end."
+        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days and you pay anonymously with crypto — no credit card and no real name needed. Combined with our self-hosted infrastructure, that keeps your fantasy art creation private end to end."
       }
     ]
   },
   "cyberpunk": {
     "slug": "cyberpunk",
     "title": "Cyberpunk Uncensored AI Art Generator | DreamForgeX",
-    "metaDescription": "Generate cyberpunk and sci-fi art with zero content filters. Self-hosted Flux GPUs, private by default, pay anonymously with crypto. 18+, AI-only. $19/30 days.",
+    "metaDescription": "Generate cyberpunk and sci-fi art with zero content filters. Self-hosted Flux GPUs, private by default, pay anonymously with crypto. 18+, AI-only. From $4.99; $19/30 days.",
     "h1": "Cyberpunk Uncensored AI Art Generator",
     "intro": "Neon-soaked megacities, chrome-laced rebels, rain-slick alleys lit by holographic ads — the cyberpunk aesthetic was built on edge, danger, and grit. So why do mainstream generators keep sanitizing it? Midjourney, DALL-E and Adobe routinely flag the exact tension that makes the genre work: the leather and latex, the mature dystopian themes, the bold pinup and street-samurai energy. DreamForgeX runs no content filter. The prompts those tools reject just render here.\n\nWe power every image on our own self-hosted GPUs running unfiltered open-source Flux models, so there's no third-party acceptable-use policy waiting to ban your account mid-project. Your generations are private by default — never published to a public feed, never shown to anyone but you. And you can pay anonymously with crypto, no card or real name required. Every output is 100% AI-generated, depicts fictional characters only, and is strictly for adults 18 and over. Build the neon future you actually imagined, not the watered-down version a filter will allow.",
     "bullets": [
@@ -352,7 +352,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "Unfiltered open-source Flux models tuned for neon lighting, wet-pavement reflections, holographic signage, and cinematic sci-fi atmosphere out of the box",
       "Runs entirely on our own self-hosted GPUs — no OpenAI, Adobe, or third-party AUP that can ban your account for mature sci-fi art",
       "Private by default: every cyberpunk render is yours alone, never posted to a public gallery or shared feed",
-      "Pay anonymously with crypto — the Uncensored Pass is $19 for 30 days, no card, no real name, no billing trail"
+      "Pay anonymously with crypto — Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, no card, no real name, no billing trail"
     ],
     "sampleConcepts": [
       "A neon-lit android femme fatale in a rain-soaked Neo-Tokyo alley, holographic ads reflecting in the puddles",
@@ -377,7 +377,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and is it anonymous?",
-        "a": "The Uncensored Pass is $19 for 30 days, paid with crypto. There's no credit card, no real name, and no billing trail — just an anonymous, private workflow from payment to generation."
+        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, paid with crypto. There's no credit card, no real name, and no billing trail — just an anonymous, private workflow from payment to generation."
       }
     ]
   },
@@ -392,7 +392,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "Self-hosted GPUs running open-source Flux — no Midjourney AUP, no Discord moderation, no third-party processor deciding what you're allowed to make",
       "Private by default — unlike Midjourney's public Discord-first gallery, your generations are never posted, indexed, or shared anywhere",
       "Pay anonymously with Bitcoin via BTCPay — no card, no subscription tied to your name, no awkward 'AI image' line item",
-      "$19 for 30 days plus 500 bonus credits — one-time, no auto-renew, cheaper than a Midjourney Standard plan that still won't do this"
+      "From $4.99 for a day pass; $19 for 30 days plus 500 bonus credits — one-time, no auto-renew, cheaper than a Midjourney Standard plan that still won't do this"
     ],
     "sampleConcepts": [
       "A moody chiaroscuro boudoir portrait lit by a single window",
@@ -436,7 +436,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "No content filter — the unfiltered Flux models render mature and artistic prompts that Civitai's post-2025 restrictions now block",
       "Crypto-paid and processor-proof — pay anonymously with Bitcoin, so no card processor can pull the plug on adult content",
       "Private by default — your generations are never posted to a public feed, model page, or gallery the way Civitai uploads are",
-      "Uncensored Pass is $19 for 30 days — flat access, no per-image surge, no card on file, no real-name account"
+      "Uncensored Passes start at $4.99 a day, or $19 for 30 days — flat access, no per-image surge, no card on file, no real-name account"
     ],
     "sampleConcepts": [
       "a moody film-noir boudoir portrait lit by a single venetian-blind window",
@@ -465,7 +465,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "What does it cost and how do I pay?",
-        "a": "The Uncensored Pass is $19 for 30 days of access plus bonus credits — flat, with no per-image surge pricing and no card stored on file. You pay anonymously with Bitcoin. Because there's no card processor in the loop, your payment can't be used to throttle or ban the content you generate."
+        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days of access plus bonus credits — flat, with no per-image surge pricing and no card stored on file. You pay anonymously with Bitcoin. Because there's no card processor in the loop, your payment can't be used to throttle or ban the content you generate."
       }
     ]
   },
@@ -480,7 +480,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "Zero setup: no Automatic1111, no ComfyUI graphs, no model downloads, no torch/CUDA debugging — open a browser and generate",
       "Datacenter GPUs, not your 8GB card: bigger resolutions and faster renders than a local rig, with no out-of-memory crashes",
       "Uncensored open-source Flux + SD-lineage checkpoints on our OWN self-hosted GPUs, so no third-party cloud AUP can ban your account",
-      "Private by default and crypto-paid — your gallery is never public, and the $19/30-day Uncensored Pass needs no card or real name"
+      "Private by default and crypto-paid — your gallery is never public, and the Uncensored Pass — from $4.99 a day, or $19/30 days — needs no card or real name"
     ],
     "sampleConcepts": [
       "a moody cyberpunk boudoir scene lit by neon rain through a window",
@@ -505,7 +505,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How private is it, and how does crypto payment work?",
-        "a": "Your generations are private by default and never shown publicly — no community feed, no shared gallery. The Uncensored Pass is $19 for 30 days, paid anonymously with crypto, so there's no card and no real name required. You get local-style privacy without keeping any files on your own machine."
+        "a": "Your generations are private by default and never shown publicly — no community feed, no shared gallery. Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, paid anonymously with crypto, so there's no card and no real name required. You get local-style privacy without keeping any files on your own machine."
       }
     ]
   },
@@ -586,8 +586,181 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "faq": [
       { "q": "Does it do both text-to-video and image-to-video?", "a": "Yes. You can generate a clip from a text prompt, or animate one of the uncensored images you created here (image-to-video). Both run on the open-source Wan 2.2 model on our own GPUs with no content filter." },
       { "q": "What are the limits?", "a": "Only legal ones. Every clip is fully AI-generated, fictional, and 18+. We categorically exclude minors and never generate real, identifiable individuals — a strict moderation gate refuses those prompts before anything renders." },
-      { "q": "How do I pay and stay anonymous?", "a": "Video is part of the Uncensored Pass — $19 for 30 days, paid with crypto, so there's no card number and no real name on a statement. Video draws from the credits the pass includes." },
+      { "q": "How do I pay and stay anonymous?", "a": "Video is part of the Uncensored Pass — from $4.99 a day, or $19 for 30 days, paid with crypto, so there's no card number and no real name on a statement. Video draws from the credits the pass includes." },
       { "q": "Will anyone see what I make?", "a": "No. Every generation is private by default. Uncensored images and videos are explicitly barred from the public gallery, explore feed, and share links." }
+    ]
+  }
+,
+  "hentai-ai-generator": {
+    "slug": "hentai-ai-generator",
+    "title": "Hentai AI Generator — Uncensored Anime Art | DreamForgeX",
+    "metaDescription": "An uncensored hentai and anime AI generator. Prompts the mainstream tools reject just render, on our own GPUs, private by default. 3 free previews, 18+.",
+    "h1": "Hentai AI Generator — Uncensored Anime, No Filter",
+    "intro": "Anime is the style most aggressively policed by mainstream AI art tools. Ask Midjourney or DALL-E for mature anime work and you'll meet a content-policy wall long before you get to the interesting part — even for the kind of figure work and adult-oriented illustration that anime as a medium has always contained. DreamForgeX runs a dedicated anime style on uncensored open-source models hosted on our own GPUs, so your prompt renders as written.\n\nThe anime preset steers the model toward clean linework, cel shading, expressive faces and saturated colour, and you can push it toward whatever composition and mood you describe. Nothing is silently rewritten and nothing comes back as a policy error. Everything you make is private by default and never enters a public feed. Try 3 free previews before paying anything; passes start at $4.99. All output is 100% AI-generated, depicts fictional characters only, and is for adults 18 and over.",
+    "bullets": [
+      "A purpose-built anime style — cel shading, clean linework, expressive faces — running on uncensored open-source models, not a filtered API.",
+      "Prompts that return a content-policy error on Midjourney, DALL-E or Firefly are processed here exactly as you wrote them.",
+      "Self-hosted GPUs, so no upstream provider's acceptable-use policy can override your prompt or close your account.",
+      "Private by default: never posted to a gallery, never in the explore feed, never used as training data.",
+      "3 free previews before you pay. Passes start at $4.99 for 24 hours, paid anonymously in Bitcoin."
+    ],
+    "sampleConcepts": [
+      "A twin-tailed anime heroine in a rain-soaked neon alley, cel shaded, dramatic rim light",
+      "A cyberpunk anime pilot in a cockpit lit by console glow, detailed linework",
+      "A fantasy anime sorceress mid-incantation, glowing sigils, sweeping robes",
+      "A moody after-hours izakaya scene in 90s anime film grain",
+      "A celestial anime figure among drifting koi and lantern light"
+    ],
+    "faq": [
+      {
+        "q": "How is this different from an anime generator that filters output?",
+        "a": "Most anime-capable tools rent compute from providers whose acceptable-use policies forbid mature content, so the filter is imposed from above and cannot be turned off. We run uncensored open-source models on hardware we control, so the model follows your wording instead of a hidden safety prompt."
+      },
+      {
+        "q": "Can I control the style?",
+        "a": "Yes. Anime is one of four styles — alongside realistic, fantasy and artistic — and each steers the model differently. Pick the style, then describe the composition, lighting and mood you want in the prompt like you normally would."
+      },
+      {
+        "q": "How do I pay, and can it stay private?",
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+      },
+      {
+        "q": "Will anyone see what I make?",
+        "a": "No. Every uncensored generation is private by default. It is never posted to the public gallery, never appears in the explore feed, and is never reachable from a share link. Your prompts and outputs are not used to train models."
+      },
+      {
+        "q": "What is off-limits?",
+        "a": "Only what the law puts off-limits, and those refusals are absolute. Every image is fully AI-generated, depicts fictional characters, and is intended for adults 18 and over. We categorically refuse any sexualisation of minors, and we do not generate sexual or nude depictions of real, identifiable people. A moderation gate checks every prompt before anything renders, on every tier — an Uncensored Pass does not buy an exception."
+      }
+    ]
+  },
+  "free-nsfw-ai-generator": {
+    "slug": "free-nsfw-ai-generator",
+    "title": "Free NSFW AI Generator — 3 Free Previews, No Card | DreamForgeX",
+    "metaDescription": "Try an uncensored NSFW AI image generator free. 3 free previews, no credit card, private by default. Passes from $4.99 in crypto if you want more. 18+.",
+    "h1": "Free NSFW AI Generator — Try It Before You Pay",
+    "intro": "Most \"free\" NSFW AI generators are one of three things: a bait page that wants your card before it renders anything, a Discord queue you wait in for twenty minutes, or a filtered tool that quietly refuses the prompt you actually came to write. DreamForgeX gives you 3 genuinely free uncensored previews. No credit card, no queue, no bait — sign up with an email and generate.\n\nThe previews run on the same uncensored open-source models as the paid tier, on our own GPUs, so what you see is what the product actually does rather than a watered-down teaser. They're watermarked and private. If you want to keep going, passes start at $4.99 for 24 hours and are paid on-chain in Bitcoin, so there's no card on file and no real name on a statement. All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
+    "bullets": [
+      "3 free uncensored previews, no credit card and no payment details of any kind up front.",
+      "Same uncensored models as the paid tier — the free previews are the real product, not a filtered demo.",
+      "No Discord queue and no waiting room. Type the prompt, get the image.",
+      "Private by default: previews are never posted publicly and never used as training data.",
+      "If you want more, passes start at $4.99 for 24 hours, paid anonymously in Bitcoin."
+    ],
+    "sampleConcepts": [
+      "A chiaroscuro figure study lit by a single window",
+      "A neon-lit boudoir scene with heavy film grain",
+      "A fantasy warrior resting by firelight after battle",
+      "A rain-soaked rooftop silhouette against city glow",
+      "An art-nouveau portrait framed by gold filigree"
+    ],
+    "faq": [
+      {
+        "q": "Is it actually free, or does it want a card?",
+        "a": "Actually free. You get 3 uncensored previews on a free account with no card, no billing details and no trial that quietly converts. When the previews are used up, nothing charges you — you simply choose whether to buy a pass."
+      },
+      {
+        "q": "What's different about the paid pass?",
+        "a": "Volume and scope. The free previews are watermarked and limited to 3. A pass removes the preview cap, includes credits (60 on the day pass through 500 on the 30-day), and unlocks uncensored video generation as well as images."
+      },
+      {
+        "q": "How do I pay, and can it stay private?",
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+      },
+      {
+        "q": "Will anyone see what I make?",
+        "a": "No. Every uncensored generation is private by default. It is never posted to the public gallery, never appears in the explore feed, and is never reachable from a share link. Your prompts and outputs are not used to train models."
+      },
+      {
+        "q": "What is off-limits?",
+        "a": "Only what the law puts off-limits, and those refusals are absolute. Every image is fully AI-generated, depicts fictional characters, and is intended for adults 18 and over. We categorically refuse any sexualisation of minors, and we do not generate sexual or nude depictions of real, identifiable people. A moderation gate checks every prompt before anything renders, on every tier — an Uncensored Pass does not buy an exception."
+      }
+    ]
+  },
+  "nsfw-ai-image-generator": {
+    "slug": "nsfw-ai-image-generator",
+    "title": "NSFW AI Image Generator — Uncensored, Private | DreamForgeX",
+    "metaDescription": "An NSFW AI image generator with no content filter — uncensored open models on self-hosted GPUs, private by default, crypto billing. 3 free previews. 18+.",
+    "h1": "NSFW AI Image Generator",
+    "intro": "An NSFW AI image generator is only useful if it actually generates. Most tools marketed that way are a filtered model with a suggestive landing page: you write the prompt, wait, and get a policy refusal or a sanitised image that ignored half of what you asked for. DreamForgeX runs uncensored open-source models on GPUs we own, which is the only arrangement where \"no filter\" can be a technical fact rather than a marketing line.\n\nThat ownership is the whole difference. Tools built on rented API compute inherit their provider's acceptable-use policy, so the filter is imposed from above and no amount of prompt engineering removes it. Because we host the models ourselves, your prompt reaches them as written — no silent rewrites, no refusals, no account bans for generating permitted adult work. Four styles steer output toward photoreal, anime, fantasy or artistic. Everything is private by default, billing is on-chain Bitcoin, and 3 previews are free. All output is AI-generated, fictional, and 18+.",
+    "bullets": [
+      "No content filter as a matter of infrastructure, not policy — we own the GPUs the models run on.",
+      "Four styles (realistic, anime, fantasy, artistic) that genuinely change the output, not just the prompt text.",
+      "Uncensored video too: generate a clip from text, or animate an uncensored image you already made.",
+      "Private by default — barred from the public gallery, explore feed and share links by design.",
+      "3 free previews, then passes from $4.99 for 24 hours, paid anonymously in Bitcoin."
+    ],
+    "sampleConcepts": [
+      "A photoreal figure study in soft window light, shallow depth of field",
+      "A neo-noir scene lit only by a flickering hotel sign",
+      "An anime character on a rooftop at dusk, cel shaded",
+      "A baroque painted portrait with candlelit skin tones",
+      "A cyberpunk interior with volumetric haze and hard neon"
+    ],
+    "faq": [
+      {
+        "q": "How do I know the filter is really off?",
+        "a": "Because there is no third party in the path who could impose one. Filtered tools call an external API whose terms forbid mature content. We load uncensored open-source weights onto our own GPUs, so nothing between your prompt and the model is entitled to rewrite or refuse it."
+      },
+      {
+        "q": "Does image quality suffer compared with the big platforms?",
+        "a": "No. It runs on current open-source Flux models with a realism LoRA on the photoreal style, which is what most of the well-known platforms are built on underneath. What you lose is the filter, not the fidelity."
+      },
+      {
+        "q": "How do I pay, and can it stay private?",
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+      },
+      {
+        "q": "Will anyone see what I make?",
+        "a": "No. Every uncensored generation is private by default. It is never posted to the public gallery, never appears in the explore feed, and is never reachable from a share link. Your prompts and outputs are not used to train models."
+      },
+      {
+        "q": "What is off-limits?",
+        "a": "Only what the law puts off-limits, and those refusals are absolute. Every image is fully AI-generated, depicts fictional characters, and is intended for adults 18 and over. We categorically refuse any sexualisation of minors, and we do not generate sexual or nude depictions of real, identifiable people. A moderation gate checks every prompt before anything renders, on every tier — an Uncensored Pass does not buy an exception."
+      }
+    ]
+  },
+  "uncensored-ai-art-generator": {
+    "slug": "uncensored-ai-art-generator",
+    "title": "Uncensored AI Art Generator — No Content Policy | DreamForgeX",
+    "metaDescription": "An uncensored AI art generator for mature and edgy work the big platforms refuse — horror, gore, figure studies, political satire. Self-hosted, private. 18+.",
+    "h1": "Uncensored AI Art Generator",
+    "intro": "Content filters don't only block pornography. They block a great deal of legitimate art: horror and body-horror concept work, battlefield and gore scenes for games, political and religious satire, drug-culture illustration, unflinching figure studies of the kind that fill every life-drawing class and every major museum. Artists working in those registers spend more time fighting refusals than making images. DreamForgeX exists for that work.\n\nWe run uncensored open-source models on our own GPUs, so the model interprets your prompt instead of a hidden safety layer interpreting it first. That matters most for exactly the prompts that are hardest to phrase around a filter — a wound, a bruise, a corpse, a caricature of a public figure in a political cartoon, a nude in a classical composition. Four styles steer toward photoreal, anime, fantasy or artistic. Everything is private by default. 3 previews are free; passes start at $4.99. All output is AI-generated, fictional, and 18+.",
+    "bullets": [
+      "Built for mature work filters over-block: horror and gore, figure studies, satire, gritty editorial and concept art.",
+      "No silent prompt rewriting — the wording you choose is the wording the model receives.",
+      "Self-hosted open-source models, so no upstream acceptable-use policy can ban your account for permitted work.",
+      "Private by default and never used as training data — your concept work stays yours.",
+      "3 free previews, then passes from $4.99 for 24 hours, paid anonymously in Bitcoin."
+    ],
+    "sampleConcepts": [
+      "A body-horror creature design in wet clay and bone, studio lit",
+      "A battlefield medic scene in muted desaturated colour, documentary framing",
+      "A classical reclining nude in the manner of an oil painting",
+      "A grotesque carnival barker in heavy German-expressionist shadow",
+      "A plague-doctor pilgrimage across a salt flat at dusk"
+    ],
+    "faq": [
+      {
+        "q": "I'm making horror and gore concept art, not adult content. Is this the right tool?",
+        "a": "Yes, and it's one of the most common reasons people end up here. Mainstream filters treat wounds, blood, corpses and body horror as violations regardless of artistic intent, which makes them nearly unusable for horror, games and editorial illustration. Running the model unfiltered removes that obstacle."
+      },
+      {
+        "q": "Can I generate political or religious satire?",
+        "a": "Satire and caricature of public figures in a non-sexual context is permitted — it is protected expression and filters routinely over-block it. The hard line is sexual content: we do not generate sexual or nude depictions of real, identifiable people under any circumstances."
+      },
+      {
+        "q": "How do I pay, and can it stay private?",
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+      },
+      {
+        "q": "Will anyone see what I make?",
+        "a": "No. Every uncensored generation is private by default. It is never posted to the public gallery, never appears in the explore feed, and is never reachable from a share link. Your prompts and outputs are not used to train models."
+      },
+      {
+        "q": "What is off-limits?",
+        "a": "Only what the law puts off-limits, and those refusals are absolute. Every image is fully AI-generated, depicts fictional characters, and is intended for adults 18 and over. We categorically refuse any sexualisation of minors, and we do not generate sexual or nude depictions of real, identifiable people. A moderation gate checks every prompt before anything renders, on every tier — an Uncensored Pass does not buy an exception."
+      }
     ]
   }
 };

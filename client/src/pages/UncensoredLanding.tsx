@@ -6,11 +6,17 @@ import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import type { UncensoredLanding as Landing } from "@shared/uncensoredLanding";
+import {
+  FREE_UNCENSORED_PREVIEWS,
+  UNCENSORED_ENTRY_PLAN,
+  UNCENSORED_PLANS,
+} from "@shared/uncensoredPlans";
 
 /**
  * Renders one /uncensored/<slug> SEO landing page from registry data. All copy
  * is data-driven (shared/uncensoredLanding.ts) so the silo scales without new
- * components. Each page funnels to the $19 Uncensored Pass on /uncensored.
+ * components. Each page funnels into the free previews on /uncensored,
+ * with the full pass ladder priced from shared/uncensoredPlans.ts.
  */
 export default function UncensoredLanding({ page }: { page: Landing }) {
   return (
@@ -49,24 +55,57 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
           ))}
         </div>
 
-        {/* Pricing CTA */}
+        {/* Pricing CTA — the whole ladder, led by the free taste.
+            These landers are the site's best-ranking non-brand pages, and they
+            used to show a hardcoded "$19 / 30 days": the most expensive plan,
+            with no mention of the cheaper way in or of the free previews.
+            Priced from the shared ladder so this can never drift from what
+            checkout actually bills. */}
         <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-8 text-center">
           <div className="flex items-baseline justify-center gap-2">
-            <span className="text-4xl font-bold">$19</span>
-            <span className="text-muted-foreground">/ 30 days</span>
+            <span className="text-muted-foreground">from</span>
+            <span className="text-4xl font-bold">${UNCENSORED_ENTRY_PLAN.priceUsd}</span>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
             No content filter · private by default · pay anonymously with crypto.
           </p>
+
+          <div className="mt-5 flex flex-wrap items-stretch justify-center gap-2">
+            {UNCENSORED_PLANS.map((p) => (
+              <div
+                key={p.id}
+                className={`min-w-[9rem] flex-1 rounded-xl border px-3 py-2.5 text-left ${
+                  p.highlight ? "border-rose-500/50 bg-rose-500/10" : "border-border/60 bg-card/40"
+                }`}
+              >
+                <div className="text-sm font-semibold">${p.priceUsd}</div>
+                <div className="text-xs text-muted-foreground">{p.label}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {p.durationDays} {p.durationDays === 1 ? "day" : "days"} · {p.bonusCredits} credits
+                </div>
+              </div>
+            ))}
+          </div>
+
           <Button
             asChild
             size="lg"
             className="mt-6 w-full max-w-sm bg-gradient-to-r from-rose-500 to-orange-500 text-base font-semibold hover:opacity-90"
           >
-            <Link href="/uncensored">
-              <Bitcoin className="mr-2 h-5 w-5" /> Get the Uncensored Pass
+            {/* Lead with the free taste, not the checkout — reaching the
+                paywall is the hard part; everyone who gets there converts. */}
+            <Link href="/uncensored?start=1">
+              <Flame className="mr-2 h-5 w-5" /> Try {FREE_UNCENSORED_PREVIEWS} free previews
             </Link>
           </Button>
+          <p className="mt-3 text-xs text-muted-foreground">
+            No card needed. Or{" "}
+            <Link href="/uncensored" className="underline underline-offset-2 hover:text-rose-400">
+              <Bitcoin className="mr-1 inline h-3 w-3" />
+              get the pass now
+            </Link>
+            .
+          </p>
         </div>
 
         {/* Sample concepts */}

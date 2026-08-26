@@ -15,6 +15,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 import { generateImage } from "../_core/imageGeneration";
 import { applyUncensoredStyle, UNCENSORED_STYLES } from "../../shared/uncensoredStyles";
+import { FREE_UNCENSORED_PREVIEWS } from "../../shared/uncensoredPlans";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
@@ -46,7 +47,8 @@ const VIDEO_ASPECTS = {
 // Free uncensored previews — the conversion hook. Lifetime cap per user
 // (tracked via generation metadata, no schema change) + a global daily cap so
 // abuse can't run up the GPU bill.
-const FREE_UNCENSORED_LIMIT = 3;
+// Single source of truth — the landing pages advertise this same number.
+const FREE_UNCENSORED_LIMIT = FREE_UNCENSORED_PREVIEWS;
 const FREE_UNCENSORED_GLOBAL_DAILY_CAP = 500;
 
 async function countFreeUncensored(userId: number): Promise<number> {
