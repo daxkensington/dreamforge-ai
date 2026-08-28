@@ -21,6 +21,7 @@ import {
   UNCENSORED_ASPECTS,
   UNCENSORED_FRAMINGS,
   UNCENSORED_IMAGE_COST,
+  DEFAULT_UNCENSORED_NEGATIVE,
   applyUncensoredFraming,
   getUncensoredAspect,
 } from "../../shared/uncensoredStudio";
@@ -28,7 +29,7 @@ import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
-import { isRunPodAvailable } from "../_core/runpod";
+import { isRunPodAvailable, runpodUpscale } from "../_core/runpod";
 import { deductCredits, refundCredits } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
@@ -76,6 +77,53 @@ async function requireDb() {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
   return db;
+}
+
+async function requireOwnUncensoredImage(userId: number, id: number) {
+  const src = await getGenerationById(id);
+  if (!src || src.userId !== userId) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available." });
+  }
+  if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can be used here." });
+  }
+  if (!(src.metadata as any)?.uncensored) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be used here." });
+  }
+  return src;
+}
+
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Couldn't load the source image.");
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function parseMaskDataUrl(dataUrl: string): Buffer {
+  const m = dataUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/i);
+  if (!m) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Mask must be a PNG from the inpaint brush." });
+  }
+  const buf = Buffer.from(m[2], "base64");
+  if (buf.length < 32 || buf.length > 1_800_000) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Mask is empty or too large." });
+  }
+  return buf;
+}
+
+async function blendMasked(source: Buffer, painted: Buffer, mask: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const meta = await sharp(source).metadata();
+  const width = meta.width ?? 1024;
+  const height = meta.height ?? 1024;
+  const maskPng = await sharp(mask).resize(width, height, { fit: "fill" }).greyscale().png().toBuffer();
+  const overlay = await sharp(painted)
+    .resize(width, height, { fit: "fill" })
+    .ensureAlpha()
+    .composite([{ input: maskPng, blend: "dest-in" }])
+    .png()
+    .toBuffer();
+  return sharp(source).composite([{ input: overlay, blend: "over" }]).png().toBuffer();
 }
 
 export async function getUncensoredEntitlement(userId: number): Promise<{
@@ -232,8 +280,9 @@ export const uncensoredRouter = router({
       const aspect = getUncensoredAspect(input.aspect);
       let prompt = applyUncensoredFraming(input.prompt, input.framing);
       prompt = applyUncensoredStyle(prompt, input.style);
-      if (input.negativePrompt?.trim()) {
-        prompt = `${prompt}. Avoid: ${input.negativePrompt.trim()}`;
+      const negative = [DEFAULT_UNCENSORED_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
+      if (negative) {
+        prompt = `${prompt}. Avoid: ${negative}`;
       }
       if (characterUrl) {
         prompt = `same character identity, same face, same body type, new scene. ${prompt}`;
@@ -602,6 +651,156 @@ export const uncensoredRouter = router({
     }),
 
   /**
+   * Real-ESRGAN upscale of the caller's own uncensored image. No LLM fallback
+   * — that path would route through a filtered provider and silently censor.
+   */
+  upscale: protectedProcedure
+    .input(
+      z.object({
+        sourceGenerationId: z.number().int().positive(),
+        scale: z.enum(["2x", "4x"]).default("2x"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required to upscale." });
+      }
+
+      const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+      if (!isRunPodAvailable()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The upscaler GPU is unavailable right now." });
+      }
+
+      const cost = input.scale === "4x" ? UNCENSORED_IMAGE_COST.upscale4x : UNCENSORED_IMAGE_COST.upscale2x;
+      await enforceRateLimit(`uncensored.upscale:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between upscales.");
+      const debit = await deductCredits(ctx.user.id, cost, `Uncensored upscale ${input.scale}`, "usage", { uncensored: true, upscale: input.scale });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+
+      const scale = input.scale === "4x" ? 4 : 2;
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: src.prompt,
+        negativePrompt: null,
+        mediaType: "image",
+        width: (src.width ?? 832) * scale,
+        height: (src.height ?? 1216) * scale,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-upscale",
+        parentGenerationId: src.id,
+        metadata: { uncensored: true, upscale: input.scale, cost, style: (src.metadata as any)?.style ?? null },
+      });
+
+      try {
+        const buf = await fetchImageBuffer(src.imageUrl!);
+        const result = await runpodUpscale(buf.toString("base64"), scale);
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, result, "image/png");
+        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        return { generationId: genId, url, cost };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored upscale failed");
+        await logToolFailure({ toolId: "uncensored-upscale", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Upscale failed — your credits were returned." });
+      }
+    }),
+
+  /**
+   * Paint-region inpaint on the caller's own uncensored image.
+   *
+   * Flux img2img has no native mask, so we img2img the whole frame then blend
+   * the result back through the brush mask. Only the painted region changes;
+   * the rest of the source is preserved pixel-for-pixel. Uploads are not
+   * accepted — same legal basis as Refine.
+   */
+  inpaint: protectedProcedure
+    .input(
+      z.object({
+        sourceGenerationId: z.number().int().positive(),
+        prompt: z.string().min(3).max(1000),
+        maskDataUrl: z.string().min(32).max(2_000_000),
+        strength: z.number().min(0.3).max(0.85).default(0.55),
+        style: z.string().max(32).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required to inpaint." });
+      }
+
+      const verdict = checkPrompt(input.prompt, { strictMinors: true });
+      if (!verdict.allowed) {
+        await logModerationBlock({
+          category: verdict.category,
+          promptLen: input.prompt.length,
+          userId: ctx.user.id,
+          surface: "uncensored.inpaint",
+          prompt: input.prompt,
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+
+      const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+      const maskBuf = parseMaskDataUrl(input.maskDataUrl);
+
+      const cost = UNCENSORED_IMAGE_COST.inpaint;
+      await enforceRateLimit(`uncensored.inpaint:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between inpaints.");
+      const debit = await deductCredits(ctx.user.id, cost, "Uncensored inpaint", "usage", { uncensored: true, inpaint: true });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+
+      const style = input.style ?? (src.metadata as any)?.style ?? undefined;
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: input.prompt,
+        negativePrompt: null,
+        mediaType: "image",
+        width: src.width ?? 832,
+        height: src.height ?? 1216,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-inpaint",
+        parentGenerationId: src.id,
+        metadata: { uncensored: true, inpaint: true, style: style ?? null, strength: input.strength, cost },
+      });
+
+      try {
+        const imageB64 = await fetchAsBase64(src.imageUrl!);
+        const painted = await refineUnfiltered(
+          imageB64,
+          applyUncensoredStyle(`ONLY change the painted region: ${input.prompt}. Leave everything outside the region identical.`, style),
+          { strength: input.strength, loraId: resolveUncensoredLora(style) },
+        );
+        const sourceBuf = await fetchImageBuffer(src.imageUrl!);
+        const blended = await blendMasked(sourceBuf, painted, maskBuf);
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, blended, "image/png");
+        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        return { generationId: genId, url, cost };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored inpaint failed");
+        await logToolFailure({ toolId: "uncensored-inpaint", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Inpaint failed — your credits were returned.";
+        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+      }
+    }),
+
+  /**
    * Free uncensored preview — the conversion hook. Age-gated, watermarked,
    * private, capped at FREE_UNCENSORED_LIMIT lifetime per user with a global
    * daily cost cap. Every prompt passes the strict moderation gate (and the
@@ -742,7 +941,7 @@ export const uncensoredRouter = router({
         ),
       )
       .orderBy(desc(generations.createdAt))
-      .limit(24);
+      .limit(48);
   }),
 
   /** Invoice history for the signed-in user (purchase status polling). */

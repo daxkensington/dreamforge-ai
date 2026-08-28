@@ -82,6 +82,20 @@ export const UNCENSORED_IMAGE_COST = {
   quality: 12,
   /** Same-character img2img (20-step) on one of the caller's own gens. */
   character: 10,
+  /** Paint-region inpaint on one of the caller's own gens. */
+  inpaint: 10,
+  /** Real-ESRGAN 2×. */
+  upscale2x: 8,
+  /** Real-ESRGAN 4×. */
+  upscale4x: 12,
 } as const;
+
+/**
+ * Always-on quality negatives. These are anatomy/artifact terms, not content
+ * policy — they fight the extra-finger / waxy-skin look that raw Flux Schnell
+ * still produces without a LoRA. Merged with any user negative.
+ */
+export const DEFAULT_UNCENSORED_NEGATIVE =
+  "extra fingers, extra limbs, fused fingers, deformed hands, mutated hands, waxy skin, plastic skin, oversmoothed, extra people, cropped head, text, watermark, logo, blurry";
 
 export type UncensoredImageQuality = keyof typeof UNCENSORED_IMAGE_COST;

@@ -22,17 +22,28 @@ const ASPECTS: { id: Aspect; label: string }[] = [
   { id: "square", label: "Square" },
 ];
 
-export default function UncensoredVideoStudio() {
-  const [mode, setMode] = useState<Mode>("t2v");
+export default function UncensoredVideoStudio({
+  focusGenerationId,
+}: {
+  focusGenerationId?: number | null;
+} = {}) {
+  const [mode, setMode] = useState<Mode>(focusGenerationId ? "i2v" : "t2v");
   const [quality, setQuality] = useState<"fast" | "hd">("fast");
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState<Aspect>("portrait");
-  const [sourceId, setSourceId] = useState<number | null>(null);
+  const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusGenerationId) {
+      setSourceId(focusGenerationId);
+      setMode("i2v");
+    }
+  }, [focusGenerationId]);
 
   const { data: status } = trpc.uncensored.status.useQuery();
   const videoAvailable = status?.videoAvailable ?? false;
-  const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" && videoAvailable });
+  const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" });
 
   const fallbackCost = { fast: { t2v: 50, i2v: 40 }, hd: { t2v: 120, i2v: 100 } };
   const cost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];

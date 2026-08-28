@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, CheckCircle2, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X } from "lucide-react";
+import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,9 +12,7 @@ import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
-import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
-import UncensoredRefineStudio from "@/components/UncensoredRefineStudio";
-import UncensoredImageStudio from "@/components/UncensoredImageStudio";
+import UncensoredStudio from "@/components/UncensoredStudio";
 import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
 
 /**
@@ -94,7 +92,6 @@ export default function Uncensored() {
   const [freePrompt, setFreePrompt] = useState("");
   const [freeStyle, setFreeStyle] = useState("realistic");
   const [freeAspect, setFreeAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
-  const [studioTab, setStudioTab] = useState<"create" | "refine" | "video">("create");
   const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
   const freeGen = trpc.uncensored.freeGenerate.useMutation({
     onSuccess: (data) => {
@@ -212,43 +209,8 @@ export default function Uncensored() {
         </motion.div>
 
         {active ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-12 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-8 text-center"
-          >
-            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-            <h2 className="mt-4 text-2xl font-semibold">Your Uncensored Pass is active</h2>
-            <p className="mt-2 text-muted-foreground">
-              Active until{" "}
-              {status?.until ? new Date(status.until).toLocaleDateString() : "—"}. Create,
-              refine, and animate here — this is the uncensored studio.
-            </p>
-            <div className="mt-6 text-left">
-              <div className="inline-flex rounded-lg border border-border/60 p-1">
-                {([
-                  ["create", "Create"],
-                  ["refine", "Refine"],
-                  ["video", "Video"],
-                ] as const).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setStudioTab(id)}
-                    className={`rounded-md px-4 py-1.5 text-sm ${
-                      studioTab === id
-                        ? "bg-rose-500/20 text-rose-200"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {studioTab === "create" && <UncensoredImageStudio />}
-              {studioTab === "refine" && <UncensoredRefineStudio />}
-              {studioTab === "video" && <UncensoredVideoStudio />}
-            </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <UncensoredStudio until={status?.until ?? null} />
           </motion.div>
         ) : (
           <>

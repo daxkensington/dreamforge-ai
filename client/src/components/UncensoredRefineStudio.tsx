@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Wand2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,8 +18,12 @@ import { toast } from "sonner";
  * subject a fictional character we produced. Accepting uploads would make this
  * a nudify tool, and no consent checkbox makes that verifiable.
  */
-export default function UncensoredRefineStudio() {
-  const [sourceId, setSourceId] = useState<number | null>(null);
+export default function UncensoredRefineStudio({
+  focusGenerationId,
+}: {
+  focusGenerationId?: number | null;
+} = {}) {
+  const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [prompt, setPrompt] = useState("");
   const [strength, setStrength] = useState(60); // 0-100 slider → 0.2–0.9
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -29,6 +33,10 @@ export default function UncensoredRefineStudio() {
 
   const utils = trpc.useUtils();
   const images = trpc.uncensored.myUncensoredImages.useQuery();
+
+  useEffect(() => {
+    if (focusGenerationId) setSourceId(focusGenerationId);
+  }, [focusGenerationId]);
 
   const refine = trpc.uncensored.refineImage.useMutation({
     onSuccess: (data) => {

@@ -23,10 +23,11 @@ describe("uncensored style LoRA resolution (env-driven)", () => {
     process.env = { ...saved };
   });
 
-  it("returns undefined when no LoRA env is set (prompt-engineering only)", () => {
+  it("uses the built-in realism LoRA when no env is set", () => {
     delete process.env.UNCENSORED_LORA_REALISTIC;
     delete process.env.UNCENSORED_LORA_DEFAULT;
-    expect(resolveUncensoredLora("realistic")).toBeUndefined();
+    expect(resolveUncensoredLora("realistic")).toContain("flux-schnell-realism");
+    expect(resolveUncensoredLora("anime")).toBeUndefined();
   });
 
   it("prefers a style-specific LoRA, then the default", () => {

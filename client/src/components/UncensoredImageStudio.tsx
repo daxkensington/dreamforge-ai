@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   UNCENSORED_FRAMINGS,
   UNCENSORED_IMAGE_COST,
   DEFAULT_UNCENSORED_ASPECT,
+  DEFAULT_UNCENSORED_NEGATIVE,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 
@@ -21,7 +22,17 @@ import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredS
  * own generations. This is the product pass-holders came for — not a toggle
  * buried in the SFW workspace.
  */
-export default function UncensoredImageStudio() {
+export default function UncensoredImageStudio({
+  focusCharacterId,
+  onRefine,
+  onInpaint,
+  onAnimate,
+}: {
+  focusCharacterId?: number | null;
+  onRefine?: (id: number) => void;
+  onInpaint?: (id: number) => void;
+  onAnimate?: (id: number) => void;
+} = {}) {
   const [prompt, setPrompt] = useState("");
   const [negative, setNegative] = useState("");
   const [style, setStyle] = useState(DEFAULT_UNCENSORED_STYLE);
@@ -37,11 +48,27 @@ export default function UncensoredImageStudio() {
   const images = trpc.uncensored.myUncensoredImages.useQuery();
   const utils = trpc.useUtils();
 
+  useEffect(() => {
+    if (focusCharacterId) {
+      setCharacterId(focusCharacterId);
+      setShowAdvanced(true);
+    }
+  }, [focusCharacterId]);
+
   const gen = trpc.uncensored.generate.useMutation({
     onSuccess: (data) => {
       setResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
       toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const upscale = trpc.uncensored.upscale.useMutation({
+    onSuccess: (data) => {
+      setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
+      utils.uncensored.myUncensoredImages.invalidate();
+      toast.success("Upscaled.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -221,7 +248,7 @@ export default function UncensoredImageStudio() {
             <Input
               value={negative}
               onChange={(e) => setNegative(e.target.value)}
-              placeholder="extra limbs, waxy skin, text, watermark…"
+              placeholder={DEFAULT_UNCENSORED_NEGATIVE}
               maxLength={500}
               disabled={gen.isPending}
             />
@@ -295,12 +322,36 @@ export default function UncensoredImageStudio() {
               <img src={r.url} alt="Generated" className="w-full" />
               <div className="flex items-center justify-between gap-2 p-2 text-[11px] text-muted-foreground">
                 <span>{r.seed != null ? `seed ${r.seed}` : aspectMeta.label}</span>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   {r.seed != null && (
                     <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => reuseSeed(r.seed)}>
                       <RotateCcw className="mr-1 h-3 w-3" /> Seed
                     </Button>
                   )}
+                  {onRefine && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onRefine(r.generationId)}>
+                      <Wand2 className="mr-1 h-3 w-3" /> Refine
+                    </Button>
+                  )}
+                  {onInpaint && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onInpaint(r.generationId)}>
+                      <Paintbrush className="mr-1 h-3 w-3" /> Inpaint
+                    </Button>
+                  )}
+                  {onAnimate && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onAnimate(r.generationId)}>
+                      <Film className="mr-1 h-3 w-3" /> Animate
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={upscale.isPending}
+                    onClick={() => upscale.mutate({ sourceGenerationId: r.generationId, scale: "2x" })}
+                  >
+                    <Maximize className="mr-1 h-3 w-3" /> 2×
+                  </Button>
                   <Button asChild variant="ghost" size="sm" className="h-7 px-2">
                     <a href={r.url} target="_blank" rel="noopener noreferrer">
                       <Download className="mr-1 h-3 w-3" /> Open

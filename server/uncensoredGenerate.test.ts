@@ -47,6 +47,11 @@ vi.mock("./stripe", () => ({
   }),
 }));
 
+vi.mock("./_core/runpod", () => ({
+  isRunPodAvailable: vi.fn(() => true),
+  runpodUpscale: vi.fn(async () => Buffer.from("upscaled-png")),
+}));
+
 vi.mock("./_core/imageGeneration", () => ({
   generateImage: vi.fn(async () => {
     state.genCalls++;
@@ -189,6 +194,41 @@ describe("uncensored.generate — character lock ownership", () => {
       uncensoredRouter.createCaller(ctx()).generate({
         prompt: "same woman, red silk dress",
         characterGenerationId: 42,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.refineCalls).toBe(0);
+    expect(state.debited).toBe(0);
+  });
+
+  it("upscales the caller's own uncensored image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer })) as any,
+    );
+    const res = await uncensoredRouter.createCaller(ctx()).upscale({ sourceGenerationId: 42, scale: "2x" });
+    expect(res.url).toContain("/img/generations/");
+    expect(state.debited).toBe(8);
+  });
+
+  it("REJECTS upscaling someone else's image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).upscale({ sourceGenerationId: 42, scale: "2x" }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
+  });
+
+  it("REJECTS inpaint on someone else's image before GPU", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).inpaint({
+        sourceGenerationId: 42,
+        prompt: "red silk dress in the painted region",
+        maskDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
       }),
     ).rejects.toThrow(/isn't available/i);
     expect(state.refineCalls).toBe(0);
