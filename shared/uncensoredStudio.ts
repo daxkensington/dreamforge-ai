@@ -98,4 +98,14 @@ export const UNCENSORED_IMAGE_COST = {
 export const DEFAULT_UNCENSORED_NEGATIVE =
   "extra fingers, extra limbs, fused fingers, deformed hands, mutated hands, waxy skin, plastic skin, oversmoothed, extra people, cropped head, text, watermark, logo, blurry";
 
+/** One-click prompt seasoning. Aesthetic only — content stays in the user's words. */
+export const UNCENSORED_PROMPT_CHIPS: { id: string; label: string; text: string }[] = [
+  { id: "golden", label: "Golden hour", text: "golden hour sunlight, warm rim light, glowing skin" },
+  { id: "neon", label: "Neon night", text: "neon-lit night, cyan and magenta practicals, wet pavement reflections" },
+  { id: "studio", label: "Studio", text: "soft studio lighting, beauty dish, clean seamless backdrop" },
+  { id: "candle", label: "Candlelight", text: "candlelight, warm chiaroscuro, intimate low-key lighting" },
+  { id: "rain", label: "Rain", text: "rain-soaked, specular highlights, moody atmosphere" },
+  { id: "film", label: "Film still", text: "cinematic film still, anamorphic bokeh, color-graded" },
+];
+
 export type UncensoredImageQuality = keyof typeof UNCENSORED_IMAGE_COST;

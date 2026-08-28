@@ -345,6 +345,7 @@ export async function runpodFluxImg2Img(
   steps: number = 20,
   guidanceScale: number = 7.5,
   loraId?: string,
+  seed?: number,
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -358,6 +359,7 @@ export async function runpodFluxImg2Img(
       // never passed one, so uncensored refines lost the realism LoRA that
       // text-to-image gets.
       ...(loraId ? { lora_id: loraId } : {}),
+      ...(typeof seed === "number" ? { seed } : {}),
     }),
   );
 }

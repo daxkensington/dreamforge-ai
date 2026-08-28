@@ -13,6 +13,7 @@ import {
   UNCENSORED_IMAGE_COST,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
+  UNCENSORED_PROMPT_CHIPS,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 
@@ -60,6 +61,7 @@ export default function UncensoredImageStudio({
       setResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
       toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
+      utils.uncensored.myLibrary.invalidate();
     },
     onError: (e) => toast.error(e.message),
   });
@@ -83,6 +85,10 @@ export default function UncensoredImageStudio({
     const n = Number(seed);
     return Number.isInteger(n) && n >= 0 ? n : undefined;
   }, [seed]);
+
+  const appendChip = (text: string) => {
+    setPrompt((p) => (p.trim() ? `${p.trim()}, ${text}` : text));
+  };
 
   const handleGenerate = () => {
     if (prompt.trim().length < 3) {
@@ -132,7 +138,25 @@ export default function UncensoredImageStudio({
         maxLength={1000}
         disabled={gen.isPending}
         className="mt-4 resize-none"
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            handleGenerate();
+          }
+        }}
       />
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {UNCENSORED_PROMPT_CHIPS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => appendChip(c.text)}
+            className="rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-rose-500/40 hover:text-rose-200"
+          >
+            + {c.label}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-4">
         <p className="text-xs text-muted-foreground mb-2">Style</p>
@@ -313,6 +337,7 @@ export default function UncensoredImageStudio({
           </>
         )}
       </Button>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">Ctrl+Enter to generate</p>
 
       {results.length > 0 && (
         <div className={`mt-6 grid gap-3 ${results.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -351,6 +376,27 @@ export default function UncensoredImageStudio({
                     onClick={() => upscale.mutate({ sourceGenerationId: r.generationId, scale: "2x" })}
                   >
                     <Maximize className="mr-1 h-3 w-3" /> 2×
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={upscale.isPending}
+                    onClick={() => upscale.mutate({ sourceGenerationId: r.generationId, scale: "4x" })}
+                  >
+                    <Maximize className="mr-1 h-3 w-3" /> 4×
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      setCharacterId(r.generationId);
+                      setShowAdvanced(true);
+                      toast.info("Character locked for the next shot.");
+                    }}
+                  >
+                    <Lock className="mr-1 h-3 w-3" /> Character
                   </Button>
                   <Button asChild variant="ghost" size="sm" className="h-7 px-2">
                     <a href={r.url} target="_blank" rel="noopener noreferrer">

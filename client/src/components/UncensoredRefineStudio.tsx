@@ -126,6 +126,12 @@ export default function UncensoredRefineStudio({
         maxLength={1000}
         disabled={isBusy}
         className="mt-4 resize-none"
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            handleRefine();
+          }
+        }}
       />
 
       <div className="mt-4">

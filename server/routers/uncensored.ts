@@ -291,9 +291,11 @@ export const uncensoredRouter = router({
       const loraId = resolveUncensoredLora(input.style);
       const results: { generationId: number; url: string; seed: number | null }[] = [];
       let failed = 0;
+      const baseSeed =
+        typeof input.seed === "number" ? input.seed : Math.floor(Math.random() * 2_147_483_646);
 
       for (let i = 0; i < input.count; i++) {
-        const seed = typeof input.seed === "number" ? input.seed + i : undefined;
+        const seed = baseSeed + i;
         const genId = await createGeneration({
           userId: ctx.user.id,
           prompt: input.prompt,
@@ -323,6 +325,7 @@ export const uncensoredRouter = router({
             const buffer = await refineUnfiltered(imageB64, prompt, {
               strength: 0.45,
               loraId,
+              seed,
             });
             const key = generateStorageKey("generations", "png");
             ({ url } = await storagePut(key, buffer, "image/png"));
@@ -341,7 +344,7 @@ export const uncensoredRouter = router({
             url = gen.url!;
             await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url });
           }
-          results.push({ generationId: genId, url, seed: seed ?? null });
+          results.push({ generationId: genId, url, seed });
         } catch (err: any) {
           failed += 1;
           await updateGeneration(genId, { status: "failed" });
@@ -755,6 +758,18 @@ export const uncensoredRouter = router({
 
       const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
       const maskBuf = parseMaskDataUrl(input.maskDataUrl);
+      {
+        const sharp = (await import("sharp")).default;
+        try {
+          const stats = await sharp(maskBuf).greyscale().stats();
+          if ((stats.channels[0]?.max ?? 0) < 16) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Paint the region you want to change first." });
+          }
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Paint the region you want to change first." });
+        }
+      }
 
       const cost = UNCENSORED_IMAGE_COST.inpaint;
       await enforceRateLimit(`uncensored.inpaint:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between inpaints.");
@@ -936,6 +951,32 @@ export const uncensoredRouter = router({
         and(
           eq(generations.userId, ctx.user.id),
           eq(generations.mediaType, "image"),
+          eq(generations.status, "completed"),
+          sql`${generations.metadata}->>'uncensored' = 'true'`,
+        ),
+      )
+      .orderBy(desc(generations.createdAt))
+      .limit(48);
+  }),
+
+  /** Images + video clips for the Library tab. */
+  myLibrary: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    return db
+      .select({
+        id: generations.id,
+        imageUrl: generations.imageUrl,
+        prompt: generations.prompt,
+        createdAt: generations.createdAt,
+        width: generations.width,
+        height: generations.height,
+        mediaType: generations.mediaType,
+        metadata: generations.metadata,
+      })
+      .from(generations)
+      .where(
+        and(
+          eq(generations.userId, ctx.user.id),
           eq(generations.status, "completed"),
           sql`${generations.metadata}->>'uncensored' = 'true'`,
         ),

@@ -18,19 +18,20 @@ export default function UncensoredLibrary({
   onUseCharacter: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
-  const images = trpc.uncensored.myUncensoredImages.useQuery();
+  const items = trpc.uncensored.myLibrary.useQuery();
   const upscale = trpc.uncensored.upscale.useMutation({
     onSuccess: () => {
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
       toast.success("Upscaled — added to your library.");
     },
     onError: (e) => toast.error(e.message),
   });
 
-  if (images.isLoading) {
+  if (items.isLoading) {
     return <p className="mt-8 text-sm text-muted-foreground">Loading your library…</p>;
   }
-  if (!images.data?.length) {
+  if (!items.data?.length) {
     return (
       <p className="mt-8 text-sm text-muted-foreground">
         Nothing here yet — generate on the Create tab and every private image lands in this library.
@@ -43,12 +44,21 @@ export default function UncensoredLibrary({
       <h2 className="text-lg font-semibold">Your library</h2>
       <p className="mt-1 text-sm text-muted-foreground">Private. Never gallery. Click through to refine, inpaint, or animate.</p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {images.data.map((img) => (
+        {items.data.map((img) => {
+          const isVideo = img.mediaType === "video";
+          return (
           <div key={img.id} className="overflow-hidden rounded-xl border border-border/60 bg-card/40">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.imageUrl ?? ""} alt={img.prompt.slice(0, 80)} className="aspect-[3/4] w-full object-cover" />
+            {isVideo ? (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video src={img.imageUrl ?? ""} className="aspect-[3/4] w-full object-cover" muted loop playsInline />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={img.imageUrl ?? ""} alt={img.prompt.slice(0, 80)} className="aspect-[3/4] w-full object-cover" />
+            )}
             <p className="line-clamp-2 px-2 pt-2 text-[11px] text-muted-foreground">{img.prompt}</p>
             <div className="flex flex-wrap gap-1 p-2">
+              {!isVideo && (
+                <>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onRefine(img.id)}>
                 <Wand2 className="mr-1 h-3 w-3" /> Refine
               </Button>
@@ -69,7 +79,31 @@ export default function UncensoredLibrary({
                 disabled={upscale.isPending}
                 onClick={() => upscale.mutate({ sourceGenerationId: img.id, scale: "2x" })}
               >
-                <Maximize className="mr-1 h-3 w-3" /> 2× ({UNCENSORED_IMAGE_COST.upscale2x})
+                <Maximize className="mr-1 h-3 w-3" /> 2×
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                disabled={upscale.isPending}
+                onClick={() => upscale.mutate({ sourceGenerationId: img.id, scale: "4x" })}
+              >
+                <Maximize className="mr-1 h-3 w-3" /> 4×
+              </Button>
+                </>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => {
+                  void navigator.clipboard.writeText(img.prompt);
+                  toast.success("Prompt copied.");
+                }}
+              >
+                Copy prompt
               </Button>
               <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11px]">
                 <a href={img.imageUrl ?? "#"} target="_blank" rel="noopener noreferrer">
@@ -78,7 +112,8 @@ export default function UncensoredLibrary({
               </Button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

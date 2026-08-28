@@ -184,6 +184,12 @@ export default function UncensoredVideoStudio({
         maxLength={1000}
         disabled={isBusy}
         className="mt-4 resize-none"
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            handleGenerate();
+          }
+        }}
       />
 
       {/* Quality tier */}

@@ -775,7 +775,7 @@ async function generateUnfiltered(
 export async function refineUnfiltered(
   imageB64: string,
   prompt: string,
-  opts?: { strength?: number; loraId?: string },
+  opts?: { strength?: number; loraId?: string; seed?: number },
 ): Promise<Buffer> {
   // Same backstop as generateUnfiltered: the no-safety chain refuses illegal
   // content even if a surface gate was missed.
@@ -797,7 +797,7 @@ export async function refineUnfiltered(
   // Clamp: below ~0.2 nothing visibly changes and the credit is wasted; at 1.0
   // the source is discarded entirely, which is just text-to-image.
   const strength = Math.min(Math.max(opts?.strength ?? 0.6, 0.2), 0.9);
-  return runpodFluxImg2Img(imageB64, prompt, strength, 20, 7.5, opts?.loraId);
+  return runpodFluxImg2Img(imageB64, prompt, strength, 20, 7.5, opts?.loraId, opts?.seed);
 }
 
 /**

@@ -138,6 +138,7 @@ describe("uncensored.generate — paid studio", () => {
     expect(state.created[0].width).toBe(832);
     expect(state.created[0].height).toBe(1216);
     expect(state.created[0].metadata.uncensored).toBe(true);
+    expect(typeof res.images[0].seed).toBe("number");
   });
 
   it("quality tier charges 12 credits", async () => {
@@ -218,6 +219,26 @@ describe("uncensored.generate — character lock ownership", () => {
     await expect(
       uncensoredRouter.createCaller(ctx()).upscale({ sourceGenerationId: 42, scale: "2x" }),
     ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
+  });
+
+  it("rejects an unpainted (all-black) inpaint mask", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const sharp = (await import("sharp")).default;
+    const black = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    await expect(
+      uncensoredRouter.createCaller(ctx()).inpaint({
+        sourceGenerationId: 42,
+        prompt: "red silk dress in the painted region",
+        maskDataUrl: `data:image/png;base64,${black.toString("base64")}`,
+      }),
+    ).rejects.toThrow(/paint/i);
+    expect(state.refineCalls).toBe(0);
     expect(state.debited).toBe(0);
   });
 
