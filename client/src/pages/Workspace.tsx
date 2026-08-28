@@ -56,6 +56,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
 import { ShareButton } from "@/components/ShareButton";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const MODEL_OPTIONS = [
   // Image models
@@ -254,6 +255,10 @@ export default function Workspace() {
       uncensored: uncensored && uncensoredActive && mediaType === "image",
     });
   };
+
+  useKeyboardShortcuts([
+    { key: "Enter", ctrl: true, handler: handleGenerate, description: "Generate image or video" },
+  ]);
 
   const toggleTag = (tagId: number) => {
     setSelectedTags((prev) =>

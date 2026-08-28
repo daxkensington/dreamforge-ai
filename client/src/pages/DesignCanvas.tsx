@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,6 +56,52 @@ export default function DesignCanvas() {
   const [bgColor, setBgColor] = useState("#000000");
   const [showSidebar, setShowSidebar] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<CanvasElement[][]>([[]]);
+  const historyIndexRef = useRef(0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const syncHistoryFlags = () => {
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+  };
+
+  const cloneEls = (els: CanvasElement[]) =>
+    els.map((el) => ({ ...el, style: el.style ? { ...el.style } : undefined }));
+
+  const commit = (next: CanvasElement[]) => {
+    const idx = historyIndexRef.current;
+    historyRef.current = historyRef.current.slice(0, idx + 1);
+    historyRef.current.push(cloneEls(next));
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    historyIndexRef.current = historyRef.current.length - 1;
+    setElements(next);
+    syncHistoryFlags();
+  };
+
+  const snapshot = () => {
+    const idx = historyIndexRef.current;
+    historyRef.current = historyRef.current.slice(0, idx + 1);
+    historyRef.current.push(cloneEls(elements));
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    historyIndexRef.current = historyRef.current.length - 1;
+    syncHistoryFlags();
+  };
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+    historyIndexRef.current -= 1;
+    setElements(cloneEls(historyRef.current[historyIndexRef.current]));
+    syncHistoryFlags();
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    historyIndexRef.current += 1;
+    setElements(cloneEls(historyRef.current[historyIndexRef.current]));
+    syncHistoryFlags();
+  }, []);
 
   const generateMutation = trpc.generation.create.useMutation({
     onSuccess: (data) => {
@@ -75,7 +122,7 @@ export default function DesignCanvas() {
       shape: { width: 150, height: 150, content: "rectangle", style: { backgroundColor: "#3b82f6", borderRadius: 0, opacity: 0.8 } },
     };
     const def = defaults[type] || {};
-    setElements((prev) => [...prev, {
+    const next = [...elements, {
       id, type,
       x: 100 + Math.random() * 200,
       y: 100 + Math.random() * 200,
@@ -83,15 +130,82 @@ export default function DesignCanvas() {
       height: def.height || 200,
       content: content || def.content || "",
       style: def.style,
-    }]);
+    }];
+    commit(next);
     setSelectedId(id);
   };
 
   const deleteSelected = () => {
     if (!selectedId) return;
-    setElements((prev) => prev.filter((el) => el.id !== selectedId));
+    commit(elements.filter((el) => el.id !== selectedId));
     setSelectedId(null);
   };
+
+  const exportPng = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasSize.width;
+      canvas.height = canvasSize.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas unsupported");
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (const el of elements) {
+        if (el.type === "text") {
+          ctx.save();
+          ctx.fillStyle = el.style?.color || "#ffffff";
+          ctx.font = `${el.style?.fontWeight || "bold"} ${el.style?.fontSize || 24}px sans-serif`;
+          ctx.textBaseline = "top";
+          ctx.fillText(el.content, el.x, el.y, el.width);
+          ctx.restore();
+        } else if (el.type === "shape") {
+          ctx.save();
+          ctx.globalAlpha = el.style?.opacity ?? 0.8;
+          ctx.fillStyle = el.style?.backgroundColor || "#3b82f6";
+          if (el.content === "circle") {
+            ctx.beginPath();
+            ctx.ellipse(el.x + el.width / 2, el.y + el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            const r = el.style?.borderRadius || 0;
+            ctx.beginPath();
+            ctx.roundRect(el.x, el.y, el.width, el.height, r);
+            ctx.fill();
+          }
+          ctx.restore();
+        } else if (el.content) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            img.src = el.content;
+          });
+          if (img.naturalWidth) ctx.drawImage(img, el.x, el.y, el.width, el.height);
+        }
+      }
+      const a = document.createElement("a");
+      a.download = "dreamforgex-canvas.png";
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+      toast.success("PNG exported");
+    } catch (err) {
+      toast.error("Export failed — a source image may block canvas export (CORS). Try uploading images instead of hotlinking.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  useKeyboardShortcuts([
+    { key: "z", ctrl: true, handler: undo, description: "Undo" },
+    { key: "z", ctrl: true, shift: true, handler: redo, description: "Redo" },
+    { key: "y", ctrl: true, handler: redo, description: "Redo" },
+    { key: "Delete", handler: deleteSelected, description: "Delete selected" },
+    { key: "Backspace", handler: deleteSelected, description: "Delete selected" },
+    { key: "e", ctrl: true, handler: () => { void exportPng(); }, description: "Export PNG" },
+  ]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -140,8 +254,14 @@ export default function DesignCanvas() {
                   <ZoomIn className="h-3 w-3" />
                 </Button>
               </div>
-              <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent text-xs" onClick={() => toast.info("Export feature launching soon — stay tuned!")}>
-                <Download className="h-3 w-3" /> Export
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-transparent" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+                <Undo className="h-3 w-3" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-transparent" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+                <Redo className="h-3 w-3" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent text-xs" onClick={() => void exportPng()} disabled={exporting}>
+                {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Export
               </Button>
             </div>
           </div>
@@ -266,6 +386,7 @@ export default function DesignCanvas() {
                 onPointerDown={(e) => {
                   e.stopPropagation();
                   setSelectedId(el.id);
+                  snapshot();
                   const target = e.currentTarget as HTMLDivElement;
                   const startX = e.clientX;
                   const startY = e.clientY;

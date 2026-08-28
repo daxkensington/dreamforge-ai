@@ -1018,14 +1018,14 @@ Tier 0 = revenue-protection shipped this session. Tiers 1-3 = planned.
 - [ ] Background job queue (Inngest or Vercel Cron + Neon) — only needed for jobs >300s; maxDuration caps cover everything currently
 
 ### Tier 4 — Polish & tech debt
-- [ ] Mobile touch UX for fabric.js tools (inpainting, design-canvas, outpainting) — currently desktop-only
+- [x] Mobile touch UX for fabric.js tools (inpainting, design-canvas, outpainting) — PointerEvents + touch-none on ToolCanvas and DesignCanvas (A6 + 2026-08-28)
 - [x] T4.1 Env var validation via Zod in `instrumentation.ts` (SHIPPED 2026-04-19) — `validateEnv()` checks DATABASE_URL, JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, AUTH_SECRET, plus at-least-one AI provider. Hard-fails in prod with which var is missing; warns in dev.
 - [x] T4.2 Dynamic gallery items in sitemap (SHIPPED 2026-04-19) — sitemap.ts now async, queries top 1000 most-recently approved gallery items and emits `/g/<generationId>` URLs so each share page becomes Google-discoverable. Compounds with T1.3 share links.
 - [x] T4.3 Composite `(userId, createdAt)` index on creditTransactions (SHIPPED 2026-04-19) — `creditTransactions_user_time_idx` migration 0005 applied to prod Neon. Billing history / audit queries on big accounts now index-scan instead of user-filter-then-sort.
 - [x] T4.4 Loading-state skeletons for /profile, /search, /brand-kits, /characters (SHIPPED 2026-04-19).
 - [x] T4.5 Theme toggle in navbar (SHIPPED 2026-04-19) — ThemeProvider flipped to `switchable`, Sun/Moon button added. Theme persists via localStorage.
 - [x] T4.6 Keyboard shortcut discovery (SHIPPED 2026-04-19) — `<KeyboardShortcutsModal>` now mounted globally in providers.tsx; `useGlobalShortcuts()` activated in Navbar (Shift+? opens modal); keyboard icon in navbar triggers the same modal for discoverability.
-- [ ] Ctrl+Z undo in image editors (separate from keyboard discovery — bigger per-tool implementation)
+- [x] Ctrl+Z undo in image editors — ToolCanvas stroke undo + DesignCanvas history/redo/export (2026-08-28)
 
 ### Audit references
 - GSC (90d): 30 impressions / 3 clicks → search-invisible, Phase 33-37 too recent to show data

@@ -1557,6 +1557,7 @@ export const appRouter = router({
           editPrompt: z.string().min(1).max(500),
           regionDescription: z.string().max(200).optional(),
           preserveStyle: z.boolean().default(true),
+          strength: z.number().min(0.1).max(1).optional().default(0.7),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -1564,9 +1565,14 @@ export const appRouter = router({
         try {
           const styleNote = input.preserveStyle ? " Maintain the exact same artistic style, lighting, and color palette as the original." : "";
           const regionNote = input.regionDescription ? ` Focus the edit on: ${input.regionDescription}.` : "";
+          const strengthNote = (input.strength ?? 0.7) >= 0.8
+            ? " Apply a complete, high-strength replacement of the described region."
+            : (input.strength ?? 0.7) <= 0.3
+              ? " Apply a subtle, low-strength edit that keeps most of the original pixels."
+              : " Apply a moderate-strength edit that blends the change with the original.";
 
           const { url } = await generateImage({
-            prompt: `Edit this image: ${input.editPrompt}.${regionNote}${styleNote} Make the edit look natural and seamlessly integrated. Professional quality.`,
+            prompt: `Edit this image: ${input.editPrompt}.${regionNote}${styleNote}${strengthNote} Make the edit look natural and seamlessly integrated. Professional quality.`,
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
 

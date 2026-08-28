@@ -26,7 +26,7 @@ export const CREDIT_PACKAGES = [
     priceDisplay: "$4.99",
     perCredit: "$0.05",
     popular: false,
-    description: "Perfect for trying out DreamForge",
+    description: "Perfect for trying out DreamForgeX",
   },
   {
     id: "creator",
@@ -301,7 +301,7 @@ export async function createCheckoutSession(
         price_data: {
           currency: "usd",
           product_data: {
-            name: `DreamForge ${pkg.name}`,
+            name: `DreamForgeX ${pkg.name}`,
             description: `${pkg.credits} generation credits`,
           },
           unit_amount: pkg.price,

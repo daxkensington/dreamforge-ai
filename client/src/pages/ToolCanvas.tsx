@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Paintbrush, Loader2, Download, Sparkles, RotateCcw, Trash2, Undo2 } from "lucide-react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 export default function ToolCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +60,10 @@ export default function ToolCanvas() {
     const prev = historyRef.current.pop();
     if (prev) ctx.putImageData(prev, 0, 0);
   };
+
+  useKeyboardShortcuts([
+    { key: "z", ctrl: true, handler: undo, description: "Undo last stroke" },
+  ]);
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;

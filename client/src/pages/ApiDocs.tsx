@@ -150,7 +150,7 @@ export default function ApiDocs() {
             <p className="text-sm font-medium">2. Make your first request:</p>
           </div>
           <div className="bg-background rounded-lg p-4 font-mono text-sm overflow-x-auto">
-            <pre className="text-xs">{`curl -X POST https://your-app.manus.space/api/v1/generate \\
+            <pre className="text-xs">{`curl -X POST https://dreamforgex.ai/api/v1/generate \\
   -H "Authorization: Bearer df_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{"prompt": "A beautiful sunset over mountains"}'`}</pre>

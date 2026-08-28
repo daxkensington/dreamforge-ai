@@ -56,14 +56,16 @@ export const SHORTCUT_REFERENCE = [
     { keys: "Escape", description: "Close dialog / Cancel" },
   ]},
   { scope: "Workspace", shortcuts: [
-    { keys: "Ctrl + Enter", description: "Generate image" },
-    { keys: "Ctrl + S", description: "Save to gallery" },
-    { keys: "Ctrl + Z", description: "Undo last change" },
+    { keys: "Ctrl + Enter", description: "Generate image or video" },
   ]},
-  { scope: "Gallery", shortcuts: [
-    { keys: "L", description: "Like / Unlike" },
-    { keys: "C", description: "Open comments" },
-    { keys: "Arrow Left / Right", description: "Navigate items" },
+  { scope: "AI Canvas", shortcuts: [
+    { keys: "Ctrl + Z", description: "Undo last stroke" },
+  ]},
+  { scope: "Design Canvas", shortcuts: [
+    { keys: "Ctrl + Z", description: "Undo" },
+    { keys: "Ctrl + Shift + Z", description: "Redo" },
+    { keys: "Delete", description: "Delete selected element" },
+    { keys: "Ctrl + E", description: "Export PNG" },
   ]},
   { scope: "Video Studio", shortcuts: [
     { keys: "Ctrl + Enter", description: "Generate storyboard" },

@@ -174,10 +174,10 @@ describe("Achievement Sharing", () => {
   });
 
   it("share link generation produces valid URLs", () => {
-    const siteUrl = "https://genlabsyn-hhycwvdm.manus.space";
+    const siteUrl = "https://dreamforgex.ai";
     const achievementName = "First Creation";
     const twitterText = encodeURIComponent(
-      `I just unlocked the "${achievementName}" achievement on DreamForge! 🏆`
+      `I just unlocked the "${achievementName}" achievement on DreamForgeX! 🏆`
     );
     const twitterUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(siteUrl)}`;
     expect(twitterUrl).toContain("twitter.com/intent/tweet");

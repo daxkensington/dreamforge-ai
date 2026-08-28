@@ -263,20 +263,20 @@ export const achievementShareRouter = router({
       const name = ctx.user.name || "Someone";
       const achievementName = catalogEntry.name;
       const achievementDesc = catalogEntry.description;
-      const siteUrl = "https://genlabsyn-hhycwvdm.manus.space";
+      const siteUrl = "https://dreamforgex.ai";
 
       const twitterText = encodeURIComponent(
-        `I just unlocked the "${achievementName}" achievement on DreamForge! 🏆 ${achievementDesc} #DreamForge #AIArt`
+        `I just unlocked the "${achievementName}" achievement on DreamForgeX! 🏆 ${achievementDesc} #DreamForgeX #AIArt`
       );
       const whatsappText = encodeURIComponent(
-        `I just unlocked the "${achievementName}" achievement on DreamForge! 🏆 ${achievementDesc}\n\nCheck it out: ${siteUrl}`
+        `I just unlocked the "${achievementName}" achievement on DreamForgeX! 🏆 ${achievementDesc}\n\nCheck it out: ${siteUrl}`
       );
       const telegramText = encodeURIComponent(
-        `I just unlocked the "${achievementName}" achievement on DreamForge! 🏆 ${achievementDesc}`
+        `I just unlocked the "${achievementName}" achievement on DreamForgeX! 🏆 ${achievementDesc}`
       );
-      const emailSubject = encodeURIComponent(`${name} unlocked an achievement on DreamForge!`);
+      const emailSubject = encodeURIComponent(`${name} unlocked an achievement on DreamForgeX!`);
       const emailBody = encodeURIComponent(
-        `I just unlocked the "${achievementName}" achievement on DreamForge!\n\n${achievementDesc}\n\nJoin me and start creating amazing AI art: ${siteUrl}`
+        `I just unlocked the "${achievementName}" achievement on DreamForgeX!\n\n${achievementDesc}\n\nJoin me and start creating amazing AI art: ${siteUrl}`
       );
 
       return {
@@ -292,7 +292,7 @@ export const achievementShareRouter = router({
           whatsapp: `https://wa.me/?text=${whatsappText}`,
           telegram: `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${telegramText}`,
           email: `mailto:?subject=${emailSubject}&body=${emailBody}`,
-          copyText: `I just unlocked the "${achievementName}" achievement on DreamForge! 🏆 ${achievementDesc} ${siteUrl}`,
+          copyText: `I just unlocked the "${achievementName}" achievement on DreamForgeX! 🏆 ${achievementDesc} ${siteUrl}`,
         },
       };
     }),

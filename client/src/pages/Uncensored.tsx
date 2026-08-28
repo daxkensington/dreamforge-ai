@@ -417,7 +417,7 @@ export default function Uncensored() {
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
                 One-time payment, no auto-renew. Pay anonymously with Bitcoin (on-chain).
-                Invoice stays open 3 hours so the confirmation can land.
+                Invoice stays open 3 hours. Your pass unlocks as soon as the payment is seen — no waiting for a block.
               </p>
 
               {!active && !ageConfirmed && (
@@ -448,7 +448,7 @@ export default function Uncensored() {
                 </p>
               )}
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                After payment confirms on-chain, this page unlocks automatically.
+                This page unlocks as soon as we see your payment — usually seconds after you send.
               </p>
                 </>
               )}
@@ -461,7 +461,7 @@ export default function Uncensored() {
                 {[
                   { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, River, or an exchange you already use. Buy ~$5–$20 of BTC." },
                   { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap Pay with crypto — the invoice appears right here with a QR code. Scan it or paste the Bitcoin address into your wallet. Send the exact amount shown." },
-                  { icon: Zap, step: "3", title: "Unlock automatically", body: "After ~1 network confirmation (usually a few minutes), this page unlocks on its own. No waiting on support. Invoice window is 3 hours." },
+                  { icon: Zap, step: "3", title: "Unlock automatically", body: "The page unlocks as soon as the payment appears (usually seconds). No waiting on a block or on support. Invoice window is 3 hours." },
                 ].map((s) => (
                   <div key={s.step} className="relative rounded-xl border border-border/60 bg-card/40 p-5">
                     <div className="absolute -top-3 left-5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-xs font-bold text-white">

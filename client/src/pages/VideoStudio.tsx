@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { exportStoryboardPdf, exportScriptPdf } from "@/lib/pdfExport";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
   Film, Clapperboard, Palette, Maximize, Music, FileText,
   Play, Loader2, ArrowRight, Sparkles, Clock, Camera,
@@ -74,6 +75,14 @@ function StoryboardTab() {
     });
     toast.success("PDF downloaded");
   };
+
+  useKeyboardShortcuts([
+    { key: "Enter", ctrl: true, handler: handleGenerate, description: "Generate storyboard" },
+    { key: "s", ctrl: true, handler: () => {
+      if (storyboard.data?.status === "completed") setSaveDialogOpen(true);
+    }, description: "Save project" },
+    { key: "e", ctrl: true, handler: handleExportPdf, description: "Export PDF" },
+  ]);
 
   return (
     <div className="space-y-6">

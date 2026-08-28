@@ -154,7 +154,7 @@ export const autoReferralRouter = router({
           referrer.id,
           "payment",
           "Referral Reward!",
-          `${ctx.user.name || "A new user"} joined DreamForge using your referral link! You earned ${BASE_REFERRAL_BONUS_REFERRER} bonus credits.`,
+          `${ctx.user.name || "A new user"} joined DreamForgeX using your referral link! You earned ${BASE_REFERRAL_BONUS_REFERRER} bonus credits.`,
           { referredUserId: ctx.user.id, credits: BASE_REFERRAL_BONUS_REFERRER }
         );
       } catch {}
@@ -560,7 +560,7 @@ async function generateDigestForUser(
 
 function formatDigestAsText(digest: DigestData): string {
   const lines: string[] = [];
-  lines.push(`Hi ${digest.userName}! Here's your ${digest.period} usage digest for DreamForge.\n`);
+  lines.push(`Hi ${digest.userName}! Here's your ${digest.period} usage digest for DreamForgeX.\n`);
   lines.push(`📊 ${digest.periodLabel} Summary:`);
   lines.push(`• Credits used: ${digest.totalSpent} (${digest.comparedToPrevious.spentChange >= 0 ? "+" : ""}${digest.comparedToPrevious.spentChange}% vs previous)`);
   lines.push(`• Generations: ${digest.totalGenerations} (${digest.comparedToPrevious.generationsChange >= 0 ? "+" : ""}${digest.comparedToPrevious.generationsChange}% vs previous)`);

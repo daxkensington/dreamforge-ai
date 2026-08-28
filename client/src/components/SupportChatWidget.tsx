@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 
 const SUGGESTED_PROMPTS = [
-  "What can DreamForge do?",
+  "What can DreamForgeX do?",
   "Which plan is right for me?",
   "How do I get started?",
   "Recommend a tool for video",
@@ -61,7 +61,7 @@ export function SupportChatWidget() {
             <div className="flex items-center gap-2">
               <MessageCircle className="size-5 text-primary-foreground" />
               <span className="font-semibold text-primary-foreground text-sm">
-                DreamForge Support
+                DreamForgeX Support
               </span>
             </div>
             <button
@@ -77,7 +77,7 @@ export function SupportChatWidget() {
             messages={messages}
             onSendMessage={handleSendMessage}
             isLoading={chatMutation.isPending}
-            placeholder="Ask me anything about DreamForge..."
+            placeholder="Ask me anything about DreamForgeX..."
             height="420px"
             emptyStateMessage="Hi! I'm Forge, your AI assistant. How can I help?"
             suggestedPrompts={SUGGESTED_PROMPTS}

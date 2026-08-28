@@ -327,7 +327,7 @@ async function sendDigestEmail(
   }
 
   const htmlContent = generateDigestHtml(digest);
-  const subject = `Your ${digest.period === "weekly" ? "Weekly" : "Monthly"} DreamForge Usage Digest`;
+  const subject = `Your ${digest.period === "weekly" ? "Weekly" : "Monthly"} DreamForgeX Usage Digest`;
 
   try {
     const endpoint = `${ENV.forgeApiUrl.replace(/\/$/, "")}/webdevtoken.v1.WebDevService/SendNotification`;
@@ -381,7 +381,7 @@ function generateDigestHtml(digest: DigestData): string {
   <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
     <!-- Header -->
     <div style="text-align:center;padding:24px 0;border-bottom:1px solid #2a2a3e;">
-      <h1 style="margin:0;color:#a78bfa;font-size:24px;">✨ DreamForge</h1>
+      <h1 style="margin:0;color:#a78bfa;font-size:24px;">✨ DreamForgeX</h1>
       <p style="margin:8px 0 0;color:#94a3b8;font-size:14px;">Your ${digest.periodLabel} Usage Digest</p>
     </div>
 

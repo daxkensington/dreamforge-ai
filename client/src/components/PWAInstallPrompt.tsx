@@ -23,6 +23,11 @@ export function PWAInstallPrompt() {
     // Don't show if already installed (standalone mode)
     if (window.matchMedia("(display-mode: standalone)").matches) return;
 
+    // Desktop Chrome also fires beforeinstallprompt. The banner then sits on
+    // top of pricing/checkout CTAs. This prompt is for add-to-home-screen.
+    const isPhone = window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
+    if (!isPhone) return;
+
     // Check dismissal cooldown
     const dismissed = localStorage.getItem("pwa-install-dismissed");
     if (dismissed) {
@@ -60,7 +65,7 @@ export function PWAInstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md animate-in slide-in-from-bottom-4 fade-in duration-300">
+    <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-md animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className="flex items-center gap-3 rounded-xl bg-card/95 p-4 shadow-2xl ring-1 ring-border backdrop-blur-lg">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <Download className="h-5 w-5 text-primary" />

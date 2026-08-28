@@ -173,19 +173,19 @@ export const socialShareRouter = router({
 });
 
 function generateShareLinks(code: string, name: string) {
-  const baseUrl = `https://genlabsyn-hhycwvdm.manus.space?ref=${code}`;
+  const baseUrl = `https://dreamforgex.ai?ref=${code}`;
   const twitterText = encodeURIComponent(
-    `I've been creating amazing AI art with DreamForge! Join me and get 15 free credits to start creating. 🎨✨`
+    `I've been creating amazing AI art with DreamForgeX! Join me and get 15 free credits to start creating. 🎨✨`
   );
   const whatsappText = encodeURIComponent(
-    `Hey! I've been using DreamForge to create stunning AI art. Sign up with my link and we both get bonus credits! ${baseUrl}`
+    `Hey! I've been using DreamForgeX to create stunning AI art. Sign up with my link and we both get bonus credits! ${baseUrl}`
   );
   const telegramText = encodeURIComponent(
-    `Check out DreamForge - an amazing AI art platform! Use my referral link to get 15 free credits: ${baseUrl}`
+    `Check out DreamForgeX - an amazing AI art platform! Use my referral link to get 15 free credits: ${baseUrl}`
   );
-  const emailSubject = encodeURIComponent(`${name} invited you to DreamForge`);
+  const emailSubject = encodeURIComponent(`${name} invited you to DreamForgeX`);
   const emailBody = encodeURIComponent(
-    `Hi!\n\nI've been using DreamForge to create stunning AI-generated images and videos. I thought you'd love it too!\n\nSign up with my referral link and get 15 free credits to start creating:\n${baseUrl}\n\nSee you there!\n${name}`
+    `Hi!\n\nI've been using DreamForgeX to create stunning AI-generated images and videos. I thought you'd love it too!\n\nSign up with my referral link and get 15 free credits to start creating:\n${baseUrl}\n\nSee you there!\n${name}`
   );
 
   return {
@@ -193,7 +193,7 @@ function generateShareLinks(code: string, name: string) {
     whatsapp: `https://wa.me/?text=${whatsappText}`,
     telegram: `https://t.me/share/url?url=${encodeURIComponent(baseUrl)}&text=${telegramText}`,
     email: `mailto:?subject=${emailSubject}&body=${emailBody}`,
-    copyText: `Join me on DreamForge and get 15 free credits! ${baseUrl}`,
+    copyText: `Join me on DreamForgeX and get 15 free credits! ${baseUrl}`,
     referralUrl: baseUrl,
   };
 }
@@ -201,15 +201,15 @@ function generateShareLinks(code: string, name: string) {
 function getShareMessage(platform: string, code: string, name: string): string {
   switch (platform) {
     case "twitter":
-      return `I've been creating amazing AI art with @DreamForge! Join me and get 15 free credits. 🎨✨`;
+      return `I've been creating amazing AI art with @DreamForgeX! Join me and get 15 free credits. 🎨✨`;
     case "whatsapp":
-      return `Hey! I've been using DreamForge to create stunning AI art. Sign up with my link and we both get bonus credits!`;
+      return `Hey! I've been using DreamForgeX to create stunning AI art. Sign up with my link and we both get bonus credits!`;
     case "telegram":
-      return `Check out DreamForge - an amazing AI art platform! Use my referral link to get 15 free credits.`;
+      return `Check out DreamForgeX - an amazing AI art platform! Use my referral link to get 15 free credits.`;
     case "email":
-      return `${name} invited you to DreamForge - create stunning AI art with 15 free credits!`;
+      return `${name} invited you to DreamForgeX - create stunning AI art with 15 free credits!`;
     default:
-      return `Join me on DreamForge and get 15 free credits to create amazing AI art!`;
+      return `Join me on DreamForgeX and get 15 free credits to create amazing AI art!`;
   }
 }
 

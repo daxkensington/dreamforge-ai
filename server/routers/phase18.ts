@@ -381,7 +381,7 @@ export const referralRouter = router({
           referrer.id,
           "payment",
           "Referral Reward!",
-          `${ctx.user.name || "A new user"} joined DreamForge using your referral link! You earned ${REFERRAL_BONUS_REFERRER} bonus credits.`,
+          `${ctx.user.name || "A new user"} joined DreamForgeX using your referral link! You earned ${REFERRAL_BONUS_REFERRER} bonus credits.`,
           { referredUserId: ctx.user.id, credits: REFERRAL_BONUS_REFERRER }
         );
       } catch {}

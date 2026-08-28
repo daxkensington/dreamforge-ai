@@ -14,6 +14,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { UNCENSORED_LANDINGS, UNCENSORED_LANDING_SLUGS } from "./uncensoredLanding";
+import { UNCENSORED_FAQ } from "./uncensoredFaq";
 import {
   FREE_UNCENSORED_PREVIEWS,
   UNCENSORED_ENTRY_PLAN,
@@ -115,6 +116,19 @@ describe("uncensored landing silo", () => {
       expect(p.bullets.length).toBeGreaterThanOrEqual(4);
       expect(p.faq.length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it("does not tell buyers they must wait for a block confirmation", () => {
+    // Checkout settles at 0-conf (see server/_core/btcpay.ts). Telling a
+    // buyer to wait for a confirm is the conversion tax we just removed.
+    const stale = /once the network confirms|wait(?:ing)? for (?:a )?(?:block )?confirm/i;
+    for (const slug of UNCENSORED_LANDING_SLUGS) {
+      const hit = allCopy(slug).match(stale);
+      expect(hit ? `${slug}: ${hit[0]}` : null).toBeNull();
+    }
+    const faqBlob = UNCENSORED_FAQ.map((f) => `${f.q} ${f.a}`).join(" ");
+    expect(faqBlob.match(stale)).toBeNull();
+    expect(faqBlob.toLowerCase()).toContain("mempool");
   });
 
   it("does not duplicate an H1 across pages (thin-content signal)", () => {

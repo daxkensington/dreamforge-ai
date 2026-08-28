@@ -165,7 +165,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "faq": [
       {
         "q": "How do I pay with crypto, and which coins work?",
-        "a": "At checkout we show you a one-time Bitcoin deposit address and amount, and once the network confirms, your Uncensored Pass activates automatically. We accept Bitcoin (on-chain). There's no card form, no name field, and nothing for a bank to itemize."
+        "a": "At checkout we show you a one-time Bitcoin deposit address and amount. Your Uncensored Pass activates as soon as the payment is seen — usually seconds after you send, without waiting for a block. We accept Bitcoin (on-chain). There's no card form, no name field, and nothing for a bank to itemize."
       },
       {
         "q": "Is it actually anonymous, or do you still track me?",

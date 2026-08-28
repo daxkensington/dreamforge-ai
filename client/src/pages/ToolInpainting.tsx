@@ -72,7 +72,7 @@ export default function ToolInpainting() {
     if (!imageUrl) { toast.error("Please provide an image URL"); return; }
     if (!editPrompt.trim()) { toast.error("Please describe what to edit"); return; }
     setResultUrl(null);
-    inpaintMutation.mutate({ imageUrl, editPrompt, regionDescription: regionDescription || undefined, preserveStyle });
+    inpaintMutation.mutate({ imageUrl, editPrompt, regionDescription: regionDescription || undefined, preserveStyle, strength: inpaintStrength });
   };
 
   const handleReset = () => {
