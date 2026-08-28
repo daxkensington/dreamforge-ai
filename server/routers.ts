@@ -659,7 +659,16 @@ export const appRouter = router({
             // Uncensored ignores model selection — only the unfiltered chain
             // (self-hosted RunPod + fal) may serve it.
             const model = input.uncensored ? "auto" : (modelMap[input.modelVersion] || "auto");
-            ({ url } = await generateImage({ prompt: enhancedPrompt, model: model as any, userTier, unfiltered: input.uncensored, loraId: input.uncensored ? resolveUncensoredLora(input.uncensoredStyle) : undefined }));
+            ({ url } = await generateImage({
+              prompt: enhancedPrompt,
+              model: model as any,
+              size: `${input.width}x${input.height}`,
+              // Pass holders on a Stripe free plan must not be watermarked —
+              // they already paid for the uncensored entitlement.
+              userTier: input.uncensored ? "pro" : userTier,
+              unfiltered: input.uncensored,
+              loraId: input.uncensored ? resolveUncensoredLora(input.uncensoredStyle) : undefined,
+            }));
           }
 
           await updateGeneration(genId, {

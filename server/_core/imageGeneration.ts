@@ -44,6 +44,13 @@ export type GenerateImageOptions = {
    * uncensoredStyleLora.ts. Ignored unless `unfiltered` is set.
    */
   loraId?: string;
+  /** Reproducible seed for the unfiltered Flux path. */
+  seed?: number;
+  /**
+   * Unfiltered quality: "fast" = Flux Schnell (4 steps), "quality" = Flux Dev
+   * (20 steps). Paid uncensored studio uses this; free previews stay fast.
+   */
+  unfilteredQuality?: "fast" | "quality";
   originalImages?: Array<{
     url?: string;
     b64Json?: string;
@@ -645,7 +652,10 @@ export async function generateImage(
     }
 
     if (options.unfiltered) {
-      imageBuffer = await generateUnfiltered(prompt, size, options.loraId);
+      imageBuffer = await generateUnfiltered(prompt, size, options.loraId, {
+        quality: options.unfilteredQuality,
+        seed: options.seed,
+      });
     } else if (model !== "auto") {
       imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
     } else {
@@ -653,8 +663,15 @@ export async function generateImage(
     }
   }
 
-  // Apply watermark for free-tier users
-  if (!options.userTier || options.userTier === "free") {
+  // Watermark: SFW free-tier, and uncensored *previews* (userTier === "free"
+  // on the unfiltered path). An Uncensored Pass holder on a Stripe free plan
+  // used to get watermarked anyway because getUserTier() ignores the crypto
+  // entitlement — that was giving paying adult buyers a preview they already
+  // paid to remove.
+  const shouldWatermark = options.unfiltered
+    ? options.userTier === "free"
+    : !options.userTier || options.userTier === "free";
+  if (shouldWatermark) {
     const { addImageWatermark } = await import("./watermark");
     imageBuffer = await addImageWatermark(imageBuffer);
   }
@@ -675,7 +692,12 @@ export async function generateImage(
  * Never touches Cloudflare / OpenAI / Stability / Grok — they hard-reject
  * NSFW or prohibit it in their terms.
  */
-async function generateUnfiltered(prompt: string, size: string, loraId?: string): Promise<Buffer> {
+async function generateUnfiltered(
+  prompt: string,
+  size: string,
+  loraId?: string,
+  opts?: { quality?: "fast" | "quality"; seed?: number },
+): Promise<Buffer> {
   // Defense-in-depth: the no-safety chain refuses illegal content even if a
   // higher-level gate was missed. Throws PromptBlockedError (CSAM / minor /
   // real-person deepfake) before any GPU call. A refusal HERE means a surface
@@ -694,10 +716,23 @@ async function generateUnfiltered(prompt: string, size: string, loraId?: string)
   }
   const [w, h] = size.split("x").map(Number);
   const errors: string[] = [];
+  const width = w || 1024;
+  const height = h || 1024;
+  const seed = opts?.seed;
+  const wantQuality = opts?.quality === "quality";
+
+  if (isRunPodAvailable() && wantQuality) {
+    try {
+      return await runpodFluxDev(prompt, width, height, 20, 7.5, loraId, seed);
+    } catch (err: any) {
+      errors.push(`RunPod Flux Dev: ${err.message}`);
+      console.warn("[ImageGen] Unfiltered Flux Dev failed, trying Schnell:", err.message);
+    }
+  }
 
   if (isRunPodAvailable()) {
     try {
-      return await runpodFluxSchnell(prompt, w || 1024, h || 1024, loraId);
+      return await runpodFluxSchnell(prompt, width, height, loraId, seed);
     } catch (err: any) {
       errors.push(`RunPod: ${err.message}`);
       console.warn("[ImageGen] Unfiltered RunPod failed, trying fal:", err.message);

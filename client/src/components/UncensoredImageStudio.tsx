@@ -1,0 +1,317 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import {
+  UNCENSORED_ASPECTS,
+  UNCENSORED_FRAMINGS,
+  UNCENSORED_IMAGE_COST,
+  DEFAULT_UNCENSORED_ASPECT,
+} from "@shared/uncensoredStudio";
+import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
+
+/**
+ * Paid uncensored image studio. Portrait-first, quality tier, framing,
+ * seed, variations, and optional same-character lock against the caller's
+ * own generations. This is the product pass-holders came for — not a toggle
+ * buried in the SFW workspace.
+ */
+export default function UncensoredImageStudio() {
+  const [prompt, setPrompt] = useState("");
+  const [negative, setNegative] = useState("");
+  const [style, setStyle] = useState(DEFAULT_UNCENSORED_STYLE);
+  const [aspect, setAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
+  const [framing, setFraming] = useState<string | null>("bust");
+  const [quality, setQuality] = useState<"fast" | "quality">("fast");
+  const [count, setCount] = useState(1);
+  const [seed, setSeed] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [characterId, setCharacterId] = useState<number | null>(null);
+  const [results, setResults] = useState<{ url: string; seed: number | null; generationId: number }[]>([]);
+
+  const images = trpc.uncensored.myUncensoredImages.useQuery();
+  const utils = trpc.useUtils();
+
+  const gen = trpc.uncensored.generate.useMutation({
+    onSuccess: (data) => {
+      setResults(data.images);
+      utils.uncensored.myUncensoredImages.invalidate();
+      toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const unitCost = characterId
+    ? UNCENSORED_IMAGE_COST.character
+    : UNCENSORED_IMAGE_COST[quality];
+  const cost = unitCost * count;
+  const aspectMeta = UNCENSORED_ASPECTS.find((a) => a.id === aspect) ?? UNCENSORED_ASPECTS[0];
+
+  const parsedSeed = useMemo(() => {
+    const n = Number(seed);
+    return Number.isInteger(n) && n >= 0 ? n : undefined;
+  }, [seed]);
+
+  const handleGenerate = () => {
+    if (prompt.trim().length < 3) {
+      toast.error("Describe what you want to create.");
+      return;
+    }
+    setResults([]);
+    gen.mutate({
+      prompt: prompt.trim(),
+      negativePrompt: negative.trim() || undefined,
+      style,
+      aspect,
+      framing: framing ?? undefined,
+      quality,
+      count,
+      seed: parsedSeed,
+      characterGenerationId: characterId ?? undefined,
+    });
+  };
+
+  const reuseSeed = (s: number | null) => {
+    if (s == null) return;
+    setSeed(String(s));
+    toast.info(`Seed ${s} locked — next generate reuses it.`);
+  };
+
+  return (
+    <div className="mt-8 rounded-2xl border border-rose-500/30 bg-card/40 p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Flame className="h-5 w-5 text-rose-500" />
+            <h2 className="text-lg font-semibold">Create</h2>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Unfiltered Flux on our GPUs. Portrait-first, private, no watermark.
+          </p>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">{cost} credits</span>
+      </div>
+
+      <Textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Describe the scene, character, lighting, mood…"
+        rows={4}
+        maxLength={1000}
+        disabled={gen.isPending}
+        className="mt-4 resize-none"
+      />
+
+      <div className="mt-4">
+        <p className="text-xs text-muted-foreground mb-2">Style</p>
+        <div className="flex flex-wrap gap-2">
+          {UNCENSORED_STYLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setStyle(s.id)}
+              disabled={gen.isPending}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                style === s.id
+                  ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Aspect</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_ASPECTS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setAspect(a.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  aspect === a.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Framing</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_FRAMINGS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFraming(framing === f.id ? null : f.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  framing === f.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-border/60 p-1">
+          {(["fast", "quality"] as const).map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => setQuality(q)}
+              disabled={gen.isPending || !!characterId}
+              className={`rounded-md px-3 py-1 text-xs capitalize ${
+                quality === q && !characterId
+                  ? "bg-rose-500/20 text-rose-200"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {q === "fast" ? `Fast · ${UNCENSORED_IMAGE_COST.fast}cr` : `Quality · ${UNCENSORED_IMAGE_COST.quality}cr`}
+            </button>
+          ))}
+        </div>
+        <div className="inline-flex rounded-lg border border-border/60 p-1">
+          {[1, 2, 4].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setCount(n)}
+              disabled={gen.isPending}
+              className={`rounded-md px-3 py-1 text-xs ${
+                count === n ? "bg-rose-500/20 text-rose-200" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              ×{n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="mt-4 text-xs text-muted-foreground hover:text-foreground"
+      >
+        {showAdvanced ? "Hide" : "Show"} advanced · seed, negative, character lock
+      </button>
+
+      {showAdvanced && (
+        <div className="mt-3 space-y-4 rounded-xl border border-border/50 bg-black/20 p-4">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Negative prompt</p>
+            <Input
+              value={negative}
+              onChange={(e) => setNegative(e.target.value)}
+              placeholder="extra limbs, waxy skin, text, watermark…"
+              maxLength={500}
+              disabled={gen.isPending}
+            />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Seed (blank = random)</p>
+            <Input
+              value={seed}
+              onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+              placeholder="reproducible seed"
+              disabled={gen.isPending}
+            />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Same character — lock to one of your own gens (img2img, {UNCENSORED_IMAGE_COST.character}cr)
+            </p>
+            {images.data && images.data.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                {images.data.slice(0, 12).map((img) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    onClick={() => setCharacterId(characterId === img.id ? null : img.id)}
+                    disabled={gen.isPending}
+                    className={`overflow-hidden rounded-lg border-2 ${
+                      characterId === img.id
+                        ? "border-rose-500 ring-1 ring-rose-500/40"
+                        : "border-transparent hover:border-rose-500/40"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.imageUrl ?? ""} alt="" className="aspect-square w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Generate one first, then lock her for the next shot.</p>
+            )}
+            {characterId && (
+              <p className="mt-2 flex items-center gap-1 text-[11px] text-rose-300">
+                <Lock className="h-3 w-3" /> Character locked — new scene, same identity.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Button
+        onClick={handleGenerate}
+        disabled={gen.isPending || prompt.trim().length < 3}
+        className="mt-5 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
+        size="lg"
+      >
+        {gen.isPending ? (
+          <>
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating {aspectMeta.label.toLowerCase()}…
+          </>
+        ) : (
+          <>
+            <Sparkles className="mr-2 h-5 w-5" /> Generate · {cost} credits
+          </>
+        )}
+      </Button>
+
+      {results.length > 0 && (
+        <div className={`mt-6 grid gap-3 ${results.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+          {results.map((r) => (
+            <div key={r.generationId} className="overflow-hidden rounded-xl border border-rose-500/30">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={r.url} alt="Generated" className="w-full" />
+              <div className="flex items-center justify-between gap-2 p-2 text-[11px] text-muted-foreground">
+                <span>{r.seed != null ? `seed ${r.seed}` : aspectMeta.label}</span>
+                <div className="flex gap-1">
+                  {r.seed != null && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => reuseSeed(r.seed)}>
+                      <RotateCcw className="mr-1 h-3 w-3" /> Seed
+                    </Button>
+                  )}
+                  <Button asChild variant="ghost" size="sm" className="h-7 px-2">
+                    <a href={r.url} target="_blank" rel="noopener noreferrer">
+                      <Download className="mr-1 h-3 w-3" /> Open
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -17,6 +17,13 @@ import { generateImage, refineUnfiltered } from "../_core/imageGeneration";
 import { storagePut, generateStorageKey } from "../storage";
 import { applyUncensoredStyle, UNCENSORED_STYLES } from "../../shared/uncensoredStyles";
 import { FREE_UNCENSORED_PREVIEWS } from "../../shared/uncensoredPlans";
+import {
+  UNCENSORED_ASPECTS,
+  UNCENSORED_FRAMINGS,
+  UNCENSORED_IMAGE_COST,
+  applyUncensoredFraming,
+  getUncensoredAspect,
+} from "../../shared/uncensoredStudio";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
@@ -122,8 +129,195 @@ export const uncensoredRouter = router({
       videoAvailable,
       refineCost: UNCENSORED_REFINE_COST,
       styles: UNCENSORED_STYLES,
+      imageCost: UNCENSORED_IMAGE_COST,
+      aspects: UNCENSORED_ASPECTS,
+      framings: UNCENSORED_FRAMINGS,
     };
   }),
+
+  /**
+   * Paid uncensored image studio — the product pass-holders actually came for.
+   *
+   * Workspace had an uncensored toggle that still rendered square 1024 and
+   * watermarked Stripe-free accounts. This is the dedicated path: portrait
+   * default, quality tier, framing, seed, variations, and optional
+   * same-character lock against one of the caller's own generations.
+   */
+  generate: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(3).max(1000),
+        negativePrompt: z.string().max(500).optional(),
+        style: z.string().max(32).optional(),
+        aspect: z.string().max(16).optional(),
+        framing: z.string().max(32).optional(),
+        quality: z.enum(["fast", "quality"]).default("fast"),
+        seed: z.number().int().min(0).max(2_147_483_647).optional(),
+        count: z.number().int().min(1).max(4).default(1),
+        characterGenerationId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "An active Uncensored Pass is required. Grab a pass to unlock the studio.",
+        });
+      }
+
+      const verdict = checkPrompt(input.prompt, {
+        strictMinors: true,
+        negativePrompt: input.negativePrompt ?? null,
+      });
+      if (!verdict.allowed) {
+        await logModerationBlock({
+          category: verdict.category,
+          promptLen: input.prompt.length,
+          userId: ctx.user.id,
+          surface: "uncensored.generate",
+          prompt: input.prompt,
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+
+      let characterUrl: string | null = null;
+      let characterId: number | null = null;
+      if (input.characterGenerationId) {
+        const src = await getGenerationById(input.characterGenerationId);
+        if (!src || src.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available as a character lock." });
+        }
+        if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can lock a character." });
+        }
+        if (!(src.metadata as any)?.uncensored) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can lock a character." });
+        }
+        characterUrl = src.imageUrl;
+        characterId = src.id;
+      }
+
+      const unitCost = characterUrl
+        ? UNCENSORED_IMAGE_COST.character
+        : UNCENSORED_IMAGE_COST[input.quality];
+      const cost = unitCost * input.count;
+
+      await enforceRateLimit(
+        `uncensored.generate:user:${ctx.user.id}`,
+        8,
+        60_000,
+        "Slow down a moment between generations.",
+      );
+
+      const debit = await deductCredits(
+        ctx.user.id,
+        cost,
+        `Uncensored ${characterUrl ? "character" : input.quality} ×${input.count}`,
+        "usage",
+        { uncensored: true, quality: input.quality, count: input.count },
+      );
+      if (!debit.success) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.`,
+        });
+      }
+
+      const aspect = getUncensoredAspect(input.aspect);
+      let prompt = applyUncensoredFraming(input.prompt, input.framing);
+      prompt = applyUncensoredStyle(prompt, input.style);
+      if (input.negativePrompt?.trim()) {
+        prompt = `${prompt}. Avoid: ${input.negativePrompt.trim()}`;
+      }
+      if (characterUrl) {
+        prompt = `same character identity, same face, same body type, new scene. ${prompt}`;
+      }
+
+      const loraId = resolveUncensoredLora(input.style);
+      const results: { generationId: number; url: string; seed: number | null }[] = [];
+      let failed = 0;
+
+      for (let i = 0; i < input.count; i++) {
+        const seed = typeof input.seed === "number" ? input.seed + i : undefined;
+        const genId = await createGeneration({
+          userId: ctx.user.id,
+          prompt: input.prompt,
+          negativePrompt: input.negativePrompt ?? null,
+          mediaType: "image",
+          width: aspect.width,
+          height: aspect.height,
+          duration: null,
+          status: "generating",
+          modelVersion: characterUrl ? "uncensored-character" : `uncensored-${input.quality}`,
+          parentGenerationId: characterId,
+          metadata: {
+            uncensored: true,
+            style: input.style ?? null,
+            framing: input.framing ?? null,
+            quality: input.quality,
+            seed: seed ?? null,
+            cost: unitCost,
+            character: !!characterUrl,
+          },
+        });
+
+        try {
+          let url: string;
+          if (characterUrl) {
+            const imageB64 = await fetchAsBase64(characterUrl);
+            const buffer = await refineUnfiltered(imageB64, prompt, {
+              strength: 0.45,
+              loraId,
+            });
+            const key = generateStorageKey("generations", "png");
+            ({ url } = await storagePut(key, buffer, "image/png"));
+            await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+          } else {
+            const gen = await generateImage({
+              prompt,
+              model: "auto",
+              size: `${aspect.width}x${aspect.height}`,
+              userTier: "pro",
+              unfiltered: true,
+              unfilteredQuality: input.quality,
+              loraId,
+              seed,
+            });
+            url = gen.url!;
+            await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url });
+          }
+          results.push({ generationId: genId, url, seed: seed ?? null });
+        } catch (err: any) {
+          failed += 1;
+          await updateGeneration(genId, { status: "failed" });
+          await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        }
+      }
+
+      if (results.length === 0) {
+        await refundCredits(ctx.user.id, cost, "Uncensored generate failed");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Generation failed — your credits were returned. Please try again.",
+        });
+      }
+
+      if (failed > 0) {
+        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate partial fail ×${failed}`);
+      }
+
+      return {
+        images: results,
+        cost: unitCost * results.length,
+        creditsRemaining: debit.balance - unitCost * failed,
+      };
+    }),
 
   /**
    * Uncensored video generation — Wan 2.2 on self-hosted GPU (no free tier).
@@ -414,7 +608,11 @@ export const uncensoredRouter = router({
    * generateUnfiltered backstop) before any GPU call.
    */
   freeGenerate: protectedProcedure
-    .input(z.object({ prompt: z.string().min(3).max(1000), style: z.string().max(32).optional() }))
+    .input(z.object({
+      prompt: z.string().min(3).max(1000),
+      style: z.string().max(32).optional(),
+      aspect: z.string().max(16).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await requireToolActive("text-to-image");
 
@@ -445,24 +643,25 @@ export const uncensoredRouter = router({
 
       const enhancedPrompt = applyUncensoredStyle(input.prompt, input.style);
       const loraId = resolveUncensoredLora(input.style);
+      const aspect = getUncensoredAspect(input.aspect);
       const genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
         negativePrompt: null,
         mediaType: "image",
-        width: 768,
-        height: 768,
+        width: aspect.width,
+        height: aspect.height,
         duration: null,
         status: "generating",
         modelVersion: "uncensored-free",
-        metadata: { uncensored: true, free: true, style: input.style ?? null },
+        metadata: { uncensored: true, free: true, style: input.style ?? null, aspect: aspect.id },
       });
 
       try {
         const { url } = await generateImage({
           prompt: enhancedPrompt,
           model: "auto",
-          size: "768x768",
+          size: `${aspect.width}x${aspect.height}`,
           userTier: "free",
           unfiltered: true,
           loraId,
@@ -524,7 +723,15 @@ export const uncensoredRouter = router({
   myUncensoredImages: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
     return db
-      .select({ id: generations.id, imageUrl: generations.imageUrl, prompt: generations.prompt, createdAt: generations.createdAt })
+      .select({
+        id: generations.id,
+        imageUrl: generations.imageUrl,
+        prompt: generations.prompt,
+        createdAt: generations.createdAt,
+        width: generations.width,
+        height: generations.height,
+        metadata: generations.metadata,
+      })
       .from(generations)
       .where(
         and(

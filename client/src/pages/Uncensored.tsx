@@ -14,6 +14,8 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredVideoStudio from "@/components/UncensoredVideoStudio";
 import UncensoredRefineStudio from "@/components/UncensoredRefineStudio";
+import UncensoredImageStudio from "@/components/UncensoredImageStudio";
+import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -91,6 +93,8 @@ export default function Uncensored() {
 
   const [freePrompt, setFreePrompt] = useState("");
   const [freeStyle, setFreeStyle] = useState("realistic");
+  const [freeAspect, setFreeAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
+  const [studioTab, setStudioTab] = useState<"create" | "refine" | "video">("create");
   const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
   const freeGen = trpc.uncensored.freeGenerate.useMutation({
     onSuccess: (data) => {
@@ -167,7 +171,7 @@ export default function Uncensored() {
       return;
     }
     setFreeResultUrl(null);
-    freeGen.mutate({ prompt: p, style: freeStyle });
+    freeGen.mutate({ prompt: p, style: freeStyle, aspect: freeAspect });
   };
 
   const handleStart = async () => {
@@ -217,17 +221,33 @@ export default function Uncensored() {
             <h2 className="mt-4 text-2xl font-semibold">Your Uncensored Pass is active</h2>
             <p className="mt-2 text-muted-foreground">
               Active until{" "}
-              {status?.until ? new Date(status.until).toLocaleDateString() : "—"}. Flip on
-              "Uncensored mode" in the Studio.
+              {status?.until ? new Date(status.until).toLocaleDateString() : "—"}. Create,
+              refine, and animate here — this is the uncensored studio.
             </p>
-            <Button asChild className="mt-6" size="lg">
-              <a href="/workspace">
-                Open Studio <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
-            <div className="mt-2 text-left">
-              <UncensoredRefineStudio />
-              <UncensoredVideoStudio />
+            <div className="mt-6 text-left">
+              <div className="inline-flex rounded-lg border border-border/60 p-1">
+                {([
+                  ["create", "Create"],
+                  ["refine", "Refine"],
+                  ["video", "Video"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setStudioTab(id)}
+                    className={`rounded-md px-4 py-1.5 text-sm ${
+                      studioTab === id
+                        ? "bg-rose-500/20 text-rose-200"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {studioTab === "create" && <UncensoredImageStudio />}
+              {studioTab === "refine" && <UncensoredRefineStudio />}
+              {studioTab === "video" && <UncensoredVideoStudio />}
             </div>
           </motion.div>
         ) : (
@@ -274,6 +294,20 @@ export default function Uncensored() {
                     disabled={freeGen.isPending}
                     className="mt-3 resize-none"
                   />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Aspect:</span>
+                    {UNCENSORED_ASPECTS.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setFreeAspect(a.id)}
+                        disabled={freeGen.isPending}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeAspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
                   {(status?.styles?.length ?? 0) > 0 && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-xs text-muted-foreground">Style:</span>
@@ -368,9 +402,9 @@ export default function Uncensored() {
                     className="mt-4 h-[660px] w-full rounded-xl border border-border/60 bg-white"
                   />
                   <p className="mt-3 text-center text-xs text-muted-foreground">
-                    Scan the QR or copy the Bitcoin address. On-chain confirmations usually
-                    take a few minutes (sometimes longer under network congestion). This
-                    invoice stays open for 3 hours — the page unlocks automatically after settle.
+                    Scan the QR or copy the Bitcoin address. The pass unlocks as soon as
+                    the payment is seen — usually seconds after you send. Invoice stays
+                    open 3 hours.
                   </p>
                   <p className="mt-2 text-center text-xs">
                     <a

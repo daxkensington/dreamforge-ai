@@ -22,7 +22,19 @@ export const UNCENSORED_STYLES: UncensoredStyle[] = [
     id: "realistic",
     label: "Realistic",
     promptSuffix:
-      "photorealistic, ultra detailed, professional photography, natural skin texture, soft cinematic lighting, sharp focus, 85mm portrait lens, high dynamic range",
+      "photorealistic, ultra detailed, professional photography, natural skin texture with visible pores, correct anatomy, natural proportions, soft cinematic lighting, sharp focus, 85mm portrait lens, high dynamic range",
+  },
+  {
+    id: "cinematic",
+    label: "Cinematic",
+    promptSuffix:
+      "cinematic still, anamorphic lens flare, dramatic motivated lighting, film grain, color-graded, 35mm movie frame, shallow depth of field, correct anatomy",
+  },
+  {
+    id: "analog",
+    label: "Analog film",
+    promptSuffix:
+      "shot on Kodak Portra 400, 35mm film, natural grain, candid photography, available light, true-to-life skin, slight halation, correct anatomy",
   },
   {
     id: "anime",
@@ -31,10 +43,16 @@ export const UNCENSORED_STYLES: UncensoredStyle[] = [
       "high quality anime illustration, detailed anime art style, clean lineart, vibrant cel shading, expressive, studio-quality key visual",
   },
   {
+    id: "render3d",
+    label: "3D render",
+    promptSuffix:
+      "octane render, blender, subsurface scattering skin, cinematic lighting, ultra detailed 3D character, physically based materials",
+  },
+  {
     id: "fantasy",
     label: "Fantasy",
     promptSuffix:
-      "fantasy digital painting, highly detailed, dramatic volumetric lighting, epic atmosphere, artstation trending, concept-art quality",
+      "fantasy digital painting, highly detailed, dramatic volumetric lighting, epic atmosphere, artstation trending, concept-art quality, correct anatomy",
   },
   {
     id: "artistic",

@@ -248,6 +248,8 @@ export async function runpodFluxDev(
   height: number = 1024,
   steps: number = 20,
   guidanceScale: number = 7.5,
+  loraId?: string,
+  seed?: number,
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -257,6 +259,8 @@ export async function runpodFluxDev(
       height,
       num_inference_steps: steps,
       guidance_scale: guidanceScale,
+      ...(loraId ? { lora_id: loraId } : {}),
+      ...(typeof seed === "number" ? { seed } : {}),
     }),
   );
 }
@@ -269,6 +273,7 @@ export async function runpodFluxSchnell(
   width: number = 1024,
   height: number = 1024,
   loraId?: string,
+  seed?: number,
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -278,6 +283,7 @@ export async function runpodFluxSchnell(
       height,
       num_inference_steps: 4,
       ...(loraId ? { lora_id: loraId } : {}),
+      ...(typeof seed === "number" ? { seed } : {}),
     }),
   );
 }
