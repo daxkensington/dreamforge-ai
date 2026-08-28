@@ -19,6 +19,7 @@ import { deductCredits, CREDIT_COSTS } from "./stripe";
 import { requireToolActive } from "./_core/toolStatus";
 import { eq } from "drizzle-orm";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
+import { isUncensoredCharacter } from "../shared/uncensoredStudio";
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
 async function tryDeductCredits(userId: number, tool: string, description?: string) {
@@ -255,14 +256,15 @@ export const characterRouter = router({
     }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
-    return listCharacters(ctx.user.id);
+    const rows = await listCharacters(ctx.user.id);
+    return rows.filter((c) => !isUncensoredCharacter(c.styleNotes));
   }),
 
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
       const char = await getCharacter(input.id, ctx.user.id);
-      if (!char) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!char || isUncensoredCharacter(char.styleNotes)) throw new TRPCError({ code: "NOT_FOUND" });
       return char;
     }),
 
@@ -275,13 +277,24 @@ export const characterRouter = router({
       styleNotes: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await getCharacter(input.id, ctx.user.id);
+      if (!existing || isUncensoredCharacter(existing.styleNotes)) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       const { id, ...data } = input;
+      if (data.styleNotes && isUncensoredCharacter(data.styleNotes)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid style notes." });
+      }
       return updateCharacter(id, ctx.user.id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await getCharacter(input.id, ctx.user.id);
+      if (!existing || isUncensoredCharacter(existing.styleNotes)) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
       return deleteCharacter(input.id, ctx.user.id);
     }),
 
@@ -293,7 +306,7 @@ export const characterRouter = router({
     .mutation(async ({ ctx, input }) => {
       await tryDeductCredits(ctx.user.id, "image-to-image", `Character #${input.characterId} scene`);
       const char = await getCharacter(input.characterId, ctx.user.id);
-      if (!char) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!char || isUncensoredCharacter(char.styleNotes)) throw new TRPCError({ code: "NOT_FOUND" });
 
       const characterPrompt = [
         `Character: ${char.name}`,

@@ -24,6 +24,7 @@ export default function UncensoredInpaintStudio({
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [prompt, setPrompt] = useState("");
   const [brush, setBrush] = useState(32);
+  const [strength, setStrength] = useState(55);
   const [erasing, setErasing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [hasPaint, setHasPaint] = useState(false);
@@ -163,6 +164,7 @@ export default function UncensoredInpaintStudio({
       sourceGenerationId: sourceId,
       prompt: prompt.trim(),
       maskDataUrl: mask.toDataURL("image/png"),
+      strength: Math.min(0.85, Math.max(0.3, strength / 100)),
     });
   };
 
@@ -275,6 +277,27 @@ export default function UncensoredInpaintStudio({
         disabled={inpaint.isPending}
         className="mt-4 resize-none"
       />
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">How much to change the painted region</span>
+          <span className="font-medium">
+            {strength <= 40 ? "Subtle" : strength <= 65 ? "Balanced" : "Heavy"}
+          </span>
+        </div>
+        <Slider
+          value={[strength]}
+          onValueChange={(v) => setStrength(v[0] ?? 55)}
+          min={30}
+          max={85}
+          step={5}
+          disabled={inpaint.isPending}
+          className="mt-2"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Lower keeps more of the original pixels in the brush; higher replaces the region more freely.
+        </p>
+      </div>
 
       <Button
         onClick={handleInpaint}

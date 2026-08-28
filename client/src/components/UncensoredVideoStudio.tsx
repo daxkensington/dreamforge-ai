@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import {
+  UNCENSORED_VIDEO_DURATIONS,
+  DEFAULT_UNCENSORED_VIDEO_DURATION,
+  uncensoredVideoCredits,
+} from "@shared/uncensoredStudio";
 
 /**
  * Uncensored video studio — shown to holders of an active pass. Wan 2.2 on our
@@ -31,6 +36,9 @@ export default function UncensoredVideoStudio({
   const [quality, setQuality] = useState<"fast" | "hd">("fast");
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState<Aspect>("portrait");
+  const [duration, setDuration] = useState<typeof DEFAULT_UNCENSORED_VIDEO_DURATION>(
+    DEFAULT_UNCENSORED_VIDEO_DURATION,
+  );
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -46,7 +54,8 @@ export default function UncensoredVideoStudio({
   const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" });
 
   const fallbackCost = { fast: { t2v: 50, i2v: 40 }, hd: { t2v: 120, i2v: 100 } };
-  const cost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];
+  const baseCost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];
+  const cost = uncensoredVideoCredits(baseCost, duration);
 
   // Async job: submit returns a generationId, then we poll videoStatus until the
   // clip lands (video routinely outlasts a single request).
@@ -100,6 +109,7 @@ export default function UncensoredVideoStudio({
       mode,
       quality,
       aspect,
+      duration,
       ...(mode === "i2v" && sourceId ? { sourceGenerationId: sourceId } : {}),
     });
   };
@@ -124,7 +134,7 @@ export default function UncensoredVideoStudio({
       <div className="flex items-center gap-2">
         <Film className="h-5 w-5 text-rose-500" />
         <h2 className="text-lg font-semibold">Uncensored video</h2>
-        <span className="ml-auto text-xs text-muted-foreground">~5s clip · {cost} credits</span>
+        <span className="ml-auto text-xs text-muted-foreground">{duration} clip · {cost} credits</span>
       </div>
 
       {/* Mode toggle */}
@@ -207,6 +217,21 @@ export default function UncensoredVideoStudio({
             className={`rounded-full border px-3 py-1 text-xs transition-colors ${quality === q.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
           >
             {q.label} <span className="opacity-60">· {q.note}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Length:</span>
+        {UNCENSORED_VIDEO_DURATIONS.map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => setDuration(d.id)}
+            disabled={isBusy}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${duration === d.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+          >
+            {d.label}
           </button>
         ))}
       </div>

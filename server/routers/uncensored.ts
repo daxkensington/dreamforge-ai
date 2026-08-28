@@ -10,7 +10,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, createGeneration, updateGeneration, getGenerationById } from "../db";
-import { users, cryptoInvoices, generations } from "../../drizzle/schema";
+import { users, cryptoInvoices, generations, characters } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
 import { generateImage, refineUnfiltered } from "../_core/imageGeneration";
@@ -21,9 +21,18 @@ import {
   UNCENSORED_ASPECTS,
   UNCENSORED_FRAMINGS,
   UNCENSORED_IMAGE_COST,
+  UNCENSORED_POSES,
+  UNCENSORED_VIDEO_DURATIONS,
+  UNCENSORED_CHARACTER_LIMIT,
   DEFAULT_UNCENSORED_NEGATIVE,
   applyUncensoredFraming,
+  applyUncensoredPose,
   getUncensoredAspect,
+  getUncensoredVideoDuration,
+  uncensoredVideoCredits,
+  uncensoredCharacterRef,
+  isUncensoredCharacter,
+  parseUncensoredCharacterRef,
 } from "../../shared/uncensoredStudio";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
@@ -91,6 +100,21 @@ async function requireOwnUncensoredImage(userId: number, id: number) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be used here." });
   }
   return src;
+}
+
+async function requireOwnUncensoredCharacter(userId: number, id: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(characters)
+    .where(and(eq(characters.id, id), eq(characters.userId, userId)))
+    .limit(1);
+  const char = rows[0];
+  const generationId = parseUncensoredCharacterRef(char?.styleNotes);
+  if (!char || !generationId) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "That character isn't available." });
+  }
+  return { char, generationId };
 }
 
 async function fetchImageBuffer(url: string): Promise<Buffer> {
@@ -180,6 +204,8 @@ export const uncensoredRouter = router({
       imageCost: UNCENSORED_IMAGE_COST,
       aspects: UNCENSORED_ASPECTS,
       framings: UNCENSORED_FRAMINGS,
+      poses: UNCENSORED_POSES,
+      videoDurations: UNCENSORED_VIDEO_DURATIONS,
     };
   }),
 
@@ -202,7 +228,9 @@ export const uncensoredRouter = router({
         quality: z.enum(["fast", "quality"]).default("fast"),
         seed: z.number().int().min(0).max(2_147_483_647).optional(),
         count: z.number().int().min(1).max(4).default(1),
+        pose: z.string().max(32).optional(),
         characterGenerationId: z.number().int().positive().optional(),
+        savedCharacterId: z.number().int().positive().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -236,8 +264,16 @@ export const uncensoredRouter = router({
 
       let characterUrl: string | null = null;
       let characterId: number | null = null;
-      if (input.characterGenerationId) {
-        const src = await getGenerationById(input.characterGenerationId);
+      let savedCharacterId: number | null = null;
+      const lockGenerationId = input.characterGenerationId
+        ?? (input.savedCharacterId
+          ? (await requireOwnUncensoredCharacter(ctx.user.id, input.savedCharacterId)).generationId
+          : null);
+      if (input.savedCharacterId && lockGenerationId) {
+        savedCharacterId = input.savedCharacterId;
+      }
+      if (lockGenerationId) {
+        const src = await getGenerationById(lockGenerationId);
         if (!src || src.userId !== ctx.user.id) {
           throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available as a character lock." });
         }
@@ -279,6 +315,7 @@ export const uncensoredRouter = router({
 
       const aspect = getUncensoredAspect(input.aspect);
       let prompt = applyUncensoredFraming(input.prompt, input.framing);
+      prompt = applyUncensoredPose(prompt, input.pose);
       prompt = applyUncensoredStyle(prompt, input.style);
       const negative = [DEFAULT_UNCENSORED_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       if (negative) {
@@ -311,10 +348,12 @@ export const uncensoredRouter = router({
             uncensored: true,
             style: input.style ?? null,
             framing: input.framing ?? null,
+            pose: input.pose ?? null,
             quality: input.quality,
             seed: seed ?? null,
             cost: unitCost,
             character: !!characterUrl,
+            savedCharacterId,
           },
         });
 
@@ -385,6 +424,7 @@ export const uncensoredRouter = router({
         quality: z.enum(["fast", "hd"]).default("fast"),
         sourceGenerationId: z.number().int().positive().optional(),
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
+        duration: z.enum(["5s", "8s"]).default("5s" as const),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -428,8 +468,9 @@ export const uncensoredRouter = router({
         parentGenerationId = src.id;
       }
 
-      const cost = UNCENSORED_VIDEO_COST[input.quality][input.mode];
-      const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality });
+      const duration = getUncensoredVideoDuration(input.duration);
+      const cost = uncensoredVideoCredits(UNCENSORED_VIDEO_COST[input.quality][input.mode], duration.id);
+      const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"} ${duration.label}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id });
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
@@ -442,13 +483,13 @@ export const uncensoredRouter = router({
         mediaType: "video",
         width: dims.w,
         height: dims.h,
-        duration: 5,
+        duration: duration.seconds,
         status: "generating",
         modelVersion: "uncensored-wan-2.2",
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -460,11 +501,13 @@ export const uncensoredRouter = router({
           sourceImageUrl,
           width: dims.w,
           height: dims.h,
+          numFrames: duration.numFrames,
+          fps: duration.fps,
           tier: input.quality,
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -958,6 +1001,84 @@ export const uncensoredRouter = router({
       .orderBy(desc(generations.createdAt))
       .limit(48);
   }),
+
+  /**
+   * Named characters for the uncensored studio. Saved only from the caller's
+   * own uncensored generations — the same ownership gate as character lock.
+   * SFW character.list hides these via the styleNotes marker.
+   */
+  listCharacters: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    const rows = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.userId, ctx.user.id))
+      .orderBy(desc(characters.createdAt));
+    return rows
+      .filter((c) => isUncensoredCharacter(c.styleNotes))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        imageUrl: Array.isArray(c.referenceImages) ? (c.referenceImages[0] as string | undefined) ?? null : null,
+        generationId: parseUncensoredCharacterRef(c.styleNotes),
+        createdAt: c.createdAt,
+      }));
+  }),
+
+  saveCharacter: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().trim().min(1).max(40),
+        sourceGenerationId: z.number().int().positive(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+
+      const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+      const db = await requireDb();
+      const existing = await db
+        .select({ id: characters.id, styleNotes: characters.styleNotes })
+        .from(characters)
+        .where(eq(characters.userId, ctx.user.id));
+      const mine = existing.filter((c) => isUncensoredCharacter(c.styleNotes));
+      if (mine.length >= UNCENSORED_CHARACTER_LIMIT) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `You already have ${UNCENSORED_CHARACTER_LIMIT} characters. Delete one to save another.`,
+        });
+      }
+
+      const inserted = await db
+        .insert(characters)
+        .values({
+          userId: ctx.user.id,
+          name: input.name,
+          description: src.prompt?.slice(0, 500) ?? null,
+          referenceImages: [src.imageUrl],
+          styleNotes: uncensoredCharacterRef(src.id),
+        })
+        .returning({ id: characters.id });
+
+      return { id: inserted[0]!.id, name: input.name, generationId: src.id, imageUrl: src.imageUrl };
+    }),
+
+  deleteCharacter: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnUncensoredCharacter(ctx.user.id, input.id);
+      const db = await requireDb();
+      await db
+        .delete(characters)
+        .where(and(eq(characters.id, input.id), eq(characters.userId, ctx.user.id)));
+      return { ok: true };
+    }),
 
   /** Images + video clips for the Library tab. */
   myLibrary: protectedProcedure.query(async ({ ctx }) => {

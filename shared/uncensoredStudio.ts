@@ -74,6 +74,116 @@ export function applyUncensoredFraming(prompt: string, framingId: string | null 
   return framing ? `${prompt}. ${framing.promptSuffix}` : prompt;
 }
 
+export interface UncensoredPose {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+/** Body language / camera-relative poses. One at a time, like framing. */
+export const UNCENSORED_POSES: UncensoredPose[] = [
+  {
+    id: "standing",
+    label: "Standing",
+    promptSuffix: "standing pose, weight on one hip, confident posture",
+  },
+  {
+    id: "sitting",
+    label: "Sitting",
+    promptSuffix: "sitting pose, relaxed, looking toward camera",
+  },
+  {
+    id: "reclining",
+    label: "Reclining",
+    promptSuffix: "reclining on a surface, stretched out, languid pose",
+  },
+  {
+    id: "kneeling",
+    label: "Kneeling",
+    promptSuffix: "kneeling pose, looking up toward camera",
+  },
+  {
+    id: "frombehind",
+    label: "Over shoulder",
+    promptSuffix: "shot from behind, looking back over the shoulder toward camera",
+  },
+  {
+    id: "arching",
+    label: "Arched",
+    promptSuffix: "arched back, elongated silhouette, editorial pose",
+  },
+  {
+    id: "leaning",
+    label: "Leaning",
+    promptSuffix: "leaning against a wall, casual confident pose",
+  },
+];
+
+export function getUncensoredPose(id: string | null | undefined): UncensoredPose | null {
+  if (!id) return null;
+  return UNCENSORED_POSES.find((p) => p.id === id) ?? null;
+}
+
+export function applyUncensoredPose(prompt: string, poseId: string | null | undefined): string {
+  const pose = getUncensoredPose(poseId);
+  return pose ? `${prompt}. ${pose.promptSuffix}` : prompt;
+}
+
+/**
+ * Named-character rows live in the shared `characters` table. styleNotes
+ * carries this marker plus the source generation id so the uncensored studio
+ * can lock identity via img2img, and the SFW character library can hide them.
+ */
+export const UNCENSORED_CHARACTER_MARKER = "uncensored:";
+
+export function uncensoredCharacterRef(generationId: number): string {
+  return `${UNCENSORED_CHARACTER_MARKER}${generationId}`;
+}
+
+export function isUncensoredCharacter(styleNotes: string | null | undefined): boolean {
+  return typeof styleNotes === "string" && styleNotes.startsWith(UNCENSORED_CHARACTER_MARKER);
+}
+
+export function parseUncensoredCharacterRef(styleNotes: string | null | undefined): number | null {
+  if (!isUncensoredCharacter(styleNotes)) return null;
+  const n = Number(styleNotes!.slice(UNCENSORED_CHARACTER_MARKER.length));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+export const UNCENSORED_CHARACTER_LIMIT = 24;
+
+export type UncensoredVideoDurationId = "5s" | "8s";
+
+export interface UncensoredVideoDuration {
+  id: UncensoredVideoDurationId;
+  label: string;
+  /** Wall-clock seconds advertised in the UI. */
+  seconds: number;
+  /** Wan 4k+1 frame counts. */
+  numFrames: number;
+  fps: number;
+  /** Multiplier on the base t2v/i2v credit cost. */
+  creditMul: number;
+}
+
+export const UNCENSORED_VIDEO_DURATIONS: UncensoredVideoDuration[] = [
+  { id: "5s", label: "~5s", seconds: 5, numFrames: 81, fps: 16, creditMul: 1 },
+  { id: "8s", label: "~8s", seconds: 8, numFrames: 121, fps: 16, creditMul: 1.5 },
+];
+
+export const DEFAULT_UNCENSORED_VIDEO_DURATION: UncensoredVideoDurationId = "5s";
+
+export function getUncensoredVideoDuration(id: string | null | undefined): UncensoredVideoDuration {
+  return (
+    UNCENSORED_VIDEO_DURATIONS.find((d) => d.id === id) ??
+    UNCENSORED_VIDEO_DURATIONS.find((d) => d.id === DEFAULT_UNCENSORED_VIDEO_DURATION)!
+  );
+}
+
+export function uncensoredVideoCredits(base: number, durationId: string | null | undefined): number {
+  return Math.round(base * getUncensoredVideoDuration(durationId).creditMul);
+}
+
 /** Credit costs for the paid uncensored image studio. */
 export const UNCENSORED_IMAGE_COST = {
   /** Flux Schnell, 4 steps — the iteration loop. */

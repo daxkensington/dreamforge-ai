@@ -9,25 +9,51 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const state: {
   user: any;
   generation: any;
+  characters: any[];
   debited: number;
   refunded: number;
   genCalls: number;
   refineCalls: number;
   created: any[];
-} = { user: null, generation: null, debited: 0, refunded: 0, genCalls: 0, refineCalls: 0, created: [] };
+} = { user: null, generation: null, characters: [], debited: 0, refunded: 0, genCalls: 0, refineCalls: 0, created: [] };
+
+function rowsFor(table: any) {
+  if (table && "styleNotes" in table && "referenceImages" in table) return state.characters;
+  if (table && ("uncensoredUntil" in table || "ageConfirmedAt" in table)) return state.user ? [state.user] : [];
+  return [];
+}
+
+function query(rows: any[]) {
+  const q: any = {
+    where: () => q,
+    orderBy: () => q,
+    limit: async () => rows,
+    then: (resolve: any, reject: any) => Promise.resolve(rows).then(resolve, reject),
+  };
+  return q;
+}
 
 vi.mock("./db", () => ({
   getDb: vi.fn(async () => ({
     select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: async () => (state.user ? [state.user] : []),
-          orderBy: () => ({ limit: async () => [] }),
-        }),
-      }),
+      from: (table: any) => query(rowsFor(table)),
     }),
     update: () => ({ set: () => ({ where: async () => undefined }) }),
-    insert: () => ({ values: async () => undefined }),
+    insert: (table: any) => ({
+      values: (v: any) => {
+        if (table && "styleNotes" in table) {
+          const row = { id: state.characters.length + 1, createdAt: new Date(), ...v };
+          state.characters.push(row);
+          return { returning: async () => [{ id: row.id }] };
+        }
+        return { returning: async () => [{ id: 1 }] };
+      },
+    }),
+    delete: () => ({
+      where: async () => {
+        state.characters = [];
+      },
+    }),
   })),
   getGenerationById: vi.fn(async () => state.generation),
   createGeneration: vi.fn(async (row: any) => {
@@ -83,6 +109,8 @@ vi.mock("./_core/toolStatus", () => ({
 vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) }));
 
 import { uncensoredRouter } from "./routers/uncensored";
+import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
+import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -109,6 +137,7 @@ describe("uncensored.generate — paid studio", () => {
   beforeEach(() => {
     state.user = null;
     state.generation = null;
+    state.characters = [];
     state.debited = 0;
     state.refunded = 0;
     state.genCalls = 0;
@@ -141,6 +170,15 @@ describe("uncensored.generate — paid studio", () => {
     expect(typeof res.images[0].seed).toBe("number");
   });
 
+  it("stores the selected pose on the generation", async () => {
+    withActivePass();
+    await uncensoredRouter.createCaller(ctx()).generate({
+      prompt: "a cinematic portrait of a woman in neon rain",
+      pose: "reclining",
+    });
+    expect(state.created[0].metadata.pose).toBe("reclining");
+  });
+
   it("quality tier charges 12 credits", async () => {
     withActivePass();
     const res = await uncensoredRouter.createCaller(ctx()).generate({
@@ -167,6 +205,7 @@ describe("uncensored.generate — character lock ownership", () => {
   beforeEach(() => {
     state.user = null;
     state.generation = null;
+    state.characters = [];
     state.debited = 0;
     state.refunded = 0;
     state.genCalls = 0;
@@ -267,5 +306,113 @@ describe("uncensored.generate — character lock ownership", () => {
     ).rejects.toThrow(/uncensored/i);
     expect(state.refineCalls).toBe(0);
     expect(state.debited).toBe(0);
+  });
+
+  it("locks via a named character that points at the caller's own uncensored gen", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    state.characters = [
+      {
+        id: 9,
+        userId: OWNER,
+        name: "Luna",
+        referenceImages: ["https://dreamforgex.ai/img/generations/src.png"],
+        styleNotes: uncensoredCharacterRef(42),
+      },
+    ];
+    const res = await uncensoredRouter.createCaller(ctx()).generate({
+      prompt: "same woman, red silk dress, balcony at night",
+      savedCharacterId: 9,
+    });
+    expect(res.images).toHaveLength(1);
+    expect(state.refineCalls).toBe(1);
+    expect(state.debited).toBe(10);
+    expect(state.created[0].metadata.savedCharacterId).toBe(9);
+  });
+
+  it("REJECTS a named character that points at someone else's generation", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    state.characters = [
+      {
+        id: 9,
+        userId: OWNER,
+        name: "Stolen",
+        styleNotes: uncensoredCharacterRef(42),
+      },
+    ];
+    await expect(
+      uncensoredRouter.createCaller(ctx()).generate({
+        prompt: "same woman, red silk dress",
+        savedCharacterId: 9,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.refineCalls).toBe(0);
+    expect(state.debited).toBe(0);
+  });
+});
+
+describe("uncensored.saveCharacter", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.characters = [];
+    state.debited = 0;
+    state.refunded = 0;
+    state.genCalls = 0;
+    state.refineCalls = 0;
+    state.created = [];
+    vi.clearAllMocks();
+  });
+
+  it("saves a named character from the caller's own uncensored image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ prompt: "neon rain portrait" });
+    const res = await uncensoredRouter.createCaller(ctx()).saveCharacter({
+      name: "Luna",
+      sourceGenerationId: 42,
+    });
+    expect(res.name).toBe("Luna");
+    expect(res.generationId).toBe(42);
+    expect(state.characters[0].styleNotes).toBe(uncensoredCharacterRef(42));
+  });
+
+  it("REJECTS saving someone else's image as a character", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).saveCharacter({
+        name: "Nope",
+        sourceGenerationId: 42,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.characters).toHaveLength(0);
+  });
+});
+
+describe("uncensored.generateVideo — duration", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.characters = [];
+    state.debited = 0;
+    state.refunded = 0;
+    state.created = [];
+    vi.clearAllMocks();
+  });
+
+  it("passes 8s frame count to Wan and charges 1.5×", async () => {
+    withActivePass();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_1" });
+    const res = await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "slow turn toward camera, hair blowing in the wind",
+      duration: "8s",
+    });
+    expect(res.status).toBe("processing");
+    expect(state.debited).toBe(75);
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ numFrames: 121, fps: 16 }),
+    );
+    expect(state.created[0].duration).toBe(8);
   });
 });

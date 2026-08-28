@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, Film, Paintbrush, User, Wand2, Maximize } from "lucide-react";
+import { useState } from "react";
+import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
 
 export default function UncensoredLibrary({
   onRefine,
@@ -19,6 +20,17 @@ export default function UncensoredLibrary({
 }) {
   const utils = trpc.useUtils();
   const items = trpc.uncensored.myLibrary.useQuery();
+  const [savingFor, setSavingFor] = useState<number | null>(null);
+  const [charName, setCharName] = useState("");
+  const saveCharacter = trpc.uncensored.saveCharacter.useMutation({
+    onSuccess: (data) => {
+      utils.uncensored.listCharacters.invalidate();
+      setSavingFor(null);
+      setCharName("");
+      toast.success(`${data.name} saved to your characters.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const upscale = trpc.uncensored.upscale.useMutation({
     onSuccess: () => {
       utils.uncensored.myUncensoredImages.invalidate();
@@ -69,7 +81,19 @@ export default function UncensoredLibrary({
                 <Film className="mr-1 h-3 w-3" /> Animate
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onUseCharacter(img.id)}>
-                <User className="mr-1 h-3 w-3" /> Character
+                <User className="mr-1 h-3 w-3" /> Lock
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => {
+                  setSavingFor(savingFor === img.id ? null : img.id);
+                  setCharName("");
+                }}
+              >
+                <UserPlus className="mr-1 h-3 w-3" /> Save
               </Button>
               <Button
                 type="button"
@@ -111,6 +135,31 @@ export default function UncensoredLibrary({
                 </a>
               </Button>
             </div>
+            {savingFor === img.id && !isVideo && (
+              <div className="flex items-center gap-2 border-t border-border/40 p-2">
+                <Input
+                  value={charName}
+                  onChange={(e) => setCharName(e.target.value.slice(0, 40))}
+                  placeholder="Name this character"
+                  maxLength={40}
+                  className="h-8"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && charName.trim()) {
+                      saveCharacter.mutate({ name: charName.trim(), sourceGenerationId: img.id });
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-8"
+                  disabled={saveCharacter.isPending || charName.trim().length < 1}
+                  onClick={() => saveCharacter.mutate({ name: charName.trim(), sourceGenerationId: img.id })}
+                >
+                  Save
+                </Button>
+              </div>
+            )}
           </div>
           );
         })}

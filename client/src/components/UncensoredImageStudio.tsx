@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   UNCENSORED_ASPECTS,
   UNCENSORED_FRAMINGS,
+  UNCENSORED_POSES,
   UNCENSORED_IMAGE_COST,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
@@ -39,14 +40,19 @@ export default function UncensoredImageStudio({
   const [style, setStyle] = useState(DEFAULT_UNCENSORED_STYLE);
   const [aspect, setAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
   const [framing, setFraming] = useState<string | null>("bust");
+  const [pose, setPose] = useState<string | null>(null);
   const [quality, setQuality] = useState<"fast" | "quality">("fast");
   const [count, setCount] = useState(1);
   const [seed, setSeed] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [characterId, setCharacterId] = useState<number | null>(null);
+  const [savedCharacterId, setSavedCharacterId] = useState<number | null>(null);
+  const [savingFor, setSavingFor] = useState<number | null>(null);
+  const [charName, setCharName] = useState("");
   const [results, setResults] = useState<{ url: string; seed: number | null; generationId: number }[]>([]);
 
   const images = trpc.uncensored.myUncensoredImages.useQuery();
+  const savedChars = trpc.uncensored.listCharacters.useQuery();
   const utils = trpc.useUtils();
 
   useEffect(() => {
@@ -75,7 +81,28 @@ export default function UncensoredImageStudio({
     onError: (e) => toast.error(e.message),
   });
 
-  const unitCost = characterId
+  const saveCharacter = trpc.uncensored.saveCharacter.useMutation({
+    onSuccess: (data) => {
+      utils.uncensored.listCharacters.invalidate();
+      setSavingFor(null);
+      setCharName("");
+      setSavedCharacterId(data.id);
+      setCharacterId(null);
+      toast.success(`${data.name} saved — locked for the next shot.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteCharacter = trpc.uncensored.deleteCharacter.useMutation({
+    onSuccess: () => {
+      utils.uncensored.listCharacters.invalidate();
+      toast.success("Character removed.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const characterLocked = !!characterId || !!savedCharacterId;
+  const unitCost = characterLocked
     ? UNCENSORED_IMAGE_COST.character
     : UNCENSORED_IMAGE_COST[quality];
   const cost = unitCost * count;
@@ -102,10 +129,12 @@ export default function UncensoredImageStudio({
       style,
       aspect,
       framing: framing ?? undefined,
+      pose: pose ?? undefined,
       quality,
       count,
       seed: parsedSeed,
       characterGenerationId: characterId ?? undefined,
+      savedCharacterId: savedCharacterId ?? undefined,
     });
   };
 
@@ -128,6 +157,61 @@ export default function UncensoredImageStudio({
           </p>
         </div>
         <span className="shrink-0 text-xs text-muted-foreground">{cost} credits</span>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-xs text-muted-foreground mb-2">Characters — save one of your gens, then lock her for new scenes</p>
+        {savedChars.data && savedChars.data.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {savedChars.data.map((c) => (
+              <div key={c.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (savedCharacterId === c.id) {
+                      setSavedCharacterId(null);
+                    } else {
+                      setSavedCharacterId(c.id);
+                      setCharacterId(null);
+                    }
+                  }}
+                  disabled={gen.isPending}
+                  className={`overflow-hidden rounded-lg border-2 ${
+                    savedCharacterId === c.id
+                      ? "border-rose-500 ring-1 ring-rose-500/40"
+                      : "border-transparent hover:border-rose-500/40"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.imageUrl ?? ""} alt={c.name} className="h-16 w-16 object-cover" />
+                  <span className="block max-w-16 truncate px-1 py-0.5 text-center text-[10px] text-muted-foreground">
+                    {c.name}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${c.name}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (savedCharacterId === c.id) setSavedCharacterId(null);
+                    deleteCharacter.mutate({ id: c.id });
+                  }}
+                  className="absolute -right-1 -top-1 rounded-full bg-black/80 p-0.5 text-muted-foreground hover:text-rose-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Generate, then tap Save on a result to keep a named character.</p>
+        )}
+        {savedCharacterId && (
+          <p className="mt-2 flex items-center gap-1 text-[11px] text-rose-300">
+            <Lock className="h-3 w-3" /> {savedChars.data?.find((c) => c.id === savedCharacterId)?.name ?? "Character"} locked — new scene, same identity.
+          </p>
+        )}
       </div>
 
       <Textarea
@@ -222,6 +306,27 @@ export default function UncensoredImageStudio({
         </div>
       </div>
 
+      <div className="mt-4">
+        <p className="text-xs text-muted-foreground mb-2">Pose</p>
+        <div className="flex flex-wrap gap-2">
+          {UNCENSORED_POSES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPose(pose === p.id ? null : p.id)}
+              disabled={gen.isPending}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                pose === p.id
+                  ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-border/60 p-1">
           {(["fast", "quality"] as const).map((q) => (
@@ -229,9 +334,9 @@ export default function UncensoredImageStudio({
               key={q}
               type="button"
               onClick={() => setQuality(q)}
-              disabled={gen.isPending || !!characterId}
+              disabled={gen.isPending || characterLocked}
               className={`rounded-md px-3 py-1 text-xs capitalize ${
-                quality === q && !characterId
+                quality === q && !characterLocked
                   ? "bg-rose-500/20 text-rose-200"
                   : "text-muted-foreground hover:text-foreground"
               }`}
@@ -296,7 +401,10 @@ export default function UncensoredImageStudio({
                   <button
                     key={img.id}
                     type="button"
-                    onClick={() => setCharacterId(characterId === img.id ? null : img.id)}
+                    onClick={() => {
+                      setCharacterId(characterId === img.id ? null : img.id);
+                      setSavedCharacterId(null);
+                    }}
                     disabled={gen.isPending}
                     className={`overflow-hidden rounded-lg border-2 ${
                       characterId === img.id
@@ -312,7 +420,7 @@ export default function UncensoredImageStudio({
             ) : (
               <p className="text-xs text-muted-foreground">Generate one first, then lock her for the next shot.</p>
             )}
-            {characterId && (
+            {characterId && !savedCharacterId && (
               <p className="mt-2 flex items-center gap-1 text-[11px] text-rose-300">
                 <Lock className="h-3 w-3" /> Character locked — new scene, same identity.
               </p>
@@ -392,11 +500,23 @@ export default function UncensoredImageStudio({
                     className="h-7 px-2"
                     onClick={() => {
                       setCharacterId(r.generationId);
+                      setSavedCharacterId(null);
                       setShowAdvanced(true);
                       toast.info("Character locked for the next shot.");
                     }}
                   >
-                    <Lock className="mr-1 h-3 w-3" /> Character
+                    <Lock className="mr-1 h-3 w-3" /> Lock
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      setSavingFor(savingFor === r.generationId ? null : r.generationId);
+                      setCharName("");
+                    }}
+                  >
+                    <UserPlus className="mr-1 h-3 w-3" /> Save
                   </Button>
                   <Button asChild variant="ghost" size="sm" className="h-7 px-2">
                     <a href={r.url} target="_blank" rel="noopener noreferrer">
@@ -405,6 +525,31 @@ export default function UncensoredImageStudio({
                   </Button>
                 </div>
               </div>
+              {savingFor === r.generationId && (
+                <div className="flex items-center gap-2 border-t border-border/40 p-2">
+                  <Input
+                    value={charName}
+                    onChange={(e) => setCharName(e.target.value.slice(0, 40))}
+                    placeholder="Name this character"
+                    maxLength={40}
+                    className="h-8"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && charName.trim()) {
+                        saveCharacter.mutate({ name: charName.trim(), sourceGenerationId: r.generationId });
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    disabled={saveCharacter.isPending || charName.trim().length < 1}
+                    onClick={() => saveCharacter.mutate({ name: charName.trim(), sourceGenerationId: r.generationId })}
+                  >
+                    {saveCharacter.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
