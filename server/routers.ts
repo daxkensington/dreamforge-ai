@@ -471,6 +471,27 @@ export const appRouter = router({
         const offset = input?.offset ?? 0;
         return getUserActivityTimeline(ctx.user.id, limit, offset);
       }),
+
+    deleteAccount: protectedProcedure
+      .input(z.object({ confirmation: z.literal("DELETE") }))
+      .mutation(async ({ ctx }) => {
+        await enforceRateLimit(
+          `user.deleteAccount:${ctx.user.id}`,
+          3,
+          60 * 60 * 1000,
+          "Too many deletion attempts. Try again later.",
+        );
+        const { deleteUserAccount } = await import("./_core/deleteAccount");
+        try {
+          await deleteUserAccount(ctx.user.id);
+        } catch (err: any) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err?.message || "Could not delete account. Email support@dreamforgex.ai.",
+          });
+        }
+        return { ok: true };
+      }),
   }),
 
   tags: router({

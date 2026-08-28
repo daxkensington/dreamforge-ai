@@ -63,6 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/uncensored", priority: 0.9, changeFrequency: "monthly" as const },
     { url: "/for", priority: 0.7, changeFrequency: "monthly" as const },
     { url: "/takedown", priority: 0.3, changeFrequency: "yearly" as const },
+    { url: "/privacy", priority: 0.4, changeFrequency: "yearly" as const },
+    { url: "/account", priority: 0.3, changeFrequency: "yearly" as const },
   ];
 
   // Tool pages

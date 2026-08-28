@@ -13,7 +13,7 @@ const fadeUp = {
   }),
 };
 
-const LAST_UPDATED = "April 17, 2026";
+const LAST_UPDATED = "August 28, 2026";
 
 const sections = [
   {
@@ -88,7 +88,7 @@ const sections = [
       "• Export your data in a machine-readable format;",
       "• Object to or restrict processing for certain purposes;",
       "• Withdraw consent for optional processing (e.g. marketing).",
-      "To exercise any of these rights, email support@dreamforgex.ai. We respond within 30 days.",
+      "To delete your account yourself, go to dreamforgex.ai/account (sign in required) and confirm. That wipes your profile, generations, gallery posts, and API keys, and cancels paid subscriptions. You can also email support@dreamforgex.ai — we respond within 30 days.",
     ],
   },
   {

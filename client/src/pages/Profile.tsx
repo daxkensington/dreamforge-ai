@@ -32,6 +32,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import DeleteAccountCard from "@/components/DeleteAccountCard";
 
 // ─── Quota Progress Bar ─────────────────────────────────────────────────────
 
@@ -690,6 +691,10 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
+
+              <div className="mt-4">
+                <DeleteAccountCard />
+              </div>
             </motion.div>
 
             {/* Quick Stats Summary */}

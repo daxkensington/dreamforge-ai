@@ -36,6 +36,7 @@ const footerLinks = {
     { label: "What's new", href: "/whats-new" },
     { label: "Terms of Service", href: "/terms" },
     { label: "Privacy Policy", href: "/privacy" },
+    { label: "Delete account", href: "/account" },
     { label: "Report content", href: "/takedown" },
     { label: "Contact", href: "mailto:support@dreamforgex.ai" },
   ],

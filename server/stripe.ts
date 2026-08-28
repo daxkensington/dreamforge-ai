@@ -7,7 +7,7 @@ import { TIERS } from "../shared/tiers";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripeClient: Stripe | null = null;
-function getStripeClient(): Stripe {
+export function getStripeClient(): Stripe {
   if (!_stripeClient) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -326,3 +326,14 @@ export async function createCheckoutSession(
 // Webhook handling lives in app/api/webhooks/stripe/route.ts (Next.js).
 // The dead Express handler that used to be here was removed — Stripe is
 // configured to POST to /api/webhooks/stripe and only that path responds.
+
+/** Cancel every active/trialing Stripe subscription for a customer. Best-effort. */
+export async function cancelStripeSubscriptionsForCustomer(customerId: string): Promise<void> {
+  if (!process.env.STRIPE_SECRET_KEY) return;
+  const stripe = getStripeClient();
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+  for (const sub of subs.data) {
+    if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+    await stripe.subscriptions.cancel(sub.id);
+  }
+}
