@@ -62,7 +62,7 @@ export default function Uncensored() {
   const checkout = trpc.uncensored.createCheckout.useMutation({
     onSuccess: (data) => {
       setInlineInvoice({ checkoutLink: data.checkoutLink, invoiceId: data.invoiceId });
-      toast.success("Invoice ready — pay below. This page unlocks once payment confirms.");
+      toast.success("Invoice ready — pay below. This page unlocks as soon as the payment is seen.");
     },
     onError: (e) => toast.error(e.message),
   });

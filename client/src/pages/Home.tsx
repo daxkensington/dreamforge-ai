@@ -1049,6 +1049,11 @@ export default function Home() {
                   Get Started Free
                 </Button>
               )}
+              {!isAuthenticated && (
+                <Link href="/demo/text-to-image" className="text-sm text-white/50 hover:text-white transition-colors">
+                  or try one image with no signup
+                </Link>
+              )}
               <div className="flex items-center gap-6 text-sm text-white/60">
                 <Link href="/pricing" className="hover:text-white transition-colors">View Pricing</Link>
                 <span className="text-white/20">|</span>

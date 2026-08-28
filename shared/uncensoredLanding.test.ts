@@ -121,7 +121,7 @@ describe("uncensored landing silo", () => {
   it("does not tell buyers they must wait for a block confirmation", () => {
     // Checkout settles at 0-conf (see server/_core/btcpay.ts). Telling a
     // buyer to wait for a confirm is the conversion tax we just removed.
-    const stale = /once the network confirms|wait(?:ing)? for (?:a )?(?:block )?confirm/i;
+    const stale = /once the network confirms|once payment confirms|after payment confirms|wait(?:ing)? for (?:a )?(?:block )?confirm/i;
     for (const slug of UNCENSORED_LANDING_SLUGS) {
       const hit = allCopy(slug).match(stale);
       expect(hit ? `${slug}: ${hit[0]}` : null).toBeNull();

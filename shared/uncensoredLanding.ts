@@ -57,7 +57,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay anonymous?",
-        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days and is paid with crypto, so there is no card number and no real name tied to a billing statement. You unlock filter-free generation immediately after payment confirms."
+        "a": "Uncensored Passes start at $4.99 for a day pass, or $19 for 30 days, and are paid with crypto, so there is no card number and no real name tied to a billing statement. You unlock filter-free generation as soon as the payment is seen — usually seconds after you send, without waiting for a block."
       }
     ]
   },
