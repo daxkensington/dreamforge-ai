@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+
+type Filter = "all" | "image" | "video";
 
 export default function UncensoredLibrary({
   onRefine,
@@ -22,14 +24,37 @@ export default function UncensoredLibrary({
 }) {
   const utils = trpc.useUtils();
   const items = trpc.uncensored.myLibrary.useQuery();
+  const savedChars = trpc.uncensored.listCharacters.useQuery();
   const [savingFor, setSavingFor] = useState<number | null>(null);
+  const [updatingFor, setUpdatingFor] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [charName, setCharName] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
+
   const saveCharacter = trpc.uncensored.saveCharacter.useMutation({
     onSuccess: (data) => {
       utils.uncensored.listCharacters.invalidate();
       setSavingFor(null);
       setCharName("");
       toast.success(`${data.name} saved to your characters.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateCharacter = trpc.uncensored.updateCharacter.useMutation({
+    onSuccess: (data) => {
+      utils.uncensored.listCharacters.invalidate();
+      setUpdatingFor(null);
+      toast.success(`${data.name}'s reference updated.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteGeneration = trpc.uncensored.deleteGeneration.useMutation({
+    onSuccess: () => {
+      utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.myUncensoredImages.invalidate();
+      setConfirmDelete(null);
+      toast.success("Removed from your library.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -41,6 +66,15 @@ export default function UncensoredLibrary({
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (items.data ?? []).filter((img) => {
+      if (filter !== "all" && img.mediaType !== filter) return false;
+      if (q && !img.prompt.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [items.data, filter, query]);
 
   if (items.isLoading) {
     return <p className="mt-8 text-sm text-muted-foreground">Loading your library…</p>;
@@ -57,8 +91,33 @@ export default function UncensoredLibrary({
     <div className="mt-8">
       <h2 className="text-lg font-semibold">Your library</h2>
       <p className="mt-1 text-sm text-muted-foreground">Private. Never gallery. Click through to refine, inpaint, or animate.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {(["all", "image", "video"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={`rounded-full border px-3 py-1 text-xs capitalize ${
+              filter === f
+                ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+            }`}
+          >
+            {f === "all" ? "All" : f === "image" ? "Images" : "Video"}
+          </button>
+        ))}
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search prompts…"
+          className="h-8 max-w-xs"
+        />
+      </div>
+      {visible.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">Nothing matches that filter.</p>
+      ) : (
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {items.data.map((img) => {
+        {visible.map((img) => {
           const isVideo = img.mediaType === "video";
           return (
           <div key={img.id} className="overflow-hidden rounded-xl border border-border/60 bg-card/40">
@@ -95,11 +154,26 @@ export default function UncensoredLibrary({
                 className="h-7 px-2 text-[11px]"
                 onClick={() => {
                   setSavingFor(savingFor === img.id ? null : img.id);
+                  setUpdatingFor(null);
                   setCharName("");
                 }}
               >
                 <UserPlus className="mr-1 h-3 w-3" /> Save
               </Button>
+              {savedChars.data && savedChars.data.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => {
+                    setUpdatingFor(updatingFor === img.id ? null : img.id);
+                    setSavingFor(null);
+                  }}
+                >
+                  <RefreshCw className="mr-1 h-3 w-3" /> Update char
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -139,6 +213,22 @@ export default function UncensoredLibrary({
                   <Download className="mr-1 h-3 w-3" /> Open
                 </a>
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-rose-300 hover:text-rose-200"
+                disabled={deleteGeneration.isPending}
+                onClick={() => {
+                  if (confirmDelete === img.id) {
+                    deleteGeneration.mutate({ id: img.id });
+                  } else {
+                    setConfirmDelete(img.id);
+                  }
+                }}
+              >
+                <Trash2 className="mr-1 h-3 w-3" /> {confirmDelete === img.id ? "Confirm" : "Delete"}
+              </Button>
             </div>
             {savingFor === img.id && !isVideo && (
               <div className="flex items-center gap-2 border-t border-border/40 p-2">
@@ -165,10 +255,27 @@ export default function UncensoredLibrary({
                 </Button>
               </div>
             )}
+            {updatingFor === img.id && !isVideo && savedChars.data && (
+              <div className="flex flex-wrap gap-2 border-t border-border/40 p-2">
+                {savedChars.data.map((c) => (
+                  <Button
+                    key={c.id}
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={updateCharacter.isPending}
+                    onClick={() => updateCharacter.mutate({ id: c.id, sourceGenerationId: img.id })}
+                  >
+                    {c.name}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -41,6 +42,7 @@ export default function UncensoredVideoStudio({
     DEFAULT_UNCENSORED_VIDEO_DURATION,
   );
   const [motion, setMotion] = useState<string | null>(null);
+  const [seed, setSeed] = useState("");
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -118,6 +120,10 @@ export default function UncensoredVideoStudio({
       aspect,
       duration,
       motion: motion ?? undefined,
+      seed: (() => {
+        const n = Number(seed);
+        return Number.isInteger(n) && n >= 0 ? n : undefined;
+      })(),
       ...(mode === "i2v" && sourceId ? { sourceGenerationId: sourceId } : {}),
     });
   };
@@ -305,6 +311,16 @@ export default function UncensoredVideoStudio({
             {a.label}
           </button>
         ))}
+      </div>
+
+      <div className="mt-3 max-w-xs">
+        <p className="text-xs text-muted-foreground mb-1">Seed (blank = random)</p>
+        <Input
+          value={seed}
+          onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+          placeholder="reproducible seed"
+          disabled={isBusy}
+        />
       </div>
 
       <Button

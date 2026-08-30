@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, X } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -142,6 +142,16 @@ export default function UncensoredImageStudio({
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const updateCharacter = trpc.uncensored.updateCharacter.useMutation({
+    onSuccess: (data) => {
+      utils.uncensored.listCharacters.invalidate();
+      toast.success(`${data.name}'s reference updated.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const lockedCharacterName = savedChars.data?.find((c) => c.id === savedCharacterId)?.name;
 
   const characterLocked = !!characterId || !!savedCharacterId;
   const unitCost = characterLocked
@@ -601,6 +611,19 @@ export default function UncensoredImageStudio({
                   >
                     <Lock className="mr-1 h-3 w-3" /> Lock
                   </Button>
+                  {savedCharacterId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={updateCharacter.isPending}
+                      onClick={() =>
+                        updateCharacter.mutate({ id: savedCharacterId, sourceGenerationId: r.generationId })
+                      }
+                    >
+                      <RefreshCw className="mr-1 h-3 w-3" /> Update {lockedCharacterName ?? "her"}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"

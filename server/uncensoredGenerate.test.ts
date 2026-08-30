@@ -112,6 +112,7 @@ import { uncensoredRouter } from "./routers/uncensored";
 import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
 import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
 import { refineUnfiltered } from "./_core/imageGeneration";
+import { updateGeneration } from "./db";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -452,5 +453,112 @@ describe("uncensored.generateVideo — duration", () => {
       expect.objectContaining({ prompt: expect.stringMatching(/hair blowing/i) }),
     );
     expect(state.created[0].metadata.motion).toBe("hair");
+  });
+
+  it("passes a seed through to Wan", async () => {
+    withActivePass();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_3" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "slow turn toward camera",
+      seed: 12345,
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(expect.objectContaining({ seed: 12345 }));
+    expect(state.created[0].metadata.seed).toBe(12345);
+  });
+});
+
+describe("uncensored.deleteGeneration", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.characters = [];
+    state.debited = 0;
+    vi.clearAllMocks();
+  });
+
+  it("hides the caller's own uncensored generation", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const res = await uncensoredRouter.createCaller(ctx()).deleteGeneration({ id: 42 });
+    expect(res.ok).toBe(true);
+    expect(updateGeneration).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ metadata: expect.objectContaining({ deleted: true, uncensored: true }) }),
+    );
+  });
+
+  it("REJECTS deleting someone else's generation", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).deleteGeneration({ id: 42 }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(updateGeneration).not.toHaveBeenCalled();
+  });
+
+  it("REJECTS locking a deleted generation as a character", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ metadata: { uncensored: true, deleted: true } });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).generate({
+        prompt: "same woman, red silk dress",
+        characterGenerationId: 42,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.refineCalls).toBe(0);
+    expect(state.debited).toBe(0);
+  });
+});
+
+describe("uncensored.updateCharacter", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.characters = [];
+    state.debited = 0;
+    vi.clearAllMocks();
+  });
+
+  it("retargets the reference to a new own uncensored gen", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({
+      id: 99,
+      prompt: "better face, golden hour",
+      imageUrl: "https://dreamforgex.ai/img/generations/better.png",
+    });
+    state.characters = [
+      {
+        id: 9,
+        userId: OWNER,
+        name: "Luna",
+        referenceImages: ["https://dreamforgex.ai/img/generations/src.png"],
+        styleNotes: uncensoredCharacterRef(42),
+      },
+    ];
+    const res = await uncensoredRouter.createCaller(ctx()).updateCharacter({
+      id: 9,
+      sourceGenerationId: 99,
+    });
+    expect(res.generationId).toBe(99);
+    expect(res.imageUrl).toContain("better.png");
+  });
+
+  it("REJECTS retargeting to someone else's image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    state.characters = [
+      {
+        id: 9,
+        userId: OWNER,
+        name: "Luna",
+        styleNotes: uncensoredCharacterRef(42),
+      },
+    ];
+    await expect(
+      uncensoredRouter.createCaller(ctx()).updateCharacter({
+        id: 9,
+        sourceGenerationId: 42,
+      }),
+    ).rejects.toThrow(/isn't available/i);
   });
 });

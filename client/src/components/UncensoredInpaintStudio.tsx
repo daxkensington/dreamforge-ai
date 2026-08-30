@@ -27,6 +27,7 @@ export default function UncensoredInpaintStudio({
   const [strength, setStrength] = useState(55);
   const [erasing, setErasing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultId, setResultId] = useState<number | null>(null);
   const [hasPaint, setHasPaint] = useState(false);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -139,6 +140,7 @@ export default function UncensoredInpaintStudio({
   const inpaint = trpc.uncensored.inpaint.useMutation({
     onSuccess: (data) => {
       setResultUrl(data.url);
+      setResultId(data.generationId);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
       toast.success("Region updated — original is untouched.");
@@ -191,6 +193,7 @@ export default function UncensoredInpaintStudio({
                 onClick={() => {
                   setSourceId(img.id);
                   setResultUrl(null);
+                  setResultId(null);
                 }}
                 className={`overflow-hidden rounded-lg border-2 ${
                   sourceId === img.id ? "border-rose-500 ring-1 ring-rose-500/40" : "border-transparent hover:border-rose-500/40"
@@ -321,11 +324,29 @@ export default function UncensoredInpaintStudio({
         <div className="mt-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={resultUrl} alt="Inpainted" className="w-full rounded-xl border border-rose-500/40" />
-          <Button asChild variant="outline" size="sm" className="mt-2 w-full">
-            <a href={resultUrl} target="_blank" rel="noopener noreferrer">
-              <Download className="mr-2 h-4 w-4" /> Open full size
-            </a>
-          </Button>
+          <div className="mt-2 flex gap-2">
+            <Button asChild variant="outline" size="sm" className="flex-1">
+              <a href={resultUrl} target="_blank" rel="noopener noreferrer">
+                <Download className="mr-2 h-4 w-4" /> Open full size
+              </a>
+            </Button>
+            {resultId && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  setSourceId(resultId);
+                  setResultUrl(null);
+                  setResultId(null);
+                  toast.info("Now painting on the new image.");
+                }}
+              >
+                Continue from this
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>

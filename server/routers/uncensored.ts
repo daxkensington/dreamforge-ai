@@ -95,13 +95,33 @@ async function requireDb() {
   return db;
 }
 
+function isHiddenUncensored(metadata: unknown): boolean {
+  return !!(metadata && typeof metadata === "object" && (metadata as { deleted?: unknown }).deleted === true);
+}
+
+const notDeletedUncensored = sql`coalesce(${generations.metadata}->>'deleted','false') <> 'true'`;
+
 async function requireOwnUncensoredImage(userId: number, id: number) {
   const src = await getGenerationById(id);
-  if (!src || src.userId !== userId) {
+  if (!src || src.userId !== userId || isHiddenUncensored(src.metadata)) {
     throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available." });
   }
   if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can be used here." });
+  }
+  if (!(src.metadata as any)?.uncensored) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be used here." });
+  }
+  return src;
+}
+
+async function requireOwnUncensoredMedia(userId: number, id: number) {
+  const src = await getGenerationById(id);
+  if (!src || src.userId !== userId || isHiddenUncensored(src.metadata)) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available." });
+  }
+  if (src.status !== "completed" || !src.imageUrl) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed generations can be used here." });
   }
   if (!(src.metadata as any)?.uncensored) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be used here." });
@@ -286,16 +306,7 @@ export const uncensoredRouter = router({
         savedCharacterId = input.savedCharacterId;
       }
       if (lockGenerationId) {
-        const src = await getGenerationById(lockGenerationId);
-        if (!src || src.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available as a character lock." });
-        }
-        if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can lock a character." });
-        }
-        if (!(src.metadata as any)?.uncensored) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can lock a character." });
-        }
+        const src = await requireOwnUncensoredImage(ctx.user.id, lockGenerationId);
         characterUrl = src.imageUrl;
         characterId = src.id;
       }
@@ -445,6 +456,7 @@ export const uncensoredRouter = router({
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
         duration: z.enum(["5s", "8s"]).default("5s" as const),
         motion: z.string().max(32).optional(),
+        seed: z.number().int().min(0).max(2_147_483_647).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -474,16 +486,7 @@ export const uncensoredRouter = router({
         if (!input.sourceGenerationId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Pick one of your generations to animate." });
         }
-        const src = await getGenerationById(input.sourceGenerationId);
-        if (!src || src.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "That generation isn't available to animate." });
-        }
-        if (src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Only your completed image generations can be animated." });
-        }
-        if (!(src.metadata as any)?.uncensored) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be animated here." });
-        }
+        const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
         sourceImageUrl = src.imageUrl;
         parentGenerationId = src.id;
       }
@@ -510,7 +513,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, seed: input.seed ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -524,11 +527,12 @@ export const uncensoredRouter = router({
           height: dims.h,
           numFrames: duration.numFrames,
           fps: duration.fps,
+          seed: input.seed,
           tier: input.quality,
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, seed: input.seed ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -1018,6 +1022,7 @@ export const uncensoredRouter = router({
           eq(generations.mediaType, "image"),
           eq(generations.status, "completed"),
           sql`${generations.metadata}->>'uncensored' = 'true'`,
+          notDeletedUncensored,
         ),
       )
       .orderBy(desc(generations.createdAt))
@@ -1102,6 +1107,57 @@ export const uncensoredRouter = router({
       return { ok: true };
     }),
 
+  updateCharacter: protectedProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        name: z.string().trim().min(1).max(40).optional(),
+        sourceGenerationId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { char } = await requireOwnUncensoredCharacter(ctx.user.id, input.id);
+      if (!input.name && !input.sourceGenerationId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing to update." });
+      }
+      const patch: { name?: string; description?: string | null; referenceImages?: string[]; styleNotes?: string } = {};
+      if (input.name) patch.name = input.name;
+      if (input.sourceGenerationId) {
+        const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+        patch.description = src.prompt?.slice(0, 500) ?? null;
+        patch.referenceImages = src.imageUrl ? [src.imageUrl] : [];
+        patch.styleNotes = uncensoredCharacterRef(src.id);
+      }
+      const db = await requireDb();
+      await db
+        .update(characters)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(and(eq(characters.id, input.id), eq(characters.userId, ctx.user.id)));
+      const generationId = input.sourceGenerationId ?? parseUncensoredCharacterRef(char.styleNotes);
+      const imageUrl = (patch.referenceImages?.[0] as string | undefined)
+        ?? (Array.isArray(char.referenceImages) ? (char.referenceImages[0] as string | undefined) : undefined)
+        ?? null;
+      return {
+        id: input.id,
+        name: patch.name ?? char.name,
+        generationId,
+        imageUrl,
+      };
+    }),
+
+  /**
+   * Hide one of the caller's own uncensored gens from the studio library.
+   * Does not touch other users, SFW gens, or the public gallery.
+   */
+  deleteGeneration: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const src = await requireOwnUncensoredMedia(ctx.user.id, input.id);
+      const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}), deleted: true };
+      await updateGeneration(src.id, { metadata: meta });
+      return { ok: true };
+    }),
+
   /** Images + video clips for the Library tab. */
   myLibrary: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
@@ -1123,6 +1179,7 @@ export const uncensoredRouter = router({
           eq(generations.userId, ctx.user.id),
           eq(generations.status, "completed"),
           sql`${generations.metadata}->>'uncensored' = 'true'`,
+          notDeletedUncensored,
         ),
       )
       .orderBy(desc(generations.createdAt))

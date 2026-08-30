@@ -27,6 +27,7 @@ export default function UncensoredRefineStudio({
   const [prompt, setPrompt] = useState("");
   const [strength, setStrength] = useState(60); // 0-100 slider → 0.2–0.9
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultId, setResultId] = useState<number | null>(null);
 
   const status = trpc.uncensored.status.useQuery();
   const refineCost = status.data?.refineCost ?? 10;
@@ -41,9 +42,11 @@ export default function UncensoredRefineStudio({
   const refine = trpc.uncensored.refineImage.useMutation({
     onSuccess: (data) => {
       setResultUrl(data.url ?? null);
+      setResultId(data.generationId);
       toast.success("Refined — that's a new image, your original is untouched.");
       // The result is itself refinable, so refresh the picker.
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
       utils.uncensored.status.invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -95,7 +98,11 @@ export default function UncensoredRefineStudio({
                 key={img.id}
                 type="button"
                 disabled={isBusy}
-                onClick={() => setSourceId(img.id)}
+                onClick={() => {
+                  setSourceId(img.id);
+                  setResultUrl(null);
+                  setResultId(null);
+                }}
                 className={`overflow-hidden rounded-lg border-2 transition-colors disabled:opacity-60 ${
                   sourceId === img.id
                     ? "border-rose-500 ring-1 ring-rose-500/40"
@@ -190,11 +197,29 @@ export default function UncensoredRefineStudio({
               <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Refined</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={resultUrl} alt="refined" className="w-full rounded-xl border border-rose-500/40" />
-              <Button asChild variant="outline" size="sm" className="mt-2 w-full">
-                <a href={resultUrl} target="_blank" rel="noopener noreferrer">
-                  <Download className="mr-2 h-4 w-4" /> Open full size
-                </a>
-              </Button>
+              <div className="mt-2 flex gap-2">
+                <Button asChild variant="outline" size="sm" className="flex-1">
+                  <a href={resultUrl} target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-2 h-4 w-4" /> Open full size
+                  </a>
+                </Button>
+                {resultId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setSourceId(resultId);
+                      setResultUrl(null);
+                      setResultId(null);
+                      toast.info("Now refining the new image.");
+                    }}
+                  >
+                    Continue from this
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
