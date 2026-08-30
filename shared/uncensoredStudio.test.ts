@@ -9,6 +9,7 @@ import {
   applyUncensoredI2vIdentity,
   applyUncensoredVideoIntensity,
   getUncensoredVideoSize,
+  getUncensoredVideoAspectFromSize,
   formatUncensoredRecipe,
   getUncensoredPose,
   getUncensoredVideoDuration,
@@ -158,6 +159,12 @@ describe("uncensored I2V identity and HD size", () => {
   it("uses 720p for HD portrait", () => {
     expect(getUncensoredVideoSize("portrait", "fast")).toEqual({ w: 480, h: 832 });
     expect(getUncensoredVideoSize("portrait", "hd")).toEqual({ w: 720, h: 1280 });
+  });
+
+  it("infers video aspect from a still so I2V does not stretch", () => {
+    expect(getUncensoredVideoAspectFromSize(832, 1216)).toBe("portrait");
+    expect(getUncensoredVideoAspectFromSize(1216, 832)).toBe("landscape");
+    expect(getUncensoredVideoAspectFromSize(1024, 1024)).toBe("square");
   });
 
   it("applies intensity without replacing the motion prompt", () => {

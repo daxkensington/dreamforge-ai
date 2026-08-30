@@ -45,6 +45,8 @@ import {
   getUncensoredAspect,
   getUncensoredVideoDuration,
   getUncensoredVideoSize,
+  getUncensoredVideoAspectFromSize,
+  getUncensoredLighting,
   DEFAULT_UNCENSORED_VIDEO_NEGATIVE,
   uncensoredVideoCredits,
   uncensoredCharacterRef,
@@ -510,6 +512,7 @@ export const uncensoredRouter = router({
       // that sidesteps real-person / minor liability on unknown images.
       let sourceImageUrl: string | null = null;
       let parentGenerationId: number | null = null;
+      let videoAspect = input.aspect;
       if (input.mode === "i2v") {
         if (!input.sourceGenerationId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Pick one of your generations to animate." });
@@ -517,6 +520,7 @@ export const uncensoredRouter = router({
         const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
         sourceImageUrl = src.imageUrl;
         parentGenerationId = src.id;
+        videoAspect = getUncensoredVideoAspectFromSize(src.width, src.height);
       }
 
       const duration = getUncensoredVideoDuration(input.duration);
@@ -530,7 +534,7 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
 
-      const dims = getUncensoredVideoSize(input.aspect, input.quality);
+      const dims = getUncensoredVideoSize(videoAspect, input.quality);
       const genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
@@ -1033,6 +1037,74 @@ export const uncensoredRouter = router({
         await refundCredits(ctx.user.id, cost, "Uncensored outfit transfer failed");
         await logToolFailure({ toolId: "uncensored-outfit", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Outfit transfer failed — your credits were returned." });
+      }
+    }),
+
+  /**
+   * Lighting-only pass on the caller's own uncensored image. Same pose and
+   * clothes; only the light changes. No uploads.
+   */
+  relight: protectedProcedure
+    .input(
+      z.object({
+        sourceGenerationId: z.number().int().positive(),
+        lighting: z.string().max(32),
+        strength: z.number().min(0.25).max(0.55).default(0.35),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+      const lighting = getUncensoredLighting(input.lighting);
+      if (!lighting) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pick a lighting look." });
+      }
+      const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+      const cost = UNCENSORED_IMAGE_COST.relight;
+      await enforceRateLimit(`uncensored.relight:user:${ctx.user.id}`, 8, 60_000, "Slow down a moment between relights.");
+      const debit = await deductCredits(ctx.user.id, cost, "Uncensored relight", "usage", { uncensored: true, relight: true });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+      const style = (src.metadata as any)?.style ?? undefined;
+      const prompt = applyUncensoredLighting(
+        "same person, same pose, same clothes, same composition, only change the lighting",
+        lighting.id,
+      );
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: `${lighting.label} relight`,
+        negativePrompt: null,
+        mediaType: "image",
+        width: src.width ?? 832,
+        height: src.height ?? 1216,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-relight",
+        parentGenerationId: src.id,
+        metadata: { uncensored: true, relight: true, lighting: lighting.id, strength: input.strength, cost, style: style ?? null },
+      });
+      try {
+        const imageB64 = await fetchAsBase64(src.imageUrl!);
+        const buffer = await refineUnfiltered(imageB64, applyUncensoredStyle(prompt, style), {
+          strength: input.strength,
+          loraId: resolveUncensoredLora(style),
+        });
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, buffer, "image/png");
+        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        return { generationId: genId, url, cost };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored relight failed");
+        await logToolFailure({ toolId: "uncensored-relight", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Relight failed — your credits were returned." });
       }
     }),
 

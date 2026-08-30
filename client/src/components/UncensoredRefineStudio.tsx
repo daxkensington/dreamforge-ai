@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wand2 } from "lucide-react";
+import { Loader2, Sun, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import UncensoredResultActions from "@/components/UncensoredResultActions";
+import { UNCENSORED_LIGHTING, UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
 
 /**
  * Refine — uncensored img2img over the user's OWN generations.
@@ -35,6 +36,7 @@ export default function UncensoredRefineStudio({
   const [strength, setStrength] = useState(60); // 0-100 slider → 0.2–0.9
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultId, setResultId] = useState<number | null>(null);
+  const [lighting, setLighting] = useState<string | null>(null);
 
   const status = trpc.uncensored.status.useQuery();
   const refineCost = status.data?.refineCost ?? 10;
@@ -59,8 +61,19 @@ export default function UncensoredRefineStudio({
     onError: (e) => toast.error(e.message),
   });
 
+  const relight = trpc.uncensored.relight.useMutation({
+    onSuccess: (data) => {
+      setResultUrl(data.url ?? null);
+      setResultId(data.generationId);
+      toast.success("Relit — original is untouched.");
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const selected = images.data?.find((i) => i.id === sourceId) ?? null;
-  const isBusy = refine.isPending;
+  const isBusy = refine.isPending || relight.isPending;
 
   const handleRefine = () => {
     if (!sourceId) {
@@ -147,6 +160,49 @@ export default function UncensoredRefineStudio({
           }
         }}
       />
+
+      <div className="mt-4">
+        <p className="text-xs text-muted-foreground mb-2">Relight only — same shot, new light</p>
+        <div className="flex flex-wrap gap-2">
+          {UNCENSORED_LIGHTING.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              onClick={() => setLighting(lighting === l.id ? null : l.id)}
+              disabled={isBusy}
+              className={`rounded-full border px-3 py-1 text-xs ${
+                lighting === l.id
+                  ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-2 w-full"
+          disabled={isBusy || !sourceId || !lighting}
+          onClick={() => {
+            if (!sourceId || !lighting) return;
+            setResultUrl(null);
+            setResultId(null);
+            relight.mutate({ sourceGenerationId: sourceId, lighting });
+          }}
+        >
+          {relight.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Relighting…
+            </>
+          ) : (
+            <>
+              <Sun className="mr-2 h-4 w-4" /> Relight · {UNCENSORED_IMAGE_COST.relight} credits
+            </>
+          )}
+        </Button>
+      </div>
 
       <div className="mt-4">
         <div className="flex items-center justify-between text-sm">

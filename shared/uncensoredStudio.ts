@@ -521,6 +521,18 @@ export function getUncensoredVideoSize(
   return UNCENSORED_VIDEO_SIZES[quality][aspect];
 }
 
+/** Pick the Wan frame that won't stretch the source still. */
+export function getUncensoredVideoAspectFromSize(
+  width?: number | null,
+  height?: number | null,
+): UncensoredVideoAspect {
+  if (!width || !height) return "portrait";
+  const r = width / height;
+  if (r >= 1.2) return "landscape";
+  if (r <= 0.85) return "portrait";
+  return "square";
+}
+
 export const DEFAULT_CHARACTER_STRENGTH = 0.45;
 export const CHARACTER_STRENGTH_MIN = 0.25;
 export const CHARACTER_STRENGTH_MAX = 0.7;
@@ -651,6 +663,8 @@ export const UNCENSORED_IMAGE_COST = {
   cutout: 5,
   /** CatVTON outfit transfer between two of the caller's own gens. */
   outfit: 10,
+  /** Lighting-only img2img — same shot, new light. */
+  relight: 8,
 } as const;
 
 /**

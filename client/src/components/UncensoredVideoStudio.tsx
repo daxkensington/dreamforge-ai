@@ -14,6 +14,7 @@ import {
   DEFAULT_UNCENSORED_VIDEO_DURATION,
   DEFAULT_UNCENSORED_VIDEO_INTENSITY,
   uncensoredVideoCredits,
+  getUncensoredVideoAspectFromSize,
 } from "@shared/uncensoredStudio";
 
 /**
@@ -52,6 +53,12 @@ export default function UncensoredVideoStudio({
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [resultSeed, setResultSeed] = useState<number | null>(null);
+  const [pendingId, setPendingId] = useState<number | null>(null);
+
+  const { data: status } = trpc.uncensored.status.useQuery();
+  const videoAvailable = status?.videoAvailable ?? false;
+  const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" });
+  const savedChars = trpc.uncensored.listCharacters.useQuery(undefined, { enabled: mode === "i2v" });
 
   useEffect(() => {
     if (focusGenerationId) {
@@ -60,18 +67,15 @@ export default function UncensoredVideoStudio({
     }
   }, [focusGenerationId]);
 
-  const { data: status } = trpc.uncensored.status.useQuery();
-  const videoAvailable = status?.videoAvailable ?? false;
-  const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" });
-  const savedChars = trpc.uncensored.listCharacters.useQuery(undefined, { enabled: mode === "i2v" });
+  useEffect(() => {
+    if (mode !== "i2v" || !sourceId || !images.data) return;
+    const img = images.data.find((i) => i.id === sourceId);
+    if (img) setAspect(getUncensoredVideoAspectFromSize(img.width, img.height));
+  }, [mode, sourceId, images.data]);
 
   const fallbackCost = { fast: { t2v: 50, i2v: 40 }, hd: { t2v: 120, i2v: 100 } };
   const baseCost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];
   const cost = uncensoredVideoCredits(baseCost, duration);
-
-  // Async job: submit returns a generationId, then we poll videoStatus until the
-  // clip lands (video routinely outlasts a single request).
-  const [pendingId, setPendingId] = useState<number | null>(null);
 
   const gen = trpc.uncensored.generateVideo.useMutation({
     onSuccess: (data) => {
@@ -195,7 +199,11 @@ export default function UncensoredVideoStudio({
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => setSourceId(c.generationId!)}
+                      onClick={() => {
+                    setSourceId(c.generationId!);
+                    const img = images.data?.find((i) => i.id === c.generationId);
+                    if (img) setAspect(getUncensoredVideoAspectFromSize(img.width, img.height));
+                  }}
                       className={`overflow-hidden rounded-lg border-2 ${
                         sourceId === c.generationId
                           ? "border-rose-500 ring-1 ring-rose-500/40"
@@ -224,7 +232,10 @@ export default function UncensoredVideoStudio({
                 <button
                   key={img.id}
                   type="button"
-                  onClick={() => setSourceId(img.id)}
+                  onClick={() => {
+                    setSourceId(img.id);
+                    setAspect(getUncensoredVideoAspectFromSize(img.width, img.height));
+                  }}
                   className={`overflow-hidden rounded-lg border-2 transition-colors ${sourceId === img.id ? "border-rose-500 ring-1 ring-rose-500/40" : "border-transparent hover:border-rose-500/40"}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -331,20 +342,25 @@ export default function UncensoredVideoStudio({
         ))}
       </div>
 
-      {/* Aspect */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Format:</span>
-        {ASPECTS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setAspect(a.id)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${aspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
-          >
-            {a.label}
-          </button>
-        ))}
-      </div>
+      {mode === "t2v" ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Format:</span>
+          {ASPECTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setAspect(a.id)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${aspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Frame matched to your still ({aspect}) so she isn’t stretched.
+        </p>
+      )}
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
@@ -403,6 +419,18 @@ export default function UncensoredVideoStudio({
                 Reuse seed {resultSeed}
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => {
+                setSeed("");
+                handleGenerate();
+              }}
+            >
+              Another take
+            </Button>
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">Private to your account. Uncensored generations never enter the public gallery.</p>
         </div>

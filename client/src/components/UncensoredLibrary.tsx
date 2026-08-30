@@ -265,6 +265,11 @@ export default function UncensoredLibrary({
               </Button>
                 </>
               )}
+              {isVideo && img.parentGenerationId && (
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onAnimate(img.parentGenerationId!)}>
+                  <Film className="mr-1 h-3 w-3" /> Animate again
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"

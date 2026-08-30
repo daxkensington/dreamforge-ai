@@ -486,6 +486,22 @@ describe("uncensored.generateVideo — duration", () => {
     );
   });
 
+  it("matches I2V frame to the source still even if landscape was requested", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_fit" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "hair blowing in the wind",
+      mode: "i2v",
+      sourceGenerationId: 42,
+      aspect: "landscape",
+      quality: "fast",
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 480, height: 832 }),
+    );
+  });
+
   it("renders HD portrait at 720p", async () => {
     withActivePass();
     vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_hd" });
@@ -777,6 +793,52 @@ describe("uncensored.outfit", () => {
       uncensoredRouter.createCaller(ctx()).outfit({
         personGenerationId: 42,
         garmentGenerationId: 43,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
+  });
+});
+
+describe("uncensored.relight", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.debited = 0;
+    state.refineCalls = 0;
+    vi.clearAllMocks();
+  });
+
+  it("relights the caller's own uncensored image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const res = await uncensoredRouter.createCaller(ctx()).relight({
+      sourceGenerationId: 42,
+      lighting: "neon",
+    });
+    expect(res.url).toContain("/img/generations/");
+    expect(state.refineCalls).toBe(1);
+    expect(state.debited).toBe(8);
+  });
+
+  it("REJECTS an unknown lighting look before GPU", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    await expect(
+      uncensoredRouter.createCaller(ctx()).relight({
+        sourceGenerationId: 42,
+        lighting: "disco-ball",
+      }),
+    ).rejects.toThrow(/lighting/i);
+    expect(state.debited).toBe(0);
+  });
+
+  it("REJECTS relighting someone else's image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).relight({
+        sourceGenerationId: 42,
+        lighting: "neon",
       }),
     ).rejects.toThrow(/isn't available/i);
     expect(state.debited).toBe(0);
