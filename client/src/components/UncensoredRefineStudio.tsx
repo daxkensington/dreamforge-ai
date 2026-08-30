@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wand2, Download } from "lucide-react";
+import { Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import UncensoredResultActions from "@/components/UncensoredResultActions";
 
 /**
  * Refine — uncensored img2img over the user's OWN generations.
@@ -20,8 +21,14 @@ import { toast } from "sonner";
  */
 export default function UncensoredRefineStudio({
   focusGenerationId,
+  onInpaint,
+  onAnimate,
+  onUseCharacter,
 }: {
   focusGenerationId?: number | null;
+  onInpaint?: (id: number) => void;
+  onAnimate?: (id: number) => void;
+  onUseCharacter?: (id: number) => void;
 } = {}) {
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [prompt, setPrompt] = useState("");
@@ -197,29 +204,21 @@ export default function UncensoredRefineStudio({
               <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Refined</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={resultUrl} alt="refined" className="w-full rounded-xl border border-rose-500/40" />
-              <div className="mt-2 flex gap-2">
-                <Button asChild variant="outline" size="sm" className="flex-1">
-                  <a href={resultUrl} target="_blank" rel="noopener noreferrer">
-                    <Download className="mr-2 h-4 w-4" /> Open full size
-                  </a>
-                </Button>
-                {resultId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setSourceId(resultId);
-                      setResultUrl(null);
-                      setResultId(null);
-                      toast.info("Now refining the new image.");
-                    }}
-                  >
-                    Continue from this
-                  </Button>
-                )}
-              </div>
+              {resultId && (
+                <UncensoredResultActions
+                  generationId={resultId}
+                  url={resultUrl}
+                  onContinue={() => {
+                    setSourceId(resultId);
+                    setResultUrl(null);
+                    setResultId(null);
+                    toast.info("Now refining the new image.");
+                  }}
+                  onInpaint={onInpaint}
+                  onAnimate={onAnimate}
+                  onUseCharacter={onUseCharacter}
+                />
+              )}
             </div>
           )}
         </div>

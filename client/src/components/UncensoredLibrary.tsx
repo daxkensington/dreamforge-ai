@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw, Trash2, RefreshCw } from "lucide-react";
+import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw, Trash2, RefreshCw, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { formatUncensoredRecipe, getUncensoredAspectFromSize } from "@shared/uncensoredStudio";
 
-type Filter = "all" | "image" | "video";
+type Filter = "all" | "image" | "video" | "starred";
 
 export default function UncensoredLibrary({
   onRefine,
@@ -49,6 +50,13 @@ export default function UncensoredLibrary({
     },
     onError: (e) => toast.error(e.message),
   });
+  const toggleStar = trpc.uncensored.toggleStar.useMutation({
+    onSuccess: (data) => {
+      utils.uncensored.myLibrary.invalidate();
+      toast.success(data.starred ? "Starred." : "Removed from starred.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const deleteGeneration = trpc.uncensored.deleteGeneration.useMutation({
     onSuccess: () => {
       utils.uncensored.myLibrary.invalidate();
@@ -70,7 +78,12 @@ export default function UncensoredLibrary({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (items.data ?? []).filter((img) => {
-      if (filter !== "all" && img.mediaType !== filter) return false;
+      const meta = (img.metadata as Record<string, unknown> | null) ?? {};
+      if (filter === "starred") {
+        if (!meta.starred) return false;
+      } else if (filter !== "all" && img.mediaType !== filter) {
+        return false;
+      }
       if (q && !img.prompt.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -92,18 +105,23 @@ export default function UncensoredLibrary({
       <h2 className="text-lg font-semibold">Your library</h2>
       <p className="mt-1 text-sm text-muted-foreground">Private. Never gallery. Click through to refine, inpaint, or animate.</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {(["all", "image", "video"] as const).map((f) => (
+        {([
+          { id: "all" as const, label: "All" },
+          { id: "image" as const, label: "Images" },
+          { id: "video" as const, label: "Video" },
+          { id: "starred" as const, label: "Starred" },
+        ]).map((f) => (
           <button
-            key={f}
+            key={f.id}
             type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full border px-3 py-1 text-xs capitalize ${
-              filter === f
+            onClick={() => setFilter(f.id)}
+            className={`rounded-full border px-3 py-1 text-xs ${
+              filter === f.id
                 ? "border-rose-500 bg-rose-500/10 text-rose-300"
                 : "border-border/60 text-muted-foreground hover:border-rose-500/40"
             }`}
           >
-            {f === "all" ? "All" : f === "image" ? "Images" : "Video"}
+            {f.label}
           </button>
         ))}
         <Input
@@ -129,7 +147,30 @@ export default function UncensoredLibrary({
               <img src={img.imageUrl ?? ""} alt={img.prompt.slice(0, 80)} className="aspect-[3/4] w-full object-cover" />
             )}
             <p className="line-clamp-2 px-2 pt-2 text-[11px] text-muted-foreground">{img.prompt}</p>
+            {(() => {
+              const meta = (img.metadata as Record<string, unknown> | null) ?? {};
+              const bits = [
+                typeof meta.style === "string" ? meta.style : null,
+                typeof meta.seed === "number" ? `seed ${meta.seed}` : null,
+              ].filter(Boolean);
+              return bits.length ? (
+                <p className="px-2 text-[10px] text-muted-foreground/80">{bits.join(" · ")}</p>
+              ) : null;
+            })()}
             <div className="flex flex-wrap gap-1 p-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                disabled={toggleStar.isPending}
+                onClick={() => toggleStar.mutate({ id: img.id })}
+              >
+                <Star
+                  className={`mr-1 h-3 w-3 ${((img.metadata as Record<string, unknown> | null)?.starred ? "fill-rose-400 text-rose-400" : "")}`}
+                />
+                Star
+              </Button>
               {!isVideo && (
                 <>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onRefine(img.id)}>
@@ -202,11 +243,25 @@ export default function UncensoredLibrary({
                 size="sm"
                 className="h-7 px-2 text-[11px]"
                 onClick={() => {
-                  void navigator.clipboard.writeText(img.prompt);
-                  toast.success("Prompt copied.");
+                  const meta = (img.metadata as Record<string, unknown> | null) ?? {};
+                  void navigator.clipboard.writeText(
+                    formatUncensoredRecipe({
+                      prompt: img.prompt,
+                      style: typeof meta.style === "string" ? meta.style : null,
+                      aspect: getUncensoredAspectFromSize(img.width, img.height),
+                      framing: typeof meta.framing === "string" ? meta.framing : null,
+                      pose: typeof meta.pose === "string" ? meta.pose : null,
+                      camera: typeof meta.camera === "string" ? meta.camera : null,
+                      lighting: typeof meta.lighting === "string" ? meta.lighting : null,
+                      wardrobe: typeof meta.wardrobe === "string" ? meta.wardrobe : null,
+                      setting: typeof meta.setting === "string" ? meta.setting : null,
+                      seed: typeof meta.seed === "number" ? meta.seed : null,
+                    }),
+                  );
+                  toast.success("Recipe copied.");
                 }}
               >
-                Copy prompt
+                Copy recipe
               </Button>
               <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11px]">
                 <a href={img.imageUrl ?? "#"} target="_blank" rel="noopener noreferrer">

@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Paintbrush, Eraser, Download, Undo2, Trash2 } from "lucide-react";
+import { Loader2, Paintbrush, Eraser, Undo2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
+import UncensoredResultActions from "@/components/UncensoredResultActions";
 
 /**
  * Paint-region inpaint. Overlay canvas sits on the original so strokes never
@@ -15,8 +16,14 @@ import { UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
  */
 export default function UncensoredInpaintStudio({
   focusGenerationId,
+  onRefine,
+  onAnimate,
+  onUseCharacter,
 }: {
   focusGenerationId?: number | null;
+  onRefine?: (id: number) => void;
+  onAnimate?: (id: number) => void;
+  onUseCharacter?: (id: number) => void;
 }) {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement | null>(null);
@@ -324,29 +331,21 @@ export default function UncensoredInpaintStudio({
         <div className="mt-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={resultUrl} alt="Inpainted" className="w-full rounded-xl border border-rose-500/40" />
-          <div className="mt-2 flex gap-2">
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <a href={resultUrl} target="_blank" rel="noopener noreferrer">
-                <Download className="mr-2 h-4 w-4" /> Open full size
-              </a>
-            </Button>
-            {resultId && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => {
-                  setSourceId(resultId);
-                  setResultUrl(null);
-                  setResultId(null);
-                  toast.info("Now painting on the new image.");
-                }}
-              >
-                Continue from this
-              </Button>
-            )}
-          </div>
+          {resultId && (
+            <UncensoredResultActions
+              generationId={resultId}
+              url={resultUrl}
+              onContinue={() => {
+                setSourceId(resultId);
+                setResultUrl(null);
+                setResultId(null);
+                toast.info("Now painting on the new image.");
+              }}
+              onRefine={onRefine}
+              onAnimate={onAnimate}
+              onUseCharacter={onUseCharacter}
+            />
+          )}
         </div>
       )}
     </div>

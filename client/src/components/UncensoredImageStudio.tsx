@@ -14,11 +14,14 @@ import {
   UNCENSORED_POSES,
   UNCENSORED_CAMERAS,
   UNCENSORED_LIGHTING,
+  UNCENSORED_WARDROBE,
+  UNCENSORED_SETTINGS,
   UNCENSORED_IMAGE_COST,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
   DEFAULT_CHARACTER_STRENGTH,
   getUncensoredAspectFromSize,
+  formatUncensoredRecipe,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 
@@ -49,6 +52,10 @@ export default function UncensoredImageStudio({
   const [pose, setPose] = useState<string | null>(null);
   const [camera, setCamera] = useState<string | null>(null);
   const [lighting, setLighting] = useState<string | null>(null);
+  const [wardrobe, setWardrobe] = useState<string | null>(null);
+  const [setting, setSetting] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const [characterStrength, setCharacterStrength] = useState(Math.round(DEFAULT_CHARACTER_STRENGTH * 100));
   const [quality, setQuality] = useState<"fast" | "quality">("fast");
   const [count, setCount] = useState(1);
@@ -88,6 +95,8 @@ export default function UncensoredImageStudio({
     setPose(typeof meta.pose === "string" ? meta.pose : null);
     setCamera(typeof meta.camera === "string" ? meta.camera : null);
     setLighting(typeof meta.lighting === "string" ? meta.lighting : null);
+    setWardrobe(typeof meta.wardrobe === "string" ? meta.wardrobe : null);
+    setSetting(typeof meta.setting === "string" ? meta.setting : null);
     if (meta.quality === "fast" || meta.quality === "quality") setQuality(meta.quality);
     if (typeof meta.seed === "number") setSeed(String(meta.seed));
     if (typeof meta.characterStrength === "number") {
@@ -146,7 +155,7 @@ export default function UncensoredImageStudio({
   const updateCharacter = trpc.uncensored.updateCharacter.useMutation({
     onSuccess: (data) => {
       utils.uncensored.listCharacters.invalidate();
-      toast.success(`${data.name}'s reference updated.`);
+      toast.success(`${data.name} updated.`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -180,6 +189,8 @@ export default function UncensoredImageStudio({
       pose: pose ?? undefined,
       camera: camera ?? undefined,
       lighting: lighting ?? undefined,
+      wardrobe: wardrobe ?? undefined,
+      setting: setting ?? undefined,
       quality,
       characterStrength: characterLocked ? characterStrength / 100 : undefined,
       count,
@@ -235,10 +246,42 @@ export default function UncensoredImageStudio({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={c.imageUrl ?? ""} alt={c.name} className="h-16 w-16 object-cover" />
-                  <span className="block max-w-16 truncate px-1 py-0.5 text-center text-[10px] text-muted-foreground">
-                    {c.name}
-                  </span>
                 </button>
+                {renamingId === c.id ? (
+                  <Input
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value.slice(0, 40))}
+                    className="mt-0.5 h-6 w-16 px-1 text-[10px]"
+                    autoFocus
+                    maxLength={40}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && renameValue.trim()) {
+                        updateCharacter.mutate({ id: c.id, name: renameValue.trim() });
+                        setRenamingId(null);
+                      }
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    onBlur={() => {
+                      if (renameValue.trim() && renameValue.trim() !== c.name) {
+                        updateCharacter.mutate({ id: c.id, name: renameValue.trim() });
+                      }
+                      setRenamingId(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="block max-w-16 truncate px-1 py-0.5 text-center text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenamingId(c.id);
+                      setRenameValue(c.name);
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={`Remove ${c.name}`}
@@ -405,6 +448,49 @@ export default function UncensoredImageStudio({
               {l.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Wardrobe</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_WARDROBE.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => setWardrobe(wardrobe === w.id ? null : w.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  wardrobe === w.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Setting</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_SETTINGS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSetting(setting === s.id ? null : s.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  setting === s.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -634,6 +720,30 @@ export default function UncensoredImageStudio({
                     }}
                   >
                     <UserPlus className="mr-1 h-3 w-3" /> Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(
+                        formatUncensoredRecipe({
+                          prompt,
+                          style,
+                          aspect,
+                          framing,
+                          pose,
+                          camera,
+                          lighting,
+                          wardrobe,
+                          setting,
+                          seed: r.seed,
+                        }),
+                      );
+                      toast.success("Recipe copied.");
+                    }}
+                  >
+                    Copy recipe
                   </Button>
                   <Button asChild variant="ghost" size="sm" className="h-7 px-2">
                     <a href={r.url} target="_blank" rel="noopener noreferrer">

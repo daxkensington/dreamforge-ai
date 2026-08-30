@@ -63,8 +63,22 @@ export default function UncensoredStudio({ until }: { until: Date | string | nul
             onAnimate={(id) => go("video", id)}
           />
         )}
-        {tab === "refine" && <UncensoredRefineStudio focusGenerationId={focusId} />}
-        {tab === "inpaint" && <UncensoredInpaintStudio focusGenerationId={focusId} />}
+        {tab === "refine" && (
+          <UncensoredRefineStudio
+            focusGenerationId={focusId}
+            onInpaint={(id) => go("inpaint", id)}
+            onAnimate={(id) => go("video", id)}
+            onUseCharacter={(id) => go("create", id)}
+          />
+        )}
+        {tab === "inpaint" && (
+          <UncensoredInpaintStudio
+            focusGenerationId={focusId}
+            onRefine={(id) => go("refine", id)}
+            onAnimate={(id) => go("video", id)}
+            onUseCharacter={(id) => go("create", id)}
+          />
+        )}
         {tab === "video" && <UncensoredVideoStudio focusGenerationId={focusId} />}
         {tab === "library" && (
           <UncensoredLibrary

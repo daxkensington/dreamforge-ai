@@ -192,6 +192,17 @@ describe("uncensored.generate — paid studio", () => {
     expect(state.created[0].metadata.lighting).toBe("neon");
   });
 
+  it("stores wardrobe and setting on the generation", async () => {
+    withActivePass();
+    await uncensoredRouter.createCaller(ctx()).generate({
+      prompt: "a cinematic portrait of a woman",
+      wardrobe: "silk",
+      setting: "balcony",
+    });
+    expect(state.created[0].metadata.wardrobe).toBe("silk");
+    expect(state.created[0].metadata.setting).toBe("balcony");
+  });
+
   it("quality tier charges 12 credits", async () => {
     withActivePass();
     const res = await uncensoredRouter.createCaller(ctx()).generate({
@@ -560,5 +571,48 @@ describe("uncensored.updateCharacter", () => {
         sourceGenerationId: 42,
       }),
     ).rejects.toThrow(/isn't available/i);
+  });
+
+  it("renames a named character", async () => {
+    withActivePass();
+    state.characters = [
+      {
+        id: 9,
+        userId: OWNER,
+        name: "Luna",
+        styleNotes: uncensoredCharacterRef(42),
+        referenceImages: ["https://dreamforgex.ai/img/generations/src.png"],
+      },
+    ];
+    const res = await uncensoredRouter.createCaller(ctx()).updateCharacter({
+      id: 9,
+      name: "Nova",
+    });
+    expect(res.name).toBe("Nova");
+  });
+});
+
+describe("uncensored.toggleStar", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    vi.clearAllMocks();
+  });
+
+  it("stars the caller's own uncensored generation", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const res = await uncensoredRouter.createCaller(ctx()).toggleStar({ id: 42 });
+    expect(res.starred).toBe(true);
+    expect(updateGeneration).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ metadata: expect.objectContaining({ starred: true, uncensored: true }) }),
+    );
+  });
+
+  it("REJECTS starring someone else's generation", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(uncensoredRouter.createCaller(ctx()).toggleStar({ id: 42 })).rejects.toThrow(/isn't available/i);
   });
 });

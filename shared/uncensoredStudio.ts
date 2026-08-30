@@ -223,6 +223,150 @@ export function applyUncensoredLighting(prompt: string, lightingId: string | nul
   return lighting ? `${prompt}. ${lighting.promptSuffix}` : prompt;
 }
 
+export interface UncensoredWardrobe {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+/** Clothing / styling — exclusive, like pose. Content still stays in the user's prompt. */
+export const UNCENSORED_WARDROBE: UncensoredWardrobe[] = [
+  {
+    id: "dress",
+    label: "Dress",
+    promptSuffix: "wearing a flowing dress, fashion editorial",
+  },
+  {
+    id: "silk",
+    label: "Silk",
+    promptSuffix: "wearing silk, soft drapery, specular highlights on fabric",
+  },
+  {
+    id: "lingerie",
+    label: "Lingerie",
+    promptSuffix: "delicate lingerie, boudoir photography, soft fabric detail",
+  },
+  {
+    id: "swimsuit",
+    label: "Swimsuit",
+    promptSuffix: "wearing a swimsuit, wet skin highlights, sun on water",
+  },
+  {
+    id: "casual",
+    label: "Casual",
+    promptSuffix: "oversized shirt, casual at-home look, relaxed styling",
+  },
+  {
+    id: "evening",
+    label: "Evening",
+    promptSuffix: "evening gown, red-carpet styling, elegant tailoring",
+  },
+  {
+    id: "leather",
+    label: "Leather",
+    promptSuffix: "black leather outfit, editorial fashion, sharp tailoring",
+  },
+  {
+    id: "knit",
+    label: "Knit",
+    promptSuffix: "cozy knitwear, intimate indoor look, soft texture",
+  },
+];
+
+export function getUncensoredWardrobe(id: string | null | undefined): UncensoredWardrobe | null {
+  if (!id) return null;
+  return UNCENSORED_WARDROBE.find((w) => w.id === id) ?? null;
+}
+
+export function applyUncensoredWardrobe(prompt: string, wardrobeId: string | null | undefined): string {
+  const wardrobe = getUncensoredWardrobe(wardrobeId);
+  return wardrobe ? `${prompt}. ${wardrobe.promptSuffix}` : prompt;
+}
+
+export interface UncensoredSetting {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+export const UNCENSORED_SETTINGS: UncensoredSetting[] = [
+  {
+    id: "bedroom",
+    label: "Bedroom",
+    promptSuffix: "in a bedroom, rumpled sheets, warm practical lamps",
+  },
+  {
+    id: "bathroom",
+    label: "Bathroom",
+    promptSuffix: "in a bathroom, steamed mirror, marble and chrome, soft moisture in the air",
+  },
+  {
+    id: "balcony",
+    label: "Balcony",
+    promptSuffix: "on a night balcony, city lights bokeh, warm interior spill",
+  },
+  {
+    id: "beach",
+    label: "Beach",
+    promptSuffix: "on a beach at dusk, wet sand, ocean horizon",
+  },
+  {
+    id: "hotel",
+    label: "Hotel",
+    promptSuffix: "in a luxury hotel suite, floor-to-ceiling windows, cinematic interior",
+  },
+  {
+    id: "club",
+    label: "Club",
+    promptSuffix: "in a nightclub, neon practicals, haze, colored gels",
+  },
+  {
+    id: "forest",
+    label: "Forest",
+    promptSuffix: "in a misty forest, dappled light through trees",
+  },
+  {
+    id: "loft",
+    label: "Loft",
+    promptSuffix: "in an industrial loft, large windows, concrete and linen",
+  },
+];
+
+export function getUncensoredSetting(id: string | null | undefined): UncensoredSetting | null {
+  if (!id) return null;
+  return UNCENSORED_SETTINGS.find((s) => s.id === id) ?? null;
+}
+
+export function applyUncensoredSetting(prompt: string, settingId: string | null | undefined): string {
+  const setting = getUncensoredSetting(settingId);
+  return setting ? `${prompt}. ${setting.promptSuffix}` : prompt;
+}
+
+export function formatUncensoredRecipe(input: {
+  prompt: string;
+  style?: string | null;
+  aspect?: string | null;
+  framing?: string | null;
+  pose?: string | null;
+  camera?: string | null;
+  lighting?: string | null;
+  wardrobe?: string | null;
+  setting?: string | null;
+  seed?: number | null;
+}): string {
+  const bits: string[] = [];
+  if (input.style) bits.push(`style ${input.style}`);
+  if (input.aspect) bits.push(input.aspect);
+  if (input.framing) bits.push(`framing ${input.framing}`);
+  if (input.pose) bits.push(`pose ${input.pose}`);
+  if (input.camera) bits.push(`camera ${input.camera}`);
+  if (input.lighting) bits.push(input.lighting);
+  if (input.wardrobe) bits.push(input.wardrobe);
+  if (input.setting) bits.push(input.setting);
+  if (typeof input.seed === "number") bits.push(`seed ${input.seed}`);
+  return bits.length ? `${input.prompt}\n${bits.join(" · ")}` : input.prompt;
+}
+
 export interface UncensoredVideoMotion {
   id: string;
   label: string;

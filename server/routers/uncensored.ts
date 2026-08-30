@@ -24,6 +24,8 @@ import {
   UNCENSORED_POSES,
   UNCENSORED_CAMERAS,
   UNCENSORED_LIGHTING,
+  UNCENSORED_WARDROBE,
+  UNCENSORED_SETTINGS,
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
   UNCENSORED_CHARACTER_LIMIT,
@@ -32,6 +34,8 @@ import {
   applyUncensoredPose,
   applyUncensoredCamera,
   applyUncensoredLighting,
+  applyUncensoredWardrobe,
+  applyUncensoredSetting,
   applyUncensoredVideoMotion,
   clampCharacterStrength,
   getUncensoredAspect,
@@ -234,6 +238,8 @@ export const uncensoredRouter = router({
       poses: UNCENSORED_POSES,
       cameras: UNCENSORED_CAMERAS,
       lighting: UNCENSORED_LIGHTING,
+      wardrobe: UNCENSORED_WARDROBE,
+      settings: UNCENSORED_SETTINGS,
       videoDurations: UNCENSORED_VIDEO_DURATIONS,
       videoMotions: UNCENSORED_VIDEO_MOTIONS,
     };
@@ -261,6 +267,8 @@ export const uncensoredRouter = router({
         pose: z.string().max(32).optional(),
         camera: z.string().max(32).optional(),
         lighting: z.string().max(32).optional(),
+        wardrobe: z.string().max(32).optional(),
+        setting: z.string().max(32).optional(),
         characterStrength: z.number().min(0.25).max(0.7).optional(),
         characterGenerationId: z.number().int().positive().optional(),
         savedCharacterId: z.number().int().positive().optional(),
@@ -343,6 +351,8 @@ export const uncensoredRouter = router({
       prompt = applyUncensoredPose(prompt, input.pose);
       prompt = applyUncensoredCamera(prompt, input.camera);
       prompt = applyUncensoredLighting(prompt, input.lighting);
+      prompt = applyUncensoredWardrobe(prompt, input.wardrobe);
+      prompt = applyUncensoredSetting(prompt, input.setting);
       prompt = applyUncensoredStyle(prompt, input.style);
       const negative = [DEFAULT_UNCENSORED_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       if (negative) {
@@ -378,6 +388,8 @@ export const uncensoredRouter = router({
             pose: input.pose ?? null,
             camera: input.camera ?? null,
             lighting: input.lighting ?? null,
+            wardrobe: input.wardrobe ?? null,
+            setting: input.setting ?? null,
             quality: input.quality,
             seed: seed ?? null,
             cost: unitCost,
@@ -1026,7 +1038,7 @@ export const uncensoredRouter = router({
         ),
       )
       .orderBy(desc(generations.createdAt))
-      .limit(48);
+      .limit(96);
   }),
 
   /**
@@ -1183,8 +1195,19 @@ export const uncensoredRouter = router({
         ),
       )
       .orderBy(desc(generations.createdAt))
-      .limit(48);
+      .limit(96);
   }),
+
+  toggleStar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const src = await requireOwnUncensoredMedia(ctx.user.id, input.id);
+      const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}) };
+      const starred = !meta.starred;
+      meta.starred = starred;
+      await updateGeneration(src.id, { metadata: meta });
+      return { starred };
+    }),
 
   /** Invoice history for the signed-in user (purchase status polling). */
   myInvoices: protectedProcedure.query(async ({ ctx }) => {

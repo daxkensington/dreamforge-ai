@@ -3,7 +3,10 @@ import {
   applyUncensoredPose,
   applyUncensoredCamera,
   applyUncensoredLighting,
+  applyUncensoredWardrobe,
+  applyUncensoredSetting,
   applyUncensoredVideoMotion,
+  formatUncensoredRecipe,
   getUncensoredPose,
   getUncensoredVideoDuration,
   getUncensoredAspectFromSize,
@@ -73,6 +76,34 @@ describe("uncensored aspect from size", () => {
     expect(getUncensoredAspectFromSize(832, 1216)).toBe("portrait");
     expect(getUncensoredAspectFromSize(1024, 1024)).toBe("square");
     expect(getUncensoredAspectFromSize(1, 1)).toBe("portrait");
+  });
+});
+
+describe("uncensored wardrobe and setting", () => {
+  it("appends clothing and location without replacing the scene", () => {
+    const dressed = applyUncensoredWardrobe("same woman looking at camera", "silk");
+    expect(dressed.startsWith("same woman looking at camera")).toBe(true);
+    expect(dressed).toMatch(/silk/i);
+    const placed = applyUncensoredSetting("same woman looking at camera", "balcony");
+    expect(placed).toMatch(/balcony/i);
+    expect(applyUncensoredWardrobe("same woman", "spacesuit")).toBe("same woman");
+  });
+});
+
+describe("uncensored recipe copy", () => {
+  it("includes prompt, controls, and seed", () => {
+    const recipe = formatUncensoredRecipe({
+      prompt: "red silk dress, balcony at night",
+      style: "realistic",
+      pose: "reclining",
+      wardrobe: "silk",
+      setting: "balcony",
+      seed: 42,
+    });
+    expect(recipe).toContain("red silk dress, balcony at night");
+    expect(recipe).toContain("seed 42");
+    expect(recipe).toContain("silk");
+    expect(recipe).toContain("realistic");
   });
 });
 
