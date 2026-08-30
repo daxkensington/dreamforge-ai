@@ -20,6 +20,8 @@ import {
   UNCENSORED_CAMERAS,
   UNCENSORED_LIGHTING,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_SHEET_VIEWS,
+  UNCENSORED_IMAGE_COST,
   UNCENSORED_VIDEO_DURATIONS,
   DEFAULT_UNCENSORED_VIDEO_DURATION,
 } from "./uncensoredStudio";
@@ -87,6 +89,14 @@ describe("uncensored wardrobe and setting", () => {
     const placed = applyUncensoredSetting("same woman looking at camera", "balcony");
     expect(placed).toMatch(/balcony/i);
     expect(applyUncensoredWardrobe("same woman", "spacesuit")).toBe("same woman");
+  });
+});
+
+describe("uncensored character sheet views", () => {
+  it("is a four-view turnaround priced cheaper than four locks", () => {
+    expect(UNCENSORED_SHEET_VIEWS).toHaveLength(4);
+    expect(UNCENSORED_IMAGE_COST.sheet).toBeLessThan(UNCENSORED_IMAGE_COST.character * 4);
+    expect(UNCENSORED_SHEET_VIEWS.map((v) => v.id).sort()).toEqual(["front", "full", "profile", "threequarter"].sort());
   });
 });
 

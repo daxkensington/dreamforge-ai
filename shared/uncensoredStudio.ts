@@ -463,6 +463,45 @@ export function parseUncensoredCharacterRef(styleNotes: string | null | undefine
 
 export const UNCENSORED_CHARACTER_LIMIT = 24;
 
+export interface UncensoredSheetView {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+/**
+ * Four-view identity pack. Same locked character, studio turnaround — the
+ * product people actually pay character tools for.
+ */
+export const UNCENSORED_SHEET_VIEWS: UncensoredSheetView[] = [
+  {
+    id: "front",
+    label: "Front",
+    promptSuffix:
+      "front view facing camera, bust portrait, even studio lighting, white seamless backdrop, character reference sheet",
+  },
+  {
+    id: "threequarter",
+    label: "Three-quarter",
+    promptSuffix:
+      "three-quarter view, head and torso, even studio lighting, white seamless backdrop, character reference sheet",
+  },
+  {
+    id: "profile",
+    label: "Profile",
+    promptSuffix:
+      "side profile, head in profile, even studio lighting, white seamless backdrop, character reference sheet",
+  },
+  {
+    id: "full",
+    label: "Full body",
+    promptSuffix:
+      "full body standing, head to toe, even studio lighting, white seamless backdrop, character turnaround sheet",
+  },
+];
+
+export type UncensoredClothType = "upper" | "lower" | "overall";
+
 export type UncensoredVideoDurationId = "5s" | "8s";
 
 export interface UncensoredVideoDuration {
@@ -509,6 +548,12 @@ export const UNCENSORED_IMAGE_COST = {
   upscale2x: 8,
   /** Real-ESRGAN 4×. */
   upscale4x: 12,
+  /** 4-view character sheet (discount vs 4× character lock). */
+  sheet: 32,
+  /** RMBG-2.0 cutout of one of the caller's own gens. */
+  cutout: 5,
+  /** CatVTON outfit transfer between two of the caller's own gens. */
+  outfit: 10,
 } as const;
 
 /**

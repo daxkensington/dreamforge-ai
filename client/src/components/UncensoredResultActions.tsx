@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Film, Lock, Maximize, Paintbrush, UserPlus, Wand2 } from "lucide-react";
+import { Download, Film, Lock, Maximize, Paintbrush, Scissors, UserPlus, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -29,6 +29,14 @@ export default function UncensoredResultActions({
   onSave?: () => void;
 }) {
   const utils = trpc.useUtils();
+  const cutout = trpc.uncensored.removeBackground.useMutation({
+    onSuccess: () => {
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+      toast.success("Cutout ready — added to your library.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const upscale = trpc.uncensored.upscale.useMutation({
     onSuccess: () => {
       utils.uncensored.myUncensoredImages.invalidate();
@@ -70,6 +78,15 @@ export default function UncensoredResultActions({
           <UserPlus className="mr-1 h-3.5 w-3.5" /> Save
         </Button>
       )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={cutout.isPending}
+        onClick={() => cutout.mutate({ sourceGenerationId: generationId })}
+      >
+        <Scissors className="mr-1 h-3.5 w-3.5" /> Cutout
+      </Button>
       <Button
         type="button"
         variant="outline"

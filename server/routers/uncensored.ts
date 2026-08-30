@@ -28,6 +28,7 @@ import {
   UNCENSORED_SETTINGS,
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_SHEET_VIEWS,
   UNCENSORED_CHARACTER_LIMIT,
   DEFAULT_UNCENSORED_NEGATIVE,
   applyUncensoredFraming,
@@ -49,7 +50,7 @@ import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
-import { isRunPodAvailable, runpodUpscale } from "../_core/runpod";
+import { isRunPodAvailable, runpodUpscale, runpodRemoveBackground, runpodTryOn } from "../_core/runpod";
 import { deductCredits, refundCredits } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
@@ -131,6 +132,24 @@ async function requireOwnUncensoredMedia(userId: number, id: number) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Only uncensored generations can be used here." });
   }
   return src;
+}
+
+async function resolveUncensoredLock(
+  userId: number,
+  input: { characterGenerationId?: number; savedCharacterId?: number },
+): Promise<{ url: string; generationId: number; savedCharacterId: number | null; style?: string } | null> {
+  const lockGenerationId = input.characterGenerationId
+    ?? (input.savedCharacterId
+      ? (await requireOwnUncensoredCharacter(userId, input.savedCharacterId)).generationId
+      : null);
+  if (!lockGenerationId) return null;
+  const src = await requireOwnUncensoredImage(userId, lockGenerationId);
+  return {
+    url: src.imageUrl!,
+    generationId: src.id,
+    savedCharacterId: input.savedCharacterId ?? null,
+    style: (src.metadata as any)?.style ?? undefined,
+  };
 }
 
 async function requireOwnUncensoredCharacter(userId: number, id: number) {
@@ -235,6 +254,7 @@ export const uncensoredRouter = router({
       imageCost: UNCENSORED_IMAGE_COST,
       aspects: UNCENSORED_ASPECTS,
       framings: UNCENSORED_FRAMINGS,
+      sheetViews: UNCENSORED_SHEET_VIEWS,
       poses: UNCENSORED_POSES,
       cameras: UNCENSORED_CAMERAS,
       lighting: UNCENSORED_LIGHTING,
@@ -306,17 +326,11 @@ export const uncensoredRouter = router({
       let characterUrl: string | null = null;
       let characterId: number | null = null;
       let savedCharacterId: number | null = null;
-      const lockGenerationId = input.characterGenerationId
-        ?? (input.savedCharacterId
-          ? (await requireOwnUncensoredCharacter(ctx.user.id, input.savedCharacterId)).generationId
-          : null);
-      if (input.savedCharacterId && lockGenerationId) {
-        savedCharacterId = input.savedCharacterId;
-      }
-      if (lockGenerationId) {
-        const src = await requireOwnUncensoredImage(ctx.user.id, lockGenerationId);
-        characterUrl = src.imageUrl;
-        characterId = src.id;
+      const lock = await resolveUncensoredLock(ctx.user.id, input);
+      if (lock) {
+        characterUrl = lock.url;
+        characterId = lock.generationId;
+        savedCharacterId = lock.savedCharacterId;
       }
 
       const unitCost = characterUrl
@@ -793,6 +807,222 @@ export const uncensoredRouter = router({
         await refundCredits(ctx.user.id, cost, "Uncensored upscale failed");
         await logToolFailure({ toolId: "uncensored-upscale", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Upscale failed — your credits were returned." });
+      }
+    }),
+
+  /**
+   * Four-view identity sheet from a locked character. Same legal gate as
+   * character lock: only the caller's own uncensored gens.
+   */
+  characterSheet: protectedProcedure
+    .input(
+      z.object({
+        characterGenerationId: z.number().int().positive().optional(),
+        savedCharacterId: z.number().int().positive().optional(),
+        style: z.string().max(32).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+
+      const lock = await resolveUncensoredLock(ctx.user.id, input);
+      if (!lock) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pick one of your characters first." });
+      }
+
+      const cost = UNCENSORED_IMAGE_COST.sheet;
+      const unitCost = Math.round(cost / UNCENSORED_SHEET_VIEWS.length);
+      await enforceRateLimit(`uncensored.sheet:user:${ctx.user.id}`, 3, 60_000, "Slow down a moment between sheets.");
+      const debit = await deductCredits(ctx.user.id, cost, "Uncensored character sheet", "usage", { uncensored: true, sheet: true });
+      if (!debit.success) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.`,
+        });
+      }
+
+      const style = input.style ?? lock.style;
+      const loraId = resolveUncensoredLora(style);
+      const aspect = getUncensoredAspect("portrait");
+      const results: { generationId: number; url: string; view: string }[] = [];
+      let failed = 0;
+      const imageB64 = await fetchAsBase64(lock.url);
+
+      for (const view of UNCENSORED_SHEET_VIEWS) {
+        let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
+        prompt = applyUncensoredStyle(prompt, style);
+        prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
+        const genId = await createGeneration({
+          userId: ctx.user.id,
+          prompt: view.label,
+          negativePrompt: null,
+          mediaType: "image",
+          width: aspect.width,
+          height: aspect.height,
+          duration: null,
+          status: "generating",
+          modelVersion: "uncensored-sheet",
+          parentGenerationId: lock.generationId,
+          metadata: {
+            uncensored: true,
+            sheet: true,
+            view: view.id,
+            style: style ?? null,
+            cost: unitCost,
+            savedCharacterId: lock.savedCharacterId,
+            character: true,
+          },
+        });
+        try {
+          const buffer = await refineUnfiltered(imageB64, prompt, { strength: 0.4, loraId });
+          const key = generateStorageKey("generations", "png");
+          const { url } = await storagePut(key, buffer, "image/png");
+          await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+          results.push({ generationId: genId, url, view: view.id });
+        } catch (err: any) {
+          failed += 1;
+          await updateGeneration(genId, { status: "failed" });
+          await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        }
+      }
+
+      if (results.length === 0) {
+        await refundCredits(ctx.user.id, cost, "Uncensored character sheet failed");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Character sheet failed — your credits were returned.",
+        });
+      }
+      if (failed > 0) {
+        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored sheet partial fail ×${failed}`);
+      }
+      return { images: results, cost: unitCost * results.length };
+    }),
+
+  /**
+   * RMBG cutout of the caller's own uncensored image. No uploads.
+   */
+  removeBackground: protectedProcedure
+    .input(z.object({ sourceGenerationId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+      const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
+      if (!isRunPodAvailable()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
+      }
+      const cost = UNCENSORED_IMAGE_COST.cutout;
+      await enforceRateLimit(`uncensored.cutout:user:${ctx.user.id}`, 8, 60_000, "Slow down a moment between cutouts.");
+      const debit = await deductCredits(ctx.user.id, cost, "Uncensored cutout", "usage", { uncensored: true, cutout: true });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: src.prompt,
+        negativePrompt: null,
+        mediaType: "image",
+        width: src.width ?? 832,
+        height: src.height ?? 1216,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-cutout",
+        parentGenerationId: src.id,
+        metadata: { uncensored: true, cutout: true, cost, style: (src.metadata as any)?.style ?? null },
+      });
+      try {
+        const buf = await fetchImageBuffer(src.imageUrl!);
+        const result = await runpodRemoveBackground(buf.toString("base64"));
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, result, "image/png");
+        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        return { generationId: genId, url, cost };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored cutout failed");
+        await logToolFailure({ toolId: "uncensored-cutout", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cutout failed — your credits were returned." });
+      }
+    }),
+
+  /**
+   * Outfit transfer: CatVTON between two of the caller's own uncensored gens.
+   * Person + garment must both already exist here — never an upload.
+   */
+  outfit: protectedProcedure
+    .input(
+      z.object({
+        personGenerationId: z.number().int().positive(),
+        garmentGenerationId: z.number().int().positive(),
+        clothType: z.enum(["upper", "lower", "overall"]).default("overall"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireToolActive("text-to-image");
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+      if (input.personGenerationId === input.garmentGenerationId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pick two different images — the person, and the outfit to copy." });
+      }
+      const person = await requireOwnUncensoredImage(ctx.user.id, input.personGenerationId);
+      const garment = await requireOwnUncensoredImage(ctx.user.id, input.garmentGenerationId);
+      if (!isRunPodAvailable()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
+      }
+      const cost = UNCENSORED_IMAGE_COST.outfit;
+      await enforceRateLimit(`uncensored.outfit:user:${ctx.user.id}`, 4, 60_000, "Slow down a moment between outfits.");
+      const debit = await deductCredits(ctx.user.id, cost, "Uncensored outfit transfer", "usage", { uncensored: true, outfit: true });
+      if (!debit.success) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
+      }
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: `outfit from #${garment.id} onto #${person.id}`,
+        negativePrompt: null,
+        mediaType: "image",
+        width: person.width ?? 768,
+        height: person.height ?? 1024,
+        duration: null,
+        status: "generating",
+        modelVersion: "uncensored-outfit",
+        parentGenerationId: person.id,
+        metadata: {
+          uncensored: true,
+          outfit: true,
+          clothType: input.clothType,
+          garmentGenerationId: garment.id,
+          cost,
+        },
+      });
+      try {
+        const result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType);
+        const key = generateStorageKey("generations", "png");
+        const { url } = await storagePut(key, result, "image/png");
+        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        return { generationId: genId, url, cost };
+      } catch (err: any) {
+        await updateGeneration(genId, { status: "failed" });
+        await refundCredits(ctx.user.id, cost, "Uncensored outfit transfer failed");
+        await logToolFailure({ toolId: "uncensored-outfit", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Outfit transfer failed — your credits were returned." });
       }
     }),
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw, Trash2, RefreshCw, Star } from "lucide-react";
+import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw, Trash2, RefreshCw, Star, Scissors, LayoutGrid, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
@@ -16,12 +16,16 @@ export default function UncensoredLibrary({
   onAnimate,
   onUseCharacter,
   onRecreate,
+  onSheet,
+  onOutfit,
 }: {
   onRefine: (id: number) => void;
   onInpaint: (id: number) => void;
   onAnimate: (id: number) => void;
   onUseCharacter: (id: number) => void;
   onRecreate: (id: number) => void;
+  onSheet: (id: number) => void;
+  onOutfit: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const items = trpc.uncensored.myLibrary.useQuery();
@@ -63,6 +67,14 @@ export default function UncensoredLibrary({
       utils.uncensored.myUncensoredImages.invalidate();
       setConfirmDelete(null);
       toast.success("Removed from your library.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const cutout = trpc.uncensored.removeBackground.useMutation({
+    onSuccess: () => {
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+      toast.success("Cutout ready — added to your library.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -181,6 +193,22 @@ export default function UncensoredLibrary({
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onAnimate(img.id)}>
                 <Film className="mr-1 h-3 w-3" /> Animate
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onSheet(img.id)}>
+                <LayoutGrid className="mr-1 h-3 w-3" /> Sheet
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onOutfit(img.id)}>
+                <Shirt className="mr-1 h-3 w-3" /> Outfit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                disabled={cutout.isPending}
+                onClick={() => cutout.mutate({ sourceGenerationId: img.id })}
+              >
+                <Scissors className="mr-1 h-3 w-3" /> Cutout
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onRecreate(img.id)}>
                 <RotateCcw className="mr-1 h-3 w-3" /> Recreate

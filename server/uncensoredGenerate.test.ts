@@ -76,6 +76,8 @@ vi.mock("./stripe", () => ({
 vi.mock("./_core/runpod", () => ({
   isRunPodAvailable: vi.fn(() => true),
   runpodUpscale: vi.fn(async () => Buffer.from("upscaled-png")),
+  runpodRemoveBackground: vi.fn(async () => Buffer.from("cutout-png")),
+  runpodTryOn: vi.fn(async () => Buffer.from("outfit-png")),
 }));
 
 vi.mock("./_core/imageGeneration", () => ({
@@ -113,6 +115,7 @@ import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
 import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
 import { refineUnfiltered } from "./_core/imageGeneration";
 import { updateGeneration } from "./db";
+import { runpodRemoveBackground, runpodTryOn } from "./_core/runpod";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -614,5 +617,123 @@ describe("uncensored.toggleStar", () => {
     withActivePass();
     state.generation = ownUncensoredImage({ userId: OWNER + 1 });
     await expect(uncensoredRouter.createCaller(ctx()).toggleStar({ id: 42 })).rejects.toThrow(/isn't available/i);
+  });
+});
+
+describe("uncensored.characterSheet", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.characters = [];
+    state.debited = 0;
+    state.refunded = 0;
+    state.refineCalls = 0;
+    state.created = [];
+    vi.clearAllMocks();
+  });
+
+  it("builds four views from the caller's own uncensored gen", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const res = await uncensoredRouter.createCaller(ctx()).characterSheet({
+      characterGenerationId: 42,
+    });
+    expect(res.images).toHaveLength(4);
+    expect(state.refineCalls).toBe(4);
+    expect(state.debited).toBe(32);
+  });
+
+  it("requires a character lock", async () => {
+    withActivePass();
+    await expect(uncensoredRouter.createCaller(ctx()).characterSheet({})).rejects.toThrow(/character/i);
+    expect(state.debited).toBe(0);
+  });
+
+  it("REJECTS a sheet from someone else's image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
+  });
+});
+
+describe("uncensored.removeBackground", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.debited = 0;
+    vi.clearAllMocks();
+  });
+
+  it("cutouts the caller's own uncensored image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer })) as any,
+    );
+    const res = await uncensoredRouter.createCaller(ctx()).removeBackground({ sourceGenerationId: 42 });
+    expect(res.url).toContain("/img/generations/");
+    expect(state.debited).toBe(5);
+    expect(runpodRemoveBackground).toHaveBeenCalled();
+  });
+
+  it("REJECTS cutting out someone else's image", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage({ userId: OWNER + 1 });
+    await expect(
+      uncensoredRouter.createCaller(ctx()).removeBackground({ sourceGenerationId: 42 }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
+  });
+});
+
+describe("uncensored.outfit", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.generation = null;
+    state.debited = 0;
+    vi.clearAllMocks();
+  });
+
+  it("transfers an outfit between two of the caller's gens", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    const res = await uncensoredRouter.createCaller(ctx()).outfit({
+      personGenerationId: 42,
+      garmentGenerationId: 43,
+    });
+    expect(res.url).toContain("/img/generations/");
+    expect(state.debited).toBe(10);
+    expect(runpodTryOn).toHaveBeenCalled();
+  });
+
+  it("REJECTS using the same image as person and garment", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    await expect(
+      uncensoredRouter.createCaller(ctx()).outfit({
+        personGenerationId: 42,
+        garmentGenerationId: 42,
+      }),
+    ).rejects.toThrow(/two different/i);
+    expect(state.debited).toBe(0);
+  });
+
+  it("REJECTS a garment that belongs to someone else", async () => {
+    withActivePass();
+    const { getGenerationById } = await import("./db");
+    vi.mocked(getGenerationById)
+      .mockResolvedValueOnce(ownUncensoredImage() as any)
+      .mockResolvedValueOnce(ownUncensoredImage({ id: 43, userId: OWNER + 1 }) as any);
+    await expect(
+      uncensoredRouter.createCaller(ctx()).outfit({
+        personGenerationId: 42,
+        garmentGenerationId: 43,
+      }),
+    ).rejects.toThrow(/isn't available/i);
+    expect(state.debited).toBe(0);
   });
 });

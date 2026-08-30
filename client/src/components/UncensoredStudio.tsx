@@ -5,14 +5,18 @@ import UncensoredImageStudio from "./UncensoredImageStudio";
 import UncensoredRefineStudio from "./UncensoredRefineStudio";
 import UncensoredInpaintStudio from "./UncensoredInpaintStudio";
 import UncensoredVideoStudio from "./UncensoredVideoStudio";
+import UncensoredSheetStudio from "./UncensoredSheetStudio";
+import UncensoredOutfitStudio from "./UncensoredOutfitStudio";
 import UncensoredLibrary from "./UncensoredLibrary";
 
-type Tab = "create" | "refine" | "inpaint" | "video" | "library";
+type Tab = "create" | "refine" | "inpaint" | "sheet" | "outfit" | "video" | "library";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "create", label: "Create" },
   { id: "refine", label: "Refine" },
   { id: "inpaint", label: "Inpaint" },
+  { id: "sheet", label: "Sheet" },
+  { id: "outfit", label: "Outfit" },
   { id: "video", label: "Video" },
   { id: "library", label: "Library" },
 ];
@@ -79,6 +83,24 @@ export default function UncensoredStudio({ until }: { until: Date | string | nul
             onUseCharacter={(id) => go("create", id)}
           />
         )}
+        {tab === "sheet" && (
+          <UncensoredSheetStudio
+            focusGenerationId={focusId}
+            onRefine={(id) => go("refine", id)}
+            onInpaint={(id) => go("inpaint", id)}
+            onAnimate={(id) => go("video", id)}
+            onUseCharacter={(id) => go("create", id)}
+          />
+        )}
+        {tab === "outfit" && (
+          <UncensoredOutfitStudio
+            focusGenerationId={focusId}
+            onRefine={(id) => go("refine", id)}
+            onInpaint={(id) => go("inpaint", id)}
+            onAnimate={(id) => go("video", id)}
+            onUseCharacter={(id) => go("create", id)}
+          />
+        )}
         {tab === "video" && <UncensoredVideoStudio focusGenerationId={focusId} />}
         {tab === "library" && (
           <UncensoredLibrary
@@ -94,6 +116,8 @@ export default function UncensoredStudio({ until }: { until: Date | string | nul
               setRecreateId(id);
               setTab("create");
             }}
+            onSheet={(id) => go("sheet", id)}
+            onOutfit={(id) => go("outfit", id)}
           />
         )}
       </div>

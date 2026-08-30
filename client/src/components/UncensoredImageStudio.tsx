@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -123,6 +123,25 @@ export default function UncensoredImageStudio({
     onError: (e) => toast.error(e.message),
   });
 
+  const [sheetResults, setSheetResults] = useState<{ generationId: number; url: string; view: string }[]>([]);
+  const sheet = trpc.uncensored.characterSheet.useMutation({
+    onSuccess: (data) => {
+      setSheetResults(data.images);
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+      toast.success("Four-view sheet ready.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const cutout = trpc.uncensored.removeBackground.useMutation({
+    onSuccess: (data) => {
+      setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+      toast.success("Cutout ready.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const upscale = trpc.uncensored.upscale.useMutation({
     onSuccess: (data) => {
       setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
@@ -636,6 +655,31 @@ export default function UncensoredImageStudio({
         )}
       </Button>
       <p className="mt-2 text-center text-[11px] text-muted-foreground">Ctrl+Enter to generate</p>
+      {characterLocked && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-2 w-full"
+          disabled={sheet.isPending}
+          onClick={() => {
+            setSheetResults([]);
+            sheet.mutate({
+              characterGenerationId: characterId ?? undefined,
+              savedCharacterId: savedCharacterId ?? undefined,
+            });
+          }}
+        >
+          {sheet.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building sheet…
+            </>
+          ) : (
+            <>
+              <LayoutGrid className="mr-2 h-4 w-4" /> 4-view sheet · {UNCENSORED_IMAGE_COST.sheet} credits
+            </>
+          )}
+        </Button>
+      )}
 
       {results.length > 0 && (
         <div className={`mt-6 grid gap-3 ${results.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -666,6 +710,15 @@ export default function UncensoredImageStudio({
                       <Film className="mr-1 h-3 w-3" /> Animate
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={cutout.isPending}
+                    onClick={() => cutout.mutate({ sourceGenerationId: r.generationId })}
+                  >
+                    <Scissors className="mr-1 h-3 w-3" /> Cutout
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -777,6 +830,18 @@ export default function UncensoredImageStudio({
                   </Button>
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sheetResults.length > 0 && (
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          {sheetResults.map((r) => (
+            <div key={r.generationId} className="overflow-hidden rounded-xl border border-rose-500/30">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={r.url} alt={r.view} className="w-full" />
+              <p className="px-2 py-1 text-[11px] capitalize text-muted-foreground">{r.view}</p>
             </div>
           ))}
         </div>
