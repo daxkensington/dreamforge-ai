@@ -111,6 +111,7 @@ vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) 
 import { uncensoredRouter } from "./routers/uncensored";
 import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
 import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
+import { refineUnfiltered } from "./_core/imageGeneration";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -177,6 +178,17 @@ describe("uncensored.generate — paid studio", () => {
       pose: "reclining",
     });
     expect(state.created[0].metadata.pose).toBe("reclining");
+  });
+
+  it("stores camera and lighting on the generation", async () => {
+    withActivePass();
+    await uncensoredRouter.createCaller(ctx()).generate({
+      prompt: "a cinematic portrait of a woman in neon rain",
+      camera: "low",
+      lighting: "neon",
+    });
+    expect(state.created[0].metadata.camera).toBe("low");
+    expect(state.created[0].metadata.lighting).toBe("neon");
   });
 
   it("quality tier charges 12 credits", async () => {
@@ -328,6 +340,19 @@ describe("uncensored.generate — character lock ownership", () => {
     expect(state.refineCalls).toBe(1);
     expect(state.debited).toBe(10);
     expect(state.created[0].metadata.savedCharacterId).toBe(9);
+    expect(state.created[0].metadata.characterStrength).toBe(0.45);
+  });
+
+  it("honours character lock strength", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    await uncensoredRouter.createCaller(ctx()).generate({
+      prompt: "same woman, red silk dress, balcony at night",
+      characterGenerationId: 42,
+      characterStrength: 0.3,
+    });
+    expect(vi.mocked(refineUnfiltered).mock.calls[0][2]).toMatchObject({ strength: 0.3 });
+    expect(state.created[0].metadata.characterStrength).toBe(0.3);
   });
 
   it("REJECTS a named character that points at someone else's generation", async () => {
@@ -414,5 +439,18 @@ describe("uncensored.generateVideo — duration", () => {
       expect.objectContaining({ numFrames: 121, fps: 16 }),
     );
     expect(state.created[0].duration).toBe(8);
+  });
+
+  it("appends motion language to the Wan prompt", async () => {
+    withActivePass();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_2" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "natural motion",
+      motion: "hair",
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: expect.stringMatching(/hair blowing/i) }),
+    );
+    expect(state.created[0].metadata.motion).toBe("hair");
   });
 });

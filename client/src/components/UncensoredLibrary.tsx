@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize } from "lucide-react";
+import { Download, Film, Paintbrush, User, UserPlus, Wand2, Maximize, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
@@ -12,11 +12,13 @@ export default function UncensoredLibrary({
   onInpaint,
   onAnimate,
   onUseCharacter,
+  onRecreate,
 }: {
   onRefine: (id: number) => void;
   onInpaint: (id: number) => void;
   onAnimate: (id: number) => void;
   onUseCharacter: (id: number) => void;
+  onRecreate: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const items = trpc.uncensored.myLibrary.useQuery();
@@ -79,6 +81,9 @@ export default function UncensoredLibrary({
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onAnimate(img.id)}>
                 <Film className="mr-1 h-3 w-3" /> Animate
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onRecreate(img.id)}>
+                <RotateCcw className="mr-1 h-3 w-3" /> Recreate
               </Button>
               <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onUseCharacter(img.id)}>
                 <User className="mr-1 h-3 w-3" /> Lock

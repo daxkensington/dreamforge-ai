@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   UNCENSORED_ASPECTS,
   UNCENSORED_FRAMINGS,
   UNCENSORED_POSES,
+  UNCENSORED_CAMERAS,
+  UNCENSORED_LIGHTING,
   UNCENSORED_IMAGE_COST,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
-  UNCENSORED_PROMPT_CHIPS,
+  DEFAULT_CHARACTER_STRENGTH,
+  getUncensoredAspectFromSize,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 
@@ -26,11 +30,13 @@ import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredS
  */
 export default function UncensoredImageStudio({
   focusCharacterId,
+  recreateId,
   onRefine,
   onInpaint,
   onAnimate,
 }: {
   focusCharacterId?: number | null;
+  recreateId?: number | null;
   onRefine?: (id: number) => void;
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
@@ -41,6 +47,9 @@ export default function UncensoredImageStudio({
   const [aspect, setAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
   const [framing, setFraming] = useState<string | null>("bust");
   const [pose, setPose] = useState<string | null>(null);
+  const [camera, setCamera] = useState<string | null>(null);
+  const [lighting, setLighting] = useState<string | null>(null);
+  const [characterStrength, setCharacterStrength] = useState(Math.round(DEFAULT_CHARACTER_STRENGTH * 100));
   const [quality, setQuality] = useState<"fast" | "quality">("fast");
   const [count, setCount] = useState(1);
   const [seed, setSeed] = useState("");
@@ -55,12 +64,45 @@ export default function UncensoredImageStudio({
   const savedChars = trpc.uncensored.listCharacters.useQuery();
   const utils = trpc.useUtils();
 
+  const appliedRecreate = useRef<number | null>(null);
+
   useEffect(() => {
     if (focusCharacterId) {
       setCharacterId(focusCharacterId);
+      setSavedCharacterId(null);
       setShowAdvanced(true);
     }
   }, [focusCharacterId]);
+
+  useEffect(() => {
+    if (!recreateId || !images.data) return;
+    if (appliedRecreate.current === recreateId) return;
+    const src = images.data.find((i) => i.id === recreateId);
+    if (!src) return;
+    appliedRecreate.current = recreateId;
+    const meta = (src.metadata as Record<string, unknown> | null) ?? {};
+    setPrompt(src.prompt);
+    if (typeof meta.style === "string") setStyle(meta.style);
+    setAspect(getUncensoredAspectFromSize(src.width, src.height));
+    setFraming(typeof meta.framing === "string" ? meta.framing : null);
+    setPose(typeof meta.pose === "string" ? meta.pose : null);
+    setCamera(typeof meta.camera === "string" ? meta.camera : null);
+    setLighting(typeof meta.lighting === "string" ? meta.lighting : null);
+    if (meta.quality === "fast" || meta.quality === "quality") setQuality(meta.quality);
+    if (typeof meta.seed === "number") setSeed(String(meta.seed));
+    if (typeof meta.characterStrength === "number") {
+      setCharacterStrength(Math.round(meta.characterStrength * 100));
+    }
+    if (typeof meta.savedCharacterId === "number") {
+      setSavedCharacterId(meta.savedCharacterId);
+      setCharacterId(null);
+    } else if (src.parentGenerationId) {
+      setCharacterId(src.parentGenerationId);
+      setSavedCharacterId(null);
+      setShowAdvanced(true);
+    }
+    toast.info("Settings loaded — edit and generate.");
+  }, [recreateId, images.data]);
 
   const gen = trpc.uncensored.generate.useMutation({
     onSuccess: (data) => {
@@ -113,10 +155,6 @@ export default function UncensoredImageStudio({
     return Number.isInteger(n) && n >= 0 ? n : undefined;
   }, [seed]);
 
-  const appendChip = (text: string) => {
-    setPrompt((p) => (p.trim() ? `${p.trim()}, ${text}` : text));
-  };
-
   const handleGenerate = () => {
     if (prompt.trim().length < 3) {
       toast.error("Describe what you want to create.");
@@ -130,7 +168,10 @@ export default function UncensoredImageStudio({
       aspect,
       framing: framing ?? undefined,
       pose: pose ?? undefined,
+      camera: camera ?? undefined,
+      lighting: lighting ?? undefined,
       quality,
+      characterStrength: characterLocked ? characterStrength / 100 : undefined,
       count,
       seed: parsedSeed,
       characterGenerationId: characterId ?? undefined,
@@ -229,19 +270,6 @@ export default function UncensoredImageStudio({
           }
         }}
       />
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {UNCENSORED_PROMPT_CHIPS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => appendChip(c.text)}
-            className="rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-rose-500/40 hover:text-rose-200"
-          >
-            + {c.label}
-          </button>
-        ))}
-      </div>
-
       <div className="mt-4">
         <p className="text-xs text-muted-foreground mb-2">Style</p>
         <div className="flex flex-wrap gap-2">
@@ -306,22 +334,65 @@ export default function UncensoredImageStudio({
         </div>
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Pose</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_POSES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPose(pose === p.id ? null : p.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  pose === p.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Camera</p>
+          <div className="flex flex-wrap gap-2">
+            {UNCENSORED_CAMERAS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCamera(camera === c.id ? null : c.id)}
+                disabled={gen.isPending}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  camera === c.id
+                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                    : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="mt-4">
-        <p className="text-xs text-muted-foreground mb-2">Pose</p>
+        <p className="text-xs text-muted-foreground mb-2">Lighting</p>
         <div className="flex flex-wrap gap-2">
-          {UNCENSORED_POSES.map((p) => (
+          {UNCENSORED_LIGHTING.map((l) => (
             <button
-              key={p.id}
+              key={l.id}
               type="button"
-              onClick={() => setPose(pose === p.id ? null : p.id)}
+              onClick={() => setLighting(lighting === l.id ? null : l.id)}
               disabled={gen.isPending}
               className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                pose === p.id
+                lighting === l.id
                   ? "border-rose-500 bg-rose-500/10 text-rose-300"
                   : "border-border/60 text-muted-foreground hover:border-rose-500/40"
               }`}
             >
-              {p.label}
+              {l.label}
             </button>
           ))}
         </div>
@@ -361,6 +432,29 @@ export default function UncensoredImageStudio({
           ))}
         </div>
       </div>
+
+      {characterLocked && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">How far from the locked character</span>
+            <span className="font-medium">
+              {characterStrength <= 35 ? "Keep her" : characterStrength <= 55 ? "New scene" : "Reimagine"}
+            </span>
+          </div>
+          <Slider
+            value={[characterStrength]}
+            onValueChange={(v) => setCharacterStrength(v[0] ?? 45)}
+            min={25}
+            max={70}
+            step={5}
+            disabled={gen.isPending}
+            className="mt-2"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Lower keeps face and body; higher lets the new scene take over.
+          </p>
+        </div>
+      )}
 
       <button
         type="button"

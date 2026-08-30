@@ -129,6 +129,173 @@ export function applyUncensoredPose(prompt: string, poseId: string | null | unde
   return pose ? `${prompt}. ${pose.promptSuffix}` : prompt;
 }
 
+export interface UncensoredCamera {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+export const UNCENSORED_CAMERAS: UncensoredCamera[] = [
+  {
+    id: "eyelevel",
+    label: "Eye level",
+    promptSuffix: "eye-level camera, natural perspective",
+  },
+  {
+    id: "low",
+    label: "Low angle",
+    promptSuffix: "low-angle shot looking up, heroic perspective, 35mm",
+  },
+  {
+    id: "high",
+    label: "High angle",
+    promptSuffix: "high-angle shot looking down, intimate overhead perspective",
+  },
+  {
+    id: "dutch",
+    label: "Dutch angle",
+    promptSuffix: "dutch angle, tilted camera, cinematic tension",
+  },
+  {
+    id: "overshoulder",
+    label: "Over-shoulder",
+    promptSuffix: "over-the-shoulder camera, cinematic coverage",
+  },
+];
+
+export function getUncensoredCamera(id: string | null | undefined): UncensoredCamera | null {
+  if (!id) return null;
+  return UNCENSORED_CAMERAS.find((c) => c.id === id) ?? null;
+}
+
+export function applyUncensoredCamera(prompt: string, cameraId: string | null | undefined): string {
+  const camera = getUncensoredCamera(cameraId);
+  return camera ? `${prompt}. ${camera.promptSuffix}` : prompt;
+}
+
+export interface UncensoredLighting {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+/** Exclusive lighting, same idea as pose — stacking golden hour + neon is noise. */
+export const UNCENSORED_LIGHTING: UncensoredLighting[] = [
+  {
+    id: "golden",
+    label: "Golden hour",
+    promptSuffix: "golden hour sunlight, warm rim light, glowing skin",
+  },
+  {
+    id: "neon",
+    label: "Neon night",
+    promptSuffix: "neon-lit night, cyan and magenta practicals, wet pavement reflections",
+  },
+  {
+    id: "studio",
+    label: "Studio",
+    promptSuffix: "soft studio lighting, beauty dish, clean seamless backdrop",
+  },
+  {
+    id: "candle",
+    label: "Candlelight",
+    promptSuffix: "candlelight, warm chiaroscuro, intimate low-key lighting",
+  },
+  {
+    id: "rain",
+    label: "Rain",
+    promptSuffix: "rain-soaked, specular highlights, moody atmosphere",
+  },
+  {
+    id: "film",
+    label: "Film still",
+    promptSuffix: "cinematic film still, anamorphic bokeh, color-graded",
+  },
+];
+
+export function getUncensoredLighting(id: string | null | undefined): UncensoredLighting | null {
+  if (!id) return null;
+  return UNCENSORED_LIGHTING.find((l) => l.id === id) ?? null;
+}
+
+export function applyUncensoredLighting(prompt: string, lightingId: string | null | undefined): string {
+  const lighting = getUncensoredLighting(lightingId);
+  return lighting ? `${prompt}. ${lighting.promptSuffix}` : prompt;
+}
+
+export interface UncensoredVideoMotion {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+export const UNCENSORED_VIDEO_MOTIONS: UncensoredVideoMotion[] = [
+  {
+    id: "turn",
+    label: "Turn to camera",
+    promptSuffix: "slow turn toward camera, natural motion",
+  },
+  {
+    id: "hair",
+    label: "Hair in wind",
+    promptSuffix: "hair blowing in the wind, subtle body movement",
+  },
+  {
+    id: "breathe",
+    label: "Breathing",
+    promptSuffix: "subtle breathing, slight chest movement, still otherwise",
+  },
+  {
+    id: "walk",
+    label: "Walk forward",
+    promptSuffix: "walking toward camera, natural gait, smooth motion",
+  },
+  {
+    id: "look",
+    label: "Look around",
+    promptSuffix: "looks around slowly, eyes scanning, gentle head turn",
+  },
+  {
+    id: "smile",
+    label: "Smile",
+    promptSuffix: "expression shifts into a smile, natural facial motion",
+  },
+  {
+    id: "pan",
+    label: "Camera pan",
+    promptSuffix: "slow cinematic camera pan, subject mostly still",
+  },
+  {
+    id: "zoom",
+    label: "Slow zoom",
+    promptSuffix: "slow zoom in, subtle subject movement",
+  },
+];
+
+export function getUncensoredVideoMotion(id: string | null | undefined): UncensoredVideoMotion | null {
+  if (!id) return null;
+  return UNCENSORED_VIDEO_MOTIONS.find((m) => m.id === id) ?? null;
+}
+
+export function applyUncensoredVideoMotion(prompt: string, motionId: string | null | undefined): string {
+  const motion = getUncensoredVideoMotion(motionId);
+  return motion ? `${prompt}. ${motion.promptSuffix}` : prompt;
+}
+
+export const DEFAULT_CHARACTER_STRENGTH = 0.45;
+export const CHARACTER_STRENGTH_MIN = 0.25;
+export const CHARACTER_STRENGTH_MAX = 0.7;
+
+export function clampCharacterStrength(n: number | null | undefined): number {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : DEFAULT_CHARACTER_STRENGTH;
+  return Math.min(CHARACTER_STRENGTH_MAX, Math.max(CHARACTER_STRENGTH_MIN, v));
+}
+
+export function getUncensoredAspectFromSize(width?: number | null, height?: number | null): string {
+  const match = UNCENSORED_ASPECTS.find((a) => a.width === width && a.height === height);
+  return match?.id ?? DEFAULT_UNCENSORED_ASPECT;
+}
+
 /**
  * Named-character rows live in the shared `characters` table. styleNotes
  * carries this marker plus the source generation id so the uncensored studio

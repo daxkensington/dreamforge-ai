@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   UNCENSORED_VIDEO_DURATIONS,
+  UNCENSORED_VIDEO_MOTIONS,
   DEFAULT_UNCENSORED_VIDEO_DURATION,
   uncensoredVideoCredits,
 } from "@shared/uncensoredStudio";
@@ -39,6 +40,7 @@ export default function UncensoredVideoStudio({
   const [duration, setDuration] = useState<typeof DEFAULT_UNCENSORED_VIDEO_DURATION>(
     DEFAULT_UNCENSORED_VIDEO_DURATION,
   );
+  const [motion, setMotion] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -52,6 +54,7 @@ export default function UncensoredVideoStudio({
   const { data: status } = trpc.uncensored.status.useQuery();
   const videoAvailable = status?.videoAvailable ?? false;
   const images = trpc.uncensored.myUncensoredImages.useQuery(undefined, { enabled: mode === "i2v" });
+  const savedChars = trpc.uncensored.listCharacters.useQuery(undefined, { enabled: mode === "i2v" });
 
   const fallbackCost = { fast: { t2v: 50, i2v: 40 }, hd: { t2v: 120, i2v: 100 } };
   const baseCost = status?.videoCost?.[quality]?.[mode] ?? fallbackCost[quality][mode];
@@ -96,20 +99,25 @@ export default function UncensoredVideoStudio({
 
   const isBusy = gen.isPending || pendingId != null;
   const canGenerate =
-    prompt.trim().length >= 3 && !isBusy && (mode === "t2v" || !!sourceId);
+    (prompt.trim().length >= 3 || !!motion) && !isBusy && (mode === "t2v" || !!sourceId);
 
   const handleGenerate = () => {
     if (mode === "i2v" && !sourceId) {
       toast.error("Pick an image to animate.");
       return;
     }
+    if (prompt.trim().length < 3 && !motion) {
+      toast.error("Describe the motion, or pick a motion chip.");
+      return;
+    }
     setVideoUrl(null);
     gen.mutate({
-      prompt: prompt.trim(),
+      prompt: prompt.trim() || "natural motion",
       mode,
       quality,
       aspect,
       duration,
+      motion: motion ?? undefined,
       ...(mode === "i2v" && sourceId ? { sourceGenerationId: sourceId } : {}),
     });
   };
@@ -158,6 +166,33 @@ export default function UncensoredVideoStudio({
       {/* I2V source picker */}
       {mode === "i2v" && (
         <div className="mt-4">
+          {savedChars.data && savedChars.data.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground">Characters</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {savedChars.data.map((c) =>
+                  c.generationId ? (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setSourceId(c.generationId!)}
+                      className={`overflow-hidden rounded-lg border-2 ${
+                        sourceId === c.generationId
+                          ? "border-rose-500 ring-1 ring-rose-500/40"
+                          : "border-transparent hover:border-rose-500/40"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.imageUrl ?? ""} alt={c.name} className="h-16 w-16 object-cover" />
+                      <span className="block max-w-16 truncate px-1 py-0.5 text-center text-[10px] text-muted-foreground">
+                        {c.name}
+                      </span>
+                    </button>
+                  ) : null,
+                )}
+              </div>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">Pick one of your uncensored images to animate:</p>
           {images.isLoading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -201,6 +236,27 @@ export default function UncensoredVideoStudio({
           }
         }}
       />
+
+      <div className="mt-3">
+        <p className="text-xs text-muted-foreground mb-2">Motion</p>
+        <div className="flex flex-wrap gap-2">
+          {UNCENSORED_VIDEO_MOTIONS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setMotion(motion === m.id ? null : m.id)}
+              disabled={isBusy}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                motion === m.id
+                  ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Quality tier */}
       <div className="mt-3 flex flex-wrap items-center gap-2">

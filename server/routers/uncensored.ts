@@ -22,11 +22,18 @@ import {
   UNCENSORED_FRAMINGS,
   UNCENSORED_IMAGE_COST,
   UNCENSORED_POSES,
+  UNCENSORED_CAMERAS,
+  UNCENSORED_LIGHTING,
   UNCENSORED_VIDEO_DURATIONS,
+  UNCENSORED_VIDEO_MOTIONS,
   UNCENSORED_CHARACTER_LIMIT,
   DEFAULT_UNCENSORED_NEGATIVE,
   applyUncensoredFraming,
   applyUncensoredPose,
+  applyUncensoredCamera,
+  applyUncensoredLighting,
+  applyUncensoredVideoMotion,
+  clampCharacterStrength,
   getUncensoredAspect,
   getUncensoredVideoDuration,
   uncensoredVideoCredits,
@@ -205,7 +212,10 @@ export const uncensoredRouter = router({
       aspects: UNCENSORED_ASPECTS,
       framings: UNCENSORED_FRAMINGS,
       poses: UNCENSORED_POSES,
+      cameras: UNCENSORED_CAMERAS,
+      lighting: UNCENSORED_LIGHTING,
       videoDurations: UNCENSORED_VIDEO_DURATIONS,
+      videoMotions: UNCENSORED_VIDEO_MOTIONS,
     };
   }),
 
@@ -229,6 +239,9 @@ export const uncensoredRouter = router({
         seed: z.number().int().min(0).max(2_147_483_647).optional(),
         count: z.number().int().min(1).max(4).default(1),
         pose: z.string().max(32).optional(),
+        camera: z.string().max(32).optional(),
+        lighting: z.string().max(32).optional(),
+        characterStrength: z.number().min(0.25).max(0.7).optional(),
         characterGenerationId: z.number().int().positive().optional(),
         savedCharacterId: z.number().int().positive().optional(),
       }),
@@ -314,8 +327,11 @@ export const uncensoredRouter = router({
       }
 
       const aspect = getUncensoredAspect(input.aspect);
+      const characterStrength = characterUrl ? clampCharacterStrength(input.characterStrength) : null;
       let prompt = applyUncensoredFraming(input.prompt, input.framing);
       prompt = applyUncensoredPose(prompt, input.pose);
+      prompt = applyUncensoredCamera(prompt, input.camera);
+      prompt = applyUncensoredLighting(prompt, input.lighting);
       prompt = applyUncensoredStyle(prompt, input.style);
       const negative = [DEFAULT_UNCENSORED_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       if (negative) {
@@ -349,10 +365,13 @@ export const uncensoredRouter = router({
             style: input.style ?? null,
             framing: input.framing ?? null,
             pose: input.pose ?? null,
+            camera: input.camera ?? null,
+            lighting: input.lighting ?? null,
             quality: input.quality,
             seed: seed ?? null,
             cost: unitCost,
             character: !!characterUrl,
+            characterStrength,
             savedCharacterId,
           },
         });
@@ -362,7 +381,7 @@ export const uncensoredRouter = router({
           if (characterUrl) {
             const imageB64 = await fetchAsBase64(characterUrl);
             const buffer = await refineUnfiltered(imageB64, prompt, {
-              strength: 0.45,
+              strength: characterStrength ?? 0.45,
               loraId,
               seed,
             });
@@ -425,6 +444,7 @@ export const uncensoredRouter = router({
         sourceGenerationId: z.number().int().positive().optional(),
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
         duration: z.enum(["5s", "8s"]).default("5s" as const),
+        motion: z.string().max(32).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -470,6 +490,7 @@ export const uncensoredRouter = router({
 
       const duration = getUncensoredVideoDuration(input.duration);
       const cost = uncensoredVideoCredits(UNCENSORED_VIDEO_COST[input.quality][input.mode], duration.id);
+      const gpuPrompt = applyUncensoredVideoMotion(input.prompt, input.motion);
       const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"} ${duration.label}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id });
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
@@ -489,14 +510,14 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
       // function, so the client polls uncensored.videoStatus(generationId).
       try {
         const { jobId } = await submitUncensoredVideoJob({
-          prompt: input.prompt,
+          prompt: gpuPrompt,
           userId: ctx.user.id,
           sourceImageUrl,
           width: dims.w,
@@ -507,7 +528,7 @@ export const uncensoredRouter = router({
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -987,6 +1008,7 @@ export const uncensoredRouter = router({
         createdAt: generations.createdAt,
         width: generations.width,
         height: generations.height,
+        parentGenerationId: generations.parentGenerationId,
         metadata: generations.metadata,
       })
       .from(generations)
@@ -1092,6 +1114,7 @@ export const uncensoredRouter = router({
         width: generations.width,
         height: generations.height,
         mediaType: generations.mediaType,
+        parentGenerationId: generations.parentGenerationId,
         metadata: generations.metadata,
       })
       .from(generations)

@@ -1,13 +1,22 @@
 import { describe, it, expect } from "vitest";
 import {
   applyUncensoredPose,
+  applyUncensoredCamera,
+  applyUncensoredLighting,
+  applyUncensoredVideoMotion,
   getUncensoredPose,
   getUncensoredVideoDuration,
+  getUncensoredAspectFromSize,
   uncensoredVideoCredits,
   uncensoredCharacterRef,
   isUncensoredCharacter,
   parseUncensoredCharacterRef,
+  clampCharacterStrength,
+  DEFAULT_CHARACTER_STRENGTH,
   UNCENSORED_POSES,
+  UNCENSORED_CAMERAS,
+  UNCENSORED_LIGHTING,
+  UNCENSORED_VIDEO_MOTIONS,
   UNCENSORED_VIDEO_DURATIONS,
   DEFAULT_UNCENSORED_VIDEO_DURATION,
 } from "./uncensoredStudio";
@@ -34,6 +43,45 @@ describe("uncensored named-character marker", () => {
     expect(isUncensoredCharacter("anime style")).toBe(false);
     expect(parseUncensoredCharacterRef("anime style")).toBeNull();
     expect(parseUncensoredCharacterRef("uncensored:nope")).toBeNull();
+  });
+});
+
+describe("uncensored camera and lighting", () => {
+  it("appends camera and lighting without replacing the scene", () => {
+    expect(UNCENSORED_CAMERAS.length).toBeGreaterThanOrEqual(4);
+    expect(UNCENSORED_LIGHTING.length).toBeGreaterThanOrEqual(5);
+    const withCam = applyUncensoredCamera("red silk dress", "low");
+    expect(withCam.startsWith("red silk dress")).toBe(true);
+    expect(withCam).toMatch(/low-angle/i);
+    const withLight = applyUncensoredLighting("red silk dress", "neon");
+    expect(withLight).toMatch(/neon-lit/i);
+    expect(applyUncensoredCamera("red silk dress", "nope")).toBe("red silk dress");
+  });
+});
+
+describe("uncensored character strength", () => {
+  it("clamps to the identity-vs-scene window", () => {
+    expect(clampCharacterStrength(undefined)).toBe(DEFAULT_CHARACTER_STRENGTH);
+    expect(clampCharacterStrength(0.1)).toBe(0.25);
+    expect(clampCharacterStrength(0.9)).toBe(0.7);
+    expect(clampCharacterStrength(0.5)).toBe(0.5);
+  });
+});
+
+describe("uncensored aspect from size", () => {
+  it("round-trips studio sizes and falls back to portrait", () => {
+    expect(getUncensoredAspectFromSize(832, 1216)).toBe("portrait");
+    expect(getUncensoredAspectFromSize(1024, 1024)).toBe("square");
+    expect(getUncensoredAspectFromSize(1, 1)).toBe("portrait");
+  });
+});
+
+describe("uncensored video motion", () => {
+  it("appends a known motion and ignores unknown ids", () => {
+    expect(UNCENSORED_VIDEO_MOTIONS.length).toBeGreaterThanOrEqual(6);
+    const out = applyUncensoredVideoMotion("natural motion", "hair");
+    expect(out).toMatch(/hair blowing/i);
+    expect(applyUncensoredVideoMotion("natural motion", "teleport")).toBe("natural motion");
   });
 });
 

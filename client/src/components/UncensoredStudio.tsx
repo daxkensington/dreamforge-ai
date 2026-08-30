@@ -24,6 +24,7 @@ const TABS: { id: Tab; label: string }[] = [
 export default function UncensoredStudio({ until }: { until: Date | string | null }) {
   const [tab, setTab] = useState<Tab>("create");
   const [focusId, setFocusId] = useState<number | null>(null);
+  const [recreateId, setRecreateId] = useState<number | null>(null);
 
   const go = (next: Tab, id?: number) => {
     if (typeof id === "number") setFocusId(id);
@@ -56,6 +57,7 @@ export default function UncensoredStudio({ until }: { until: Date | string | nul
         {tab === "create" && (
           <UncensoredImageStudio
             focusCharacterId={focusId}
+            recreateId={recreateId}
             onRefine={(id) => go("refine", id)}
             onInpaint={(id) => go("inpaint", id)}
             onAnimate={(id) => go("video", id)}
@@ -69,7 +71,15 @@ export default function UncensoredStudio({ until }: { until: Date | string | nul
             onRefine={(id) => go("refine", id)}
             onInpaint={(id) => go("inpaint", id)}
             onAnimate={(id) => go("video", id)}
-            onUseCharacter={(id) => go("create", id)}
+            onUseCharacter={(id) => {
+              setRecreateId(null);
+              go("create", id);
+            }}
+            onRecreate={(id) => {
+              setFocusId(null);
+              setRecreateId(id);
+              setTab("create");
+            }}
           />
         )}
       </div>
