@@ -469,6 +469,51 @@ describe("uncensored.generateVideo — duration", () => {
     expect(state.created[0].metadata.motion).toBe("hair");
   });
 
+  it("locks image-to-video to the source identity", async () => {
+    withActivePass();
+    state.generation = ownUncensoredImage();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_i2v" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "hair blowing in the wind",
+      mode: "i2v",
+      sourceGenerationId: 42,
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringMatching(/first frame/i),
+        sourceImageUrl: "https://dreamforgex.ai/img/generations/src.png",
+      }),
+    );
+  });
+
+  it("renders HD portrait at 720p", async () => {
+    withActivePass();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_hd" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "slow turn toward camera",
+      quality: "hd",
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 720, height: 1280 }),
+    );
+    expect(state.created[0].width).toBe(720);
+    expect(state.debited).toBe(120);
+  });
+
+  it("passes ~10s as 121 frames at 12fps", async () => {
+    withActivePass();
+    vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_10" });
+    await uncensoredRouter.createCaller(ctx()).generateVideo({
+      prompt: "slow turn toward camera",
+      duration: "10s",
+    });
+    expect(submitUncensoredVideoJob).toHaveBeenCalledWith(
+      expect.objectContaining({ numFrames: 121, fps: 12 }),
+    );
+    expect(state.created[0].duration).toBe(10);
+    expect(state.debited).toBe(75);
+  });
+
   it("passes a seed through to Wan", async () => {
     withActivePass();
     vi.mocked(submitUncensoredVideoJob).mockResolvedValue({ jobId: "job_3" });

@@ -30,6 +30,7 @@ export interface UncensoredVideoParams {
   numFrames?: number;
   fps?: number;
   seed?: number;
+  negativePrompt?: string;
   /** Optional Wan NSFW LoRA (HF repo id or .safetensors URL). */
   loraId?: string;
   /** "fast" = 5B TI2V (~90s), "hd" = 14B A14B top quality (~2-4min on 80GB). */
@@ -100,6 +101,7 @@ export async function submitUncensoredVideoJob(
     numFrames: params.numFrames,
     fps: params.fps,
     seed: params.seed,
+    negativePrompt: params.negativePrompt,
     loraId: params.loraId,
     tier: params.tier,
   });

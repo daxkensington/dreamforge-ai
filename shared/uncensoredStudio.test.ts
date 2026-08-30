@@ -6,6 +6,9 @@ import {
   applyUncensoredWardrobe,
   applyUncensoredSetting,
   applyUncensoredVideoMotion,
+  applyUncensoredI2vIdentity,
+  applyUncensoredVideoIntensity,
+  getUncensoredVideoSize,
   formatUncensoredRecipe,
   getUncensoredPose,
   getUncensoredVideoDuration,
@@ -133,5 +136,33 @@ describe("uncensored video duration", () => {
     expect(uncensoredVideoCredits(50, "5s")).toBe(50);
     expect(uncensoredVideoCredits(50, "8s")).toBe(75);
     expect(UNCENSORED_VIDEO_DURATIONS.every((d) => (d.numFrames - 1) % 4 === 0)).toBe(true);
+  });
+
+  it("offers a ~10s option within Wan's 121-frame cap", () => {
+    const ten = getUncensoredVideoDuration("10s");
+    expect(ten.seconds).toBe(10);
+    expect(ten.numFrames).toBe(121);
+    expect(ten.fps).toBe(12);
+    expect(uncensoredVideoCredits(50, "10s")).toBe(75);
+  });
+});
+
+describe("uncensored I2V identity and HD size", () => {
+  it("locks I2V to the first-frame identity", () => {
+    const out = applyUncensoredI2vIdentity("hair blowing", true);
+    expect(out).toMatch(/first frame/i);
+    expect(out).toMatch(/same face/i);
+    expect(applyUncensoredI2vIdentity("hair blowing", false)).toBe("hair blowing");
+  });
+
+  it("uses 720p for HD portrait", () => {
+    expect(getUncensoredVideoSize("portrait", "fast")).toEqual({ w: 480, h: 832 });
+    expect(getUncensoredVideoSize("portrait", "hd")).toEqual({ w: 720, h: 1280 });
+  });
+
+  it("applies intensity without replacing the motion prompt", () => {
+    const out = applyUncensoredVideoIntensity("natural motion", "energetic");
+    expect(out.startsWith("natural motion")).toBe(true);
+    expect(out).toMatch(/energetic/i);
   });
 });

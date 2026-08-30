@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon } from "lucide-react";
+import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import {
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_VIDEO_INTENSITIES,
   DEFAULT_UNCENSORED_VIDEO_DURATION,
+  DEFAULT_UNCENSORED_VIDEO_INTENSITY,
   uncensoredVideoCredits,
 } from "@shared/uncensoredStudio";
 
@@ -34,7 +36,7 @@ export default function UncensoredVideoStudio({
 }: {
   focusGenerationId?: number | null;
 } = {}) {
-  const [mode, setMode] = useState<Mode>(focusGenerationId ? "i2v" : "t2v");
+  const [mode, setMode] = useState<Mode>("i2v");
   const [quality, setQuality] = useState<"fast" | "hd">("fast");
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState<Aspect>("portrait");
@@ -42,9 +44,14 @@ export default function UncensoredVideoStudio({
     DEFAULT_UNCENSORED_VIDEO_DURATION,
   );
   const [motion, setMotion] = useState<string | null>(null);
+  const [intensity, setIntensity] = useState<"subtle" | "natural" | "energetic">(
+    DEFAULT_UNCENSORED_VIDEO_INTENSITY,
+  );
+  const [negative, setNegative] = useState("");
   const [seed, setSeed] = useState("");
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [resultSeed, setResultSeed] = useState<number | null>(null);
 
   useEffect(() => {
     if (focusGenerationId) {
@@ -91,6 +98,7 @@ export default function UncensoredVideoStudio({
     if (!data || pendingId == null) return;
     if (data.status === "completed" && data.url) {
       setVideoUrl(data.url);
+      setResultSeed(typeof data.seed === "number" ? data.seed : null);
       setPendingId(null);
       toast.success("Video ready.");
     } else if (data.status === "failed") {
@@ -113,6 +121,7 @@ export default function UncensoredVideoStudio({
       return;
     }
     setVideoUrl(null);
+    setResultSeed(null);
     gen.mutate({
       prompt: prompt.trim() || "natural motion",
       mode,
@@ -120,6 +129,8 @@ export default function UncensoredVideoStudio({
       aspect,
       duration,
       motion: motion ?? undefined,
+      intensity,
+      negativePrompt: negative.trim() || undefined,
       seed: (() => {
         const n = Number(seed);
         return Number.isInteger(n) && n >= 0 ? n : undefined;
@@ -150,22 +161,25 @@ export default function UncensoredVideoStudio({
         <h2 className="text-lg font-semibold">Uncensored video</h2>
         <span className="ml-auto text-xs text-muted-foreground">{duration} clip · {cost} credits</span>
       </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Animate one of your images — same person, moving. Or start from text. Wan 2.2 on our GPUs; nothing else will render this.
+      </p>
 
-      {/* Mode toggle */}
+      {/* Mode toggle — I2V first: that's the clip buyers actually want */}
       <div className="mt-4 inline-flex rounded-lg border border-border/60 p-1">
-        <button
-          type="button"
-          onClick={() => setMode("t2v")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${mode === "t2v" ? "bg-rose-500/15 text-rose-300" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          <Wand2 className="h-3.5 w-3.5" /> Text to video
-        </button>
         <button
           type="button"
           onClick={() => setMode("i2v")}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${mode === "i2v" ? "bg-rose-500/15 text-rose-300" : "text-muted-foreground hover:text-foreground"}`}
         >
           <ImageIcon className="h-3.5 w-3.5" /> Animate an image
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("t2v")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${mode === "t2v" ? "bg-rose-500/15 text-rose-300" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <Wand2 className="h-3.5 w-3.5" /> Text to video
         </button>
       </div>
 
@@ -264,12 +278,31 @@ export default function UncensoredVideoStudio({
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Intensity:</span>
+        {UNCENSORED_VIDEO_INTENSITIES.map((i) => (
+          <button
+            key={i.id}
+            type="button"
+            onClick={() => setIntensity(i.id as "subtle" | "natural" | "energetic")}
+            disabled={isBusy}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+              intensity === i.id
+                ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+            }`}
+          >
+            {i.label}
+          </button>
+        ))}
+      </div>
+
       {/* Quality tier */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Quality:</span>
         {([
           { id: "fast", label: "Fast", note: "~90s" },
-          { id: "hd", label: "HD · Top quality", note: "~2-4 min" },
+          { id: "hd", label: "HD · 720p", note: "~2-4 min" },
         ] as const).map((q) => (
           <button
             key={q.id}
@@ -313,14 +346,26 @@ export default function UncensoredVideoStudio({
         ))}
       </div>
 
-      <div className="mt-3 max-w-xs">
-        <p className="text-xs text-muted-foreground mb-1">Seed (blank = random)</p>
-        <Input
-          value={seed}
-          onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
-          placeholder="reproducible seed"
-          disabled={isBusy}
-        />
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Seed (blank = random)</p>
+          <Input
+            value={seed}
+            onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+            placeholder="reproducible seed"
+            disabled={isBusy}
+          />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Negative (optional)</p>
+          <Input
+            value={negative}
+            onChange={(e) => setNegative(e.target.value.slice(0, 500))}
+            placeholder="morphing face, extra limbs…"
+            maxLength={500}
+            disabled={isBusy}
+          />
+        </div>
       </div>
 
       <Button
@@ -339,6 +384,26 @@ export default function UncensoredVideoStudio({
         <div className="mt-5">
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <video src={videoUrl} controls autoPlay loop className="mx-auto max-h-[520px] w-full rounded-xl border border-border/60 bg-black" />
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href={videoUrl} download target="_blank" rel="noopener noreferrer">
+                <Download className="mr-1 h-3.5 w-3.5" /> Download
+              </a>
+            </Button>
+            {resultSeed != null && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSeed(String(resultSeed));
+                  toast.info(`Seed ${resultSeed} locked for the next clip.`);
+                }}
+              >
+                Reuse seed {resultSeed}
+              </Button>
+            )}
+          </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">Private to your account. Uncensored generations never enter the public gallery.</p>
         </div>
       )}

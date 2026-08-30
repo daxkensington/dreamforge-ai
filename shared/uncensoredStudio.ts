@@ -380,6 +380,26 @@ export const UNCENSORED_VIDEO_MOTIONS: UncensoredVideoMotion[] = [
     promptSuffix: "slow turn toward camera, natural motion",
   },
   {
+    id: "sway",
+    label: "Sway",
+    promptSuffix: "slow body sway, weight shifting, natural hips",
+  },
+  {
+    id: "lean",
+    label: "Lean in",
+    promptSuffix: "leans toward camera, intimate approach",
+  },
+  {
+    id: "approach",
+    label: "Walk in",
+    promptSuffix: "walks toward camera, closing the distance, smooth gait",
+  },
+  {
+    id: "still",
+    label: "Mostly still",
+    promptSuffix: "subject mostly still, only breathing and slight hair movement",
+  },
+  {
     id: "hair",
     label: "Hair in wind",
     promptSuffix: "hair blowing in the wind, subtle body movement",
@@ -424,6 +444,81 @@ export function getUncensoredVideoMotion(id: string | null | undefined): Uncenso
 export function applyUncensoredVideoMotion(prompt: string, motionId: string | null | undefined): string {
   const motion = getUncensoredVideoMotion(motionId);
   return motion ? `${prompt}. ${motion.promptSuffix}` : prompt;
+}
+
+export interface UncensoredVideoIntensity {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+export const UNCENSORED_VIDEO_INTENSITIES: UncensoredVideoIntensity[] = [
+  {
+    id: "subtle",
+    label: "Subtle",
+    promptSuffix: "very subtle motion, almost still, only breathing and micro-movements",
+  },
+  {
+    id: "natural",
+    label: "Natural",
+    promptSuffix: "natural moderate motion, smooth and continuous",
+  },
+  {
+    id: "energetic",
+    label: "Energetic",
+    promptSuffix: "strong dynamic motion, energetic, continuous movement",
+  },
+];
+
+export const DEFAULT_UNCENSORED_VIDEO_INTENSITY = "natural";
+
+export function getUncensoredVideoIntensity(id: string | null | undefined): UncensoredVideoIntensity {
+  return (
+    UNCENSORED_VIDEO_INTENSITIES.find((i) => i.id === id) ??
+    UNCENSORED_VIDEO_INTENSITIES.find((i) => i.id === DEFAULT_UNCENSORED_VIDEO_INTENSITY)!
+  );
+}
+
+export function applyUncensoredVideoIntensity(prompt: string, intensityId: string | null | undefined): string {
+  const intensity = getUncensoredVideoIntensity(intensityId);
+  return `${prompt}. ${intensity.promptSuffix}`;
+}
+
+/** I2V must lock to the source frame or the clip drifts off the character. */
+export const UNCENSORED_I2V_IDENTITY =
+  "Animate the person in the first frame. Keep the same face, same body, same identity throughout the clip";
+
+export function applyUncensoredI2vIdentity(prompt: string, isI2v: boolean): string {
+  return isI2v ? `${UNCENSORED_I2V_IDENTITY}. ${prompt}` : prompt;
+}
+
+export const DEFAULT_UNCENSORED_VIDEO_NEGATIVE =
+  "blurry, low quality, distorted, deformed, extra limbs, extra fingers, morphing face, identity change, watermark, text";
+
+export type UncensoredVideoAspect = "portrait" | "landscape" | "square";
+export type UncensoredVideoQuality = "fast" | "hd";
+
+export const UNCENSORED_VIDEO_SIZES: Record<
+  UncensoredVideoQuality,
+  Record<UncensoredVideoAspect, { w: number; h: number }>
+> = {
+  fast: {
+    portrait: { w: 480, h: 832 },
+    landscape: { w: 832, h: 480 },
+    square: { w: 640, h: 640 },
+  },
+  hd: {
+    portrait: { w: 720, h: 1280 },
+    landscape: { w: 1280, h: 720 },
+    square: { w: 768, h: 768 },
+  },
+};
+
+export function getUncensoredVideoSize(
+  aspect: UncensoredVideoAspect,
+  quality: UncensoredVideoQuality,
+): { w: number; h: number } {
+  return UNCENSORED_VIDEO_SIZES[quality][aspect];
 }
 
 export const DEFAULT_CHARACTER_STRENGTH = 0.45;
@@ -502,7 +597,7 @@ export const UNCENSORED_SHEET_VIEWS: UncensoredSheetView[] = [
 
 export type UncensoredClothType = "upper" | "lower" | "overall";
 
-export type UncensoredVideoDurationId = "5s" | "8s";
+export type UncensoredVideoDurationId = "5s" | "8s" | "10s";
 
 export interface UncensoredVideoDuration {
   id: UncensoredVideoDurationId;
@@ -519,6 +614,8 @@ export interface UncensoredVideoDuration {
 export const UNCENSORED_VIDEO_DURATIONS: UncensoredVideoDuration[] = [
   { id: "5s", label: "~5s", seconds: 5, numFrames: 81, fps: 16, creditMul: 1 },
   { id: "8s", label: "~8s", seconds: 8, numFrames: 121, fps: 16, creditMul: 1.5 },
+  /** Same 121 frames as 8s, 12fps — longest Wan will go on this worker. */
+  { id: "10s", label: "~10s", seconds: 10, numFrames: 121, fps: 12, creditMul: 1.5 },
 ];
 
 export const DEFAULT_UNCENSORED_VIDEO_DURATION: UncensoredVideoDurationId = "5s";

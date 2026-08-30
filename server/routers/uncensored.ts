@@ -28,6 +28,7 @@ import {
   UNCENSORED_SETTINGS,
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_VIDEO_INTENSITIES,
   UNCENSORED_SHEET_VIEWS,
   UNCENSORED_CHARACTER_LIMIT,
   DEFAULT_UNCENSORED_NEGATIVE,
@@ -38,9 +39,13 @@ import {
   applyUncensoredWardrobe,
   applyUncensoredSetting,
   applyUncensoredVideoMotion,
+  applyUncensoredVideoIntensity,
+  applyUncensoredI2vIdentity,
   clampCharacterStrength,
   getUncensoredAspect,
   getUncensoredVideoDuration,
+  getUncensoredVideoSize,
+  DEFAULT_UNCENSORED_VIDEO_NEGATIVE,
   uncensoredVideoCredits,
   uncensoredCharacterRef,
   isUncensoredCharacter,
@@ -71,12 +76,6 @@ const UNCENSORED_VIDEO_COST = {
 // Refining costs a full generation on the GPU (same 20-step Flux pass), so it
 // is priced like a quality image rather than as a cheap tweak.
 const UNCENSORED_REFINE_COST = 10;
-
-const VIDEO_ASPECTS = {
-  portrait: { w: 480, h: 832 },
-  landscape: { w: 832, h: 480 },
-  square: { w: 640, h: 640 },
-} as const;
 
 // Free uncensored previews — the conversion hook. Lifetime cap per user
 // (tracked via generation metadata, no schema change) + a global daily cap so
@@ -262,6 +261,7 @@ export const uncensoredRouter = router({
       settings: UNCENSORED_SETTINGS,
       videoDurations: UNCENSORED_VIDEO_DURATIONS,
       videoMotions: UNCENSORED_VIDEO_MOTIONS,
+      videoIntensities: UNCENSORED_VIDEO_INTENSITIES,
     };
   }),
 
@@ -480,8 +480,10 @@ export const uncensoredRouter = router({
         quality: z.enum(["fast", "hd"]).default("fast"),
         sourceGenerationId: z.number().int().positive().optional(),
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
-        duration: z.enum(["5s", "8s"]).default("5s" as const),
+        duration: z.enum(["5s", "8s", "10s"]).default("5s" as const),
         motion: z.string().max(32).optional(),
+        intensity: z.enum(["subtle", "natural", "energetic"]).default("natural"),
+        negativePrompt: z.string().max(500).optional(),
         seed: z.number().int().min(0).max(2_147_483_647).optional(),
       }),
     )
@@ -519,17 +521,20 @@ export const uncensoredRouter = router({
 
       const duration = getUncensoredVideoDuration(input.duration);
       const cost = uncensoredVideoCredits(UNCENSORED_VIDEO_COST[input.quality][input.mode], duration.id);
-      const gpuPrompt = applyUncensoredVideoMotion(input.prompt, input.motion);
+      let gpuPrompt = applyUncensoredI2vIdentity(input.prompt, input.mode === "i2v");
+      gpuPrompt = applyUncensoredVideoMotion(gpuPrompt, input.motion);
+      gpuPrompt = applyUncensoredVideoIntensity(gpuPrompt, input.intensity);
+      const negative = [DEFAULT_UNCENSORED_VIDEO_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"} ${duration.label}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id });
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
 
-      const dims = VIDEO_ASPECTS[input.aspect];
+      const dims = getUncensoredVideoSize(input.aspect, input.quality);
       const genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
-        negativePrompt: null,
+        negativePrompt: input.negativePrompt ?? null,
         mediaType: "video",
         width: dims.w,
         height: dims.h,
@@ -539,7 +544,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, seed: input.seed ?? null, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -554,11 +559,12 @@ export const uncensoredRouter = router({
           numFrames: duration.numFrames,
           fps: duration.fps,
           seed: input.seed,
+          negativePrompt: negative,
           tier: input.quality,
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, seed: input.seed ?? null, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -584,12 +590,15 @@ export const uncensoredRouter = router({
       if (!gen || gen.userId !== ctx.user.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Generation not found." });
       }
-      if (gen.status === "completed") return { status: "completed" as const, url: gen.imageUrl };
-      if (gen.status === "failed") return { status: "failed" as const, url: null };
+      if (gen.status === "completed") {
+        const doneMeta = (gen.metadata as any) ?? {};
+        return { status: "completed" as const, url: gen.imageUrl, seed: typeof doneMeta.seed === "number" ? doneMeta.seed : null };
+      }
+      if (gen.status === "failed") return { status: "failed" as const, url: null, seed: null };
 
       const meta = (gen.metadata as any) ?? {};
       const jobId: string | undefined = meta.runpodJobId;
-      if (!jobId) return { status: "processing" as const, url: null }; // submit not yet recorded
+      if (!jobId) return { status: "processing" as const, url: null, seed: null }; // submit not yet recorded
 
       const result = await collectUncensoredVideoJob(jobId);
       const db = await requireDb();
@@ -601,7 +610,8 @@ export const uncensoredRouter = router({
           .update(generations)
           .set({ status: "completed", imageUrl: result.url, fileKey: result.key })
           .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
-        return { status: "completed" as const, url: result.url };
+        const doneMeta = (gen.metadata as any) ?? {};
+        return { status: "completed" as const, url: result.url, seed: typeof doneMeta.seed === "number" ? doneMeta.seed : null };
       }
       if (result.status === "failed") {
         const claimed = await db
@@ -613,9 +623,9 @@ export const uncensoredRouter = router({
           await refundCredits(ctx.user.id, Number(meta.cost) || 0, "Uncensored video generation failed");
           await logToolFailure({ toolId: "uncensored-video", errorMessage: result.error, userId: ctx.user.id });
         }
-        return { status: "failed" as const, url: null };
+        return { status: "failed" as const, url: null, seed: null };
       }
-      return { status: "processing" as const, url: null };
+      return { status: "processing" as const, url: null, seed: null };
     }),
 
   /**
