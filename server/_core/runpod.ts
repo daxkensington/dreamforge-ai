@@ -422,7 +422,14 @@ export async function runpodSubmit(input: RunPodInput, opts: RunPodRunOpts = {})
 export interface RunPodJobState {
   status: RunPodRunResponse["status"];
   videoB64?: string;
+  imageB64?: string;
+  imageUrl?: string;
   error?: string;
+}
+
+/** Endpoint id used for Flux image jobs (exported for async status polling). */
+export function getImageEndpointId(): string {
+  return ENV.runpodFluxEndpointId;
 }
 
 /** Poll a submitted job's status. Transient HTTP errors read as still-running. */
@@ -439,7 +446,16 @@ export async function runpodJobStatus(jobId: string, endpointId?: string): Promi
   }
   if (!res.ok) return { status: "IN_PROGRESS" };
   const s = (await res.json()) as RunPodRunResponse;
-  return { status: s.status, videoB64: s.output?.video_b64, error: s.error };
+  // The worker reports its own exceptions as a COMPLETED job whose output is
+  // `{ error }` — surface that as the error so callers don't read "no output".
+  const outputError = (s.output as { error?: string } | undefined)?.error;
+  return {
+    status: s.status,
+    videoB64: s.output?.video_b64,
+    imageB64: s.output?.image_b64,
+    imageUrl: s.output?.image_url,
+    error: s.error ?? outputError,
+  };
 }
 
 /** Submit a Wan video job (T2V or I2V) and return the job id (no wait). */

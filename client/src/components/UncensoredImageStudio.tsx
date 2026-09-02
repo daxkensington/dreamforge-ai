@@ -31,6 +31,12 @@ import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredS
  * own generations. This is the product pass-holders came for — not a toggle
  * buried in the SFW workspace.
  */
+function newRequestId(): string {
+  const c = typeof crypto !== "undefined" ? crypto : null;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID().replace(/-/g, "");
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export default function UncensoredImageStudio({
   focusCharacterId,
   recreateId,
@@ -216,6 +222,9 @@ export default function UncensoredImageStudio({
       seed: parsedSeed,
       characterGenerationId: characterId ?? undefined,
       savedCharacterId: savedCharacterId ?? undefined,
+      // Per-click idempotency key: a multi-minute render can be re-sent at
+      // the transport layer, and without this the retry debited + rendered again.
+      requestId: newRequestId(),
     });
   };
 

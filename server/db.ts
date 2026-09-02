@@ -162,6 +162,25 @@ export async function updateGeneration(
   await db.update(generations).set(data).where(eq(generations.id, id));
 }
 
+/**
+ * Generations a user created under one client requestId, oldest first.
+ *
+ * The requestId is minted in the browser per click and travels in the POST
+ * body, so a transport-level retry of the same click carries the same id.
+ * Looking it up BEFORE creating rows / debiting credits / submitting GPU work
+ * is what turns a retry into "return what the first attempt made" instead of
+ * a second charge and a second job (see routers/uncensored.ts).
+ */
+export async function findGenerationsByRequestId(userId: number, requestId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(generations)
+    .where(and(eq(generations.userId, userId), sql`${generations.metadata}->>'requestId' = ${requestId}`))
+    .orderBy(asc(generations.id));
+}
+
 export async function getGenerationById(id: number) {
   const db = await getDb();
   if (!db) return undefined;

@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getDb, createGeneration, updateGeneration, getGenerationById } from "../db";
+import { getDb, createGeneration, updateGeneration, getGenerationById, findGenerationsByRequestId } from "../db";
 import { users, cryptoInvoices, generations, characters } from "../../drizzle/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createUncensoredInvoice, isBtcpayConfigured, UNCENSORED_PLAN, UNCENSORED_PLANS, getUncensoredPlanById } from "../_core/btcpay";
@@ -55,10 +55,11 @@ import {
 } from "../../shared/uncensoredStudio";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
+import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfilteredImageJob } from "../_core/imageGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable, runpodUpscale, runpodRemoveBackground, runpodTryOn } from "../_core/runpod";
-import { deductCredits, refundCredits } from "../stripe";
+import { deductCredits, refundCredits, getOrCreateBalance } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
 
@@ -91,8 +92,45 @@ async function countFreeUncensored(userId: number): Promise<number> {
   const rows = await db
     .select({ c: sql<number>`count(*)::int` })
     .from(generations)
-    .where(and(eq(generations.userId, userId), sql`${generations.metadata}->>'free' = 'true'`));
+    .where(
+      and(
+        eq(generations.userId, userId),
+        sql`${generations.metadata}->>'free' = 'true'`,
+        // A preview that failed on OUR side never showed the user anything —
+        // it must not spend one of their three lifetime tastes.
+        sql`${generations.status} <> 'failed'`,
+      ),
+    );
   return Number(rows[0]?.c ?? 0);
+}
+
+/**
+ * Client-minted idempotency key. Optional so older bundles keep working, but
+ * every current caller sends one: it is what lets a transport-level retry of
+ * the same click return the first attempt's result instead of re-running it.
+ */
+const requestIdSchema = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/).optional();
+
+type FreePreviewStatus = "processing" | "completed" | "failed";
+
+function freePreviewStatusOf(gen: { status: string }): FreePreviewStatus {
+  if (gen.status === "completed") return "completed";
+  if (gen.status === "failed") return "failed";
+  return "processing";
+}
+
+/**
+ * Wait for the rows a previous attempt of the same click created to leave
+ * "generating" (the first invocation is still rendering them in its own
+ * function). Bounded well under the route's maxDuration.
+ */
+async function awaitRequestSettled(userId: number, requestId: string, maxMs = 240_000) {
+  const started = Date.now();
+  for (;;) {
+    const rows = await findGenerationsByRequestId(userId, requestId);
+    if (!rows.some((r) => r.status === "generating") || Date.now() - started > maxMs) return rows;
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
 }
 
 async function requireDb() {
@@ -294,6 +332,7 @@ export const uncensoredRouter = router({
         characterStrength: z.number().min(0.25).max(0.7).optional(),
         characterGenerationId: z.number().int().positive().optional(),
         savedCharacterId: z.number().int().positive().optional(),
+        requestId: requestIdSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -308,6 +347,35 @@ export const uncensoredRouter = router({
           code: "FORBIDDEN",
           message: "An active Uncensored Pass is required. Grab a pass to unlock the studio.",
         });
+      }
+
+      // A retried click (same requestId) must never debit or render again:
+      // hand back what the first attempt made, waiting for it if it's still
+      // rendering. Multi-minute renders get re-sent at the transport layer
+      // and this was double-charging paying users.
+      if (input.requestId) {
+        const prior = await findGenerationsByRequestId(ctx.user.id, input.requestId);
+        if (prior.length) {
+          const rows = await awaitRequestSettled(ctx.user.id, input.requestId);
+          const done = rows.filter((r) => r.status === "completed" && r.imageUrl);
+          if (done.length === 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Generation failed — your credits were returned. Please try again.",
+            });
+          }
+          const unit = Number((done[0].metadata as any)?.cost) || 0;
+          const bal = await getOrCreateBalance(ctx.user.id);
+          return {
+            images: done.map((r) => ({
+              generationId: r.id,
+              url: r.imageUrl as string,
+              seed: typeof (r.metadata as any)?.seed === "number" ? ((r.metadata as any).seed as number) : null,
+            })),
+            cost: unit * done.length,
+            creditsRemaining: bal.balance,
+          };
+        }
       }
 
       const verdict = checkPrompt(input.prompt, {
@@ -412,6 +480,7 @@ export const uncensoredRouter = router({
             character: !!characterUrl,
             characterStrength,
             savedCharacterId,
+            requestId: input.requestId ?? null,
           },
         });
 
@@ -1211,13 +1280,21 @@ export const uncensoredRouter = router({
    * Free uncensored preview — the conversion hook. Age-gated, watermarked,
    * private, capped at FREE_UNCENSORED_LIMIT lifetime per user with a global
    * daily cost cap. Every prompt passes the strict moderation gate (and the
-   * generateUnfiltered backstop) before any GPU call.
+   * submit backstop) before any GPU call.
+   *
+   * ASYNC: submits the GPU job and returns `{ generationId, status:
+   * "processing" }`; the client polls `freeStatus`. This used to await the
+   * whole render inside one request — measured 237s on prod, during which the
+   * connection was silently re-sent and the same prompt ran twice, burning two
+   * of the three lifetime previews. `requestId` makes that retry return the
+   * first attempt instead.
    */
   freeGenerate: protectedProcedure
     .input(z.object({
       prompt: z.string().min(3).max(1000),
       style: z.string().max(32).optional(),
       aspect: z.string().max(16).optional(),
+      requestId: requestIdSchema,
     }))
     .mutation(async ({ ctx, input }) => {
       await requireToolActive("text-to-image");
@@ -1228,6 +1305,21 @@ export const uncensoredRouter = router({
       }
       if (!ent.ageConfirmed) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+
+      // Idempotency FIRST — before moderation, rate limits and the quota —
+      // so a retried click can never be charged a second preview.
+      if (input.requestId) {
+        const [existing] = await findGenerationsByRequestId(ctx.user.id, input.requestId);
+        if (existing) {
+          const used = await countFreeUncensored(ctx.user.id);
+          return {
+            generationId: existing.id,
+            status: freePreviewStatusOf(existing),
+            url: existing.status === "completed" ? existing.imageUrl : null,
+            remaining: Math.max(0, FREE_UNCENSORED_LIMIT - used),
+          };
+        }
       }
 
       // Illegal-content refusal BEFORE any quota burn or GPU call.
@@ -1250,6 +1342,7 @@ export const uncensoredRouter = router({
       const enhancedPrompt = applyUncensoredStyle(input.prompt, input.style);
       const loraId = resolveUncensoredLora(input.style);
       const aspect = getUncensoredAspect(input.aspect);
+      const metadata = { uncensored: true, free: true, style: input.style ?? null, aspect: aspect.id, requestId: input.requestId ?? null };
       const genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
@@ -1260,9 +1353,30 @@ export const uncensoredRouter = router({
         duration: null,
         status: "generating",
         modelVersion: "uncensored-free",
-        metadata: { uncensored: true, free: true, style: input.style ?? null, aspect: aspect.id },
+        metadata,
       });
+      const remaining = Math.max(0, FREE_UNCENSORED_LIMIT - used - 1);
 
+      if (canSubmitUnfilteredImageJob()) {
+        try {
+          const { jobId } = await submitUnfilteredImageJob({
+            prompt: enhancedPrompt,
+            width: aspect.width,
+            height: aspect.height,
+            loraId,
+          });
+          await updateGeneration(genId, { metadata: { ...metadata, runpodJobId: jobId } });
+          return { generationId: genId, status: "processing" as FreePreviewStatus, url: null, remaining };
+        } catch (err: any) {
+          await updateGeneration(genId, { status: "failed" });
+          await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+          const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the preview — please try again.";
+          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        }
+      }
+
+      // No self-hosted GPU configured: the synchronous fallback chain (fal
+      // Schnell, safety checker off) is fast enough to answer inline.
       try {
         const { url } = await generateImage({
           prompt: enhancedPrompt,
@@ -1273,13 +1387,63 @@ export const uncensoredRouter = router({
           loraId,
         });
         await updateGeneration(genId, { status: "completed", imageUrl: url ?? null, thumbnailUrl: url ?? null });
-        return { url, remaining: Math.max(0, FREE_UNCENSORED_LIMIT - used - 1) };
+        return { generationId: genId, status: "completed" as FreePreviewStatus, url: url ?? null, remaining };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
         // PromptBlockedError from the backstop carries a userMessage.
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Generation failed — please try again.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
       }
+    }),
+
+  /**
+   * Poll a submitted free preview. Idempotent like videoStatus: the first poll
+   * that sees the GPU job COMPLETED watermarks + stores the PNG and atomically
+   * claims generating→completed; FAILED claims generating→failed (which also
+   * hands the preview back — failed rows don't count against the quota).
+   */
+  freeStatus: protectedProcedure
+    .input(z.object({ generationId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const gen = await getGenerationById(input.generationId);
+      const meta = (gen?.metadata as any) ?? {};
+      if (!gen || gen.userId !== ctx.user.id || meta.free !== true) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Preview not found." });
+      }
+      const remainingNow = async () => Math.max(0, FREE_UNCENSORED_LIMIT - (await countFreeUncensored(ctx.user.id)));
+
+      if (gen.status === "completed") {
+        return { status: "completed" as FreePreviewStatus, url: gen.imageUrl, remaining: await remainingNow() };
+      }
+      if (gen.status === "failed") {
+        return { status: "failed" as FreePreviewStatus, url: null, remaining: await remainingNow() };
+      }
+
+      const jobId: string | undefined = meta.runpodJobId;
+      if (!jobId) return { status: "processing" as FreePreviewStatus, url: null, remaining: await remainingNow() };
+
+      const result = await collectUnfilteredImageJob(jobId, { watermark: true });
+      const db = await requireDb();
+
+      if (result.status === "completed") {
+        await db
+          .update(generations)
+          .set({ status: "completed", imageUrl: result.url, thumbnailUrl: result.url, fileKey: result.key })
+          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
+        return { status: "completed" as FreePreviewStatus, url: result.url, remaining: await remainingNow() };
+      }
+      if (result.status === "failed") {
+        const claimed = await db
+          .update(generations)
+          .set({ status: "failed" })
+          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
+          .returning({ id: generations.id });
+        if (claimed.length) {
+          await logToolFailure({ toolId: "uncensored-free", errorMessage: result.error, userId: ctx.user.id });
+        }
+        return { status: "failed" as FreePreviewStatus, url: null, remaining: await remainingNow() };
+      }
+      return { status: "processing" as FreePreviewStatus, url: null, remaining: await remainingNow() };
     }),
 
   /** One-time 18+ attestation. Required before purchase or generation. */

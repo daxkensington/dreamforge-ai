@@ -30,6 +30,33 @@ import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensore
 // Shared ladder (shared/uncensoredPlans.ts) — same IDs/prices the server bills.
 const FALLBACK_PLANS = UNCENSORED_PLANS;
 
+/** Per-click idempotency key — a transport retry re-sends the same body. */
+function newRequestId(): string {
+  const c = typeof crypto !== "undefined" ? crypto : null;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID().replace(/-/g, "");
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * Honest wait copy. Render time is dominated by the GPU waking up; the visitor
+ * used to watch a bare spinner with no idea whether a minute was normal, and
+ * the ones who gave up never saw the image the job still produced.
+ */
+function FreeRenderHint({ startedAt }: { startedAt: number | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const secs = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+  return (
+    <p className="mt-2 text-center text-xs text-muted-foreground" aria-live="polite">
+      Rendering on our own GPU · {secs}s. Usually under a minute; a couple of minutes if the GPU is waking up.
+      Keep this tab open — it appears here as soon as it&apos;s done.
+    </p>
+  );
+}
+
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState("uncensored-30d");
@@ -93,14 +120,58 @@ export default function Uncensored() {
   const [freeStyle, setFreeStyle] = useState("realistic");
   const [freeAspect, setFreeAspect] = useState(DEFAULT_UNCENSORED_ASPECT);
   const [freeResultUrl, setFreeResultUrl] = useState<string | null>(null);
+  // The preview renders on our own GPU as a background job: the click returns
+  // a generationId in ~1s and we poll freeStatus until it lands. Holding one
+  // request open for the whole render (up to minutes) got silently re-sent
+  // by the browser and ran the same prompt twice — costing the visitor two of
+  // their three free previews for one click.
+  const [pendingFreeId, setPendingFreeId] = useState<number | null>(null);
+  const [freeStartedAt, setFreeStartedAt] = useState<number | null>(null);
   const freeGen = trpc.uncensored.freeGenerate.useMutation({
     onSuccess: (data) => {
-      if (data.url) setFreeResultUrl(data.url);
-      refetch();
-      toast.success("Done — that's a free preview.");
+      if (data.status === "completed" && data.url) {
+        setFreeResultUrl(data.url);
+        setFreeStartedAt(null);
+        refetch();
+        toast.success("Done — that's a free preview.");
+        return;
+      }
+      if (data.status === "failed") {
+        setFreeStartedAt(null);
+        toast.error("Generation failed — please try again.");
+        return;
+      }
+      setPendingFreeId(data.generationId);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      setFreeStartedAt(null);
+      toast.error(e.message);
+    },
   });
+  const freeStatus = trpc.uncensored.freeStatus.useQuery(
+    { generationId: pendingFreeId ?? 0 },
+    {
+      enabled: pendingFreeId != null,
+      refetchInterval: (q) => (q.state.data && q.state.data.status !== "processing" ? false : 3000),
+      // react-query pauses intervals in hidden tabs by default; a visitor who
+      // tabs away mid-render would otherwise never see the result.
+      refetchIntervalInBackground: true,
+    },
+  );
+  useEffect(() => {
+    const d = freeStatus.data;
+    if (!d || pendingFreeId == null || d.status === "processing") return;
+    setPendingFreeId(null);
+    setFreeStartedAt(null);
+    refetch();
+    if (d.status === "completed" && d.url) {
+      setFreeResultUrl(d.url);
+      toast.success("Done — that's a free preview.");
+    } else {
+      toast.error("Generation failed — that preview wasn't counted. Please try again.");
+    }
+  }, [freeStatus.data, pendingFreeId, refetch]);
+  const freeBusy = freeGen.isPending || pendingFreeId != null;
 
   const plans = status?.plans ?? FALLBACK_PLANS;
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? plans[plans.length - 1];
@@ -168,7 +239,8 @@ export default function Uncensored() {
       return;
     }
     setFreeResultUrl(null);
-    freeGen.mutate({ prompt: p, style: freeStyle, aspect: freeAspect });
+    setFreeStartedAt(Date.now());
+    freeGen.mutate({ prompt: p, style: freeStyle, aspect: freeAspect, requestId: newRequestId() });
   };
 
   const handleStart = async () => {
@@ -253,7 +325,7 @@ export default function Uncensored() {
                     placeholder="Describe what you want to create…"
                     rows={3}
                     maxLength={1000}
-                    disabled={freeGen.isPending}
+                    disabled={freeBusy}
                     className="mt-3 resize-none"
                   />
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -263,7 +335,7 @@ export default function Uncensored() {
                         key={a.id}
                         type="button"
                         onClick={() => setFreeAspect(a.id)}
-                        disabled={freeGen.isPending}
+                        disabled={freeBusy}
                         className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeAspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
                       >
                         {a.label}
@@ -278,7 +350,7 @@ export default function Uncensored() {
                           key={s.id}
                           type="button"
                           onClick={() => setFreeStyle(s.id)}
-                          disabled={freeGen.isPending}
+                          disabled={freeBusy}
                           className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeStyle === s.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
                         >
                           {s.label}
@@ -288,15 +360,16 @@ export default function Uncensored() {
                   )}
                   <Button
                     onClick={handleFreeGenerate}
-                    disabled={freeGen.isPending || freePrompt.trim().length < 3}
+                    disabled={freeBusy || freePrompt.trim().length < 3}
                     className="mt-3 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
                   >
-                    {freeGen.isPending ? (
+                    {freeBusy ? (
                       <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating…</>
                     ) : (
                       <><Flame className="mr-2 h-5 w-5" /> Generate (free)</>
                     )}
                   </Button>
+                  {freeBusy && <FreeRenderHint startedAt={freeStartedAt} />}
                   {freeResultUrl && (
                     <div className="mt-4">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
