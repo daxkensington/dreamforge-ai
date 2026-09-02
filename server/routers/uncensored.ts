@@ -55,7 +55,7 @@ import {
 } from "../../shared/uncensoredStudio";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
-import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfilteredImageJob } from "../_core/imageGenerationUncensored";
+import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfilteredImageJob, warmUnfilteredImageWorker } from "../_core/imageGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable, runpodUpscale, runpodRemoveBackground, runpodTryOn } from "../_core/runpod";
@@ -736,6 +736,30 @@ export const uncensoredRouter = router({
    * a row a dead function orphaned gets failed + refunded instead of holding
    * the user's credits forever.
    */
+  /**
+   * Pre-load the image worker while the visitor is still typing. Gated on
+   * age confirmation (anonymous traffic and bots can't spin a GPU) and one
+   * warm-up per 3 minutes across all users — the second visitor in that
+   * window finds the worker already warm. Never throws: a warm-up that
+   * couldn't be sent just means the old wait, and the click still works.
+   */
+  warm: protectedProcedure.mutation(async ({ ctx }) => {
+    const ent = await getUncensoredEntitlement(ctx.user.id);
+    if (!ent.ageConfirmed) return { submitted: false };
+    try {
+      await enforceRateLimit("uncensored.warm:global", 1, 3 * 60_000);
+    } catch {
+      return { submitted: false };
+    }
+    try {
+      const submitted = await warmUnfilteredImageWorker(resolveUncensoredLora(undefined));
+      return { submitted };
+    } catch (err) {
+      console.warn("[uncensored.warm] warm-up not sent:", err instanceof Error ? err.message : err);
+      return { submitted: false };
+    }
+  }),
+
   pendingGenerations: protectedProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
     const rows = await db

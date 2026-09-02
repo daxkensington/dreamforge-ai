@@ -17,6 +17,7 @@ const RUNPOD_API_BASE = "https://api.runpod.ai/v2";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type RunPodTask =
+  | "warm"
   | "flux-dev"
   | "flux-schnell"
   | "flux-img2img"
@@ -67,6 +68,13 @@ export interface RunPodInput {
   fps?: number;
   /** Wan quality tier: "fast" = 5B TI2V, "hd" = 14B A14B */
   tier?: "fast" | "hd";
+  /**
+   * Base model for flux-img2img. The worker defaults to "dev"; the uncensored
+   * studio sends "schnell" so a refine shares the Schnell weights its
+   * text-to-image path already holds (two bases don't fit on a 48GB card) and
+   * so its Schnell realism LoRA lands on the base it was trained for.
+   */
+  model?: "dev" | "schnell";
 }
 
 interface RunPodRunResponse {
@@ -346,6 +354,7 @@ export async function runpodFluxImg2Img(
   guidanceScale: number = 7.5,
   loraId?: string,
   seed?: number,
+  model?: "dev" | "schnell",
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
@@ -355,6 +364,7 @@ export async function runpodFluxImg2Img(
       strength,
       num_inference_steps: steps,
       guidance_scale: guidanceScale,
+      ...(model ? { model } : {}),
       // handle_flux_img2img already loads a LoRA per request; the app just
       // never passed one, so uncensored refines lost the realism LoRA that
       // text-to-image gets.

@@ -51,6 +51,25 @@ All tasks use the same endpoint. Route via the `task` field:
 }
 ```
 
+### Image-to-Image
+```json
+{
+  "input": {
+    "task": "flux-img2img",
+    "image_b64": "<base64-encoded-image>",
+    "prompt": "same person, red evening dress, studio lighting",
+    "strength": 0.5,
+    "num_inference_steps": 10,
+    "model": "schnell",
+    "lora_id": "hugovntr/flux-schnell-realism::schnell-realism_v2.3.safetensors"
+  }
+}
+```
+`model` is `"dev"` (default) or `"schnell"`. The img2img pipe is built from the
+text-to-image pipe's components, so it shares the loaded weights: a worker holds
+ONE Flux base at a time (Dev and Schnell are ~34GB each in bf16 on 48GB cards), and
+asking for the other base unloads the first. Send the base your LoRA was trained for.
+
 ### Image Upscaling
 ```json
 {

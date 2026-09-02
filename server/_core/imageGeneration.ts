@@ -772,6 +772,9 @@ async function generateUnfiltered(
  * disable on this route, so a fallback would silently return a refusal or a
  * sanitised frame; failing loudly is better than a confusing half-result.
  */
+/** See refineUnfiltered / submitUnfilteredImageJob — one number, two rails. */
+export const UNCENSORED_IMG2IMG_STEPS = 10;
+
 export async function refineUnfiltered(
   imageB64: string,
   prompt: string,
@@ -797,7 +800,20 @@ export async function refineUnfiltered(
   // Clamp: below ~0.2 nothing visibly changes and the credit is wasted; at 1.0
   // the source is discarded entirely, which is just text-to-image.
   const strength = Math.min(Math.max(opts?.strength ?? 0.6, 0.2), 0.9);
-  return runpodFluxImg2Img(imageB64, prompt, strength, 20, 7.5, opts?.loraId, opts?.seed);
+  // Schnell, like the uncensored text-to-image path: the realism LoRA is a
+  // Schnell LoRA, and the worker can't hold Dev next to Schnell on 48GB.
+  // Img2img only runs the last strength×steps steps, so 10 total keeps ~4-6
+  // real denoising steps at the strengths the studio uses (0.4–0.6).
+  return runpodFluxImg2Img(
+    imageB64,
+    prompt,
+    strength,
+    UNCENSORED_IMG2IMG_STEPS,
+    0,
+    opts?.loraId,
+    opts?.seed,
+    "schnell",
+  );
 }
 
 /**

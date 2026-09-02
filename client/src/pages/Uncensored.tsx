@@ -154,6 +154,21 @@ export default function Uncensored() {
   const freeLimit = status?.freeLimit ?? 3;
   const freeRemaining = status ? status.freeRemaining : freeLimit;
 
+  // Warm the GPU worker the moment we know this visitor can render (pass
+  // holder, or a free preview left), so the ~1-2 minute weight load happens
+  // while they type instead of after they click. Once per page load; the
+  // server rate-limits it globally and never errors back.
+  const warm = trpc.uncensored.warm.useMutation();
+  const warmedRef = useRef(false);
+  useEffect(() => {
+    if (warmedRef.current || !isAuthed || !status) return;
+    if (!ageConfirmed) return;
+    if (!active && freeRemaining <= 0) return;
+    warmedRef.current = true;
+    warm.mutate(undefined, { onError: () => {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed, status, ageConfirmed, active, freeRemaining]);
+
   // Read the intent the sign-in round-trip carried back.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

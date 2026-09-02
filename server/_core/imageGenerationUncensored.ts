@@ -20,6 +20,7 @@
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodSubmit, runpodJobStatus, getImageEndpointId } from "./runpod";
 import { storagePut, generateStorageKey } from "../storage";
+import { UNCENSORED_IMG2IMG_STEPS } from "./imageGeneration";
 
 export interface UnfilteredImageJobParams {
   prompt: string;
@@ -79,8 +80,10 @@ export async function submitUnfilteredImageJob(params: UnfilteredImageJobParams)
         image_b64: params.imageB64,
         prompt: params.prompt,
         strength,
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
+        // Same base as the text path below: Schnell. Dev next to Schnell is
+        // two ~34GB models on a 48GB worker, and the realism LoRA is Schnell's.
+        model: "schnell",
+        num_inference_steps: UNCENSORED_IMG2IMG_STEPS,
         ...lora,
         ...seed,
       },
@@ -103,6 +106,28 @@ export async function submitUnfilteredImageJob(params: UnfilteredImageJobParams)
     { endpointId: getImageEndpointId() },
   );
   return { jobId };
+}
+
+/**
+ * Ask the image endpoint to load Flux Schnell (+ the style LoRA) now, without
+ * rendering anything, so the weight load overlaps the visitor typing a prompt.
+ *
+ * Measured 2026-09-03 on the live endpoint: a worker idle for 10 minutes took
+ * 129s to answer its next request and ~2s of that was inference; the same
+ * worker asked again 75s later answered in 8s. Nearly every first click of a
+ * session was paying the load. Fire-and-forget: the caller never waits.
+ */
+export async function warmUnfilteredImageWorker(loraId?: string): Promise<boolean> {
+  if (!canSubmitUnfilteredImageJob()) return false;
+  await runpodSubmit(
+    {
+      task: "warm",
+      model: "schnell",
+      ...(loraId ? { lora_id: loraId } : {}),
+    },
+    { endpointId: getImageEndpointId() },
+  );
+  return true;
 }
 
 /**

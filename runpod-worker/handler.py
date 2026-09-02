@@ -18,6 +18,7 @@ import torch
 import base64
 import io
 import os
+import gc
 import time
 import sys
 from PIL import Image
@@ -66,31 +67,49 @@ _wan_hd_t2v_pipe = None
 _wan_hd_i2v_pipe = None
 
 
+def _release_flux_pipes():
+    """Drop every Flux pipe and give the VRAM back BEFORE loading another base.
+
+    Dev and Schnell are each ~34GB in bf16, and the worker runs on 48GB cards.
+    Rebinding the global only drops the old pipe after the new one is already
+    on the GPU, which is exactly when there is no room for it.
+    """
+    global _flux_pipe, _flux_img2img_pipe
+    _flux_pipe = None
+    _flux_img2img_pipe = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def get_flux_pipe(model_type="dev"):
     """Load Flux.1 pipeline (Dev or Schnell)."""
     global _flux_pipe
     if _flux_pipe is None or _flux_pipe._model_type != model_type:
         from diffusers import FluxPipeline
 
+        _release_flux_pipes()
         model_id = (
             "black-forest-labs/FLUX.1-dev"
             if model_type == "dev"
             else "black-forest-labs/FLUX.1-schnell"
         )
         print(f"[DreamForge] Loading {model_id}...")
+        t0 = time.time()
         pipe = FluxPipeline.from_pretrained(
             model_id,
             torch_dtype=torch.bfloat16,
         )
         pipe.to("cuda")
+        print(f"[DreamForge] {model_id} on GPU in {time.time() - t0:.1f}s")
 
-        # Optimize with torch.compile for 30-50% speedup
-        if hasattr(torch, "compile"):
-            try:
-                pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead")
-                print("[DreamForge] torch.compile applied to transformer")
-            except Exception as e:
-                print(f"[DreamForge] torch.compile skipped: {e}")
+        # Deliberately NOT torch.compile'd. mode="reduce-overhead" captured a
+        # CUDA graph per input shape: measured 2026-09-02 on an A40, the first
+        # schnell request after a worker (re)start spent ~45s compiling and
+        # every new aspect ratio (the studio offers four) paid it again, to
+        # save well under a second on a 4-step render. Each LoRA fuse/unfuse
+        # also invalidated the graph. On a bursty serverless endpoint the
+        # capture cost dwarfs the per-image win.
 
         pipe._model_type = model_type
         _flux_pipe = pipe
@@ -98,22 +117,23 @@ def get_flux_pipe(model_type="dev"):
 
 
 def get_flux_img2img_pipe(model_type="dev"):
-    """Load Flux.1 img2img pipeline."""
+    """Load Flux.1 img2img pipeline, sharing weights with the text pipe.
+
+    Built from the text-to-image pipe's components rather than a second
+    from_pretrained: the two pipelines then hold ONE copy of the transformer,
+    text encoders and VAE, so a worker that already serves text-to-image can
+    take an img2img job without trying to fit a second ~34GB model next to the
+    first. It also means a LoRA fused for one path is fused for the other.
+    """
     global _flux_img2img_pipe
-    if _flux_img2img_pipe is None or getattr(_flux_img2img_pipe, "_model_type", None) != model_type:
+    if (
+        _flux_img2img_pipe is None
+        or getattr(_flux_img2img_pipe, "_model_type", None) != model_type
+    ):
         from diffusers import FluxImg2ImgPipeline
 
-        model_id = (
-            "black-forest-labs/FLUX.1-dev"
-            if model_type == "dev"
-            else "black-forest-labs/FLUX.1-schnell"
-        )
-        print(f"[DreamForge] Loading Flux img2img ({model_id})...")
-        pipe = FluxImg2ImgPipeline.from_pretrained(
-            model_id,
-            torch_dtype=torch.bfloat16,
-        )
-        pipe.to("cuda")
+        base = get_flux_pipe(model_type)
+        pipe = FluxImg2ImgPipeline(**base.components)
         pipe._model_type = model_type
         _flux_img2img_pipe = pipe
     return _flux_img2img_pipe
@@ -358,7 +378,12 @@ def apply_flux_lora(pipe, lora_id, lora_scale):
     asks for the same LoRA, so we remember what is fused on the pipe and only
     swap when a request wants something different (or none).
     """
-    current = getattr(pipe, "_dfx_lora", None)
+    # The text and img2img pipes share one transformer (see
+    # get_flux_img2img_pipe), so the "what is fused" marker has to live on the
+    # shared module — a per-pipe flag would let the second pipe fuse the same
+    # LoRA on top of itself.
+    owner = pipe.transformer if hasattr(pipe, "transformer") else pipe
+    current = getattr(owner, "_dfx_lora", None)
     wanted = (lora_id, float(lora_scale)) if lora_id else None
     if current == wanted:
         return
@@ -368,7 +393,7 @@ def apply_flux_lora(pipe, lora_id, lora_scale):
             pipe.unload_lora_weights()
         except Exception as e:
             print(f"[DreamForge] LoRA unload failed ({current[0]}): {e}")
-        pipe._dfx_lora = None
+        owner._dfx_lora = None
     if wanted is None:
         return
     try:
@@ -392,7 +417,7 @@ def apply_flux_lora(pipe, lora_id, lora_scale):
             # HuggingFace repo ID (single default LoRA file)
             pipe.load_lora_weights(lora_id)
         pipe.fuse_lora(lora_scale=lora_scale)
-        pipe._dfx_lora = wanted
+        owner._dfx_lora = wanted
         print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
     except Exception as e:
         print(f"[DreamForge] LoRA load failed ({lora_id}): {e}")
@@ -400,7 +425,29 @@ def apply_flux_lora(pipe, lora_id, lora_scale):
             pipe.unload_lora_weights()
         except Exception:
             pass
-        pipe._dfx_lora = None
+        owner._dfx_lora = None
+
+
+def handle_warm(job_input):
+    """Load a Flux base (and optionally fuse a LoRA) without rendering.
+
+    The app fires this when a signed-in, age-confirmed visitor lands in the
+    uncensored studio, so the ~60s weight load happens while they are still
+    typing a prompt instead of after they click Generate. Measured 2026-09-03:
+    a worker that had been idle 10 minutes answered its next real request in
+    129s, of which only ~2s was inference.
+    """
+    model_type = job_input.get("model", "schnell")
+    if model_type not in ("dev", "schnell"):
+        raise ValueError(f"Unknown model: {model_type}")
+    t0 = time.time()
+    pipe = get_flux_pipe(model_type)
+    lora_id = job_input.get("lora_id")
+    if lora_id:
+        apply_flux_lora(pipe, lora_id, job_input.get("lora_scale", 0.8))
+    warm_time = time.time() - t0
+    print(f"[DreamForge] Warm ({model_type}, lora={'yes' if lora_id else 'no'}) in {warm_time:.1f}s")
+    return {"warm": True, "model": model_type, "warm_time": warm_time}
 
 
 def handle_flux(job_input):
@@ -460,6 +507,12 @@ def handle_flux_img2img(job_input):
     seed = job_input.get("seed")
     lora_id = job_input.get("lora_id")
     lora_scale = job_input.get("lora_scale", 0.8)
+    # "dev" is the historical default; the uncensored studio sends "schnell"
+    # because its realism LoRA is a Schnell LoRA and its text-to-image path
+    # already holds Schnell on the worker.
+    model_type = job_input.get("model", "dev")
+    if model_type not in ("dev", "schnell"):
+        raise ValueError(f"Unknown img2img model: {model_type}")
 
     if not image_b64:
         raise ValueError("image_b64 is required for img2img")
@@ -477,7 +530,7 @@ def handle_flux_img2img(job_input):
     if (w, h) != init_image.size:
         init_image = init_image.resize((w, h), Image.LANCZOS)
 
-    pipe = get_flux_img2img_pipe("dev")
+    pipe = get_flux_img2img_pipe(model_type)
 
     # LoRA stays fused on the pipe between requests — see apply_flux_lora.
     # (Also fixes the "repo::weight_name" form, which this path never parsed,
@@ -498,7 +551,7 @@ def handle_flux_img2img(job_input):
         generator=generator,
     )
     inference_time = time.time() - start
-    print(f"[DreamForge] Flux img2img completed in {inference_time:.1f}s (seed={seed}, strength={strength})")
+    print(f"[DreamForge] Flux img2img ({model_type}) completed in {inference_time:.1f}s (seed={seed}, strength={strength})")
 
     output_image = result.images[0]
     buf = io.BytesIO()
@@ -878,7 +931,9 @@ def handler(job):
     task = job_input.get("task", "flux-dev")
 
     try:
-        if task in ("flux-dev", "flux-schnell"):
+        if task == "warm":
+            return handle_warm(job_input)
+        elif task in ("flux-dev", "flux-schnell"):
             return handle_flux(job_input)
         elif task == "flux-img2img":
             return handle_flux_img2img(job_input)
