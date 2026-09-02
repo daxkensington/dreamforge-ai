@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "../../../../server/db";
 import { verifyBTCPayWebhook, getUncensoredPlanById } from "../../../../server/_core/btcpay";
-import { cryptoInvoices, creditBalances, creditTransactions } from "../../../../drizzle/schema";
+import { cryptoInvoices, creditBalances, creditTransactions, users } from "../../../../drizzle/schema";
+import { sendPassActivatedEmail } from "../../../../server/_core/uncensoredEmail";
 import { and, eq, ne, sql } from "drizzle-orm";
 
 export const maxDuration = 30;
@@ -137,5 +138,24 @@ export async function POST(req: NextRequest) {
   });
 
   console.log(`[BTCPay] Settled ${invoice.invoiceId}: user ${invoice.userId} uncensored +${plan.durationDays}d, +${plan.bonusCredits}cr`);
+
+  // Tell the buyer. On-chain settlement can land minutes after they stopped
+  // watching the page; without this the pass was granted into silence and
+  // neither real buyer to date ever came back to use it. Never throws — the
+  // grant above is already committed and must not be retried by BTCPay.
+  try {
+    const [buyer] = await db
+      .select({ email: users.email, until: users.uncensoredUntil })
+      .from(users)
+      .where(eq(users.id, invoice.userId))
+      .limit(1);
+    if (buyer?.email) {
+      const until = buyer.until ?? new Date(Date.now() + plan.durationDays * 86_400_000);
+      const sent = await sendPassActivatedEmail({ to: buyer.email, plan, until });
+      if (!sent) console.warn(`[BTCPay] pass email NOT sent for user ${invoice.userId}`);
+    }
+  } catch (err: any) {
+    console.warn(`[BTCPay] pass email lookup failed: ${err?.message ?? err}`);
+  }
   return NextResponse.json({ ok: true });
 }
