@@ -14,6 +14,7 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredStudio from "@/components/UncensoredStudio";
 import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
+import RenderWaitHint, { newRequestId } from "@/components/RenderWaitHint";
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -29,33 +30,6 @@ import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensore
  */
 // Shared ladder (shared/uncensoredPlans.ts) — same IDs/prices the server bills.
 const FALLBACK_PLANS = UNCENSORED_PLANS;
-
-/** Per-click idempotency key — a transport retry re-sends the same body. */
-function newRequestId(): string {
-  const c = typeof crypto !== "undefined" ? crypto : null;
-  if (c && typeof c.randomUUID === "function") return c.randomUUID().replace(/-/g, "");
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
-}
-
-/**
- * Honest wait copy. Render time is dominated by the GPU waking up; the visitor
- * used to watch a bare spinner with no idea whether a minute was normal, and
- * the ones who gave up never saw the image the job still produced.
- */
-function FreeRenderHint({ startedAt }: { startedAt: number | null }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-  const secs = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
-  return (
-    <p className="mt-2 text-center text-xs text-muted-foreground" aria-live="polite">
-      Rendering on our own GPU · {secs}s. Usually under a minute; a couple of minutes if the GPU is waking up.
-      Keep this tab open — it appears here as soon as it&apos;s done.
-    </p>
-  );
-}
 
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
@@ -369,7 +343,7 @@ export default function Uncensored() {
                       <><Flame className="mr-2 h-5 w-5" /> Generate (free)</>
                     )}
                   </Button>
-                  {freeBusy && <FreeRenderHint startedAt={freeStartedAt} />}
+                  {freeBusy && <RenderWaitHint startedAt={freeStartedAt} />}
                   {freeResultUrl && (
                     <div className="mt-4">
                       {/* eslint-disable-next-line @next/next/no-img-element */}

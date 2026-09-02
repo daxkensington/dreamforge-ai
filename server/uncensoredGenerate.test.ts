@@ -97,6 +97,14 @@ vi.mock("./_core/videoGenerationUncensored", () => ({
   fetchAsBase64: vi.fn(async () => "ZmFrZQ=="),
 }));
 
+// This file pins the synchronous fallback (no self-hosted GPU configured).
+// The async submit-and-poll path is covered in uncensoredFreePreview.test.ts.
+vi.mock("./_core/imageGenerationUncensored", () => ({
+  canSubmitUnfilteredImageJob: vi.fn(() => false),
+  submitUnfilteredImageJob: vi.fn(),
+  collectUnfilteredImageJob: vi.fn(),
+}));
+
 vi.mock("./storage", () => ({
   storagePut: vi.fn(async () => ({ url: "https://dreamforgex.ai/img/generations/char.png" })),
   generateStorageKey: vi.fn(() => "generations/char.png"),

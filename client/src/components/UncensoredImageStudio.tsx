@@ -24,6 +24,7 @@ import {
   formatUncensoredRecipe,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
+import RenderWaitHint, { newRequestId } from "./RenderWaitHint";
 
 /**
  * Paid uncensored image studio. Portrait-first, quality tier, framing,
@@ -31,12 +32,6 @@ import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredS
  * own generations. This is the product pass-holders came for — not a toggle
  * buried in the SFW workspace.
  */
-function newRequestId(): string {
-  const c = typeof crypto !== "undefined" ? crypto : null;
-  if (c && typeof c.randomUUID === "function") return c.randomUUID().replace(/-/g, "");
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
-}
-
 export default function UncensoredImageStudio({
   focusCharacterId,
   recreateId,
@@ -72,6 +67,13 @@ export default function UncensoredImageStudio({
   const [savingFor, setSavingFor] = useState<number | null>(null);
   const [charName, setCharName] = useState("");
   const [results, setResults] = useState<{ url: string; seed: number | null; generationId: number }[]>([]);
+  // Renders run as background GPU jobs: `generate` returns generation ids in
+  // ~1s and we poll generateStatus until every one lands. Holding one request
+  // open for the render died at Vercel's 300s ceiling on a cold worker — the
+  // credits stayed debited and the finished image was never collected.
+  const [pendingIds, setPendingIds] = useState<number[]>([]);
+  const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
+  const recoveredOnce = useRef(false);
 
   const images = trpc.uncensored.myUncensoredImages.useQuery();
   const savedChars = trpc.uncensored.listCharacters.useQuery();
@@ -121,13 +123,69 @@ export default function UncensoredImageStudio({
 
   const gen = trpc.uncensored.generate.useMutation({
     onSuccess: (data) => {
+      if (data.status === "processing") {
+        setPendingIds(data.generationIds);
+        return;
+      }
+      setGenStartedAt(null);
       setResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
       toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
       utils.uncensored.myLibrary.invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      setGenStartedAt(null);
+      toast.error(e.message);
+    },
   });
+  const genStatus = trpc.uncensored.generateStatus.useQuery(
+    { generationIds: pendingIds.length ? pendingIds : [1] },
+    {
+      enabled: pendingIds.length > 0,
+      refetchInterval: (q) => (q.state.data?.allSettled ? false : 3000),
+      // react-query pauses intervals in hidden tabs; a buyer who tabs away
+      // mid-render would otherwise never see the result.
+      refetchIntervalInBackground: true,
+    },
+  );
+  useEffect(() => {
+    const d = genStatus.data;
+    if (!d || pendingIds.length === 0) return;
+    const done = d.items
+      .filter((i) => i.status === "completed" && i.url)
+      .map((i) => ({ generationId: i.generationId, url: i.url as string, seed: i.seed }));
+    if (done.length) setResults(done);
+    if (!d.allSettled) return;
+    setPendingIds([]);
+    setGenStartedAt(null);
+    utils.uncensored.myUncensoredImages.invalidate();
+    utils.uncensored.myLibrary.invalidate();
+    const failed = d.items.filter((i) => i.status === "failed").length;
+    if (done.length === 0) toast.error("Generation failed — your credits were returned.");
+    else if (failed > 0) toast.warning(`${done.length} ready · ${failed} failed (credits returned).`);
+    else toast.success(done.length === 1 ? "Image ready." : `${done.length} images ready.`);
+  }, [genStatus.data, pendingIds.length, utils]);
+
+  // On mount, pick up renders still running from a previous visit (tab closed
+  // mid-render) — and let the server fail + refund anything a dead function
+  // orphaned, instead of those credits staying gone.
+  const pendingQ = trpc.uncensored.pendingGenerations.useQuery(undefined, { staleTime: Infinity });
+  useEffect(() => {
+    if (recoveredOnce.current || !pendingQ.data) return;
+    recoveredOnce.current = true;
+    const stillRunning = pendingQ.data.items.filter((i) => i.status === "processing").map((i) => i.generationId);
+    const finished = pendingQ.data.items.filter((i) => i.status !== "processing").length;
+    if (finished > 0) {
+      utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.myUncensoredImages.invalidate();
+    }
+    if (stillRunning.length && pendingIds.length === 0) {
+      setPendingIds(stillRunning);
+      setGenStartedAt(Date.now());
+      toast.info("Picking up a render that was still going when you left.");
+    }
+  }, [pendingQ.data, pendingIds.length, utils]);
+  const busy = gen.isPending || pendingIds.length > 0;
 
   const [sheetResults, setSheetResults] = useState<{ generationId: number; url: string; view: string }[]>([]);
   const sheet = trpc.uncensored.characterSheet.useMutation({
@@ -205,6 +263,7 @@ export default function UncensoredImageStudio({
       return;
     }
     setResults([]);
+    setGenStartedAt(Date.now());
     gen.mutate({
       prompt: prompt.trim(),
       negativePrompt: negative.trim() || undefined,
@@ -265,7 +324,7 @@ export default function UncensoredImageStudio({
                       setCharacterId(null);
                     }
                   }}
-                  disabled={gen.isPending}
+                  disabled={busy}
                   className={`overflow-hidden rounded-lg border-2 ${
                     savedCharacterId === c.id
                       ? "border-rose-500 ring-1 ring-rose-500/40"
@@ -342,7 +401,7 @@ export default function UncensoredImageStudio({
         placeholder="Describe the scene, character, lighting, mood…"
         rows={4}
         maxLength={1000}
-        disabled={gen.isPending}
+        disabled={busy}
         className="mt-4 resize-none"
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -359,7 +418,7 @@ export default function UncensoredImageStudio({
               key={s.id}
               type="button"
               onClick={() => setStyle(s.id)}
-              disabled={gen.isPending}
+              disabled={busy}
               className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                 style === s.id
                   ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -381,7 +440,7 @@ export default function UncensoredImageStudio({
                 key={a.id}
                 type="button"
                 onClick={() => setAspect(a.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   aspect === a.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -401,7 +460,7 @@ export default function UncensoredImageStudio({
                 key={f.id}
                 type="button"
                 onClick={() => setFraming(framing === f.id ? null : f.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   framing === f.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -424,7 +483,7 @@ export default function UncensoredImageStudio({
                 key={p.id}
                 type="button"
                 onClick={() => setPose(pose === p.id ? null : p.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   pose === p.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -444,7 +503,7 @@ export default function UncensoredImageStudio({
                 key={c.id}
                 type="button"
                 onClick={() => setCamera(camera === c.id ? null : c.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   camera === c.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -466,7 +525,7 @@ export default function UncensoredImageStudio({
               key={l.id}
               type="button"
               onClick={() => setLighting(lighting === l.id ? null : l.id)}
-              disabled={gen.isPending}
+              disabled={busy}
               className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                 lighting === l.id
                   ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -488,7 +547,7 @@ export default function UncensoredImageStudio({
                 key={w.id}
                 type="button"
                 onClick={() => setWardrobe(wardrobe === w.id ? null : w.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   wardrobe === w.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -508,7 +567,7 @@ export default function UncensoredImageStudio({
                 key={s.id}
                 type="button"
                 onClick={() => setSetting(setting === s.id ? null : s.id)}
-                disabled={gen.isPending}
+                disabled={busy}
                 className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                   setting === s.id
                     ? "border-rose-500 bg-rose-500/10 text-rose-300"
@@ -546,7 +605,7 @@ export default function UncensoredImageStudio({
               key={n}
               type="button"
               onClick={() => setCount(n)}
-              disabled={gen.isPending}
+              disabled={busy}
               className={`rounded-md px-3 py-1 text-xs ${
                 count === n ? "bg-rose-500/20 text-rose-200" : "text-muted-foreground hover:text-foreground"
               }`}
@@ -571,7 +630,7 @@ export default function UncensoredImageStudio({
             min={25}
             max={70}
             step={5}
-            disabled={gen.isPending}
+            disabled={busy}
             className="mt-2"
           />
           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -597,7 +656,7 @@ export default function UncensoredImageStudio({
               onChange={(e) => setNegative(e.target.value)}
               placeholder={DEFAULT_UNCENSORED_NEGATIVE}
               maxLength={500}
-              disabled={gen.isPending}
+              disabled={busy}
             />
           </div>
           <div>
@@ -606,7 +665,7 @@ export default function UncensoredImageStudio({
               value={seed}
               onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
               placeholder="reproducible seed"
-              disabled={gen.isPending}
+              disabled={busy}
             />
           </div>
           <div>
@@ -623,7 +682,7 @@ export default function UncensoredImageStudio({
                       setCharacterId(characterId === img.id ? null : img.id);
                       setSavedCharacterId(null);
                     }}
-                    disabled={gen.isPending}
+                    disabled={busy}
                     className={`overflow-hidden rounded-lg border-2 ${
                       characterId === img.id
                         ? "border-rose-500 ring-1 ring-rose-500/40"
@@ -649,11 +708,11 @@ export default function UncensoredImageStudio({
 
       <Button
         onClick={handleGenerate}
-        disabled={gen.isPending || prompt.trim().length < 3}
+        disabled={busy || prompt.trim().length < 3}
         className="mt-5 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
         size="lg"
       >
-        {gen.isPending ? (
+        {busy ? (
           <>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating {aspectMeta.label.toLowerCase()}…
           </>
@@ -663,6 +722,7 @@ export default function UncensoredImageStudio({
           </>
         )}
       </Button>
+      {busy && <RenderWaitHint startedAt={genStartedAt} />}
       <p className="mt-2 text-center text-[11px] text-muted-foreground">Ctrl+Enter to generate</p>
       {characterLocked && (
         <Button

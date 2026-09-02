@@ -120,7 +120,7 @@ vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) 
 
 import { uncensoredRouter } from "./routers/uncensored";
 import { submitUnfilteredImageJob, collectUnfilteredImageJob } from "./_core/imageGenerationUncensored";
-import { deductCredits } from "./stripe";
+import { deductCredits, refundCredits } from "./stripe";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -265,38 +265,146 @@ describe("uncensored.freeStatus — poll + finalize", () => {
   });
 });
 
-describe("uncensored.generate — paid retry is idempotent", () => {
+describe("uncensored.generate — paid path is submit-and-poll", () => {
   beforeEach(() => {
     state.user = { uncensoredUntil: new Date(Date.now() + 864e5), ageConfirmedAt: new Date() };
     state.byRequest = [];
     state.created = [];
+    state.updated = [];
+    state.submitted = [];
+    state.collect = null;
     state.debited = 0;
+    state.claims = [];
     vi.mocked(deductCredits).mockClear();
+    vi.mocked(refundCredits).mockClear();
+    vi.mocked(submitUnfilteredImageJob).mockClear();
   });
 
-  it("returns the first attempt's images without a second debit", async () => {
+  it("debits once, submits one job per image, and returns before any render", async () => {
+    const caller = uncensoredRouter.createCaller(ctx());
+    const res = await caller.generate({ prompt: "a woman on a beach at sunset", count: 3, requestId: REQ });
+
+    expect(res.status).toBe("processing");
+    expect(res.generationIds).toHaveLength(3);
+    expect(res.images).toHaveLength(0);
+    expect(res.cost).toBe(15);
+    expect(deductCredits).toHaveBeenCalledTimes(1);
+    expect(state.submitted).toHaveLength(3);
+    // every row remembers its job + the click id, and none was awaited inline
+    expect(state.updated.filter((u) => u.data.metadata?.runpodJobId).map((u) => u.data.metadata.runpodJobId)).toEqual(["job-1", "job-2", "job-3"]);
+    expect(state.created.every((r) => r.metadata.requestId === REQ && r.metadata.cost === 5)).toBe(true);
+    expect(state.updated.some((u) => u.data.status === "completed")).toBe(false);
+  });
+
+  it("a submit that fails is refunded for that image only and the row is failed", async () => {
+    vi.mocked(submitUnfilteredImageJob)
+      .mockResolvedValueOnce({ jobId: "job-ok" })
+      .mockRejectedValueOnce(new Error("RunPod submit failed (503)"));
+    const caller = uncensoredRouter.createCaller(ctx());
+    const res = await caller.generate({ prompt: "a woman on a beach at sunset", count: 2, requestId: REQ });
+
+    expect(res.generationIds).toHaveLength(1);
+    expect(res.cost).toBe(5);
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(refundCredits).mock.calls[0][1]).toBe(5);
+    expect(state.updated.some((u) => u.id === 502 && u.data.status === "failed")).toBe(true);
+  });
+
+  it("when nothing could be submitted everything is refunded and the caller is told", async () => {
+    vi.mocked(submitUnfilteredImageJob).mockRejectedValue(new Error("RunPod submit failed (503)"));
+    const caller = uncensoredRouter.createCaller(ctx());
+    await expect(caller.generate({ prompt: "a woman on a beach at sunset", count: 2, requestId: REQ })).rejects.toThrow(/credits were returned/i);
+    expect(vi.mocked(refundCredits).mock.calls.reduce((a, c) => a + c[1], 0)).toBe(10);
+  });
+
+  it("a retried click returns the first attempt's ids without a second debit or submit", async () => {
     state.byRequest = [
-      { id: 900, userId: OWNER, status: "completed", imageUrl: "https://dreamforgex.ai/img/generations/a.png", metadata: { cost: 12, seed: 5 } },
-      { id: 901, userId: OWNER, status: "completed", imageUrl: "https://dreamforgex.ai/img/generations/b.png", metadata: { cost: 12, seed: 6 } },
+      { id: 900, userId: OWNER, status: "generating", imageUrl: null, metadata: { cost: 5, seed: 5, runpodJobId: "j1" } },
+      { id: 901, userId: OWNER, status: "completed", imageUrl: "https://dreamforgex.ai/img/generations/b.png", metadata: { cost: 5, seed: 6 } },
     ];
     const caller = uncensoredRouter.createCaller(ctx());
     const res = await caller.generate({ prompt: "a woman on a beach at sunset", count: 2, requestId: REQ });
 
     expect(deductCredits).not.toHaveBeenCalled();
+    expect(submitUnfilteredImageJob).not.toHaveBeenCalled();
     expect(state.created).toHaveLength(0);
-    expect(res.images.map((i) => i.generationId)).toEqual([900, 901]);
-    expect(res.cost).toBe(24);
+    expect(res.status).toBe("processing");
+    expect(res.generationIds).toEqual([900, 901]);
+    expect(res.images.map((i) => i.generationId)).toEqual([901]);
+    expect(res.cost).toBe(10);
     expect(res.creditsRemaining).toBe(321);
   });
+});
 
-  it("a fresh requestId is billed and rendered once, and the rows carry it", async () => {
-    const caller = uncensoredRouter.createCaller(ctx());
-    vi.doMock("./_core/imageGeneration", () => ({}));
-    // generateImage is mocked to throw, so the row fails and credits refund —
-    // the assertion here is only that the debit happened exactly once and the
-    // row carried the requestId for a later retry to find.
-    await expect(caller.generate({ prompt: "a woman on a beach at sunset", count: 1, requestId: REQ })).rejects.toThrow();
-    expect(deductCredits).toHaveBeenCalledTimes(1);
-    expect(state.created[0].metadata.requestId).toBe(REQ);
+describe("uncensored.generateStatus / pendingGenerations — finalize + refund exactly once", () => {
+  beforeEach(() => {
+    state.user = { uncensoredUntil: new Date(Date.now() + 864e5), ageConfirmedAt: new Date() };
+    state.generation = null;
+    state.collect = null;
+    state.claims = [];
+    vi.mocked(refundCredits).mockClear();
+    vi.mocked(collectUnfilteredImageJob).mockClear();
+  });
+
+  const paidPending = (over?: Record<string, unknown>) => ({
+    id: 601,
+    userId: OWNER,
+    mediaType: "image",
+    status: "generating",
+    imageUrl: null,
+    createdAt: new Date(),
+    metadata: { uncensored: true, cost: 5, seed: 9, runpodJobId: "job-1" },
+    ...over,
+  });
+
+  it("stores a COMPLETED job WITHOUT a watermark and reports it", async () => {
+    state.generation = paidPending();
+    state.collect = { status: "completed", url: "https://dreamforgex.ai/img/generations/x.png", key: "generations/x.png" };
+    const res = await uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] });
+    expect(res.allSettled).toBe(true);
+    expect(res.items[0]).toMatchObject({ generationId: 601, status: "completed", url: "https://dreamforgex.ai/img/generations/x.png", seed: 9 });
+    expect(collectUnfilteredImageJob).toHaveBeenCalledWith("job-1", { watermark: false });
+    expect(state.claims.at(-1)?.set).toMatchObject({ status: "completed" });
+    expect(refundCredits).not.toHaveBeenCalled();
+  });
+
+  it("a FAILED job is refunded exactly once — inside the claim", async () => {
+    state.generation = paidPending();
+    state.collect = { status: "failed", error: "CUDA OOM" };
+    const res = await uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] });
+    expect(res.items[0].status).toBe("failed");
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(refundCredits).mock.calls[0].slice(0, 2)).toEqual([OWNER, 5]);
+  });
+
+  it("keeps reporting processing while the GPU job runs", async () => {
+    state.generation = paidPending();
+    state.collect = { status: "processing" };
+    const res = await uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] });
+    expect(res.allSettled).toBe(false);
+    expect(res.items[0].status).toBe("processing");
+    expect(state.claims).toHaveLength(0);
+  });
+
+  it("an old row with NO job id is orphaned: failed + refunded (a dead function debited it)", async () => {
+    state.generation = paidPending({ createdAt: new Date(Date.now() - 20 * 60_000), metadata: { uncensored: true, cost: 5, seed: 1 } });
+    const res = await uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] });
+    expect(res.items[0].status).toBe("failed");
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(collectUnfilteredImageJob).not.toHaveBeenCalled();
+  });
+
+  it("a FRESH row with no job id yet is just processing (the submit is still in flight)", async () => {
+    state.generation = paidPending({ metadata: { uncensored: true, cost: 5, seed: 1 } });
+    const res = await uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] });
+    expect(res.items[0].status).toBe("processing");
+    expect(refundCredits).not.toHaveBeenCalled();
+  });
+
+  it("refuses another user's row and refuses a free preview", async () => {
+    state.generation = paidPending({ userId: 99 });
+    await expect(uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] })).rejects.toThrow(/not found/i);
+    state.generation = paidPending({ metadata: { uncensored: true, free: true, runpodJobId: "j" } });
+    await expect(uncensoredRouter.createCaller(ctx()).generateStatus({ generationIds: [601] })).rejects.toThrow(/not found/i);
   });
 });

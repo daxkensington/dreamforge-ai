@@ -119,18 +119,124 @@ function freePreviewStatusOf(gen: { status: string }): FreePreviewStatus {
   return "processing";
 }
 
+type ImageRowState = { generationId: number; status: FreePreviewStatus; url: string | null; seed: number | null };
+type GenerationRow = NonNullable<Awaited<ReturnType<typeof getGenerationById>>>;
+
 /**
- * Wait for the rows a previous attempt of the same click created to leave
- * "generating" (the first invocation is still rendering them in its own
- * function). Bounded well under the route's maxDuration.
+ * A "generating" row with no GPU job id older than this was orphaned: the
+ * function died between the debit and the submit (or it came from the old
+ * synchronous path, which Vercel killed at 300s). Nothing can ever finish it.
  */
-async function awaitRequestSettled(userId: number, requestId: string, maxMs = 240_000) {
-  const started = Date.now();
-  for (;;) {
-    const rows = await findGenerationsByRequestId(userId, requestId);
-    if (!rows.some((r) => r.status === "generating") || Date.now() - started > maxMs) return rows;
-    await new Promise((r) => setTimeout(r, 2_000));
+const ORPHAN_AFTER_MS = 10 * 60_000;
+
+/**
+ * Bring one paid uncensored image row up to date from its GPU job. Idempotent:
+ * completed/failed transitions are claimed with `WHERE status='generating'`,
+ * and the refund for a failure happens only inside a successful claim, so
+ * concurrent polls (two tabs, a poll racing the mount-time recovery) can't
+ * double-refund or double-write.
+ */
+async function finalizePaidImageRow(gen: GenerationRow, userId: number): Promise<ImageRowState> {
+  const meta = (gen.metadata as any) ?? {};
+  const seed = typeof meta.seed === "number" ? (meta.seed as number) : null;
+  if (gen.status === "completed") return { generationId: gen.id, status: "completed", url: gen.imageUrl, seed };
+  if (gen.status === "failed") return { generationId: gen.id, status: "failed", url: null, seed };
+
+  const db = await requireDb();
+  const cost = Number(meta.cost) || 0;
+  const failRow = async (reason: string): Promise<ImageRowState> => {
+    const claimed = await db
+      .update(generations)
+      .set({ status: "failed" })
+      .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
+      .returning({ id: generations.id });
+    if (claimed.length) {
+      if (cost > 0) await refundCredits(userId, cost, reason);
+      await logToolFailure({ toolId: "uncensored-generate", errorMessage: reason, userId });
+    }
+    return { generationId: gen.id, status: "failed", url: null, seed };
+  };
+
+  const jobId: string | undefined = meta.runpodJobId;
+  if (!jobId) {
+    const age = gen.createdAt ? Date.now() - new Date(gen.createdAt).getTime() : 0;
+    if (age > ORPHAN_AFTER_MS) return failRow("Uncensored generate orphaned — no GPU job was recorded");
+    return { generationId: gen.id, status: "processing", url: null, seed };
   }
+
+  const result = await collectUnfilteredImageJob(jobId, { watermark: false });
+  if (result.status === "completed") {
+    await db
+      .update(generations)
+      .set({ status: "completed", imageUrl: result.url, thumbnailUrl: result.url, fileKey: result.key })
+      .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
+    return { generationId: gen.id, status: "completed", url: result.url, seed };
+  }
+  if (result.status === "failed") return failRow(result.error ?? "Uncensored GPU job failed");
+  return { generationId: gen.id, status: "processing", url: null, seed };
+}
+
+/** Same as finalizePaidImageRow for a FREE preview: watermarked, no credits involved. */
+async function finalizeFreeRow(
+  gen: GenerationRow,
+  userId: number,
+): Promise<{ status: FreePreviewStatus; url: string | null }> {
+  if (gen.status === "completed") return { status: "completed", url: gen.imageUrl };
+  if (gen.status === "failed") return { status: "failed", url: null };
+  const meta = (gen.metadata as any) ?? {};
+  const jobId: string | undefined = meta.runpodJobId;
+  const db = await requireDb();
+  if (!jobId) {
+    const age = gen.createdAt ? Date.now() - new Date(gen.createdAt).getTime() : 0;
+    if (age > ORPHAN_AFTER_MS) {
+      await db
+        .update(generations)
+        .set({ status: "failed" })
+        .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
+      return { status: "failed", url: null };
+    }
+    return { status: "processing", url: null };
+  }
+  const result = await collectUnfilteredImageJob(jobId, { watermark: true });
+  if (result.status === "completed") {
+    await db
+      .update(generations)
+      .set({ status: "completed", imageUrl: result.url, thumbnailUrl: result.url, fileKey: result.key })
+      .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
+    return { status: "completed", url: result.url };
+  }
+  if (result.status === "failed") {
+    const claimed = await db
+      .update(generations)
+      .set({ status: "failed" })
+      .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
+      .returning({ id: generations.id });
+    if (claimed.length) await logToolFailure({ toolId: "uncensored-free", errorMessage: result.error, userId });
+    return { status: "failed", url: null };
+  }
+  return { status: "processing", url: null };
+}
+
+/**
+ * Finish any free preview whose GPU job completed after the visitor left.
+ * Without this the row sits "generating" forever — counted as a spent preview
+ * with no image behind it. Runs on the status query, i.e. every page load.
+ */
+async function recoverFreePreviews(userId: number): Promise<void> {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(generations)
+    .where(
+      and(
+        eq(generations.userId, userId),
+        eq(generations.status, "generating"),
+        sql`${generations.metadata}->>'free' = 'true'`,
+      ),
+    )
+    .orderBy(desc(generations.id))
+    .limit(5);
+  for (const gen of rows) await finalizeFreeRow(gen, userId);
 }
 
 async function requireDb() {
@@ -265,6 +371,7 @@ export const uncensoredRouter = router({
     const ent = await getUncensoredEntitlement(ctx.user.id);
     let freeUsed = 0;
     try {
+      await recoverFreePreviews(ctx.user.id);
       freeUsed = await countFreeUncensored(ctx.user.id);
     } catch {
       /* counting failure must not break the page */
@@ -356,23 +463,25 @@ export const uncensoredRouter = router({
       if (input.requestId) {
         const prior = await findGenerationsByRequestId(ctx.user.id, input.requestId);
         if (prior.length) {
-          const rows = await awaitRequestSettled(ctx.user.id, input.requestId);
-          const done = rows.filter((r) => r.status === "completed" && r.imageUrl);
-          if (done.length === 0) {
+          const live = prior.filter((r) => r.status !== "failed");
+          if (live.length === 0) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "Generation failed — your credits were returned. Please try again.",
             });
           }
-          const unit = Number((done[0].metadata as any)?.cost) || 0;
+          const unit = Number((prior[0].metadata as any)?.cost) || 0;
           const bal = await getOrCreateBalance(ctx.user.id);
+          const done = live.filter((r) => r.status === "completed" && r.imageUrl);
           return {
+            status: (done.length === live.length ? "completed" : "processing") as "completed" | "processing",
+            generationIds: live.map((r) => r.id),
             images: done.map((r) => ({
               generationId: r.id,
               url: r.imageUrl as string,
               seed: typeof (r.metadata as any)?.seed === "number" ? ((r.metadata as any).seed as number) : null,
             })),
-            cost: unit * done.length,
+            cost: unit * live.length,
             creditsRemaining: bal.balance,
           };
         }
@@ -448,41 +557,103 @@ export const uncensoredRouter = router({
 
       const loraId = resolveUncensoredLora(input.style);
       const results: { generationId: number; url: string; seed: number | null }[] = [];
-      let failed = 0;
       const baseSeed =
         typeof input.seed === "number" ? input.seed : Math.floor(Math.random() * 2_147_483_646);
+      const rowFor = (seed: number) => ({
+        userId: ctx.user.id,
+        prompt: input.prompt,
+        negativePrompt: input.negativePrompt ?? null,
+        mediaType: "image" as const,
+        width: aspect.width,
+        height: aspect.height,
+        duration: null,
+        status: "generating" as const,
+        modelVersion: characterUrl ? "uncensored-character" : `uncensored-${input.quality}`,
+        parentGenerationId: characterId,
+        metadata: {
+          uncensored: true,
+          style: input.style ?? null,
+          framing: input.framing ?? null,
+          pose: input.pose ?? null,
+          camera: input.camera ?? null,
+          lighting: input.lighting ?? null,
+          wardrobe: input.wardrobe ?? null,
+          setting: input.setting ?? null,
+          quality: input.quality,
+          seed,
+          cost: unitCost,
+          character: !!characterUrl,
+          characterStrength,
+          savedCharacterId,
+          requestId: input.requestId ?? null,
+        },
+      });
 
+      // ── Async path (self-hosted GPU): submit every image, return at once. ──
+      // The render outlives a serverless function on a cold worker (measured
+      // 303s → Vercel killed the request, the credits stayed debited and the
+      // finished image was never collected). The client polls generateStatus.
+      if (canSubmitUnfilteredImageJob()) {
+        let characterB64: string | null = null;
+        if (characterUrl) {
+          try {
+            characterB64 = await fetchAsBase64(characterUrl);
+          } catch {
+            await refundCredits(ctx.user.id, cost, "Uncensored generate: character source unavailable");
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Couldn't load the locked character — your credits were returned. Please try again.",
+            });
+          }
+        }
+        const generationIds: number[] = [];
+        let failed = 0;
+        for (let i = 0; i < input.count; i++) {
+          const seed = baseSeed + i;
+          const row = rowFor(seed);
+          const genId = await createGeneration(row);
+          try {
+            const { jobId } = await submitUnfilteredImageJob({
+              prompt,
+              width: aspect.width,
+              height: aspect.height,
+              loraId,
+              seed,
+              quality: input.quality,
+              ...(characterB64 ? { imageB64: characterB64, strength: characterStrength ?? 0.45 } : {}),
+            });
+            await updateGeneration(genId, { metadata: { ...row.metadata, runpodJobId: jobId } });
+            generationIds.push(genId);
+          } catch (err: any) {
+            failed += 1;
+            await updateGeneration(genId, { status: "failed" });
+            await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+          }
+        }
+        if (generationIds.length === 0) {
+          await refundCredits(ctx.user.id, cost, "Uncensored generate submit failed");
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Couldn't start the generation — your credits were returned. Please try again.",
+          });
+        }
+        if (failed > 0) {
+          await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate submit partial fail ×${failed}`);
+        }
+        return {
+          status: "processing" as const,
+          generationIds,
+          images: results,
+          cost: unitCost * generationIds.length,
+          creditsRemaining: debit.balance - unitCost * failed,
+        };
+      }
+
+      // ── Sync fallback (no self-hosted GPU): the fal chain answers inline. ──
+      let failed = 0;
       for (let i = 0; i < input.count; i++) {
         const seed = baseSeed + i;
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: input.prompt,
-          negativePrompt: input.negativePrompt ?? null,
-          mediaType: "image",
-          width: aspect.width,
-          height: aspect.height,
-          duration: null,
-          status: "generating",
-          modelVersion: characterUrl ? "uncensored-character" : `uncensored-${input.quality}`,
-          parentGenerationId: characterId,
-          metadata: {
-            uncensored: true,
-            style: input.style ?? null,
-            framing: input.framing ?? null,
-            pose: input.pose ?? null,
-            camera: input.camera ?? null,
-            lighting: input.lighting ?? null,
-            wardrobe: input.wardrobe ?? null,
-            setting: input.setting ?? null,
-            quality: input.quality,
-            seed: seed ?? null,
-            cost: unitCost,
-            character: !!characterUrl,
-            characterStrength,
-            savedCharacterId,
-            requestId: input.requestId ?? null,
-          },
-        });
+        const genId = await createGeneration(rowFor(seed));
 
         try {
           let url: string;
@@ -531,11 +702,61 @@ export const uncensoredRouter = router({
       }
 
       return {
+        status: "completed" as const,
+        generationIds: results.map((r) => r.generationId),
         images: results,
         cost: unitCost * results.length,
         creditsRemaining: debit.balance - unitCost * failed,
       };
     }),
+
+  /**
+   * Poll paid image generations submitted by `generate`. Each id must be the
+   * caller's own paid uncensored image row. Finalizes completed jobs (stores
+   * the PNG, no watermark) and refunds failed ones exactly once.
+   */
+  generateStatus: protectedProcedure
+    .input(z.object({ generationIds: z.array(z.number().int().positive()).min(1).max(8) }))
+    .query(async ({ ctx, input }) => {
+      const items: ImageRowState[] = [];
+      for (const id of input.generationIds) {
+        const gen = await getGenerationById(id);
+        const meta = (gen?.metadata as any) ?? {};
+        if (!gen || gen.userId !== ctx.user.id || meta.uncensored !== true || meta.free === true || gen.mediaType !== "image") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Generation not found." });
+        }
+        items.push(await finalizePaidImageRow(gen, ctx.user.id));
+      }
+      return { items, allSettled: items.every((i) => i.status !== "processing") };
+    }),
+
+  /**
+   * The caller's paid image rows still "generating" — checked on studio mount
+   * so a render that finished after the tab closed lands in the library, and
+   * a row a dead function orphaned gets failed + refunded instead of holding
+   * the user's credits forever.
+   */
+  pendingGenerations: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    const rows = await db
+      .select()
+      .from(generations)
+      .where(
+        and(
+          eq(generations.userId, ctx.user.id),
+          eq(generations.status, "generating"),
+          eq(generations.mediaType, "image"),
+          sql`${generations.metadata}->>'uncensored' = 'true'`,
+          sql`coalesce(${generations.metadata}->>'free', '') <> 'true'`,
+          sql`${generations.createdAt} > now() - interval '2 days'`,
+        ),
+      )
+      .orderBy(desc(generations.id))
+      .limit(8);
+    const items: ImageRowState[] = [];
+    for (const gen of rows) items.push(await finalizePaidImageRow(gen, ctx.user.id));
+    return { items };
+  }),
 
   /**
    * Uncensored video generation — Wan 2.2 on self-hosted GPU (no free tier).
@@ -1411,39 +1632,8 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Preview not found." });
       }
       const remainingNow = async () => Math.max(0, FREE_UNCENSORED_LIMIT - (await countFreeUncensored(ctx.user.id)));
-
-      if (gen.status === "completed") {
-        return { status: "completed" as FreePreviewStatus, url: gen.imageUrl, remaining: await remainingNow() };
-      }
-      if (gen.status === "failed") {
-        return { status: "failed" as FreePreviewStatus, url: null, remaining: await remainingNow() };
-      }
-
-      const jobId: string | undefined = meta.runpodJobId;
-      if (!jobId) return { status: "processing" as FreePreviewStatus, url: null, remaining: await remainingNow() };
-
-      const result = await collectUnfilteredImageJob(jobId, { watermark: true });
-      const db = await requireDb();
-
-      if (result.status === "completed") {
-        await db
-          .update(generations)
-          .set({ status: "completed", imageUrl: result.url, thumbnailUrl: result.url, fileKey: result.key })
-          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")));
-        return { status: "completed" as FreePreviewStatus, url: result.url, remaining: await remainingNow() };
-      }
-      if (result.status === "failed") {
-        const claimed = await db
-          .update(generations)
-          .set({ status: "failed" })
-          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
-          .returning({ id: generations.id });
-        if (claimed.length) {
-          await logToolFailure({ toolId: "uncensored-free", errorMessage: result.error, userId: ctx.user.id });
-        }
-        return { status: "failed" as FreePreviewStatus, url: null, remaining: await remainingNow() };
-      }
-      return { status: "processing" as FreePreviewStatus, url: null, remaining: await remainingNow() };
+      const { status, url } = await finalizeFreeRow(gen, ctx.user.id);
+      return { status, url, remaining: await remainingNow() };
     }),
 
   /** One-time 18+ attestation. Required before purchase or generation. */

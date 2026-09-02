@@ -30,6 +30,14 @@ export interface UnfilteredImageJobParams {
   seed?: number;
   /** "quality" = Flux Dev 20 steps; default "fast" = Flux Schnell 4 steps. */
   quality?: "fast" | "quality";
+  /**
+   * Source frame for img2img (character lock / refine). MUST already be one of
+   * the caller's own generations — the router resolves it, this layer never
+   * accepts uploads (see refineUnfiltered for why).
+   */
+  imageB64?: string;
+  /** img2img strength; clamped 0.2–0.9 like refineUnfiltered. */
+  strength?: number;
 }
 
 export type UnfilteredImageJobResult =
@@ -59,6 +67,27 @@ export async function submitUnfilteredImageJob(params: UnfilteredImageJobParams)
     });
     throw new PromptBlockedError(verdict);
   }
+  const lora = params.loraId ? { lora_id: params.loraId } : {};
+  const seed = typeof params.seed === "number" ? { seed: params.seed } : {};
+  if (params.imageB64) {
+    // Same clamp as refineUnfiltered: below ~0.2 nothing visibly changes, at
+    // 1.0 the source is discarded and it's just text-to-image.
+    const strength = Math.min(Math.max(params.strength ?? 0.6, 0.2), 0.9);
+    const jobId = await runpodSubmit(
+      {
+        task: "flux-img2img",
+        image_b64: params.imageB64,
+        prompt: params.prompt,
+        strength,
+        num_inference_steps: 20,
+        guidance_scale: 7.5,
+        ...lora,
+        ...seed,
+      },
+      { endpointId: getImageEndpointId() },
+    );
+    return { jobId };
+  }
   const dev = params.quality === "quality";
   const jobId = await runpodSubmit(
     {
@@ -68,8 +97,8 @@ export async function submitUnfilteredImageJob(params: UnfilteredImageJobParams)
       height: params.height,
       num_inference_steps: dev ? 20 : 4,
       ...(dev ? { guidance_scale: 7.5 } : {}),
-      ...(params.loraId ? { lora_id: params.loraId } : {}),
-      ...(typeof params.seed === "number" ? { seed: params.seed } : {}),
+      ...lora,
+      ...seed,
     },
     { endpointId: getImageEndpointId() },
   );
