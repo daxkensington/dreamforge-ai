@@ -348,6 +348,61 @@ def get_catvton():
 
 # ─── Task Handlers ───────────────────────────────────────────────────────────
 
+def apply_flux_lora(pipe, lora_id, lora_scale):
+    """Fuse a LoRA into a Flux pipe, and KEEP it fused across requests.
+
+    Measured 2026-09-02 on a warm A40 worker: flux-schnell 4 steps at 832x1216
+    ran in 4.1s with no LoRA and 59s with the realism LoRA — the per-request
+    load → fuse → unfuse → unload dance (plus the torch.compile re-capture it
+    forces) was 93% of every uncensored image's wall time. Nearly every request
+    asks for the same LoRA, so we remember what is fused on the pipe and only
+    swap when a request wants something different (or none).
+    """
+    current = getattr(pipe, "_dfx_lora", None)
+    wanted = (lora_id, float(lora_scale)) if lora_id else None
+    if current == wanted:
+        return
+    if current is not None:
+        try:
+            pipe.unfuse_lora()
+            pipe.unload_lora_weights()
+        except Exception as e:
+            print(f"[DreamForge] LoRA unload failed ({current[0]}): {e}")
+        pipe._dfx_lora = None
+    if wanted is None:
+        return
+    try:
+        if lora_id.startswith("http://") or lora_id.startswith("https://"):
+            # Direct URL — download to temp file and load
+            import requests as req_lib
+            lora_path = f"/tmp/lora_{hash(lora_id) % 10**8}.safetensors"
+            if not os.path.exists(lora_path):
+                print(f"[DreamForge] Downloading LoRA from URL: {lora_id}")
+                resp = req_lib.get(lora_id, timeout=120)
+                resp.raise_for_status()
+                with open(lora_path, "wb") as f:
+                    f.write(resp.content)
+            pipe.load_lora_weights(lora_path)
+        elif "::" in lora_id:
+            # "repo::weight_file.safetensors" — needed when a repo ships
+            # multiple LoRA files (e.g. the schnell-realism v1 + v2.3).
+            repo, weight_name = lora_id.split("::", 1)
+            pipe.load_lora_weights(repo, weight_name=weight_name)
+        else:
+            # HuggingFace repo ID (single default LoRA file)
+            pipe.load_lora_weights(lora_id)
+        pipe.fuse_lora(lora_scale=lora_scale)
+        pipe._dfx_lora = wanted
+        print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
+    except Exception as e:
+        print(f"[DreamForge] LoRA load failed ({lora_id}): {e}")
+        try:
+            pipe.unload_lora_weights()
+        except Exception:
+            pass
+        pipe._dfx_lora = None
+
+
 def handle_flux(job_input):
     """Generate image with Flux.1 Dev or Schnell. Supports LoRA + reproducible seeds."""
     task = job_input.get("task", "flux-dev")
@@ -367,32 +422,8 @@ def handle_flux(job_input):
     model_type = "dev" if task == "flux-dev" else "schnell"
     pipe = get_flux_pipe(model_type)
 
-    # Load LoRA weights if requested (supports HF repo ID or direct URL to .safetensors)
-    if lora_id:
-        try:
-            if lora_id.startswith("http://") or lora_id.startswith("https://"):
-                # Direct URL — download to temp file and load
-                import requests as req_lib
-                lora_path = f"/tmp/lora_{hash(lora_id) % 10**8}.safetensors"
-                if not os.path.exists(lora_path):
-                    print(f"[DreamForge] Downloading LoRA from URL: {lora_id}")
-                    resp = req_lib.get(lora_id, timeout=120)
-                    resp.raise_for_status()
-                    with open(lora_path, "wb") as f:
-                        f.write(resp.content)
-                pipe.load_lora_weights(lora_path)
-            elif "::" in lora_id:
-                # "repo::weight_file.safetensors" — needed when a repo ships
-                # multiple LoRA files (e.g. the schnell-realism v1 + v2.3).
-                repo, weight_name = lora_id.split("::", 1)
-                pipe.load_lora_weights(repo, weight_name=weight_name)
-            else:
-                # HuggingFace repo ID (single default LoRA file)
-                pipe.load_lora_weights(lora_id)
-            pipe.fuse_lora(lora_scale=lora_scale)
-            print(f"[DreamForge] LoRA loaded: {lora_id} (scale={lora_scale})")
-        except Exception as e:
-            print(f"[DreamForge] LoRA load failed ({lora_id}): {e}")
+    # LoRA stays fused on the pipe between requests — see apply_flux_lora.
+    apply_flux_lora(pipe, lora_id, lora_scale)
 
     # Reproducible seed — use provided seed or generate one
     if seed is None:
@@ -410,14 +441,6 @@ def handle_flux(job_input):
     )
     inference_time = time.time() - start
     print(f"[DreamForge] Flux {model_type} generated in {inference_time:.1f}s (seed={seed})")
-
-    # Unload LoRA after generation to keep base model clean for next request
-    if lora_id:
-        try:
-            pipe.unfuse_lora()
-            pipe.unload_lora_weights()
-        except Exception:
-            pass
 
     image = result.images[0]
     buf = io.BytesIO()
@@ -456,14 +479,10 @@ def handle_flux_img2img(job_input):
 
     pipe = get_flux_img2img_pipe("dev")
 
-    # Load LoRA if requested
-    if lora_id:
-        try:
-            pipe.load_lora_weights(lora_id)
-            pipe.fuse_lora(lora_scale=lora_scale)
-            print(f"[DreamForge] img2img LoRA loaded: {lora_id}")
-        except Exception as e:
-            print(f"[DreamForge] img2img LoRA load failed: {e}")
+    # LoRA stays fused on the pipe between requests — see apply_flux_lora.
+    # (Also fixes the "repo::weight_name" form, which this path never parsed,
+    # so the realism LoRA silently failed to load on every refine.)
+    apply_flux_lora(pipe, lora_id, lora_scale)
 
     if seed is None:
         seed = int(time.time()) % 2**32
@@ -480,13 +499,6 @@ def handle_flux_img2img(job_input):
     )
     inference_time = time.time() - start
     print(f"[DreamForge] Flux img2img completed in {inference_time:.1f}s (seed={seed}, strength={strength})")
-
-    if lora_id:
-        try:
-            pipe.unfuse_lora()
-            pipe.unload_lora_weights()
-        except Exception:
-            pass
 
     output_image = result.images[0]
     buf = io.BytesIO()
