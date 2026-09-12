@@ -26,6 +26,7 @@ const footerLinks = {
   resources: [
     { label: "Pricing", href: "/pricing" },
     { label: "Tools by profession", href: "/for" },
+    { label: "Blog", href: "/blog" },
     { label: "API Documentation", href: "/api-docs" },
     { label: "Prompt Guide", href: "/tools/prompt-builder" },
     { label: "Explore AI Art", href: "/explore" },
