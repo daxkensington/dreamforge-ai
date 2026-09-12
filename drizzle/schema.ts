@@ -941,3 +941,38 @@ export const verificationTokens = pgTable(
     pk: primaryKey({ columns: [t.identifier, t.token] }),
   }),
 );
+
+// ─── Analytics Events ─────────────────────────────────────────────────────
+/**
+ * First-party funnel log. The site had no analytics of any kind, so the drop
+ * from signup to first generation was unmeasurable and the acquisition channel
+ * was unknown (53 signups came from 43 organic clicks — the rest was invisible).
+ *
+ * Anonymous visitors are keyed by `anonId`, a random id kept in localStorage,
+ * so a session can be followed across the signup boundary and stitched to a
+ * userId once they authenticate. No PII beyond what we already store.
+ */
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: serial("id").primaryKey(),
+    anonId: varchar("anonId", { length: 64 }).notNull(),
+    userId: integer("userId"),
+    event: varchar("event", { length: 64 }).notNull(),
+    path: varchar("path", { length: 512 }),
+    referrer: varchar("referrer", { length: 512 }),
+    utmSource: varchar("utmSource", { length: 128 }),
+    utmMedium: varchar("utmMedium", { length: 128 }),
+    utmCampaign: varchar("utmCampaign", { length: 128 }),
+    props: jsonb("props"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("analytics_events_event_time_idx").on(table.event, table.createdAt),
+    index("analytics_events_anon_idx").on(table.anonId),
+    index("analytics_events_user_idx").on(table.userId),
+  ],
+);
+
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;

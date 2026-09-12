@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import PageLayout from "@/components/PageLayout";
@@ -26,7 +27,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CREDIT_PACKS } from "@shared/creditCosts";
 import { CreditCalculator } from "@/components/CreditCalculator";
 
@@ -214,6 +215,18 @@ export default function Pricing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
 
+  useEffect(() => {
+    track("paywall_viewed");
+    // Stripe sends the buyer back here on success; record the completion so
+    // checkout_started -> checkout_completed is a closed loop.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      track("checkout_completed", { kind: "subscription" });
+    } else if (params.get("credit_success") === "true") {
+      track("checkout_completed", { kind: "credit_pack" });
+    }
+  }, []);
+
   const onCheckoutError = (err: { message: string }) => {
     setPendingCheckout(null);
     toast.error(err.message || "Couldn't open checkout. Please try again.");
@@ -246,6 +259,7 @@ export default function Pricing() {
       window.location.href = "/workspace";
       return;
     }
+    track("checkout_started", { kind: "subscription", plan: tier, interval: billing });
     setPendingCheckout(tier);
     subscribeMutation.mutate({
       planName: tier as "creator" | "pro" | "studio" | "business" | "agency",
@@ -259,6 +273,7 @@ export default function Pricing() {
       window.location.href = getLoginUrl();
       return;
     }
+    track("checkout_started", { kind: "credit_pack", pack: packId });
     setPendingCheckout(packId);
     creditsMutation.mutate({ packId, origin: window.location.origin });
   };

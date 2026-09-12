@@ -52,6 +52,7 @@ import {
   Flame,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
+import { track } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
 import { ShareButton } from "@/components/ShareButton";
@@ -97,6 +98,10 @@ const VIDEO_PRESETS = [
 ];
 
 export default function Workspace() {
+  useEffect(() => {
+    track("studio_opened");
+  }, []);
+
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState("");
 

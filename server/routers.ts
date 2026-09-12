@@ -104,6 +104,7 @@ import {
   checkAndSendBudgetAlerts,
 } from "./routers/phase22";
 import { pricingRouter } from "./routers/pricing";
+import { analyticsRouter } from "./routers/analytics";
 import { marketplaceRouter } from "./routers/marketplace";
 import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
@@ -5434,6 +5435,7 @@ export const appRouter = router({
 
   // ─── Pricing & Subscriptions ─────────────────────────────────────────
   pricing: pricingRouter,
+  analytics: analyticsRouter,
 
   // ─── Creator Marketplace ──────────────────────────────────────────────
   marketplace: marketplaceRouter,
