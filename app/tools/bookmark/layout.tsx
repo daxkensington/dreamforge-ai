@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/bookmark" },
   title: "Bookmark Designer — DreamForgeX",
   description: "Printable bookmarks for readers, book clubs, and Etsy sellers.",
   openGraph: { title: "Bookmark Designer — DreamForgeX", description: "AI-designed printable bookmarks." },

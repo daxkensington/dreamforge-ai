@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/ig-carousel" },
   title: "Instagram Carousel Designer — DreamForgeX",
   description: "Branded multi-slide Instagram carousels with AI copy and design.",
   openGraph: {

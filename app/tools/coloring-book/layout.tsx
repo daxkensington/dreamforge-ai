@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/coloring-book" },
   title: "Coloring Book Page Generator — DreamForgeX",
   description: "Print-ready line-art coloring pages for kids, adults, and Etsy printables.",
   openGraph: {

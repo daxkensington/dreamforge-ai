@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/face-enhancer" },
   title: "AI Face Enhancer — DreamForgeX",
   description: "AI portrait retouching and face restoration",
   openGraph: {

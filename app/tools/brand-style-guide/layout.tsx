@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/brand-style-guide" },
   title: "Brand Style Guide Generator — DreamForgeX",
   description: "Full brand systems with logo, color palette, and typography on one reference sheet.",
   openGraph: { title: "Brand Style Guide — DreamForgeX", description: "AI-designed brand systems." },

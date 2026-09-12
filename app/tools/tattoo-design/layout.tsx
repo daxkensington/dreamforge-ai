@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/tattoo-design" },
   title: "Tattoo Designer — DreamForgeX",
   description: "AI tattoo designs with stencil and full-color variants across 10 classic styles.",
   openGraph: {

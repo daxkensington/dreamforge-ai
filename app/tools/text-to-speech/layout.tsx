@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/text-to-speech" },
   title: "Bark TTS Voice Generator — Free Online AI | DreamForgeX",
   description: "Convert text to natural speech with Bark TTS, self-hosted on our own GPUs, plus 400+ free voices. Free online AI text-to-speech, no install.",
   openGraph: {

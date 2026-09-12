@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/pixel-art" },
   title: "Pixel Art Generator — DreamForgeX",
   description: "Create game-ready 8, 16, and 32-bit pixel art sprites, characters, and tilesets with AI.",
   openGraph: {

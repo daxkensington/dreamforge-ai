@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/variations" },
   title: "AI Image Variations — DreamForgeX",
   description: "Generate creative variations of any image",
   openGraph: {

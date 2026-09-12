@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/clip-maker" },
   title: "Viral Clip Maker — DreamForgeX",
   description: "AI creates scroll-stopping short clips for TikTok and Reels",
   openGraph: {

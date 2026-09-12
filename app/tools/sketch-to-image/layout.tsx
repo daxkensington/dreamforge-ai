@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/sketch-to-image" },
   title: "Sketch to Image AI — DreamForgeX",
   description: "Transform rough sketches into polished AI artwork",
   openGraph: {

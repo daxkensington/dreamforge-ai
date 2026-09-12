@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/fashion-lookbook" },
   title: "Fashion Lookbook — DreamForgeX",
   description: "Multi-scene editorial lookbook shots from a single garment description.",
   openGraph: {

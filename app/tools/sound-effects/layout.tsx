@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/sound-effects" },
   title: "AudioGen Sound Effects Generator — Free Online | DreamForgeX",
   description: "Generate custom sound effects with AudioGen, self-hosted on our own GPUs. Free online AI sound-effect generator for games, video, and streams.",
   openGraph: {

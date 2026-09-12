@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/travel-postcard" },
   title: "Travel Postcard Maker — DreamForgeX",
   description: "Vintage-style travel postcards for any destination, any era.",
   openGraph: { title: "Travel Postcard Maker — DreamForgeX", description: "Vintage travel postcards with AI." },
