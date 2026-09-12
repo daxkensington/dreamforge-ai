@@ -1,4 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import PageLayout from "@/components/PageLayout";
@@ -210,6 +212,56 @@ export default function Pricing() {
   const { isAuthenticated } = useAuth();
   const [billing, setBilling] = useState<BillingPeriod>("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+
+  const onCheckoutError = (err: { message: string }) => {
+    setPendingCheckout(null);
+    toast.error(err.message || "Couldn't open checkout. Please try again.");
+  };
+  const goToCheckout = (res: { url: string | null }) => {
+    if (!res.url) {
+      setPendingCheckout(null);
+      toast.error("Stripe didn't return a checkout link. Please try again.");
+      return;
+    }
+    window.location.href = res.url;
+  };
+
+  const subscribeMutation = trpc.pricing.subscribe.useMutation({
+    onSuccess: goToCheckout,
+    onError: onCheckoutError,
+  });
+  const creditsMutation = trpc.pricing.purchaseCredits.useMutation({
+    onSuccess: goToCheckout,
+    onError: onCheckoutError,
+  });
+
+  /** Paid tiers open Stripe; signed-out visitors sign in first. */
+  const handleSelectPlan = (tier: string) => {
+    if (!isAuthenticated) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+    if (tier === "free") {
+      window.location.href = "/workspace";
+      return;
+    }
+    setPendingCheckout(tier);
+    subscribeMutation.mutate({
+      planName: tier as "creator" | "pro" | "studio" | "business" | "agency",
+      billingInterval: billing === "yearly" ? "year" : "month",
+      origin: window.location.origin,
+    });
+  };
+
+  const handleBuyCredits = (packId: string) => {
+    if (!isAuthenticated) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+    setPendingCheckout(packId);
+    creditsMutation.mutate({ packId, origin: window.location.origin });
+  };
 
   return (
     <PageLayout>
@@ -371,13 +423,10 @@ export default function Pricing() {
                           <Button
                             variant="outline"
                             className="w-full gap-2 bg-transparent"
-                            onClick={() => {
-                              if (!isAuthenticated) {
-                                window.location.href = getLoginUrl();
-                              }
-                            }}
+                            disabled={pendingCheckout === plan.tier}
+                            onClick={() => handleSelectPlan(plan.tier)}
                           >
-                            Go Agency
+                            {pendingCheckout === plan.tier ? "Opening checkout..." : "Go Agency"}
                             <ArrowRight className="h-4 w-4" />
                           </Button>
                           <a
@@ -390,13 +439,10 @@ export default function Pricing() {
                       ) : plan.popular ? (
                         <Button
                           className="w-full gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white border-0 shadow-lg shadow-violet-500/25"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = getLoginUrl();
-                            }
-                          }}
+                          disabled={pendingCheckout === plan.tier}
+                          onClick={() => handleSelectPlan(plan.tier)}
                         >
-                          {plan.cta}
+                          {pendingCheckout === plan.tier ? "Opening checkout..." : plan.cta}
                           <Zap className="h-4 w-4" />
                         </Button>
                       ) : plan.tier === "free" ? (
@@ -421,13 +467,10 @@ export default function Pricing() {
                         <Button
                           variant="outline"
                           className="w-full gap-2 bg-transparent"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = getLoginUrl();
-                            }
-                          }}
+                          disabled={pendingCheckout === plan.tier}
+                          onClick={() => handleSelectPlan(plan.tier)}
                         >
-                          {plan.cta}
+                          {pendingCheckout === plan.tier ? "Opening checkout..." : plan.cta}
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       )}
@@ -833,13 +876,10 @@ export default function Pricing() {
                   <Button
                     variant="outline"
                     className="w-full bg-transparent hover:bg-cyan-500/10 hover:border-cyan-500/30"
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        window.location.href = getLoginUrl();
-                      }
-                    }}
+                    disabled={pendingCheckout === pack.id}
+                    onClick={() => handleBuyCredits(pack.id)}
                   >
-                    Buy Credits
+                    {pendingCheckout === pack.id ? "Opening checkout..." : "Buy Credits"}
                   </Button>
                 </motion.div>
               );
