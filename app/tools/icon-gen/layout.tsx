@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/icon-gen" },
   title: "AI Icon Generator — DreamForgeX",
   description: "Create custom app icons and favicons with AI",
   openGraph: {

@@ -34,6 +34,37 @@ function getStripeClient(): Stripe {
   return _stripe;
 }
 
+/**
+ * Stripe moved current_period_start/end off the subscription and onto its
+ * items. Reading them from the subscription yields undefined -> NaN ->
+ * new Date(NaN), which THREW before any entitlement was written: verified in
+ * prod on 2026-09-12, the subscription was active and paid and the customer
+ * got no plan row and no credits.
+ *
+ * Prefer the item, fall back to the legacy top-level field, then to sensible
+ * defaults — a future shape change must never again cost a payer their plan.
+ */
+function subscriptionPeriod(sub: Stripe.Subscription): { start: Date; end: Date } {
+  const anySub = sub as any;
+  const item = anySub.items?.data?.[0];
+  const rawStart = item?.current_period_start ?? anySub.current_period_start ?? anySub.start_date;
+  const rawEnd = item?.current_period_end ?? anySub.current_period_end;
+
+  const start = Number.isFinite(rawStart) ? new Date(rawStart * 1000) : new Date();
+  const end = Number.isFinite(rawEnd)
+    ? new Date(rawEnd * 1000)
+    : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) {
+    console.warn(
+      "[Stripe Webhook] Subscription period missing on",
+      sub.id,
+      "- falling back so the entitlement is still granted"
+    );
+  }
+  return { start, end };
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -161,13 +192,8 @@ export async function POST(req: NextRequest) {
         const planId = parseInt(sub.metadata?.plan_id || "0");
 
         if (userId && planId) {
-          await activateSubscription(
-            userId,
-            planId,
-            sub.id,
-            new Date((sub as any).current_period_start * 1000),
-            new Date((sub as any).current_period_end * 1000)
-          );
+          const period = subscriptionPeriod(sub);
+          await activateSubscription(userId, planId, sub.id, period.start, period.end);
           console.log(
             `[Stripe Webhook] Subscription created for user ${userId}, plan ${sub.metadata?.plan_name}`
           );
@@ -192,12 +218,13 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
         const planName = sub.metadata?.plan_name || "";
+        const updatedPeriod = subscriptionPeriod(sub);
         await handleSubscriptionUpdated(
           sub.id,
           planName,
           sub.status,
-          new Date((sub as any).current_period_start * 1000),
-          new Date((sub as any).current_period_end * 1000)
+          updatedPeriod.start,
+          updatedPeriod.end
         );
         console.log(`[Stripe Webhook] Subscription updated: ${sub.id} → ${sub.status}`);
         await logWebhookEvent(

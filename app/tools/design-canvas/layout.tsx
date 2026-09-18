@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/design-canvas" },
   title: "AI Design Canvas — DreamForgeX",
   description: "Drag-and-drop design editor powered by AI. Create social posts, ads, and graphics with AI-generated elements, text, and shapes.",
   openGraph: { title: "AI Design Canvas — DreamForgeX", description: "Canva-style design editor powered by AI" },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/meme-template" },
   title: "Meme Template Filler — DreamForgeX",
   description: "Classic meme templates — Drake, Distracted Boyfriend, Galaxy Brain — with your captions.",
   openGraph: {

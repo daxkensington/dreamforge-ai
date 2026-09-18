@@ -35,7 +35,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "ad-copy": {
-    title: `Ad Copy`,
+    title: `AI Ad Copy Generator`,
     intro: `Ad Copy helps freelancers and small-business owners craft persuasive text for online advertisements, tailored to platforms like Google or Instagram. By inputting product details and target audience, it produces multiple variations in seconds, ensuring concise messaging that drives clicks. This tool matters for quick iterations without writer's block, supporting campaigns that convert viewers into customers through clear, benefit-focused language.`,
     howItWorks: [
       `Provide key details about your product, service, or campaign goal.`,
@@ -58,7 +58,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "architecture-concept": {
-    title: `Architecture Concept`,
+    title: `Architecture Concept Renderer`,
     intro: `Architecture Concept generates visual ideas for building designs from textual briefs, aiding architects and interior designers in early-stage ideation. Freelancers and small firms use it to create renders or sketches showing layouts, facades, and materials, outputting high-res images in PNG or PDF formats within a minute. It supports efficient client presentations, reducing time from concept to proposal while exploring sustainable or modern styles without drawing tools.`,
     howItWorks: [
       `Describe the project, including site details, style, and key features like room count.`,
@@ -80,7 +80,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "audio-enhance": {
-    title: `Audio Enhance`,
+    title: `AI Audio Enhancer`,
     intro: `Audio Enhance cleans up recordings by reducing noise, balancing levels, and improving clarity, perfect for podcasters, video creators, and small-business owners producing content. Upload files up to 30 minutes long, and get enhanced versions in MP3 or WAV formats in under two minutes. This tool ensures professional sound without expensive equipment, making remote interviews or tutorials more engaging and accessible to wider audiences.`,
     howItWorks: [
       `Upload your audio file from a device or cloud storage.`,
@@ -102,7 +102,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "avatar": {
-    title: `Avatar`,
+    title: `AI Avatar Generator`,
     intro: `Avatar creates personalized digital portraits from photos or descriptions, helping freelancers, creators, and small-business owners build consistent online personas for social media or branding. Generate cartoonish or realistic styles in seconds, outputting PNG images at 1024x1024 resolution. This simplifies profile setup, ensuring avatars match professional vibes without hiring illustrators, and supports quick updates for evolving personal brands.`,
     howItWorks: [
       `Upload a selfie or enter a text description of desired appearance.`,
@@ -124,7 +124,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "background": {
-    title: `Background`,
+    title: `RMBG-2.0 Background Remover`,
     intro: `The Background tool helps creators and freelancers remove or replace image backgrounds using AI, making it easier to edit photos for marketing materials or product shots. Ideal for small-business owners needing quick visual tweaks without advanced software, it streamlines workflows by delivering clean, transparent PNG files in seconds. This saves time on manual editing, allowing focus on creative projects while ensuring professional results for online listings or social media.`,
     howItWorks: [
       `Upload your image to the tool.`,
@@ -147,7 +147,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "batch-prompts": {
-    title: `Batch Prompts`,
+    title: `AI Batch Generator`,
     intro: `Batch Prompts enables users to generate multiple AI prompts at once, tailored for image or text creation in creative projects. Freelancers and small-business owners can input a base idea and produce variations efficiently, cutting down on repetitive brainstorming. This tool matters for scaling content production, delivering 10-50 prompts in under a minute to fuel tools like image generators or writers.`,
     howItWorks: [
       `Enter a core prompt or theme in the input field.`,
@@ -193,7 +193,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "bookmark": {
-    title: `Bookmark`,
+    title: `Bookmark Designer`,
     intro: `The Bookmark tool lets users save and organize prompts, images, or project assets within DreamForgeX for quick access in future sessions. Creators and freelancers benefit from a centralized library to reuse effective elements, reducing setup time across tools. It supports small-business owners by maintaining a personal repository, exportable as lists or folders for offline backup.`,
     howItWorks: [
       `Select content from any tool output to bookmark.`,
@@ -216,7 +216,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "brand-style-guide": {
-    title: `Brand Style Guide`,
+    title: `Brand Style Guide Generator`,
     intro: `Brand Style Guide generates comprehensive visual and textual guidelines from your logo, colors, and preferences, aiding small-business owners and freelancers in maintaining consistency across assets. It outputs a downloadable PDF with rules for fonts, imagery, and tone, typically 5-10 pages long. This tool ensures professional branding without hiring designers, supporting scalable growth for creative projects.`,
     howItWorks: [
       `Upload your logo and select primary colors.`,
@@ -371,7 +371,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "collage": {
-    title: `Collage`,
+    title: `AI Collage Maker`,
     intro: `Collage lets creators combine multiple images into cohesive designs using AI-assisted layouts. Suited for freelancers handling visual content and small-business owners needing quick graphics, it simplifies arranging photos with automatic balancing of colors and spacing. This tool streamlines mood boards or promotional visuals, exporting in PNG or JPG formats under 5MB, ready for web or print use in moments.`,
     howItWorks: [
       `Upload 2 to 10 images from your device or cloud storage.`,
@@ -393,7 +393,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "color-grading": {
-    title: `Color Grading`,
+    title: `AI Color Grading`,
     intro: `Color Grading applies precise adjustments to enhance tones in photos and videos with AI guidance. Photographers, videographers, and small-business marketers use it to achieve professional looks without complex software. It balances exposure, saturation, and hues for consistent branding, processing files in seconds and exporting in standard formats like JPG for images or MP4 for videos, typically 2-10MB depending on length.`,
     howItWorks: [
       `Upload your photo or video file.`,
@@ -415,7 +415,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "color-palette": {
-    title: `Color Palette`,
+    title: `AI Color Palette Extractor`,
     intro: `Color Palette generates harmonious schemes from images, keywords, or moods using AI analysis. Designers, web developers, and small-business owners rely on it for consistent branding without trial-and-error. It extracts or creates sets of 4-8 colors, exporting as swatches, CSS code, or PNG files under 1MB, enabling fast integration into projects like logos or websites.`,
     howItWorks: [
       `Input an image, describe a theme, or select a mood.`,
@@ -437,7 +437,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "coloring-book": {
-    title: `Coloring Book`,
+    title: `Coloring Book Page Generator`,
     intro: `Coloring Book transforms images or text prompts into printable line art pages with AI outline generation. Educators, artists, and small-business owners creating custom printables use it to produce engaging designs quickly. It creates clean, black-and-white illustrations suitable for kids or adults, exporting as PDF sheets of 5-20 pages, each under 2MB, ready for home printing or digital sales.`,
     howItWorks: [
       `Upload an image or enter a descriptive prompt.`,
@@ -459,7 +459,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "comic-strip": {
-    title: `Comic Strip`,
+    title: `Comic Strip Generator`,
     intro: `This tool lets creators generate custom comic strips from text descriptions, turning ideas into visual sequences with characters, dialogue, and scenes. It's designed for freelance writers, indie comic artists, and small business owners creating content for social media or blogs. By simplifying the illustration process, it saves time on sketching and layout, allowing focus on storytelling while producing shareable PNG files up to 2000x2000 pixels in under a minute.`,
     howItWorks: [
       `Enter a text prompt describing the comic's plot, characters, and style.`,
@@ -481,7 +481,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "concert-poster": {
-    title: `Concert Poster`,
+    title: `Concert Poster Maker`,
     intro: `Generate eye-catching concert posters using AI from event details like band name, date, and venue. Tailored for musicians, event planners, and small venue owners, it handles design elements such as typography, imagery, and layouts efficiently. This streamlines promotion without hiring a designer, delivering customizable JPEG or PNG files in sizes up to A3, ready for print or digital sharing in about 30 seconds.`,
     howItWorks: [
       `Input event specifics including performer, date, location, and theme.`,
@@ -547,7 +547,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "depth-map": {
-    title: `Depth Map`,
+    title: `AI Depth Map Generator`,
     intro: `Convert 2D images into depth maps to add 3D-like effects or support AR/VR projects, using AI to analyze layers and distances. For photographers, video editors, and small content creators, it enhances visuals for apps or social posts without complex software. Outputs grayscale PNG maps at original image resolution, processed in 10-20 seconds, enabling realistic depth simulations for practical applications.`,
     howItWorks: [
       `Upload a source image or describe a scene.`,
@@ -569,7 +569,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "design-canvas": {
-    title: `Design Canvas`,
+    title: `AI Design Canvas`,
     intro: `Design Canvas lets creators and freelancers build custom graphics and layouts from scratch using AI-assisted tools. Ideal for small-business owners needing quick visuals without design software expertise, it streamlines the process of combining text, shapes, and images into cohesive designs. Outputs are available in standard formats like PNG or JPEG, typically ready in under a minute, helping you produce professional assets for marketing or personal projects efficiently.`,
     howItWorks: [
       `Start by selecting a template or blank canvas size.`,
@@ -615,7 +615,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "event-flyer": {
-    title: `Event Flyer`,
+    title: `Event Flyer Designer`,
     intro: `Event Flyer helps small-business owners and freelancers produce eye-catching promotional materials for gatherings, workshops, or launches using AI-driven templates. It combines your event details with visuals to create ready-to-print or digital shares. Flyers export as PDF or high-res images in about 30 seconds, sized for standard formats like A5 or social media, saving time on design while ensuring a polished look that attracts attendees.`,
     howItWorks: [
       `Input event details such as date, location, and theme.`,
@@ -684,7 +684,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "film-grain": {
-    title: `Film Grain`,
+    title: `Film Grain Effects`,
     intro: `The Film Grain tool adds subtle, realistic grain effects to your digital images, mimicking the texture of traditional film photography. It's designed for photographers, graphic designers, and content creators who want to give modern photos a vintage or cinematic feel without complex editing software. This helps small-business owners and freelancers stand out on platforms like Instagram or Etsy by creating authentic-looking visuals that evoke nostalgia, all processed quickly for files up to 10MB in JPEG or PNG formats.`,
     howItWorks: [
       `Upload your image file directly to the tool.`,
@@ -706,7 +706,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "greeting-card": {
-    title: `Greeting Card`,
+    title: `Greeting Card Designer`,
     intro: `The Greeting Card tool lets you create personalized digital and printable cards using AI-generated designs tailored to occasions like birthdays or holidays. Freelancers, small-business owners, and creators can quickly produce unique cards for clients or their own marketing without design expertise. It saves time on custom projects, delivering ready-to-use files in PDF or high-res PNG formats, typically under 5MB, ideal for email sharing or print-on-demand services.`,
     howItWorks: [
       `Enter a description of the occasion and recipient.`,
@@ -728,7 +728,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "hdr-enhance": {
-    title: `HDR Enhance`,
+    title: `AI HDR Enhancer`,
     intro: `The HDR Enhance tool improves the dynamic range of your photos, bringing out details in shadows and highlights for a more balanced look. Photographers and small-business owners use it to polish product shots or event images without expensive equipment. It processes files efficiently, handling up to 20MB images in seconds and outputting in standard formats like JPEG, making it practical for quick edits in freelance workflows or online stores.`,
     howItWorks: [
       `Upload a single photo or batch of images.`,
@@ -750,7 +750,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "headshot": {
-    title: `Headshot`,
+    title: `AI Professional Headshots`,
     intro: `The Headshot tool generates professional-looking headshots from uploaded selfies or text descriptions, ideal for freelancers and small-business owners needing polished profiles without studio costs. It refines lighting, background, and attire for LinkedIn or website use, producing realistic results in minutes. Creators benefit from versatile outputs in PNG format, around 2MB, suitable for resumes, social media, or client portfolios.`,
     howItWorks: [
       `Upload a selfie or describe your desired appearance.`,
@@ -772,7 +772,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "icon-gen": {
-    title: `Icon Gen`,
+    title: `AI Icon Generator`,
     intro: `The Icon Gen tool creates custom vector icons based on your descriptions, helping UI designers, app developers, and small-business owners build cohesive visual assets quickly. It outputs scalable SVGs for websites or apps, typically under 100KB, ensuring crisp display at any size without pixelation. Freelancers save hours on repetitive design tasks, focusing instead on unique branding elements.`,
     howItWorks: [
       `Describe the icon concept and style preferences.`,
@@ -794,7 +794,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "ig-carousel": {
-    title: `IG Carousel`,
+    title: `Instagram Carousel Designer`,
     intro: `IG Carousel helps creators and small business owners design multi-slide posts for Instagram, combining images, text, and graphics into cohesive carousels. It's useful for freelancers promoting services or shops showcasing products, allowing quick assembly of up to 10 slides that fit Instagram's format. This tool streamlines content creation, ensuring visuals align with brand aesthetics and engage audiences without needing advanced design software, saving time on social media management.`,
     howItWorks: [
       `Upload your images and graphics to the tool.`,
@@ -816,7 +816,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "image-blender": {
-    title: `Image Blender`,
+    title: `AI Image Blender`,
     intro: `Image Blender enables creators and freelancers to merge multiple images into seamless composites, ideal for custom visuals in marketing or personal projects. Small business owners use it to combine product photos with backgrounds, creating professional-looking assets without expensive software. It handles layering and blending modes efficiently, producing high-resolution outputs that enhance visual storytelling and brand consistency across platforms.`,
     howItWorks: [
       `Select and upload two or more images to blend.`,
@@ -838,7 +838,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "image-caption": {
-    title: `Image Caption`,
+    title: `AI Image Caption Generator`,
     intro: `Image Caption generates descriptive text for photos, helping freelancers and small business owners optimize social media posts or blog content. It's designed for creators needing quick, relevant captions that boost engagement without writer's block. By analyzing image content, it suggests SEO-friendly phrases, making it easier to describe products or services accurately and attract the right audience.`,
     howItWorks: [
       `Upload a single image to the tool.`,
@@ -860,7 +860,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "image-to-prompt": {
-    title: `Image To Prompt`,
+    title: `Image to Prompt Analyzer`,
     intro: `Image To Prompt converts uploaded images into detailed text descriptions, aiding creators and freelancers in recreating or iterating on visuals via AI tools. Small business owners benefit by turning reference photos into prompts for generating variations, streamlining design workflows. This tool extracts styles, compositions, and elements accurately, saving time on manual descriptions for consistent branding.`,
     howItWorks: [
       `Upload an image for analysis.`,
@@ -882,7 +882,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "image-to-video": {
-    title: `Image To Video`,
+    title: `CogVideoX Image to Video`,
     intro: `Image To Video animates static images into short clips, perfect for creators and freelancers adding motion to social content or presentations. Small business owners use it to bring product visuals to life, increasing viewer retention without video editing expertise. It applies subtle effects like pans or zooms, outputting quick videos that fit platform specs and enhance marketing efforts.`,
     howItWorks: [
       `Upload a high-res image.`,
@@ -904,7 +904,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "inpainting": {
-    title: `Inpainting`,
+    title: `AI Inpainting Editor`,
     intro: `Inpainting lets creators and freelancers edit images by seamlessly filling in selected areas with AI-generated content that matches the surroundings. Ideal for photographers, graphic designers, and small business owners needing to remove unwanted elements or add details without starting from scratch. It handles tasks like erasing backgrounds or inserting objects, producing high-resolution outputs in formats like PNG or JPEG, typically within seconds, to streamline workflows and improve visual appeal for client projects.`,
     howItWorks: [
       `Upload your image to the tool.`,
@@ -926,7 +926,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "interior-design": {
-    title: `Interior Design`,
+    title: `AI Interior Design`,
     intro: `This tool generates realistic interior design visuals from text descriptions or uploaded room photos, helping freelancers, homeowners, and small business owners visualize renovations or layouts. It supports styles from modern minimalist to cozy rustic, outputting high-quality renders in PNG or JPEG formats ready for presentations. Users can iterate quickly to refine ideas, saving time on sketches and consultations while making design decisions more accessible and collaborative.`,
     howItWorks: [
       `Input a photo of your space or describe the room and desired style.`,
@@ -948,7 +948,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "invitation": {
-    title: `Invitation`,
+    title: `Invitation Designer`,
     intro: `Design custom digital invitations for events using AI to blend templates with your personal touches, perfect for event planners, small business owners, and creators handling parties or promotions. It offers editable text, colors, and imagery, producing print-ready PDFs or shareable PNGs in under a minute. This streamlines creating professional invites that stand out, reducing design time and costs for weddings, launches, or casual gatherings.`,
     howItWorks: [
       `Select a template or describe your event theme.`,
@@ -970,7 +970,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "listing-photos": {
-    title: `Listing Photos`,
+    title: `Listing Photo Pack`,
     intro: `Enhance real estate listing photos with AI-powered edits like virtual staging and lighting adjustments, targeted at agents, sellers, and freelancers in property marketing. It transforms empty spaces into furnished ones or boosts curb appeal, delivering optimized JPEGs or PNGs sized for MLS uploads in moments. This practical tool helps listings attract more views without the expense of professional staging, making properties sell faster through better visuals.`,
     howItWorks: [
       `Upload your property photo to the platform.`,
@@ -992,7 +992,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "logo-animator": {
-    title: `Logo Animator`,
+    title: `AI Logo Animator`,
     intro: `Turn static logos into smooth animated videos using AI, designed for freelancers, brands, and small business owners to add motion to branding without animation software. Choose from effects like fade-ins or rotations, exporting MP4 files up to 10 seconds long at 1080p resolution in seconds. It simplifies creating engaging intros for social media, websites, or ads, enhancing brand visibility with minimal effort.`,
     howItWorks: [
       `Upload your logo file in PNG or SVG format.`,
@@ -1035,7 +1035,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "meme": {
-    title: `Meme`,
+    title: `AI Meme Generator`,
     intro: `Meme is a straightforward tool for creators and social media managers to build humorous images with text overlays. Upload your photo or pick from stock, add top and bottom captions, and apply filters for that classic meme look. It's ideal for quick content that boosts engagement on platforms like Instagram or Twitter. Results export in JPG format at 1080x1080 pixels, ready to post in seconds, helping small businesses add personality to their marketing.`,
     howItWorks: [
       `Select a base image or upload your own.`,
@@ -1056,7 +1056,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "meme-template": {
-    title: `Meme Template`,
+    title: `Meme Template Filler`,
     intro: `Meme Template lets small-business owners and content creators design reusable bases for custom memes. Input themes or keywords to generate blank templates with placeholders for text, then tweak layouts for consistency across posts. Perfect for building a library of branded humor without starting from scratch each time. Templates download as editable PSD files up to 1200x1200 pixels, allowing easy customization in tools like Photoshop for ongoing social campaigns.`,
     howItWorks: [
       `Enter a theme or description to generate template ideas.`,
@@ -1077,7 +1077,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "menu-design": {
-    title: `Menu Design`,
+    title: `Menu Designer`,
     intro: `Menu Design assists restaurant owners and event planners in crafting professional layouts for food and drink offerings. Provide your items, prices, and theme—modern or rustic—and it arranges them into clean, printable designs. This tool streamlines updates for seasonal changes, delivering PDFs at 8.5x11 inches for easy printing or digital sharing. Freelancers can use it to offer quick services, with generations completing in about 20 seconds.`,
     howItWorks: [
       `List your menu items, categories, and prices in the form.`,
@@ -1098,7 +1098,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "mockup": {
-    title: `Mockup`,
+    title: `AI Mockup Generator`,
     intro: `Mockup enables designers and e-commerce sellers to place their artwork on realistic product visuals, like t-shirts or phone cases. Upload your design, choose the item type, and adjust angles or lighting for lifelike presentations. It's useful for portfolios or sales pages, generating high-res images in PNG format up to 4000x4000 pixels within 15 seconds. Small-business owners appreciate how it elevates product listings without photography setups.`,
     howItWorks: [
       `Upload your design file or generate one in the tool.`,
@@ -1207,7 +1207,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "object-eraser": {
-    title: `Object Eraser`,
+    title: `AI Object Eraser`,
     intro: `The Object Eraser removes unwanted items from photos using AI selection or text prompts, filling the space naturally. Photographers, real estate agents, and online sellers use it to clean up images efficiently. It handles uploads up to 5MB in standard formats, producing seamless PNG results in under 20 seconds for professional-looking outputs.`,
     howItWorks: [
       `Upload the image containing the object to remove.`,
@@ -1229,7 +1229,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "outpainting": {
-    title: `Outpainting`,
+    title: `AI Outpainting`,
     intro: `Outpainting extends the borders of your existing images by generating seamless new content that matches the original style and composition. Freelancers and small-business owners use it to create wider scenes from standard photos without starting from scratch, saving time on design projects. It helps in building immersive visuals for marketing materials or personal art, delivering high-resolution outputs up to 4K in PNG or JPEG formats within minutes.`,
     howItWorks: [
       `Upload your image to the tool.`,
@@ -1252,7 +1252,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "panorama": {
-    title: `Panorama`,
+    title: `AI Panorama Generator`,
     intro: `Panorama stitches multiple images or expands a single photo into a wide, immersive view using AI to fill in gaps naturally. Creators and small-business owners rely on it for quick assembly of scenic or product shots, ideal when manual editing feels time-consuming. It produces detailed 360-degree or wide-angle results in high resolution, ready for download in under two minutes, supporting formats like JPEG for web or print use.`,
     howItWorks: [
       `Upload one or more overlapping photos.`,
@@ -1276,7 +1276,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "pet-portrait": {
-    title: `Pet Portrait`,
+    title: `Pet Portrait Generator`,
     intro: `Pet Portrait transforms everyday photos of your animals into stylized artistic renderings, like oil paintings or sketches, using AI to capture their personality. Freelancers offering custom pet art and small-business owners in pet services use it to create engaging visuals for social media or products. It generates downloadable images in PNG format at up to 3000x3000 pixels in seconds, making it straightforward to produce shareable or sellable content.`,
     howItWorks: [
       `Upload a clear photo of your pet.`,
@@ -1300,7 +1300,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "photo-colorize": {
-    title: `Photo Colorize`,
+    title: `Old Photo Colorizer`,
     intro: `Photo Colorize adds realistic colors to black-and-white images using AI to analyze tones and suggest historically accurate or creative hues. It's useful for creators restoring family archives or freelancers enhancing vintage content for clients. The tool delivers colorized versions in JPEG or PNG up to 4K resolution quickly, often in 30 seconds, helping preserve memories or modernize old visuals for blogs and prints.`,
     howItWorks: [
       `Upload your black-and-white photo.`,
@@ -1324,7 +1324,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "photo-restore": {
-    title: `Photo Restore`,
+    title: `AI Photo Restorer`,
     intro: `Photo Restore repairs damaged or aged photographs by removing scratches, fading, and tears with AI-driven fixes while preserving original details. Small-business owners in photography and freelancers handling client archives find it essential for quick revivals without expensive software. It outputs cleaned images in high resolution, typically PNG format ready in one minute, ideal for digitizing and sharing heirlooms or professional portfolios.`,
     howItWorks: [
       `Upload the damaged photo.`,
@@ -1485,7 +1485,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "qr-art": {
-    title: `QR Art`,
+    title: `AI QR Code Art`,
     intro: `QR Art transforms standard QR codes into visually appealing designs that incorporate logos, colors, and patterns while maintaining scannability. It's ideal for small-business owners and marketers who want to add a branded touch to invitations, packaging, or ads without sacrificing functionality. This tool ensures codes link reliably to websites or profiles, helping creators stand out in crowded markets like events or retail displays.`,
     howItWorks: [
       `Input your URL or contact data to generate the base QR code.`,
@@ -1529,7 +1529,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "recipe-card": {
-    title: `Recipe Card`,
+    title: `Recipe Card Generator`,
     intro: `Recipe Card generates clean, printable cards from your ingredients, steps, and notes, perfect for food bloggers, home cooks, or small-batch sellers organizing their collections. It formats content into attractive layouts with space for photos, helping creators share recipes professionally on blogs, social media, or as Etsy printables. The tool ensures readability and customization, making it easier to produce shareable assets that enhance audience engagement without design expertise.`,
     howItWorks: [
       `Input recipe title, ingredients list, and step-by-step instructions.`,
@@ -1551,7 +1551,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "relight": {
-    title: `Relight`,
+    title: `AI Relighting`,
     intro: `Relight allows photographers and e-commerce sellers to adjust lighting in existing images, simulating new angles or intensities to fix underexposed shots or enhance moods. Freelancers use it for quick product tweaks or portrait improvements, delivering polished results that boost sales on sites like Shopify without reshoots. The tool handles common formats efficiently, providing editable outputs that integrate into workflows seamlessly.`,
     howItWorks: [
       `Upload your image in JPG, PNG, or RAW format up to 20MB.`,
@@ -1594,7 +1594,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "sketch-to-image": {
-    title: `Sketch To Image`,
+    title: `Sketch to Image AI`,
     intro: `Sketch To Image transforms rough hand-drawn sketches into detailed digital artwork using AI on DreamForgeX. Ideal for illustrators, designers, and hobbyists who want to refine ideas without advanced software skills. Upload a simple line drawing, add a description, and get a high-resolution image that captures your vision. This tool bridges the gap between concept and polished visuals, helping creators iterate faster and produce assets for client work or personal projects in under a minute per generation.`,
     howItWorks: [
       `Upload your sketch as a PNG or JPG file under 5MB.`,
@@ -1615,7 +1615,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "social-resize": {
-    title: `Social Resize`,
+    title: `Social Media Resizer`,
     intro: `Social Resize on DreamForgeX automatically adjusts images to fit various social media dimensions, saving time for content creators and small-business owners. Upload a single photo or graphic, select target platforms like Instagram or Twitter, and get optimized versions ready for posting. This ensures your visuals look sharp without distortion, maintaining brand consistency across channels. It's practical for freelancers managing multiple accounts, producing batch downloads in seconds to streamline your workflow.`,
     howItWorks: [
       `Upload an image file up to 10MB in JPG or PNG format.`,
@@ -1636,7 +1636,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "social-templates": {
-    title: `Social Templates`,
+    title: `Social Video Templates`,
     intro: `Social Templates provides customizable starting points for eye-catching posts on DreamForgeX, tailored for freelancers and small-business owners building online presence. Choose from editable graphics for announcements, promotions, or stories, then tweak text, colors, and images to match your brand. This speeds up content creation without design expertise, delivering ready-to-post files in formats like PNG or JPG. It's useful for consistent posting schedules, helping you engage audiences more effectively with professional-looking updates.`,
     howItWorks: [
       `Browse and select a template category, such as quotes or product highlights.`,
@@ -1678,7 +1678,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "sound-effects": {
-    title: `Sound Effects`,
+    title: `AudioGen Sound Effects Generator`,
     intro: `The Sound Effects tool lets creators generate custom audio clips based on text descriptions, ideal for video editors, podcasters, and game developers who need quick, tailored sounds without searching stock libraries. It produces realistic effects like footsteps or ambient noise, saving time on projects where audio enhances storytelling or immersion. Freelancers can integrate these into client work efficiently, downloading files in standard formats for seamless use in editing software, helping small businesses add professional polish without hiring specialists.`,
     howItWorks: [
       `Enter a detailed text description of the desired sound effect.`,
@@ -1701,7 +1701,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "sticker-pack": {
-    title: `Sticker Pack`,
+    title: `Sticker Pack Designer`,
     intro: `Sticker Pack helps designers and small-business owners create themed sets of digital stickers from simple prompts, perfect for messaging apps, merchandise, or social media graphics. It outputs cohesive packs of 10-20 stickers in high-resolution PNGs with transparent backgrounds, making it easy to customize branding or fun content. Freelancers can produce these quickly for clients in e-commerce or content creation, downloading ready-to-use files that streamline production without design software expertise.`,
     howItWorks: [
       `Describe the theme or style for your sticker pack.`,
@@ -1724,7 +1724,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "style-transfer": {
-    title: `Style Transfer`,
+    title: `AI Style Transfer`,
     intro: `Style Transfer applies artistic styles to your images using AI, allowing photographers, graphic designers, and social media managers to reimagine photos in painterly or vintage looks without advanced skills. It processes uploads quickly, outputting files in common formats like JPEG or PNG, which helps freelancers enhance client visuals or personal portfolios. Small-business owners use it to create unique marketing assets, transforming ordinary shots into eye-catching content that stands out online.`,
     howItWorks: [
       `Upload your base image from your device.`,
@@ -1747,7 +1747,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "tarot-card": {
-    title: `Tarot Card`,
+    title: `Tarot Card Designer`,
     intro: `The Tarot Card tool generates custom tarot-inspired designs based on themes or prompts, suited for artists, spiritual coaches, and gift shop owners seeking unique decks for readings or decor. It creates individual cards or full sets with symbolic imagery, outputting high-res PNGs ready for printing or digital use. Freelancers benefit by producing personalized items quickly, helping small businesses offer bespoke products like custom oracle sets without traditional illustration time.`,
     howItWorks: [
       `Input a theme, card name, or symbolic elements for the design.`,
@@ -1770,7 +1770,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "tattoo-design": {
-    title: `Tattoo Design`,
+    title: `Tattoo Designer`,
     intro: `Tattoo Design uses AI to create original tattoo concepts from text descriptions, aiding tattoo artists, body art enthusiasts, and merch sellers in visualizing ideas efficiently. It generates black-and-white or colored sketches in scalable vector-like PNGs, downloadable for client consultations or portfolio building. Freelancers and small studios save sketching time, producing multiple variations to refine personal or custom requests without starting from scratch each time.`,
     howItWorks: [
       `Describe the tattoo idea, including style, size, and placement.`,
@@ -1793,7 +1793,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "templates": {
-    title: `Templates`,
+    title: `Project Templates`,
     intro: `The Templates tool on DreamForgeX lets creators and freelancers quickly generate customizable design templates using AI prompts. Tailored for small-business owners needing professional visuals without starting from scratch, it produces editable files in formats like PSD or Figma-compatible exports. This saves hours on repetitive design work, allowing focus on unique branding while ensuring consistent, high-quality outputs for marketing materials or social media graphics.`,
     howItWorks: [
       `Enter a description of your desired template, such as a social media post layout or business card design.`,
@@ -1815,7 +1815,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "text-effects": {
-    title: `Text Effects`,
+    title: `AI Text Effects`,
     intro: `DreamForgeX's Text Effects tool applies AI-driven styling to text elements, from metallic shines to neon glows, helping creators enhance visuals in graphics and videos. Freelancers and small-business owners use it to add professional flair without advanced software skills, producing effects in PNG or GIF formats ready for web or print. It streamlines the process of making text stand out in designs, improving engagement for social posts or branding materials.`,
     howItWorks: [
       `Input your text string and choose an effect category like shadow, gradient, or 3D.`,
@@ -1837,7 +1837,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "text-to-speech": {
-    title: `Text To Speech`,
+    title: `Bark TTS Voice Generator`,
     intro: `The Text To Speech tool converts written content into natural-sounding audio files, ideal for creators producing podcasts or audiobooks without recording equipment. Freelancers and small-business owners benefit by adding voiceovers to videos or apps efficiently, outputting in MP3 or WAV formats at speeds up to 150 words per minute. It supports multiple voices and accents, making content accessible and engaging for global audiences.`,
     howItWorks: [
       `Paste or type your text script into the input field.`,
@@ -1859,7 +1859,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "text-to-video": {
-    title: `Text To Video`,
+    title: `AI Text to Video`,
     intro: `DreamForgeX's Text To Video tool turns descriptive text prompts into short video clips, assisting creators in producing marketing or social media content quickly. Freelancers and small-business owners find it useful for visualizing ideas without filming, generating 10-30 second videos in MP4 format at 1080p resolution. This approach cuts production time, enabling rapid iteration on visuals for ads or tutorials.`,
     howItWorks: [
       `Describe your video concept in a detailed text prompt, including scenes and style.`,
@@ -1881,7 +1881,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "texture": {
-    title: `Texture`,
+    title: `AI Texture Generator`,
     intro: `The Texture tool generates realistic surface patterns and materials via AI, supporting designers in creating backgrounds or 3D assets for graphics and products. Creators, freelancers, and small-business owners use it to add depth to visuals without sourcing images, outputting high-res files in JPEG or PNG up to 4K resolution. It facilitates efficient workflow for packaging designs or digital art, ensuring versatile, seamless textures.`,
     howItWorks: [
       `Enter a prompt describing the texture, like 'rusty metal' or 'linen fabric'.`,
@@ -1947,7 +1947,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "train-model": {
-    title: `Train Custom Model`,
+    title: `Train Custom AI Model`,
     intro: `The Train Custom Model tool lets creators and small-business owners fine-tune AI models with their own data for tailored creative outputs. Suited for freelancers building personalized tools, it processes datasets to improve results in image or text generation, typically completing in 10-30 minutes depending on size. This approach helps achieve more relevant designs without starting from scratch, outputting a deployable model file under 500MB.`,
     howItWorks: [
       `Upload your dataset, such as images or text files.`,
@@ -2059,7 +2059,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "variations": {
-    title: `Variations`,
+    title: `AI Image Variations`,
     intro: `The Variations tool generates multiple AI-based edits of an input image, ideal for creators exploring design options. Freelancers and small-business owners can create diverse color schemes or style tweaks from one base file, outputting in PNG format. This streamlines ideation for marketing materials, reducing trial-and-error time. Outputs come as a set of 4-8 files, each around 2MB, ready for client presentations or A/B testing.`,
     howItWorks: [
       `Upload a base image in PNG or JPEG, up to 5MB.`,
@@ -2082,7 +2082,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "vectorize": {
-    title: `Vectorize`,
+    title: `AI Image Vectorizer`,
     intro: `The Vectorize tool converts raster images like photos or sketches into editable SVG vectors for designers and small-business owners. It traces edges accurately, producing scalable files without quality loss, perfect for logos or icons in print or web use. Freelancers save hours on redrawing, getting outputs ready for tools like Adobe Illustrator. Files download instantly, typically 50-200KB, supporting unlimited scaling for various project sizes.`,
     howItWorks: [
       `Upload a raster image in PNG, JPEG, or BMP, ideally with clear edges.`,
@@ -2105,7 +2105,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
   },
   "virtual-tryon": {
-    title: `Virtual Tryon`,
+    title: `Virtual Try-On`,
     intro: `The Virtual Tryon tool lets apparel creators and small-business owners visualize clothing on diverse AI-generated models. Upload garment images to see realistic fits on body types, poses, and skin tones, outputting in high-res PNG. Freelancers use it to preview designs before production, aiding client approvals. This cuts physical sample costs, with renders ready in seconds and files around 3MB for easy sharing in proposals or e-commerce.`,
     howItWorks: [
       `Upload your clothing image, such as a flat lay or mannequin photo.`,

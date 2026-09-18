@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/listing-photos" },
   title: "Listing Photo Pack — DreamForgeX",
   description: "Turn one product shot into a 5-photo Etsy/Shopify-ready listing pack.",
   openGraph: {

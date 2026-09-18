@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/tshirt-designer" },
   title: "T-Shirt Designer — DreamForgeX",
   description: "Generate print-ready t-shirt designs with AI",
   openGraph: {

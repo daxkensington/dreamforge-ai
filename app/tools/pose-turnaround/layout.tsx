@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/pose-turnaround" },
   title: "Pose Turnaround — DreamForgeX",
   description: "Multi-view character reference sheets for artists — front, side, back, and 3/4 views.",
   openGraph: {

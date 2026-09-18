@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/meme" },
   title: "AI Meme Generator — DreamForgeX",
   description: "Create viral memes with AI and trending formats",
   openGraph: {

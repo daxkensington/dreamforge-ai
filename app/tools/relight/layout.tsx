@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/relight" },
   title: "AI Relighting — DreamForgeX",
   description: "Change the lighting and mood of any photo",
   openGraph: {

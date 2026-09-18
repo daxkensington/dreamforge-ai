@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/nl-edit" },
   title: "AI Natural Language Image Editor — DreamForgeX",
   description: "Edit images by describing changes in English",
   openGraph: {

@@ -57,6 +57,68 @@ async function getPlanByName(name: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Resolve the Stripe price id for a plan at the requested billing interval.
+ * Creates the product/price on Stripe the first time a plan is bought and
+ * reuses whatever already exists, so repeat checkouts don't pile up prices.
+ */
+async function resolveStripePriceId(
+  plan: {
+    id: number;
+    name: string;
+    displayName: string;
+    price: number;
+    monthlyCredits: number;
+    stripeProductId: string | null;
+    stripePriceId: string | null;
+  },
+  interval: "month" | "year"
+): Promise<string> {
+  const stripe = getStripe();
+  const shared = SUBSCRIPTION_PLANS.find((p) => p.name === plan.name);
+  const unitAmount = interval === "year" ? shared?.yearlyPrice ?? plan.price * 12 : plan.price;
+  if (!unitAmount || unitAmount <= 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "That plan is not purchasable" });
+  }
+
+  let productId = plan.stripeProductId;
+  if (!productId) {
+    const product = await stripe.products.create({
+      name: `DreamForge ${plan.displayName} Plan`,
+      description: `${plan.monthlyCredits.toLocaleString()} credits/month`,
+      metadata: { planId: plan.id.toString(), planName: plan.name },
+    });
+    productId = product.id;
+  }
+
+  // Reuse an existing price for this interval/amount if Stripe already has one.
+  const existing = await stripe.prices.list({ product: productId, active: true, limit: 100 });
+  const match = existing.data.find(
+    (p) => p.recurring?.interval === interval && p.unit_amount === unitAmount && p.currency === "usd"
+  );
+  const priceId =
+    match?.id ??
+    (
+      await stripe.prices.create({
+        product: productId,
+        unit_amount: unitAmount,
+        currency: "usd",
+        recurring: { interval },
+        metadata: { planId: plan.id.toString(), planName: plan.name },
+      })
+    ).id;
+
+  // Persist the product id, and the monthly price as the plan's canonical one.
+  const db = await getDb();
+  if (db) {
+    const set: Record<string, unknown> = { stripeProductId: productId };
+    if (interval === "month") set.stripePriceId = priceId;
+    await db.update(subscriptionPlans).set(set).where(eq(subscriptionPlans.id, plan.id));
+  }
+
+  return priceId;
+}
+
 async function getPlanById(planId: number) {
   const db = await getDb();
   if (!db) return null;
@@ -145,37 +207,14 @@ export const pricingRouter = router({
     .input(
       z.object({
         planName: z.enum(["creator", "pro", "studio", "business", "agency"]),
+        billingInterval: z.enum(["month", "year"]).default("month"),
         origin: z.string().url(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const plan = await getPlanByName(input.planName);
       if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-      if (!plan.stripePriceId) {
-        // Create Stripe product + price on the fly if not yet configured
-        const product = await getStripe().products.create({
-          name: `DreamForge ${plan.displayName} Plan`,
-          description: `${plan.monthlyCredits.toLocaleString()} credits/month`,
-          metadata: { planId: plan.id.toString(), planName: plan.name },
-        });
-        const price = await getStripe().prices.create({
-          product: product.id,
-          unit_amount: plan.price,
-          currency: "usd",
-          recurring: { interval: "month" },
-          metadata: { planId: plan.id.toString() },
-        });
-
-        const db = await getDb();
-        if (db) {
-          await db
-            .update(subscriptionPlans)
-            .set({ stripeProductId: product.id, stripePriceId: price.id })
-            .where(eq(subscriptionPlans.id, plan.id));
-        }
-        plan.stripePriceId = price.id;
-        plan.stripeProductId = product.id;
-      }
+      const priceId = await resolveStripePriceId(plan, input.billingInterval);
 
       const customerId = await getStripeCustomerId(
         ctx.user.id,
@@ -197,17 +236,19 @@ export const pricingRouter = router({
         client_reference_id: ctx.user.id.toString(),
         mode: "subscription",
         allow_promotion_codes: true,
-        line_items: [{ price: plan.stripePriceId!, quantity: 1 }],
+        line_items: [{ price: priceId, quantity: 1 }],
         metadata: {
           user_id: ctx.user.id.toString(),
           plan_id: plan.id.toString(),
           plan_name: plan.name,
+          billing_interval: input.billingInterval,
         },
         subscription_data: {
           metadata: {
             user_id: ctx.user.id.toString(),
             plan_id: plan.id.toString(),
             plan_name: plan.name,
+            billing_interval: input.billingInterval,
           },
         },
         success_url: `${input.origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,

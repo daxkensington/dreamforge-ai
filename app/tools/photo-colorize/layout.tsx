@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/photo-colorize" },
   title: "Old Photo Colorizer — DreamForgeX",
   description: "Era-aware AI colorization for black and white photographs.",
   openGraph: {

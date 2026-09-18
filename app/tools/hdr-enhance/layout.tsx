@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/hdr-enhance" },
   title: "AI HDR Enhancer — DreamForgeX",
   description: "Transform lighting and enhance dynamic range with AI",
   openGraph: {

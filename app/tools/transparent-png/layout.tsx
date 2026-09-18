@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/transparent-png" },
   title: "AI Transparent PNG — DreamForgeX",
   description: "Create clean transparent PNG cutouts with AI",
   openGraph: {

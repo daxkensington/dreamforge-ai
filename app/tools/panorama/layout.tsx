@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/panorama" },
   title: "AI Panorama Generator — DreamForgeX",
   description: "Transform photos into panoramic views",
   openGraph: {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/character-sheet" },
   title: "AI Character Sheet Generator — DreamForgeX",
   description: "Create detailed character reference sheets",
   openGraph: {

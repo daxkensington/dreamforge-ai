@@ -4,6 +4,7 @@ import { getDb } from "../server/db";
 import { galleryItems, generations } from "../drizzle/schema";
 import { USE_CASE_SLUGS } from "../shared/useCaseData";
 import { UNCENSORED_LANDING_SLUGS } from "../shared/uncensoredLanding";
+import { BLOG_POSTS } from "../shared/blogPosts";
 
 const BASE_URL = "https://dreamforgex.ai";
 
@@ -124,6 +125,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
   }));
 
+  // Blog posts — one route per published guide.
+  const blogRoutes = BLOG_POSTS.map((p) => ({
+    url: `/blog/${p.slug}`,
+    lastModified: new Date(p.updated ?? p.published),
+    priority: 0.7,
+    changeFrequency: "monthly" as const,
+  }));
+
   // Video Studio sub-pages
   const videoRoutes = [
     "storyboard", "scene-director", "script", "style-transfer",
@@ -148,6 +157,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...toolRoutes,
     ...useCaseRoutes,
     ...uncensoredSiloRoutes,
+    { url: "/blog", priority: 0.7, changeFrequency: "weekly" as const },
+    ...blogRoutes,
     ...comparisonRoutes,
     ...videoRoutes,
   ].map((route) => ({

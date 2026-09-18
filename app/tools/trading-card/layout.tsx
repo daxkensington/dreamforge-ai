@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/trading-card" },
   title: "Trading Card Designer — DreamForgeX",
   description: "TCG-quality custom cards with stats, art, and rarity — design your own card game.",
   openGraph: { title: "Trading Card Designer — DreamForgeX", description: "Magic/Pokemon-quality custom cards." },

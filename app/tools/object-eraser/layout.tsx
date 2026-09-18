@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/object-eraser" },
   title: "AI Object Eraser — DreamForgeX",
   description: "Remove unwanted objects from images with AI",
   openGraph: {

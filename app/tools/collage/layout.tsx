@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/collage" },
   title: "AI Collage Maker — DreamForgeX",
   description: "Create AI-arranged photo collages",
   openGraph: {

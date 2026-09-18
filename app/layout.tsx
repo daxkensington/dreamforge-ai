@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { MetaPixel } from "./MetaPixel";
+import { Analytics } from "./Analytics";
 import { MetaPixelConversions } from "./MetaPixelConversions";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -108,6 +109,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MetaPixel />
         <Providers>
           <MetaPixelConversions />
+          <Analytics />
           {children}
         </Providers>
       </body>

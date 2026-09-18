@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/yt-thumbnails" },
   title: "YouTube Chapter Thumbnails — DreamForgeX",
   description: "Batch-generate per-chapter YouTube thumbnails optimized for CTR.",
   openGraph: {

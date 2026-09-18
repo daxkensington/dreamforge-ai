@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/tools/music-gen" },
   title: "MusicGen Online — Free AI Music Generator | DreamForgeX",
   description: "Generate original instrumental music with MusicGen, self-hosted on our own GPUs. Free online AI music generator — no install, royalty-free output.",
   openGraph: {
