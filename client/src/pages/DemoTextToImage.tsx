@@ -18,6 +18,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
+import { track } from "@/lib/analytics";
 
 const DEMO_PROMPTS = [
   "An astronaut riding a horse on Mars at sunset, photorealistic",
@@ -48,6 +49,7 @@ export default function DemoTextToImage() {
       if (data.status === "completed" && data.url) {
         setResultUrl(data.url);
         setResultPrompt(data.prompt ?? prompt);
+        track("generation_completed", { kind: "demo" });
         toast.success("Done! Sign up to make more.");
       } else {
         const err = ("error" in data && data.error) || "";
@@ -82,6 +84,7 @@ export default function DemoTextToImage() {
       autoRan.current = true;
       setPrompt(trimmed);
       setResultUrl(null);
+      track("generation_started", { kind: "demo", source: "autogen" });
       generate.mutate({ prompt: trimmed });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,6 +98,7 @@ export default function DemoTextToImage() {
       return;
     }
     setResultUrl(null);
+    track("generation_started", { kind: "demo" });
     generate.mutate({ prompt: trimmed });
   };
 

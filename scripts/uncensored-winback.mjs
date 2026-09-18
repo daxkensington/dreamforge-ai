@@ -77,6 +77,7 @@ const users = await sql`
   select u.id, u.name, u.email
   from users u
   where u.email is not null
+    and u."ageConfirmedAt" is not null
     and (u."uncensoredUntil" is null or u."uncensoredUntil" < now())
     and not exists (
       select 1 from "creditTransactions" ct

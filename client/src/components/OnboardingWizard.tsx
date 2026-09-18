@@ -102,7 +102,11 @@ export default function OnboardingWizard({ onComplete, onDismiss }: OnboardingWi
 
   const handleFinish = () => {
     onComplete();
-    navigate(`/workspace${selectedPrompt ? `?prompt=${encodeURIComponent(selectedPrompt)}` : ""}`);
+    navigate(
+      selectedPrompt
+        ? `/workspace?prompt=${encodeURIComponent(selectedPrompt)}&autogen=1`
+        : "/workspace",
+    );
   };
 
   const slideVariants = {

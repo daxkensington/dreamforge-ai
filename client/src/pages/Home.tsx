@@ -237,36 +237,11 @@ function CyclingWord() {
 }
 
 /* ── Count-up hook ── */
-function useCountUp(target: number, duration = 2000) {
-  const [value, setValue] = useState(0);
+function useCountUp(target: number) {
+  // Real number on first paint. The old 0→target count-up left "0+ AI Tools"
+  // on the page until the stats bar scrolled into view.
   const ref = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started.current) {
-          started.current = true;
-          const start = performance.now();
-          const animate = (now: number) => {
-            const elapsed = now - start;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setValue(Math.round(eased * target));
-            if (progress < 1) requestAnimationFrame(animate);
-          };
-          requestAnimationFrame(animate);
-        }
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [target, duration]);
-
-  return { value, ref };
+  return { value: target, ref };
 }
 
 /* ── Stat item component ── */
@@ -317,7 +292,13 @@ export default function Home() {
       {showOnboarding && (
         <OnboardingWizard
           onComplete={() => { markCompleted(); setShowOnboarding(false); }}
-          onDismiss={() => { markCompleted(); setShowOnboarding(false); }}
+          onDismiss={() => {
+            markCompleted();
+            setShowOnboarding(false);
+            window.location.href = "/demo/text-to-image?prompt=" + encodeURIComponent(
+              "A cyberpunk Tokyo street market in heavy rain, neon reflections",
+            );
+          }}
         />
       )}
 

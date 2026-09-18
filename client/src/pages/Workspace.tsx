@@ -97,6 +97,9 @@ const VIDEO_PRESETS = [
   "Abstract paint strokes flowing and morphing into cosmic nebula patterns, dreamlike motion",
 ];
 
+/** Survives React Strict Mode remount so onboarding autogen cannot double-fire. */
+let workspaceAutogenArmed = false;
+
 export default function Workspace() {
   useEffect(() => {
     track("studio_opened");
@@ -105,13 +108,14 @@ export default function Workspace() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState("");
 
-  // Accept prompt from onboarding wizard via URL params
+  // Accept prompt from onboarding wizard via URL params. `autogen=1` fires
+  // the first generation so skip/finish doesn't dump them on an empty studio.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wizardPrompt = params.get("prompt");
-    if (wizardPrompt) {
-      setPrompt(wizardPrompt);
-      // Clean up URL
+    if (wizardPrompt) setPrompt(wizardPrompt);
+    if (params.get("autogen") === "1" && wizardPrompt) workspaceAutogenArmed = true;
+    if (wizardPrompt || params.get("autogen")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -161,6 +165,7 @@ export default function Workspace() {
   const generateMutation = trpc.generation.create.useMutation({
     onSuccess: (data: any) => {
       if (data.status === "completed") {
+        track("generation_completed", { source: "workspace", mediaType: data.mediaType });
         toast.success(`${data.mediaType === "video" ? "Video" : "Image"} generation completed!`);
         // Show achievement unlock toasts
         if (data.newAchievements && data.newAchievements.length > 0) {
@@ -248,6 +253,7 @@ export default function Workspace() {
       toast.error("Please enter a prompt");
       return;
     }
+    track("generation_started", { source: "workspace" });
     generateMutation.mutate({
       prompt: prompt.trim(),
       negativePrompt: negativePrompt.trim() || undefined,
@@ -260,6 +266,15 @@ export default function Workspace() {
       uncensored: uncensored && uncensoredActive && mediaType === "image",
     });
   };
+
+  useEffect(() => {
+    if (!workspaceAutogenArmed || authLoading || !isAuthenticated) return;
+    const p = prompt.trim();
+    if (p.length < 3) return;
+    workspaceAutogenArmed = false;
+    handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, prompt]);
 
   useKeyboardShortcuts([
     { key: "Enter", ctrl: true, handler: handleGenerate, description: "Generate image or video" },

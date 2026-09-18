@@ -10,11 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
+import { track } from "@/lib/analytics";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredStudio from "@/components/UncensoredStudio";
 import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
 import RenderWaitHint, { newRequestId } from "@/components/RenderWaitHint";
+
+/** One-tap starters so age-confirmed visitors don't stall on an empty box. */
+const FREE_STARTERS = [
+  "A film-noir detective lit only by neon through venetian blinds, cigarette smoke curling",
+  "A baroque oil-painting portrait of a fallen angel with cracked marble wings",
+  "A tattooed biker gang at a desert gas station at golden hour, grimy and cinematic",
+  "A moody boudoir-style figure study in dramatic chiaroscuro lighting",
+];
 
 /**
  * /uncensored — the crypto-paid Uncensored Pass landing + checkout.
@@ -52,7 +61,10 @@ export default function Uncensored() {
   });
 
   const confirmAge = trpc.uncensored.confirmAge.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => {
+      refetch();
+      toast.success("Unlocked — your 3 free previews are ready.");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -62,6 +74,7 @@ export default function Uncensored() {
 
   const checkout = trpc.uncensored.createCheckout.useMutation({
     onSuccess: (data) => {
+      track("checkout_started", { kind: "uncensored", plan: selectedPlanId });
       setInlineInvoice({ checkoutLink: data.checkoutLink, invoiceId: data.invoiceId });
       toast.success("Invoice ready — pay below. This page unlocks as soon as the payment is seen.");
     },
@@ -107,6 +120,7 @@ export default function Uncensored() {
         setFreeResultUrl(data.url);
         setFreeStartedAt(null);
         refetch();
+        track("generation_completed", { kind: "uncensored_free" });
         toast.success("Done — that's a free preview.");
         return;
       }
@@ -140,6 +154,7 @@ export default function Uncensored() {
     refetch();
     if (d.status === "completed" && d.url) {
       setFreeResultUrl(d.url);
+      track("generation_completed", { kind: "uncensored_free" });
       toast.success("Done — that's a free preview.");
     } else {
       toast.error("Generation failed — that preview wasn't counted. Please try again.");
@@ -171,6 +186,7 @@ export default function Uncensored() {
 
   // Read the intent the sign-in round-trip carried back.
   useEffect(() => {
+    track("paywall_viewed", { surface: "uncensored" });
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
@@ -182,19 +198,19 @@ export default function Uncensored() {
     else if (plan) setReturnIntent("buy");
   }, []);
 
-  // Once entitlement has loaded, put the returning visitor ON the thing they
-  // clicked: the free-taste card, focused and ready to type. Runs once — it
-  // must not fight the user's own scrolling on later status polls.
+  // Once entitlement has loaded, put the visitor ON the free preview — that is
+  // the leak: 21 age-confirmed accounts never generated because the hero sat
+  // above the fold and the prompt never got focus. Skip only if they came
+  // back specifically to buy (plan= in the URL).
   useEffect(() => {
-    if (!returnIntent || restoredIntent.current) return;
+    if (restoredIntent.current) return;
     if (!isAuthed || !status || active) return;
+    if (returnIntent === "buy") return;
+    if (!ageConfirmed || freeRemaining <= 0) return;
     restoredIntent.current = true;
     conversionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (returnIntent === "free" && ageConfirmed) {
-      // Age already attested on a previous visit — go straight to the prompt.
-      window.setTimeout(() => freePromptRef.current?.focus(), 400);
-    }
-  }, [returnIntent, isAuthed, status, active, ageConfirmed]);
+    window.setTimeout(() => freePromptRef.current?.focus(), 400);
+  }, [returnIntent, isAuthed, status, active, ageConfirmed, freeRemaining]);
 
   /**
    * Sign-in URL that comes back to THIS page with everything intact.
@@ -221,14 +237,16 @@ export default function Uncensored() {
     await confirmAge.mutateAsync({ confirmed: true });
   };
 
-  const handleFreeGenerate = () => {
-    const p = freePrompt.trim();
+  const handleFreeGenerate = (promptOverride?: string) => {
+    const p = (promptOverride ?? freePrompt).trim();
     if (p.length < 3) {
       toast.error("Describe what you want to create.");
       return;
     }
+    if (promptOverride) setFreePrompt(promptOverride);
     setFreeResultUrl(null);
     setFreeStartedAt(Date.now());
+    track("generation_started", { kind: "uncensored_free" });
     freeGen.mutate({ prompt: p, style: freeStyle, aspect: freeAspect, requestId: newRequestId() });
   };
 
@@ -317,6 +335,19 @@ export default function Uncensored() {
                     disabled={freeBusy}
                     className="mt-3 resize-none"
                   />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {FREE_STARTERS.map((starter) => (
+                      <button
+                        key={starter}
+                        type="button"
+                        disabled={freeBusy}
+                        onClick={() => handleFreeGenerate(starter)}
+                        className="rounded-full border border-border/60 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-50"
+                      >
+                        {starter.length > 72 ? `${starter.slice(0, 72)}…` : starter}
+                      </button>
+                    ))}
+                  </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-muted-foreground">Aspect:</span>
                     {UNCENSORED_ASPECTS.map((a) => (
