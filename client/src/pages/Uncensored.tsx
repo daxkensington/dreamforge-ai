@@ -379,7 +379,7 @@ export default function Uncensored() {
                     </div>
                   )}
                   <Button
-                    onClick={handleFreeGenerate}
+                    onClick={() => handleFreeGenerate()}
                     disabled={freeBusy || freePrompt.trim().length < 3}
                     className="mt-3 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
                   >
