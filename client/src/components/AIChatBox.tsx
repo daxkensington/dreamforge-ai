@@ -26,6 +26,8 @@ export type AIChatBoxProps = {
    * Typically you'll call a tRPC mutation here to invoke the LLM.
    */
   onSendMessage: (content: string) => void;
+  /** Restore a failed send without replacing text the user is already typing. */
+  retryDraft?: string;
 
   /**
    * Whether the AI is currently generating a response
@@ -113,6 +115,7 @@ export type AIChatBoxProps = {
 export function AIChatBox({
   messages,
   onSendMessage,
+  retryDraft,
   isLoading = false,
   placeholder = "Type your message...",
   className,
@@ -121,6 +124,9 @@ export function AIChatBox({
   suggestedPrompts,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
+  useEffect(() => {
+    if (retryDraft) setInput(current => current || retryDraft);
+  }, [retryDraft]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
@@ -181,7 +187,7 @@ export function AIChatBox({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -197,7 +203,7 @@ export function AIChatBox({
       style={{ height }}
     >
       {/* Messages Area */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-hidden">
+      <div ref={scrollAreaRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation" className="flex-1 overflow-hidden">
         {displayMessages.length === 0 ? (
           <div className="flex h-full flex-col p-4">
             <div className="flex flex-1 flex-col items-center justify-center gap-6 text-muted-foreground">
@@ -314,11 +320,13 @@ export function AIChatBox({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          aria-label={placeholder}
           className="flex-1 max-h-32 resize-none min-h-9"
           rows={1}
         />
         <Button
           type="submit"
+          aria-label="Send message"
           size="icon"
           disabled={!input.trim() || isLoading}
           className="shrink-0 h-[38px] w-[38px]"

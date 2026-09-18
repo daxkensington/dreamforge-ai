@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { AIChatBox, type Message } from "./AIChatBox";
 import { trpc } from "@/lib/trpc";
@@ -16,6 +16,8 @@ const SUGGESTED_PROMPTS = [
 export function SupportChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [retryDraft, setRetryDraft] = useState("");
+  const sendLockRef = useRef(false);
 
   const chatMutation = trpc.supportChat.send.useMutation({
     onSuccess: (response) => {
@@ -24,13 +26,15 @@ export function SupportChatWidget() {
         { role: "assistant", content: response },
       ]);
     },
-    onError: () => {
+    onSettled: () => { sendLockRef.current = false; },
+    onError: (_error, variables) => {
+      setRetryDraft(variables.messages.at(-1)?.content || "");
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-            "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+            "I couldn't get a reply. Your message is ready to retry. You can also email support@dreamforgex.ai.",
         },
       ]);
     },
@@ -38,6 +42,9 @@ export function SupportChatWidget() {
 
   const handleSendMessage = useCallback(
     (content: string) => {
+      if (!content.trim() || sendLockRef.current || chatMutation.isPending) return;
+      sendLockRef.current = true;
+      setRetryDraft("");
       const userMessage: Message = { role: "user", content };
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
@@ -51,6 +58,9 @@ export function SupportChatWidget() {
       {/* Chat Panel */}
       {isOpen && (
         <div
+          role="dialog"
+          aria-label="DreamForgeX Support"
+          onKeyDown={e => { if (e.key === "Escape") setIsOpen(false); }}
           className={cn(
             "fixed bottom-20 right-4 z-[9999] w-[380px] max-w-[calc(100vw-2rem)]",
             "animate-in slide-in-from-bottom-4 fade-in duration-200"
@@ -66,6 +76,7 @@ export function SupportChatWidget() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
+              aria-label="Close support chat"
               className="rounded-full p-1 text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
             >
               <X className="size-4" />
@@ -76,9 +87,10 @@ export function SupportChatWidget() {
           <AIChatBox
             messages={messages}
             onSendMessage={handleSendMessage}
+            retryDraft={retryDraft}
             isLoading={chatMutation.isPending}
             placeholder="Ask me anything about DreamForgeX..."
-            height="420px"
+            height="min(420px, calc(100dvh - 10rem))"
             emptyStateMessage="Hi! I'm Forge, your AI assistant. How can I help?"
             suggestedPrompts={SUGGESTED_PROMPTS}
             className="rounded-t-none rounded-b-xl border-t-0 shadow-2xl"
