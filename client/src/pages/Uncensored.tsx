@@ -505,8 +505,8 @@ export default function Uncensored() {
                 })}
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                One-time payment, no auto-renew. Pay anonymously with Bitcoin (on-chain).
-                Invoice stays open 3 hours. Your pass unlocks as soon as the payment is seen — no waiting for a block.
+                One-time payment, no auto-renew. Pay anonymously with Bitcoin, on-chain or Lightning.
+                Invoice stays open 3 hours. Lightning settles as soon as it is paid. An on-chain payment unlocks the pass when it is seen — no waiting for a block.
               </p>
 
               {!active && !ageConfirmed && (

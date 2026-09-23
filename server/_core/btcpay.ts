@@ -8,9 +8,8 @@
  * Store "DreamForgeX" provisioned 2026-06-12 via Greenfield API.
  * Ported from the golden-climax integration (HMAC verify pattern).
  *
- * Live payment methods (verified 2026-07-31): BTC-CHAIN only.
- * Lightning / USDC require operator enablement on the BTCPay store —
- * see marketing/OPERATOR-BATCH.md.
+ * Live payment methods (verified 2026-09-23): BTC-CHAIN, BTC-LN, and BTC-LNURL
+ * on the shared PayMohawk Lightning node. USDC is not enabled.
  */
 import crypto from "crypto";
 import {

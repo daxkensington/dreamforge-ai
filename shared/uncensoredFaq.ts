@@ -21,7 +21,7 @@ export const UNCENSORED_FAQ: UncensoredFaqItem[] = [
   },
   {
     q: "How do I pay? Do I need a credit card?",
-    a: "No card. You pay anonymously with Bitcoin through a self-hosted BTCPay invoice (QR or address). Passes start at $4.99 for a day, $12 for a week, or $19 for 30 days — each a one-time payment with no auto-renew. Invoices stay open 3 hours. Your pass unlocks as soon as the payment is seen (mempool), not after a block confirmation.",
+    a: "No card. You pay anonymously with Bitcoin through a self-hosted BTCPay invoice — Lightning, or an on-chain QR and address. Passes start at $4.99 for a day, $12 for a week, or $19 for 30 days — each a one-time payment with no auto-renew. Invoices stay open 3 hours. Lightning settles as soon as it is paid. An on-chain payment unlocks the pass when it is seen in the mempool, not after a block confirmation.",
   },
   {
     q: "Why crypto only and not a card?",

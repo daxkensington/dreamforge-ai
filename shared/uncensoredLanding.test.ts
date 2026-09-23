@@ -44,8 +44,8 @@ describe("uncensored landing silo", () => {
   });
 
   it("never advertises a coin the checkout cannot take", () => {
-    // server/_core/btcpay.ts: "Live payment methods (verified 2026-07-31):
-    // BTC-CHAIN only." Lightning/USDC need operator enablement on the store.
+    // server/_core/btcpay.ts: live methods are BTC-CHAIN, BTC-LN, and BTC-LNURL.
+    // USDC and altcoins are still not enabled.
     const unsupported = /\b(litecoin|monero|xmr|usdt|tether|dogecoin|ethereum|\bltc\b|\beth\b)\b/i;
     for (const slug of UNCENSORED_LANDING_SLUGS) {
       const hit = allCopy(slug).match(unsupported);
@@ -129,6 +129,17 @@ describe("uncensored landing silo", () => {
     const faqBlob = UNCENSORED_FAQ.map((f) => `${f.q} ${f.a}`).join(" ");
     expect(faqBlob.match(stale)).toBeNull();
     expect(faqBlob.toLowerCase()).toContain("mempool");
+    expect(faqBlob.toLowerCase()).toContain("lightning");
+  });
+
+  it("names Lightning wherever it tells the buyer how checkout is paid", () => {
+    // Checkout offers BTC-LN. A page that still says on-chain only sends
+    // mobile buyers away from the faster rail.
+    for (const slug of UNCENSORED_LANDING_SLUGS) {
+      const copy = allCopy(slug);
+      if (!/on-chain|btc ?pay|deposit address/i.test(copy)) continue;
+      expect(copy.toLowerCase().includes("lightning") ? null : `${slug} describes checkout without Lightning`).toBeNull();
+    }
   });
 
   it("does not duplicate an H1 across pages (thin-content signal)", () => {

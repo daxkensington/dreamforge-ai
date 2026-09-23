@@ -43,10 +43,11 @@ plans above stay strictly SFW, so the pass is NOT part of a subscription.
 - **Day Pass $4.99** — 24 hours, +60 credits
 - **Week Pass $12** — 7 days, +250 credits
 - **30-Day Pass $19** — 30 days, +500 credits (best value)
-- Paid with on-chain Bitcoin via BTCPay. The pass unlocks as soon as the
-  payment is seen (mempool / 0-conf), usually seconds after send — do NOT tell
-  people they have to wait for a block confirmation. If a 0-conf payment later
-  fails to confirm, access is reversed.
+- Paid with Bitcoin via BTCPay, on-chain or Lightning. Lightning unlocks the
+  pass as soon as it is paid. An on-chain payment unlocks as soon as it is seen
+  (mempool / 0-conf), usually seconds after send — do NOT tell people they have
+  to wait for a block confirmation. If a 0-conf payment later fails to confirm,
+  access is reversed. Lightning does not have that reversal.
 - Requires an 18+ confirmation. Includes uncensored image generation (realistic,
   anime, fantasy, artistic styles), Refine (change one detail of an image you
   already generated and keep the rest — 10 credits), and uncensored video

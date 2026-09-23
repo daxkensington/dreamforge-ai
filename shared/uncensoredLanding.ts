@@ -165,7 +165,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "faq": [
       {
         "q": "How do I pay with crypto, and which coins work?",
-        "a": "At checkout we show you a one-time Bitcoin deposit address and amount. Your Uncensored Pass activates as soon as the payment is seen — usually seconds after you send, without waiting for a block. We accept Bitcoin (on-chain). There's no card form, no name field, and nothing for a bank to itemize."
+        "a": "At checkout we show a Bitcoin invoice: Lightning, or a one-time on-chain address and amount. Lightning settles as soon as it is paid. An on-chain payment activates your Uncensored Pass as soon as it is seen — usually seconds after you send, without waiting for a block. There's no card form, no name field, and nothing for a bank to itemize."
       },
       {
         "q": "Is it actually anonymous, or do you still track me?",
@@ -391,7 +391,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "No content filter, period — the artistic and mature prompts Midjourney bounces render here without word-swaps, mutes, or warnings",
       "Self-hosted GPUs running open-source Flux — no Midjourney AUP, no Discord moderation, no third-party processor deciding what you're allowed to make",
       "Private by default — unlike Midjourney's public Discord-first gallery, your generations are never posted, indexed, or shared anywhere",
-      "Pay anonymously with Bitcoin via BTCPay — no card, no subscription tied to your name, no awkward 'AI image' line item",
+      "Pay anonymously with Bitcoin via BTCPay, on-chain or Lightning — no card, no subscription tied to your name, no awkward 'AI image' line item",
       "From $4.99 for a day pass; $19 for 30 days plus 500 bonus credits — one-time, no auto-renew, cheaper than a Midjourney Standard plan that still won't do this"
     ],
     "sampleConcepts": [
@@ -417,7 +417,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Why pay with crypto instead of a card like Midjourney uses?",
-        "a": "Card networks and processors prohibit adult content in their terms, which is why Midjourney can't offer it. Paying with Bitcoin through a BTCPay invoice keeps this tier available and keeps your billing private and discreet — no card, no recurring charge with your name on it."
+        "a": "Card networks and processors prohibit adult content in their terms, which is why Midjourney can't offer it. Paying with Bitcoin through a BTCPay invoice, on-chain or by Lightning, keeps this tier available and keeps your billing private and discreet — no card, no recurring charge with your name on it."
       },
       {
         "q": "What's allowed, and what isn't?",
@@ -622,7 +622,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid in Bitcoin through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -639,7 +639,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Free NSFW AI Generator — 3 Free Previews, No Card | DreamForgeX",
     "metaDescription": "Try an uncensored NSFW AI image generator free. 3 free previews, no credit card, private by default. Passes from $4.99 in crypto if you want more. 18+.",
     "h1": "Free NSFW AI Generator — Try It Before You Pay",
-    "intro": "Most \"free\" NSFW AI generators are one of three things: a bait page that wants your card before it renders anything, a Discord queue you wait in for twenty minutes, or a filtered tool that quietly refuses the prompt you actually came to write. DreamForgeX gives you 3 genuinely free uncensored previews. No credit card, no queue, no bait — sign up with an email and generate.\n\nThe previews run on the same uncensored open-source models as the paid tier, on our own GPUs, so what you see is what the product actually does rather than a watered-down teaser. They're watermarked and private. If you want to keep going, passes start at $4.99 for 24 hours and are paid on-chain in Bitcoin, so there's no card on file and no real name on a statement. All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
+    "intro": "Most \"free\" NSFW AI generators are one of three things: a bait page that wants your card before it renders anything, a Discord queue you wait in for twenty minutes, or a filtered tool that quietly refuses the prompt you actually came to write. DreamForgeX gives you 3 genuinely free uncensored previews. No credit card, no queue, no bait — sign up with an email and generate.\n\nThe previews run on the same uncensored open-source models as the paid tier, on our own GPUs, so what you see is what the product actually does rather than a watered-down teaser. They're watermarked and private. If you want to keep going, passes start at $4.99 for 24 hours and are paid in Bitcoin, on-chain or by Lightning, so there's no card on file and no real name on a statement. All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
     "bullets": [
       "3 free uncensored previews, no credit card and no payment details of any kind up front.",
       "Same uncensored models as the paid tier — the free previews are the real product, not a filtered demo.",
@@ -665,7 +665,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid in Bitcoin through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -682,7 +682,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "NSFW AI Image Generator — Uncensored, Private | DreamForgeX",
     "metaDescription": "An NSFW AI image generator with no content filter — uncensored open models on self-hosted GPUs, private by default, crypto billing. 3 free previews. 18+.",
     "h1": "NSFW AI Image Generator",
-    "intro": "An NSFW AI image generator is only useful if it actually generates. Most tools marketed that way are a filtered model with a suggestive landing page: you write the prompt, wait, and get a policy refusal or a sanitised image that ignored half of what you asked for. DreamForgeX runs uncensored open-source models on GPUs we own, which is the only arrangement where \"no filter\" can be a technical fact rather than a marketing line.\n\nThat ownership is the whole difference. Tools built on rented API compute inherit their provider's acceptable-use policy, so the filter is imposed from above and no amount of prompt engineering removes it. Because we host the models ourselves, your prompt reaches them as written — no silent rewrites, no refusals, no account bans for generating permitted adult work. Four styles steer output toward photoreal, anime, fantasy or artistic. Everything is private by default, billing is on-chain Bitcoin, and 3 previews are free. All output is AI-generated, fictional, and 18+.",
+    "intro": "An NSFW AI image generator is only useful if it actually generates. Most tools marketed that way are a filtered model with a suggestive landing page: you write the prompt, wait, and get a policy refusal or a sanitised image that ignored half of what you asked for. DreamForgeX runs uncensored open-source models on GPUs we own, which is the only arrangement where \"no filter\" can be a technical fact rather than a marketing line.\n\nThat ownership is the whole difference. Tools built on rented API compute inherit their provider's acceptable-use policy, so the filter is imposed from above and no amount of prompt engineering removes it. Because we host the models ourselves, your prompt reaches them as written — no silent rewrites, no refusals, no account bans for generating permitted adult work. Four styles steer output toward photoreal, anime, fantasy or artistic. Everything is private by default, billing is Bitcoin, on-chain or Lightning, and 3 previews are free. All output is AI-generated, fictional, and 18+.",
     "bullets": [
       "No content filter as a matter of infrastructure, not policy — we own the GPUs the models run on.",
       "Four styles (realistic, anime, fantasy, artistic) that genuinely change the output, not just the prompt text.",
@@ -708,7 +708,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid in Bitcoin through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -751,7 +751,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid on-chain in Bitcoin through BTCPay — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are paid in Bitcoin through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
