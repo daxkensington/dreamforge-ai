@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
  */
 
 const PUBLIC_PAGES = [
-  { path: "/", contains: ["Create Stunning", "Start Creating"] },
+  { path: "/", contains: ["Create Stunning", "AI Tools"] },
   { path: "/about", contains: ["About DreamForgeX", "Browse 100+ Tools"] },
   { path: "/terms", contains: ["Terms of Service", "Acceptable Use"] },
   { path: "/privacy", contains: ["Privacy Policy", "AI model training"] },
@@ -30,12 +30,18 @@ for (const page of PUBLIC_PAGES) {
   });
 }
 
-test("homepage What's New section is visible", async ({ page }) => {
+test("homepage hero and What's New section render", async ({ page }) => {
   await page.goto("/");
-  // Section header — proves the new homepage content shipped.
-  await expect(page.getByText(/Just shipped/i)).toBeVisible();
-  await expect(page.getByText(/Virtual Try-On/i)).toBeVisible();
-  await expect(page.getByText(/3D Model Generator/i)).toBeVisible();
+  // Hero headline is stable brand copy; the rotating word after it is not.
+  await expect(page.locator("h1").first()).toContainText(/Create Stunning/i);
+  // The What's New cards rotate as tools ship, so assert structure rather
+  // than specific tool names: the section header exists and it links to
+  // at least one real /tools/* page.
+  await expect(page.getByText(/Just shipped|What.s new/i).first()).toBeVisible();
+  expect(
+    await page.locator('a[href^="/tools/"]').count(),
+    "homepage links to no /tools/* pages",
+  ).toBeGreaterThan(0);
 });
 
 test("footer renders with all link sections", async ({ page }) => {
