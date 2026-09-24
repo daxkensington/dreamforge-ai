@@ -79,10 +79,24 @@ test("no console errors on homepage", async ({ page }) => {
       // Filter known third-party noise we don't control.
       if (text.includes("Sentry") && text.includes("DSN")) return;
       if (text.includes("favicon")) return;
+      // middleware.ts rate-limits /api/auth/* to 20 req/min per IP. Every
+      // page load polls /api/auth/session, so this suite (~60 page loads
+      // from one runner IP in about a minute) trips its own limiter; the
+      // 429 and the Auth.js client error it causes are test artefacts.
+      // They are dropped only when an /api/auth 429 was actually observed.
       errors.push(text);
+    }
+  });
+  let authRateLimited = false;
+  page.on("response", (res) => {
+    if (res.status() === 429 && new URL(res.url()).pathname.startsWith("/api/auth")) {
+      authRateLimited = true;
     }
   });
   await page.goto("/", { waitUntil: "load" });
   await page.waitForTimeout(2500);
-  expect(errors, `console errors:\n${errors.join("\n")}`).toEqual([]);
+  const real = authRateLimited
+    ? errors.filter((e) => !e.includes("status of 429") && !e.includes("authjs.dev#autherror"))
+    : errors;
+  expect(real, `console errors:\n${real.join("\n")}`).toEqual([]);
 });
