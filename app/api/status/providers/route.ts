@@ -21,9 +21,19 @@ type ProviderCheck = {
 
 let cache: { at: number; body: any } | null = null;
 const CACHE_TTL_MS = 60_000;
-const PROBE_TIMEOUT_MS = 8_000;
+const PROBE_TIMEOUT_MS = 6_500;
 
+// One retry on timeout: provider account/meta APIs (Replicate especially)
+// intermittently stall past the timeout while generation is unaffected, and a
+// single stall was paging ohwista with fail→recover flaps. A real outage still
+// fails both attempts.
 async function ping(url: string, opts?: RequestInit): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
+  const first = await pingOnce(url, opts);
+  if (first.error !== "timeout") return first;
+  return pingOnce(url, opts);
+}
+
+async function pingOnce(url: string, opts?: RequestInit): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const start = Date.now();
@@ -41,59 +51,46 @@ async function ping(url: string, opts?: RequestInit): Promise<{ ok: boolean; lat
   }
 }
 
-async function buildReport(): Promise<{ checks: ProviderCheck[]; summary: string }> {
-  const checks: ProviderCheck[] = [];
+async function probe(
+  name: string,
+  configured: boolean,
+  url: string,
+  opts?: RequestInit,
+): Promise<ProviderCheck> {
+  if (!configured) return { name, configured: false };
+  const r = await ping(url, opts);
+  return { name, configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error };
+}
 
-  const runpodOk = !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId;
-  if (runpodOk) {
+async function buildReport(): Promise<{ checks: ProviderCheck[]; summary: string }> {
+  // Probes run concurrently so total latency is the slowest probe (with its
+  // one retry), not the sum — keeps us under ohwista's 15s check timeout.
+  const checks = await Promise.all([
     // RunPod serverless: GET /v2/{endpointId}/health is the documented probe
-    const r = await ping(
+    probe(
+      "runpod",
+      !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
       `https://api.runpod.ai/v2/${ENV.runpodFluxEndpointId}/health`,
       { headers: { Authorization: `Bearer ${ENV.runpodApiKey}` } },
-    );
-    checks.push({ name: "runpod", configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error });
-  } else {
-    checks.push({ name: "runpod", configured: false });
-  }
-
-  if (ENV.replicateApiToken) {
-    const r = await ping("https://api.replicate.com/v1/account", {
+    ),
+    probe("replicate", !!ENV.replicateApiToken, "https://api.replicate.com/v1/account", {
       headers: { Authorization: `Token ${ENV.replicateApiToken}` },
-    });
-    checks.push({ name: "replicate", configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error });
-  } else {
-    checks.push({ name: "replicate", configured: false });
-  }
-
-  if (ENV.falApiKey) {
+    }),
     // fal.ai public ping — their queue endpoint 401s without auth but 5xx if down
-    const r = await ping("https://queue.fal.run/", {
+    probe("fal", !!ENV.falApiKey, "https://queue.fal.run/", {
       headers: { Authorization: `Key ${ENV.falApiKey}` },
-    });
-    checks.push({ name: "fal", configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error });
-  } else {
-    checks.push({ name: "fal", configured: false });
-  }
-
-  if (ENV.runwayApiKey) {
-    const r = await ping("https://api.dev.runwayml.com/v1/organization", {
+    }),
+    probe("runway", !!ENV.runwayApiKey, "https://api.dev.runwayml.com/v1/organization", {
       headers: {
         Authorization: `Bearer ${ENV.runwayApiKey}`,
         "X-Runway-Version": "2024-11-06",
       },
-    });
-    checks.push({ name: "runway", configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error });
-  } else {
-    checks.push({ name: "runway", configured: false });
-  }
-
-  if (ENV.klingAccessKey && ENV.klingSecretKey) {
+    }),
     // Kling has no lightweight health endpoint; probe base host reachability.
-    const r = await ping("https://api.klingai.com/", { method: "HEAD" as any });
-    checks.push({ name: "kling", configured: true, ok: r.ok, latencyMs: r.latencyMs, error: r.error });
-  } else {
-    checks.push({ name: "kling", configured: false });
-  }
+    probe("kling", !!(ENV.klingAccessKey && ENV.klingSecretKey), "https://api.klingai.com/", {
+      method: "HEAD",
+    }),
+  ]);
 
   const degraded = checks.filter((c) => c.configured && c.ok === false);
   const summary = degraded.length === 0 ? "all-healthy" : `degraded:${degraded.map((c) => c.name).join(",")}`;
