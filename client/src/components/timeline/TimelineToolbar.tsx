@@ -19,10 +19,15 @@ interface TimelineToolbarProps {
   timeline: UseTimelineReturn;
 }
 
+const FPS = 30;
+// Absorbs floating-point error in seconds * FPS.
+const FRAME_EPSILON = 1e-6;
+
 function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  const frames = Math.floor((seconds % 1) * 30);
+  const totalFrames = Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * FPS + FRAME_EPSILON) : 0;
+  const mins = Math.floor(totalFrames / (FPS * 60));
+  const secs = Math.floor(totalFrames / FPS) % 60;
+  const frames = totalFrames % FPS;
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}:${String(frames).padStart(2, "0")}`;
 }
 
