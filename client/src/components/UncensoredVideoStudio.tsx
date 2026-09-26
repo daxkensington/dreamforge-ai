@@ -32,6 +32,13 @@ const ASPECTS: { id: Aspect; label: string }[] = [
   { id: "square", label: "Square" },
 ];
 
+function parseSeedInput(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
 export default function UncensoredVideoStudio({
   focusGenerationId,
 }: {
@@ -115,7 +122,7 @@ export default function UncensoredVideoStudio({
   const canGenerate =
     (prompt.trim().length >= 3 || !!motion) && !isBusy && (mode === "t2v" || !!sourceId);
 
-  const handleGenerate = () => {
+  const handleGenerate = (opts?: { seedOverride?: string }) => {
     if (mode === "i2v" && !sourceId) {
       toast.error("Pick an image to animate.");
       return;
@@ -124,6 +131,7 @@ export default function UncensoredVideoStudio({
       toast.error("Describe the motion, or pick a motion chip.");
       return;
     }
+    const seedInput = opts?.seedOverride !== undefined ? opts.seedOverride : seed;
     setVideoUrl(null);
     setResultSeed(null);
     gen.mutate({
@@ -135,10 +143,7 @@ export default function UncensoredVideoStudio({
       motion: motion ?? undefined,
       intensity,
       negativePrompt: negative.trim() || undefined,
-      seed: (() => {
-        const n = Number(seed);
-        return Number.isInteger(n) && n >= 0 ? n : undefined;
-      })(),
+      seed: parseSeedInput(seedInput),
       ...(mode === "i2v" && sourceId ? { sourceGenerationId: sourceId } : {}),
     });
   };
@@ -385,7 +390,7 @@ export default function UncensoredVideoStudio({
       </div>
 
       <Button
-        onClick={handleGenerate}
+        onClick={() => handleGenerate()}
         disabled={!canGenerate}
         className="mt-4 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
       >
@@ -426,7 +431,7 @@ export default function UncensoredVideoStudio({
               disabled={isBusy}
               onClick={() => {
                 setSeed("");
-                handleGenerate();
+                handleGenerate({ seedOverride: "" });
               }}
             >
               Another take
