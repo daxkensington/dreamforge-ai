@@ -59,10 +59,14 @@ export default function ToolBackground() {
       return;
     }
 
+    setImageUrl("");
     setUploading(true);
+    let failed = false;
     try {
       const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
+      reader.onload = () => {
+        if (!failed) setImagePreview(reader.result as string);
+      };
       reader.readAsDataURL(file);
 
       const formData = new FormData();
@@ -71,15 +75,24 @@ export default function ToolBackground() {
       if (res.ok) {
         const { url } = await res.json();
         setImageUrl(url);
+      } else {
+        failed = true;
+        toast.error("Upload failed");
+        setImagePreview(null);
+        setImageUrl("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch {
       toast.error("Upload failed");
+      failed = true;
+      setImagePreview(null);
     } finally {
       setUploading(false);
     }
   };
 
   const handleProcess = () => {
+    if (uploading) return;
     if (!imageUrl) {
       toast.error("Please provide an image URL or upload an image");
       return;
@@ -124,6 +137,7 @@ export default function ToolBackground() {
                 <Input
                   placeholder="Paste image URL..."
                   value={imageUrl}
+                  disabled={uploading}
                   onChange={(e) => {
                     setImageUrl(e.target.value);
                     setImagePreview(e.target.value);
@@ -217,7 +231,7 @@ export default function ToolBackground() {
             <div className="flex gap-3">
               <Button
                 onClick={handleProcess}
-                disabled={!imageUrl || isProcessing || (mode === "replace" && !replacementPrompt)}
+                disabled={!imageUrl || uploading || isProcessing || (mode === "replace" && !replacementPrompt)}
                 className="flex-1"
                 size="lg"
               >
