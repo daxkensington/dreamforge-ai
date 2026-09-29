@@ -29,11 +29,12 @@ async function checkDb(): Promise<Check> {
     await (db as any).execute(sql`select 1`);
     return { name: "db", ok: true, ms: Date.now() - start };
   } catch (err) {
+    console.error("[health] Database check failed:", err);
     return {
       name: "db",
       ok: false,
       ms: Date.now() - start,
-      error: err instanceof Error ? err.message : String(err),
+      error: "db_unreachable",
     };
   }
 }
