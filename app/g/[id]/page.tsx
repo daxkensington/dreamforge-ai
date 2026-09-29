@@ -25,8 +25,9 @@ interface PageProps {
 }
 
 async function loadGeneration(rawId: string) {
-  const id = parseInt(rawId, 10);
-  if (!Number.isFinite(id) || id <= 0) return null;
+  if (!rawId || /[^0-9]/.test(rawId)) return null;
+  const id = Number(rawId);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
   try {
     const gen = await getGenerationById(id);
     if (!gen) return null;
