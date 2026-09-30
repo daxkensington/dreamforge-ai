@@ -152,6 +152,14 @@ const tools = [
   { icon: Users, title: "Community Gallery", desc: "Discover and share AI-generated artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
 ];
 
+/* External providers shown in the marquee. Kling is dropped at render time
+   when /api/status/providers reports it unconfigured. */
+const marqueeProviders = [
+  "Grok (xAI)", "OpenAI", "Gemini", "Claude", "Stability AI",
+  "Replicate", "fal.ai", "Together AI", "Cloudflare AI", "Groq",
+  "Runway", "Kling", "Sync Labs",
+];
+
 const pricingPlans = [
   {
     name: "Explorer",
@@ -265,6 +273,29 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [heroIdx, setHeroIdx] = useState(0);
   const [promptText, setPromptText] = useState("");
+  /* Kling availability from /api/status/providers. undefined while loading or
+     if the probe is unreachable — in that case we default to showing it. */
+  const [klingConfigured, setKlingConfigured] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    fetch("/api/status/providers")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        const kling = body?.checks?.find((c: any) => c.name === "kling");
+        if (typeof kling?.configured === "boolean") setKlingConfigured(kling.configured);
+      })
+      .catch(() => {});
+  }, []);
+
+  const showKling = klingConfigured !== false;
+  const visibleTools = showKling
+    ? tools
+    : tools.map((t) =>
+        t.title === "AI Video"
+          ? { ...t, desc: "Runway, Veo 3, Wan 2.5 — text or image to video" }
+          : t
+      );
+  const visibleProviders = showKling ? marqueeProviders : marqueeProviders.filter((p) => p !== "Kling");
 
   useEffect(() => {
     if (isAuthenticated && !onboardingDone) setShowOnboarding(true);
@@ -421,13 +452,9 @@ export default function Home() {
 
       {/* AI Model Marquee — external providers (matches the "13 providers" stat) */}
       <section className="py-6 overflow-hidden border-b border-white/5">
-        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by 13 AI providers</p>
+        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by {visibleProviders.length} AI providers</p>
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 md:gap-x-12">
-          {[
-            "Grok (xAI)", "OpenAI", "Gemini", "Claude", "Stability AI",
-            "Replicate", "fal.ai", "Together AI", "Cloudflare AI", "Groq",
-            "Runway", "Kling", "Sync Labs",
-          ].map((provider) => (
+          {visibleProviders.map((provider) => (
             <span key={provider} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
               {provider}
             </span>
@@ -797,7 +824,7 @@ export default function Home() {
           </motion.h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {tools.map((tool, i) => (
+            {visibleTools.map((tool, i) => (
               <Link key={tool.title} href={tool.href}>
                 <motion.div
                   initial="hidden"
