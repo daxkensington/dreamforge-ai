@@ -11,8 +11,9 @@ interface BeforeInstallPromptEvent extends Event {
 
 /**
  * Shows an "Add to Home Screen" banner on mobile browsers when the app
- * is not yet installed. Uses the beforeinstallprompt event. Dismissals
- * are remembered for 7 days via localStorage.
+ * is not yet installed. Uses the beforeinstallprompt event. The banner
+ * hides after the native install dialog closes, whether accepted or dismissed.
+ * Only the X button starts the 7-day cooldown via localStorage.
  */
 export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
@@ -48,12 +49,13 @@ export function PWAInstallPrompt() {
 
   const handleInstall = useCallback(async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
+    try {
+      await deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+    } finally {
       setVisible(false);
+      setDeferredPrompt(null);
     }
-    setDeferredPrompt(null);
   }, [deferredPrompt]);
 
   const handleDismiss = useCallback(() => {

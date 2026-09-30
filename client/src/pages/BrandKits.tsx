@@ -14,6 +14,61 @@ import { toast } from "sonner";
 import { Plus, Trash2, Edit, Palette, ArrowLeft, Paintbrush, Copy } from "lucide-react";
 import { Link } from "wouter";
 
+type KitFormProps = {
+  name: string;
+  setName: (value: string) => void;
+  stylePrompt: string;
+  setStylePrompt: (value: string) => void;
+  typography: string;
+  setTypography: (value: string) => void;
+  colors: string[];
+  setColors: (value: string[]) => void;
+  onSubmit: () => void;
+  submitLabel: string;
+  isPending: boolean;
+};
+
+function KitForm({
+  name,
+  setName,
+  stylePrompt,
+  setStylePrompt,
+  typography,
+  setTypography,
+  colors,
+  setColors,
+  onSubmit,
+  submitLabel,
+  isPending,
+}: KitFormProps) {
+  return (
+    <div className="space-y-4">
+      <Input placeholder="Kit name" value={name} onChange={(e) => setName(e.target.value)} />
+      <Textarea placeholder="Style prompt (e.g., cinematic lighting, film grain, dramatic shadows...)" value={stylePrompt} onChange={(e) => setStylePrompt(e.target.value)} rows={3} />
+      <Input placeholder="Typography (e.g., Inter, Playfair Display)" value={typography} onChange={(e) => setTypography(e.target.value)} />
+      <div>
+        <label className="text-sm font-medium mb-2 block">Color Palette</label>
+        <div className="flex gap-2 items-center flex-wrap">
+          {colors.map((c, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <input type="color" value={c} onChange={(e) => { const nc = [...colors]; nc[i] = e.target.value; setColors(nc); }} className="w-8 h-8 rounded cursor-pointer border-0" />
+              <span className="text-xs font-mono text-muted-foreground">{c}</span>
+            </div>
+          ))}
+          {colors.length < 8 && (
+            <Button size="sm" variant="outline" onClick={() => setColors([...colors, "#888888"])}>
+              <Plus className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+      <Button className="w-full" onClick={onSubmit} disabled={!name || isPending}>
+        {isPending ? "Saving..." : submitLabel}
+      </Button>
+    </div>
+  );
+}
+
 export default function BrandKits() {
   const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
@@ -54,33 +109,6 @@ export default function BrandKits() {
     toast.info(`Applied "${preset.name}" preset`);
   }
 
-
-  const KitForm = ({ onSubmit, submitLabel, isPending }: { onSubmit: () => void; submitLabel: string; isPending: boolean }) => (
-    <div className="space-y-4">
-      <Input placeholder="Kit name" value={name} onChange={(e) => setName(e.target.value)} />
-      <Textarea placeholder="Style prompt (e.g., cinematic lighting, film grain, dramatic shadows...)" value={stylePrompt} onChange={(e) => setStylePrompt(e.target.value)} rows={3} />
-      <Input placeholder="Typography (e.g., Inter, Playfair Display)" value={typography} onChange={(e) => setTypography(e.target.value)} />
-      <div>
-        <label className="text-sm font-medium mb-2 block">Color Palette</label>
-        <div className="flex gap-2 items-center flex-wrap">
-          {colors.map((c, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <input type="color" value={c} onChange={(e) => { const nc = [...colors]; nc[i] = e.target.value; setColors(nc); }} className="w-8 h-8 rounded cursor-pointer border-0" />
-              <span className="text-xs font-mono text-muted-foreground">{c}</span>
-            </div>
-          ))}
-          {colors.length < 8 && (
-            <Button size="sm" variant="outline" onClick={() => setColors([...colors, "#888888"])}>
-              <Plus className="w-3 h-3" />
-            </Button>
-          )}
-        </div>
-      </div>
-      <Button className="w-full" onClick={onSubmit} disabled={!name || isPending}>
-        {isPending ? "Saving..." : submitLabel}
-      </Button>
-    </div>
-  );
 
   return (
     <div>
@@ -140,7 +168,19 @@ export default function BrandKits() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Create Brand Kit</DialogTitle></DialogHeader>
-                <KitForm onSubmit={() => createMut.mutate({ name, stylePrompt, typography, colorPalette: colors })} submitLabel="Create Kit" isPending={createMut.isPending} />
+                <KitForm
+                  name={name}
+                  setName={setName}
+                  stylePrompt={stylePrompt}
+                  setStylePrompt={setStylePrompt}
+                  typography={typography}
+                  setTypography={setTypography}
+                  colors={colors}
+                  setColors={setColors}
+                  onSubmit={() => createMut.mutate({ name, stylePrompt, typography, colorPalette: colors })}
+                  submitLabel="Create Kit"
+                  isPending={createMut.isPending}
+                />
               </DialogContent>
             </Dialog>
           </div>
@@ -222,7 +262,19 @@ export default function BrandKits() {
       <Dialog open={editId !== null} onOpenChange={(open) => { if (!open) setEditId(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Brand Kit</DialogTitle></DialogHeader>
-          <KitForm onSubmit={() => editId && updateMut.mutate({ id: editId, name, stylePrompt, typography, colorPalette: colors })} submitLabel="Save Changes" isPending={updateMut.isPending} />
+          <KitForm
+            name={name}
+            setName={setName}
+            stylePrompt={stylePrompt}
+            setStylePrompt={setStylePrompt}
+            typography={typography}
+            setTypography={setTypography}
+            colors={colors}
+            setColors={setColors}
+            onSubmit={() => editId && updateMut.mutate({ id: editId, name, stylePrompt, typography, colorPalette: colors })}
+            submitLabel="Save Changes"
+            isPending={updateMut.isPending}
+          />
         </DialogContent>
       </Dialog>
     </div>
