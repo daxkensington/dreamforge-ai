@@ -19,7 +19,7 @@ const REQUIRED_ENV = [
   "JWT_SECRET",
 ] as const;
 
-type Check = { name: string; ok: boolean; ms?: number; error?: string };
+type Check = { name: string; ok: boolean; ms?: number; error?: string; missingCount?: number };
 
 async function checkDb(): Promise<Check> {
   const start = Date.now();
@@ -29,20 +29,25 @@ async function checkDb(): Promise<Check> {
     await (db as any).execute(sql`select 1`);
     return { name: "db", ok: true, ms: Date.now() - start };
   } catch (err) {
+    // Raw driver errors (host, SQL state, credential fragments) go to the
+    // server logs only — this endpoint is public and must not leak them.
+    console.error("[health] Database check failed:", err);
     return {
       name: "db",
       ok: false,
       ms: Date.now() - start,
-      error: err instanceof Error ? err.message : String(err),
+      error: "db_unreachable",
     };
   }
 }
 
 function checkEnv(): Check {
   const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
-  return missing.length === 0
-    ? { name: "env", ok: true }
-    : { name: "env", ok: false, error: `missing: ${missing.join(", ")}` };
+  if (missing.length === 0) return { name: "env", ok: true };
+  // Var names stay in the server logs — naming them in the response would
+  // hand an attacker the app's secrets schema.
+  console.error(`[health] Missing required env vars: ${missing.join(", ")}`);
+  return { name: "env", ok: false, error: "env_incomplete", missingCount: missing.length };
 }
 
 export async function GET() {

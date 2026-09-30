@@ -11,6 +11,7 @@ import {
   authSessions,
   verificationTokens,
 } from "../../../drizzle/schema";
+import { getUserByEmail } from "../../../server/db";
 
 // Auth-dedicated Drizzle client. Initialized once at module load — safe because
 // DATABASE_URL is always set in prod and this file is only imported server-side.
@@ -80,7 +81,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.provider = account?.provider;
         token.email = user.email;
-        token.role = (user as any).role || "user";
+        // authUsers (the NextAuth adapter table) has no role column — the
+        // app-level users table does. The middleware /admin check reads
+        // token.role, which used to be hardcoded from a nonexistent column
+        // and locked every admin out. Look the role up from the app user.
+        // Role changes still require re-login: the token is only rebuilt at
+        // sign-in, same trade-off as before.
+        try {
+          const appUser = user.email ? await getUserByEmail(user.email) : null;
+          token.role = appUser?.role ?? "user";
+        } catch {
+          token.role = "user";
+        }
       }
       return token;
     },

@@ -4,6 +4,9 @@
  * The longest sliding window we use is ~1 minute, so anything > 1 hour is
  * just dead weight on the index. Bounds the table to a few thousand rows
  * even under heavy traffic.
+ *
+ * Auth: same as auto-degrade — "Authorization: Bearer <CRON_SECRET>", with
+ * the secret mandatory in production (missing secret fails closed).
  */
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
@@ -15,7 +18,13 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
   const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
+  // Prod: require an exact match unconditionally — an unset CRON_SECRET must
+  // never fail open. Non-prod: only enforce when a secret is configured.
+  if (process.env.NODE_ENV === "production") {
+    if (!expected || auth !== `Bearer ${expected}`) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  } else if (expected && auth !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
