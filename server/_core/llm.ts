@@ -1,12 +1,20 @@
 /**
- * LLM invocation using OpenAI, Grok, Gemini, or Claude APIs.
- * Uses OpenAI-compatible API format for all providers.
+ * LLM invocation using Groq, OpenAI, Grok, Gemini, or Claude APIs.
+ * Uses the OpenAI-compatible chat/completions format for every provider
+ * except Anthropic, which goes through its native Messages API
+ * (callAnthropic) — an OpenAI-format payload posted to api.anthropic.com
+ * always fails.
  *
  * Supports:
- *   - Multi-provider fallback (OpenAI -> Grok -> Gemini -> Claude)
+ *   - Multi-provider fallback (Groq -> OpenAI -> Grok -> Gemini -> Claude)
  *   - Vision (image analysis via multimodal models)
  *   - JSON mode / structured output
  *   - Tool calling
+ *
+ * Note: callAnthropic handles plain text turns only. Requests carrying
+ * images/files, tool calls, or tool/function-role messages are routed away
+ * from Anthropic (see requiresOpenAiCompatApi) so those parts are never
+ * silently dropped.
  */
 import { ENV } from "./env";
 
@@ -75,6 +83,8 @@ export type InvokeParams = {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
   provider?: "groq" | "openai" | "anthropic" | "gemini" | "grok";
+  /** Override the provider's default model id. */
+  model?: string;
   /** When true, automatically falls back to next provider on failure. Default: false. */
   autoFallback?: boolean;
   /** Temperature for generation (0-2). Default: provider default. */
@@ -248,17 +258,24 @@ const PROVIDER_DEFINITIONS: Array<{
             name: "anthropic",
             url: "https://api.anthropic.com/v1/messages",
             key: ENV.anthropicApiKey,
-            model: "claude-sonnet-4-20250514",
+            model: "claude-sonnet-4-6",
           }
         : null,
   },
 ];
 
-function resolveProvider(preferred?: string): ProviderConfig {
+function resolveProvider(
+  preferred?: string,
+  opts?: { needsOpenAiCompat?: boolean },
+): ProviderConfig {
+  // Anthropic's native path can't carry images, files, or tool calls — a
+  // request that needs those must fall through to an OpenAI-compatible one.
+  const blocked = (name: string) => !!opts?.needsOpenAiCompat && name === "anthropic";
+
   // If preferred, try that first
   if (preferred) {
     const p = PROVIDER_DEFINITIONS.find((p) => p.name === preferred);
-    if (p) {
+    if (p && !blocked(p.name)) {
       const config = p.config();
       if (config) return config;
     }
@@ -266,17 +283,21 @@ function resolveProvider(preferred?: string): ProviderConfig {
 
   // Fall through to first available
   for (const p of PROVIDER_DEFINITIONS) {
+    if (blocked(p.name)) continue;
     const config = p.config();
     if (config) return config;
   }
 
   throw new Error(
-    "No LLM API key configured. Set OPENAI_API_KEY, GROK_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.",
+    "No LLM API key configured. Set GROQ_API_KEY, OPENAI_API_KEY, GROK_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.",
   );
 }
 
 /** Get all available providers in fallback order, optionally starting after a given provider. */
-function getAvailableProviders(afterProvider?: string): ProviderConfig[] {
+function getAvailableProviders(
+  afterProvider?: string,
+  opts?: { needsOpenAiCompat?: boolean },
+): ProviderConfig[] {
   const configs: ProviderConfig[] = [];
   let started = !afterProvider;
 
@@ -285,6 +306,7 @@ function getAvailableProviders(afterProvider?: string): ProviderConfig[] {
       if (p.name === afterProvider) started = true;
       continue;
     }
+    if (opts?.needsOpenAiCompat && p.name === "anthropic") continue;
     const config = p.config();
     if (config) configs.push(config);
   }
@@ -295,11 +317,28 @@ function getAvailableProviders(afterProvider?: string): ProviderConfig[] {
 // ─── Main Function ────────────────────────────────────────────────────────────
 
 /**
+ * True when the request relies on features callAnthropic doesn't implement:
+ * tool calls, image/file content parts, or tool/function-role messages (which
+ * toAnthropicMessages would silently drop). Such requests must be routed to
+ * an OpenAI-compatible provider only.
+ */
+function requiresOpenAiCompatApi(params: InvokeParams): boolean {
+  if (params.tools && params.tools.length > 0) return true;
+  return params.messages.some((message) => {
+    if (message.role === "tool" || message.role === "function") return true;
+    return ensureArray(message.content).some(
+      (part) => typeof part !== "string" && part.type !== "text",
+    );
+  });
+}
+
+/**
  * Invoke an LLM with full support for vision, tools, structured output, and
  * multi-provider fallback.
  */
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const provider = resolveProvider(params.provider);
+  const needsOpenAiCompat = requiresOpenAiCompatApi(params);
+  const provider = resolveProvider(params.provider, { needsOpenAiCompat });
 
   try {
     return await callProvider(provider, params);
@@ -307,13 +346,17 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     // If autoFallback is enabled (or no explicit provider was requested),
     // try remaining providers
     if (params.autoFallback || !params.provider) {
-      const fallbacks = getAvailableProviders(provider.name);
+      const fallbacks = getAvailableProviders(provider.name, { needsOpenAiCompat });
       for (const fallback of fallbacks) {
         try {
           console.warn(
             `[LLM] ${provider.name} failed (${err.message}), trying ${fallback.name}...`,
           );
-          return await callProvider(fallback, params);
+          // A caller's `model` override is provider-specific (e.g. an
+          // Anthropic model id) and valid only for the primary provider —
+          // fallbacks must use their own default model, else they fail with
+          // model_not_found on a foreign id.
+          return await callProvider(fallback, { ...params, model: undefined });
         } catch (fallbackErr: any) {
           console.warn(`[LLM] ${fallback.name} also failed: ${fallbackErr.message}`);
         }
@@ -324,13 +367,108 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 }
 
+function toAnthropicMessages(messages: Message[]): {
+  system: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+} {
+  const systemParts: string[] = [];
+  const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const message of messages) {
+    const text = typeof message.content === "string"
+      ? message.content
+      : Array.isArray(message.content)
+        ? message.content
+            .map((part) => {
+              if (typeof part === "string") return part;
+              if (part && typeof part === "object" && part.type === "text") return part.text;
+              return "";
+            })
+            .filter(Boolean)
+            .join("\n")
+        : "";
+    if (!text.trim()) continue;
+    if (message.role === "system") {
+      systemParts.push(text.trim());
+      continue;
+    }
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    const role = message.role;
+    const last = turns[turns.length - 1];
+    if (last && last.role === role) last.content += `\n\n${text.trim()}`;
+    else turns.push({ role, content: text.trim() });
+  }
+
+  if (turns.length === 0 || turns[0].role !== "user") {
+    turns.unshift({ role: "user", content: "Hello" });
+  }
+
+  return { system: systemParts.join("\n\n"), messages: turns };
+}
+
+/** Anthropic's messages API is not OpenAI-compatible. A bearer call to it always fails. */
+async function callAnthropic(
+  provider: ProviderConfig,
+  params: InvokeParams,
+): Promise<InvokeResult> {
+  const model = params.model || provider.model;
+  const { system, messages } = toAnthropicMessages(params.messages);
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: params.maxTokens || params.max_tokens || 4096,
+    messages,
+  };
+  if (system) body.system = system;
+  if (params.temperature !== undefined) body.temperature = params.temperature;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": provider.key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `LLM invoke failed (${model}): ${response.status} ${response.statusText} – ${errorText}`,
+    );
+  }
+
+  const data = await response.json();
+  const text = (Array.isArray(data.content) ? data.content : [])
+    .filter((part: { type?: string; text?: string }) => part?.type === "text" && part.text)
+    .map((part: { text: string }) => part.text)
+    .join("")
+    .trim();
+  if (!text) throw new Error(`LLM invoke failed (${model}): empty response`);
+
+  return {
+    id: data.id || "",
+    created: Math.floor(Date.now() / 1000),
+    model: data.model || model,
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: text },
+        finish_reason: data.stop_reason === "end_turn" ? "stop" : data.stop_reason || "stop",
+      },
+    ],
+  };
+}
+
 /** Build and send the request to a specific provider. */
 async function callProvider(
   provider: ProviderConfig,
   params: InvokeParams,
 ): Promise<InvokeResult> {
+  if (provider.name === "anthropic") return callAnthropic(provider, params);
+
   const payload: Record<string, unknown> = {
-    model: provider.model,
+    model: params.model || provider.model,
     messages: params.messages.map(normalizeMessage),
     max_tokens: params.maxTokens || params.max_tokens || 4096,
   };
@@ -368,7 +506,7 @@ async function callProvider(
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `LLM invoke failed (${provider.model}): ${response.status} ${response.statusText} – ${errorText}`,
+      `LLM invoke failed (${params.model || provider.model}): ${response.status} ${response.statusText} – ${errorText}`,
     );
   }
 

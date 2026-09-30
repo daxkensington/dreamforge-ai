@@ -2,6 +2,9 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import type { Message } from "../_core/llm";
+import { enforceIpRateLimit } from "../rate-limit";
+
+const ONE_MINUTE_MS = 60 * 1000;
 
 const DREAMFORGE_SYSTEM_PROMPT = `You are Forge, the DreamForgeX AI assistant. You help users get the most out of DreamForgeX — the ultimate AI creative studio.
 
@@ -103,12 +106,25 @@ export const supportChatRouter = router({
         messages: z.array(
           z.object({
             role: z.enum(["system", "user", "assistant"]),
-            content: z.string(),
+            content: z.string().max(4000),
           })
-        ),
+        ).min(1).max(20),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // This endpoint burns a paid Anthropic key — cap each IP at 10
+      // messages/minute so a pasted curl loop can't run up the bill.
+      // Same Postgres-backed limiter the demo/newsletter routers use.
+      if (ctx.ip) {
+        await enforceIpRateLimit(
+          "supportChat.send",
+          ctx.ip,
+          10,
+          ONE_MINUTE_MS,
+          "You're sending messages too quickly — please wait a moment and try again.",
+        );
+      }
+
       // Prepend the system prompt
       const messages: Message[] = [
         { role: "system", content: DREAMFORGE_SYSTEM_PROMPT },
@@ -119,8 +135,10 @@ export const supportChatRouter = router({
         messages,
         maxTokens: 512,
         temperature: 0.7,
-        provider: "groq", // Free tier — cheapest option
-        autoFallback: true, // Falls back to Gemini etc. if Groq is down
+        // Haiku answers this widget. Groq is unset here, and the OpenAI key has no credits.
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        autoFallback: true,
       });
 
       const content = result.choices[0]?.message?.content;
