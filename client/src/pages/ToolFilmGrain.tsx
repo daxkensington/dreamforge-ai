@@ -59,15 +59,25 @@ export default function ToolFilmGrain() {
     if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
     setUploading(true);
     try {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
+      const preview = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => (typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read file")));
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) { const { url } = await res.json(); setImageUrl(url); }
+      if (!res.ok) throw new Error("Upload failed");
+      const data: unknown = await res.json();
+      const url = data && typeof data === "object" ? (data as { url?: unknown }).url : undefined;
+      if (typeof url !== "string" || url.trim() === "") throw new Error("Upload failed");
+      setImagePreview(preview); setImageUrl(url); setResultUrl(null);
     } catch { toast.error("Upload failed"); }
-    finally { setUploading(false); }
+    finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleApply = () => {

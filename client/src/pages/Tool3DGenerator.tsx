@@ -45,10 +45,14 @@ export default function Tool3DGenerator() {
       return;
     }
 
+    setImageUrl("");
     setUploading(true);
+    let failed = false;
     try {
       const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
+      reader.onload = () => {
+        if (!failed) setImagePreview(reader.result as string);
+      };
       reader.readAsDataURL(file);
 
       const formData = new FormData();
@@ -57,15 +61,24 @@ export default function Tool3DGenerator() {
       if (res.ok) {
         const { url } = await res.json();
         setImageUrl(url);
+      } else {
+        failed = true;
+        toast.error("Upload failed");
+        setImagePreview(null);
+        setImageUrl("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch {
       toast.error("Upload failed");
+      failed = true;
+      setImagePreview(null);
     } finally {
       setUploading(false);
     }
   };
 
   const handleGenerate = () => {
+    if (uploading) return;
     if (!imageUrl) {
       toast.error("Please provide an image");
       return;
@@ -103,6 +116,7 @@ export default function Tool3DGenerator() {
                 <Input
                   placeholder="Paste image URL..."
                   value={imageUrl}
+                  disabled={uploading}
                   onChange={(e) => {
                     setImageUrl(e.target.value);
                     setImagePreview(e.target.value);
@@ -142,7 +156,7 @@ export default function Tool3DGenerator() {
             <div className="flex gap-3">
               <Button
                 onClick={handleGenerate}
-                disabled={!imageUrl || isProcessing}
+                disabled={!imageUrl || uploading || isProcessing}
                 className="flex-1"
                 size="lg"
               >
