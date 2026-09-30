@@ -29,6 +29,55 @@
       "when": 1776480961476,
       "tag": "0003_naive_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "when": 1776577024000,
+      "tag": "0004_rate_limit_hits",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "when": 1776581883000,
+      "tag": "0005_credit_tx_user_time_idx",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "when": 1776589523000,
+      "tag": "0006_newsletter_signups",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "when": 1781313258000,
+      "tag": "0007_uncensored_tier",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "when": 1782977659000,
+      "tag": "0008_moderation_takedown",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "when": 1789235137000,
+      "tag": "0009_analytics_events",
+      "version": "7",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790748108447,
+      "tag": "0010_missing_schema_indexes",
+      "breakpoints": true
     }
   ]
 }

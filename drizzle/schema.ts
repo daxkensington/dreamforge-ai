@@ -10,6 +10,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -103,7 +104,9 @@ export const users = pgTable("users", {
   // recorded once, required before purchase or uncensored generation.
   uncensoredUntil: timestamp("uncensoredUntil"),
   ageConfirmedAt: timestamp("ageConfirmedAt"),
-});
+}, (table) => [
+  uniqueIndex("users_email_unique").on(table.email),
+]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -244,6 +247,7 @@ export const galleryItems = pgTable("galleryItems", {
 }, (table) => [
   index("galleryItems_generationId_idx").on(table.generationId),
   index("galleryItems_userId_idx").on(table.userId),
+  uniqueIndex("galleryItems_generationId_unique").on(table.generationId),
 ]);
 
 export type GalleryItem = typeof galleryItems.$inferSelect;
@@ -337,7 +341,9 @@ export const galleryLikes = pgTable("galleryLikes", {
   userId: integer("userId").notNull(),
   galleryItemId: integer("galleryItemId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("galleryLikes_userId_galleryItemId_unique").on(table.userId, table.galleryItemId),
+]);
 
 export type GalleryLike = typeof galleryLikes.$inferSelect;
 
@@ -359,7 +365,9 @@ export const userFollows = pgTable("userFollows", {
   followerId: integer("followerId").notNull(),
   followingId: integer("followingId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("userFollows_followerId_followingId_unique").on(table.followerId, table.followingId),
+]);
 
 export type UserFollow = typeof userFollows.$inferSelect;
 
@@ -458,7 +466,9 @@ export const userSubscriptions = pgTable("userSubscriptions", {
   cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("userSubscriptions_stripeSubscriptionId_unique").on(table.stripeSubscriptionId),
+]);
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
