@@ -3,11 +3,14 @@ import Stripe from "stripe";
 import { getDb } from "../../../../server/db";
 import { addCredits } from "../../../../server/stripe";
 import { createNotification } from "../../../../server/routersPhase15";
+import { hasPurchased, recordPurchase } from "../../../../server/dbMarketplace";
 import {
   webhookEvents,
   creditBalances,
   creditTransactions,
   userSubscriptions,
+  marketplaceListings,
+  users,
 } from "../../../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -142,9 +145,122 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (event.type) {
-      // ─── Credit Purchase ─────────────────────────────────────────
+      // ─── Checkout Completed (credit packs & marketplace) ─────────
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // ─── Marketplace Purchase ────────────────────────────────
+        // Marketplace sessions are created in server/routers/marketplace.ts
+        // with metadata.type = "marketplace_purchase". Without this branch the
+        // buyer is charged but no purchase row is written and downloadAsset
+        // denies them forever.
+        if (session.metadata?.type === "marketplace_purchase") {
+          const buyerId = parseInt(session.metadata?.buyer_id || "0");
+          const listingId = parseInt(session.metadata?.listing_id || "0");
+
+          if (!buyerId || !listingId) {
+            await logWebhookEvent(
+              "ignored",
+              `Marketplace checkout with missing buyer/listing metadata: ${session.id}`
+            );
+            break;
+          }
+          if (!db) {
+            await logWebhookEvent(
+              "failed",
+              `Marketplace purchase for buyer ${buyerId}, listing ${listingId}: no database`
+            );
+            break;
+          }
+
+          // Idempotency — same convention as the marketplace router's
+          // purchase route (webhookEvents dedupe by event.id happens above).
+          if (await hasPurchased(buyerId, listingId)) {
+            console.log(
+              `[Stripe Webhook] Marketplace purchase already recorded: buyer ${buyerId}, listing ${listingId}`
+            );
+            await logWebhookEvent(
+              "processed",
+              `Duplicate marketplace purchase skipped: buyer ${buyerId}, listing ${listingId}`
+            );
+            break;
+          }
+
+          const listingRows = await db
+            .select({
+              sellerId: marketplaceListings.sellerId,
+              title: marketplaceListings.title,
+              price: marketplaceListings.price,
+            })
+            .from(marketplaceListings)
+            .where(eq(marketplaceListings.id, listingId))
+            .limit(1);
+          const listing = listingRows[0];
+
+          const buyerRows = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.id, buyerId))
+            .limit(1);
+
+          // Orphaned metadata (listing deleted or buyer account gone): the
+          // buyer was charged but we can't compute fees or notify a seller.
+          // Log loudly and mark handled — Stripe retries can't fix a deleted
+          // listing, so don't let it retry for 3 days (house convention for
+          // unresolvable refs, see charge.refunded).
+          if (!listing || buyerRows.length === 0) {
+            console.error(
+              `[Stripe Webhook] Marketplace purchase orphaned (buyer charged, not recorded): ` +
+                `listing ${listingId} exists=${!!listing}, buyer ${buyerId} exists=${buyerRows.length > 0}, session ${session.id}`
+            );
+            await logWebhookEvent(
+              "ignored",
+              `Marketplace purchase orphaned: listing ${listingId} or buyer ${buyerId} no longer exists (session ${session.id})`
+            );
+            break;
+          }
+
+          // Price agreed at checkout (metadata), falling back to the listing's
+          // current price if the metadata is missing/corrupt.
+          const price = parseInt(session.metadata?.price || "") || listing.price;
+
+          const result = await recordPurchase({
+            buyerId,
+            listingId,
+            price,
+            stripePaymentId: (session.payment_intent as string) || session.id,
+          });
+          // Download entitlement needs no extra step: downloadAsset and
+          // hasPurchased read marketplacePurchases directly.
+          console.log(
+            `[Stripe Webhook] Marketplace purchase recorded: buyer ${buyerId} bought listing ${listingId} (purchase ${result.id}, session ${session.id})`
+          );
+
+          // Notify the seller
+          try {
+            await createNotification(
+              listing.sellerId,
+              "payment",
+              "New Sale",
+              `Your listing "${listing.title}" just sold for $${(price / 100).toFixed(2)}.`,
+              {
+                listingId,
+                purchaseId: result.id,
+                buyerId,
+                price,
+                sessionId: session.id,
+              }
+            );
+          } catch {}
+
+          await logWebhookEvent(
+            "processed",
+            `Marketplace purchase: buyer ${buyerId} bought listing ${listingId} (${listing.title})`
+          );
+          break;
+        }
+
+        // ─── Credit Purchase ─────────────────────────────────────
         const userId = parseInt(session.metadata?.user_id || "0");
         const credits = parseInt(session.metadata?.credits || "0");
         const packageId = session.metadata?.package_id || "";

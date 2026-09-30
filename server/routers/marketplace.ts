@@ -148,8 +148,8 @@ const purchaseRoute = protectedProcedure
           listing_id: input.listingId.toString(),
           price: price.toString(),
         },
-        success_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/purchases?success=true`,
-        cancel_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/${input.listingId}?canceled=true`,
+        success_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/purchases?success=true`,
+        cancel_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/${input.listingId}?canceled=true`,
       });
 
       return { success: true, checkoutUrl: session.url, free: false };
@@ -359,8 +359,8 @@ const setupSellerAccountRoute = protectedProcedure
         // Generate onboarding link
         const accountLink = await getStripe().accountLinks.create({
           account: account.id,
-          refresh_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/seller/setup?refresh=true`,
-          return_url: `${process.env.APP_URL || "https://dreamforge.art"}/marketplace/seller/dashboard?onboarded=true`,
+          refresh_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/seller/setup?refresh=true`,
+          return_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/seller/dashboard?onboarded=true`,
           type: "account_onboarding",
         });
 
