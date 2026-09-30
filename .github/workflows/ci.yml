@@ -1,0 +1,36 @@
+name: CI
+
+# Core checks for every change to main and every PR:
+#   • pnpm check — tsc --noEmit, catches type errors before deploy
+#   • pnpm test — vitest unit/integration suite
+#
+# Runs on the repo's pinned toolchain (Node 22 + pnpm 10.34.5) so results
+# match what smoke.yml and local dev see.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Run tests
+        run: pnpm test
