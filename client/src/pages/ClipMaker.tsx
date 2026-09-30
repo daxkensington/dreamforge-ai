@@ -41,6 +41,9 @@ export default function ClipMaker() {
   const [targetPlatform, setTargetPlatform] = useState("tiktok");
   const [clips, setClips] = useState<Array<{ title: string; description: string; timestamp: string; hook: string }>>([]);
 
+  // Shared presence check for Generate and Regenerate: a loaded video or a non-empty description.
+  const hasContent = Boolean(videoUrl) || description.trim().length > 0;
+
   const clipMutation = trpc.video.generateStoryboard.useMutation({
     onSuccess: (data) => {
       if (data.status === "completed" && data.scenes) {
@@ -51,6 +54,11 @@ export default function ClipMaker() {
           hook: s.cameraAngle || "Dynamic cut",
         })));
         toast.success(`${data.scenes.length} clip ideas generated!`);
+      } else {
+        toast.error(
+          data?.error ||
+            (data?.status ? `Clip generation ${data.status}` : "Clip generation did not return any clips")
+        );
       }
     },
     onError: (err) => toast.error(err.message),
@@ -216,7 +224,7 @@ export default function ClipMaker() {
 
                 <Button
                   onClick={handleAnalyze}
-                  disabled={(!videoUrl && !description.trim()) || clipMutation.isPending}
+                  disabled={!hasContent || clipMutation.isPending}
                   className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
                 >
                   {clipMutation.isPending ? (
@@ -276,8 +284,8 @@ export default function ClipMaker() {
                       </Button>
                       <Button
                         className="flex-1 gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs"
-                        onClick={() => { setClips([]); handleAnalyze(); }}
-                        disabled={clipMutation.isPending}
+                        onClick={handleAnalyze}
+                        disabled={!hasContent || clipMutation.isPending}
                       >
                         <Sparkles className="h-3 w-3" /> Regenerate
                       </Button>
