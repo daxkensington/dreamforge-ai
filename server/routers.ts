@@ -110,6 +110,8 @@ import { audioRouter } from "./routers/audio";
 import { demoRouter } from "./routers/demo";
 import { uncensoredRouter, getUncensoredEntitlement } from "./routers/uncensored";
 import { checkPrompt, isSexualPrompt, logModerationBlock } from "./_core/promptModeration";
+import { assertSafeImageUrl, fetchGuardedImage } from "./_core/imageUrlGuard";
+import { safeErrorMessage } from "./_core/errorSanitizer";
 import { ADULT_REDIRECT_MESSAGE } from "../shared/adultRouting";
 import { applyUncensoredStyle } from "../shared/uncensoredStyles";
 import { resolveUncensoredLora } from "./_core/uncensoredStyleLora";
@@ -700,7 +702,13 @@ export const appRouter = router({
           });
 
           // Notify on completion
-          try { await createNotification(ctx.user.id, "generation", "Generation Complete", `Your ${input.mediaType} "${input.prompt.slice(0, 40)}..." is ready!`); } catch {}
+          try {
+            await createNotification(ctx.user.id, "generation", "Generation Complete", `Your ${input.mediaType} "${input.prompt.slice(0, 40)}..." is ready!`);
+          } catch (err) {
+            // Best-effort side effect — log it (raw goes to console via
+            // safeErrorMessage) but never fail a completed generation.
+            console.warn("[generation.create] completion notification failed:", safeErrorMessage(err, "generation.create"));
+          }
 
           // Auto-check achievements and budget alerts (fire-and-forget)
           const achievementPromise = autoCheckAchievements(ctx.user.id).catch(() => []);
@@ -802,9 +810,20 @@ export const appRouter = router({
         // Re-screen the prompt + title/description with the safety gate. The
         // prompt already passed at generation time, but the user-supplied
         // title/description are new free-text and could carry disallowed content.
-        const modVerdict = checkPrompt(`${input.title} ${input.description ?? ""} ${gen.prompt}`, { strictMinors: false });
+        // Keep the exact screened text around: the audit row below must log
+        // THAT text's length + hash (what logModerationBlock hashes into
+        // promptSha256), not just the title's.
+        const screenedText = `${input.title} ${input.description ?? ""} ${gen.prompt}`;
+        const modVerdict = checkPrompt(screenedText, { strictMinors: false });
         if (!modVerdict.allowed) {
-          await logModerationBlock({ category: modVerdict.category, promptLen: input.title.length, userId: ctx.user.id, surface: "gallery.submitToGallery" });
+          await logModerationBlock({
+            category: modVerdict.category,
+            promptLen: screenedText.length,
+            prompt: screenedText,
+            userId: ctx.user.id,
+            ip: ctx.ip,
+            surface: "gallery.submitToGallery",
+          });
           throw new TRPCError({ code: "BAD_REQUEST", message: modVerdict.userMessage });
         }
 
@@ -1152,23 +1171,26 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // SSRF guard: imageUrl is fetched server-side below. Reject non-https
+        // or private/loopback/metadata hosts before any credits are spent.
+        assertSafeImageUrl(input.imageUrl);
         await tryDeductCredits(ctx.user.id, "super-resolution", "Image upscale");
         try {
           // Try RunPod Real-ESRGAN first (true pixel-level upscaling, 90% cheaper)
           const { isRunPodAvailable, runpodUpscale } = await import("./_core/runpod");
           if (isRunPodAvailable()) {
             try {
-              const imgResp = await fetch(input.imageUrl);
-              if (imgResp.ok) {
-                const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-                const imageB64 = imgBuffer.toString("base64");
-                const scale = input.scaleFactor === "4x" ? 4 : 2;
-                const resultBuffer = await runpodUpscale(imageB64, scale);
-                const { storagePut, generateStorageKey } = await import("./storage");
-                const key = generateStorageKey("upscaled", "png");
-                const { url } = await storagePut(key, resultBuffer, "image/png");
-                return { url, status: "completed" as const };
-              }
+              // Guarded fetch: https-only + private-host block + image
+              // content-type + 20MB declared / 25MB actual size caps
+              // (see server/_core/imageUrlGuard).
+              const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
+              const imageB64 = imgBuffer.toString("base64");
+              const scale = input.scaleFactor === "4x" ? 4 : 2;
+              const resultBuffer = await runpodUpscale(imageB64, scale);
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const key = generateStorageKey("upscaled", "png");
+              const { url } = await storagePut(key, resultBuffer, "image/png");
+              return { url, status: "completed" as const };
             } catch (err: any) {
               console.warn("[Upscale] RunPod ESRGAN failed, falling back to LLM:", err.message);
             }
@@ -1211,6 +1233,10 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // SSRF guard: no local fetch here, but the URL is forwarded to
+        // generateImage which fetches it server-side — validate before the
+        // credit spend so a blocked host fails fast and free.
+        assertSafeImageUrl(input.imageUrl);
         await tryDeductCredits(ctx.user.id, "style-transfer", `Style transfer: ${input.style}`);
         const styleDescriptions: Record<string, string> = {
           "oil-painting": "rich oil painting with visible brushstrokes, thick impasto texture, classical fine art",
@@ -1250,6 +1276,9 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // SSRF guard: imageUrl is fetched server-side below. Reject non-https
+        // or private/loopback/metadata hosts before any credits are spent.
+        assertSafeImageUrl(input.imageUrl);
         await tryDeductCredits(ctx.user.id, "background-edit", "Background edit");
         try {
           // For "remove" mode, try RunPod RMBG-2.0 first (true segmentation, 95% cheaper)
@@ -1257,16 +1286,16 @@ export const appRouter = router({
             const { isRunPodAvailable, runpodRemoveBackground } = await import("./_core/runpod");
             if (isRunPodAvailable()) {
               try {
-                const imgResp = await fetch(input.imageUrl);
-                if (imgResp.ok) {
-                  const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-                  const imageB64 = imgBuffer.toString("base64");
-                  const resultBuffer = await runpodRemoveBackground(imageB64);
-                  const { storagePut, generateStorageKey } = await import("./storage");
-                  const key = generateStorageKey("bg-removed", "png");
-                  const { url } = await storagePut(key, resultBuffer, "image/png");
-                  return { url, status: "completed" as const, mode: input.mode };
-                }
+                // Guarded fetch: https-only + private-host block + image
+                // content-type + 20MB declared / 25MB actual size caps
+                // (see server/_core/imageUrlGuard).
+                const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
+                const imageB64 = imgBuffer.toString("base64");
+                const resultBuffer = await runpodRemoveBackground(imageB64);
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const key = generateStorageKey("bg-removed", "png");
+                const { url } = await storagePut(key, resultBuffer, "image/png");
+                return { url, status: "completed" as const, mode: input.mode };
               } catch (err: any) {
                 console.warn("[BgRemove] RunPod RMBG failed, falling back to LLM:", err.message);
               }
@@ -4863,6 +4892,10 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
         await enforceRateLimit(`video.imageToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
+        // SSRF guard: imageUrl is fetched server-side (Veo 3 path below) and
+        // forwarded to providers that fetch it themselves. Reject non-https
+        // or private/loopback/metadata hosts before any credits are spent.
+        assertSafeImageUrl(input.imageUrl);
         await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
 
         const motionDescriptions: Record<string, string> = {
@@ -4883,10 +4916,11 @@ export const appRouter = router({
         // straight to Runway / Kling / Minimax.
         if (process.env.VEO3_ENABLED === "true" && process.env.GEMINI_API_KEY) {
           try {
-            const imgResponse = await fetch(input.imageUrl);
-            const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+            // Guarded fetch: https-only + private-host block + image
+            // content-type + 20MB declared / 25MB actual size caps
+            // (see server/_core/imageUrlGuard).
+            const { buffer: imgBuffer, contentType: mimeType } = await fetchGuardedImage(input.imageUrl);
             const imgBase64 = imgBuffer.toString("base64");
-            const mimeType = imgResponse.headers.get("content-type") || "image/jpeg";
             const { generateVeo3Video } = await import("./_core/videoGeneration");
             const videoUrl = await generateVeo3Video({
               prompt: enhancedPrompt,
@@ -5023,7 +5057,10 @@ export const appRouter = router({
                   { projectId: input.id }
                 );
               }
-            } catch {}
+            } catch (err) {
+              // Best-effort owner notification — log sanitized, never fail the save.
+              console.warn("[videoProject.save] owner notification failed:", safeErrorMessage(err, "videoProject.save"));
+            }
           }
           return { id: input.id, action: "updated" as const };
         }
@@ -5173,7 +5210,10 @@ export const appRouter = router({
             `Someone joined your project via share link as ${shareToken.permission}`,
             { projectId: shareToken.projectId }
           );
-        } catch {}
+        } catch (err) {
+          // Best-effort owner notification — log sanitized, never fail accepting the link.
+          console.warn("[videoProject.acceptShareLink] owner notification failed:", safeErrorMessage(err, "videoProject.acceptShareLink"));
+        }
         return { projectId: shareToken.projectId, role: shareToken.permission, action };
       }),
 

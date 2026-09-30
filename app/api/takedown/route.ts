@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../../../server/db";
 import { takedownRequests } from "../../../drizzle/schema";
 import { enforceRateLimit } from "../../../server/rate-limit";
+import { getClientIp } from "../../../server/_core/context";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -31,11 +32,10 @@ const takedownInput = z.object({
 });
 
 function extractIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const xreal = req.headers.get("x-real-ip");
-  if (xreal) return xreal.trim();
-  return null;
+  // Shared spoof-resistant IP resolution: platform-verified
+  // x-vercel-forwarded-for first, else last x-forwarded-for entry. The old
+  // x-forwarded-for[0] was client-controlled and bypassed this limit.
+  return getClientIp(req.headers);
 }
 
 export async function POST(req: NextRequest) {

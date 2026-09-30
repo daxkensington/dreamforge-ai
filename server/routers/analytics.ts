@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { analyticsEvents } from "../../drizzle/schema";
-import { enforceRateLimit } from "../rate-limit";
+import { enforceIpRateLimit, enforceRateLimit } from "../rate-limit";
 
 /**
  * The funnel events worth counting. A closed list keeps junk out of the table
@@ -46,6 +46,14 @@ export const analyticsRouter = router({
       try {
         // Generous, but enough to stop a loop or a bot filling the table.
         await enforceRateLimit(`analytics.track:${input.anonId}`, 120, 60_000);
+
+        // Per-IP limit alongside the anonId key. anonId is client-supplied
+        // and rotated in one line of JS, so on its own it is not a throttle
+        // at all. 600/min/IP tolerates shared NATs (offices, schools) while
+        // still capping a single address at ~10 events/sec sustained.
+        if (ctx.ip) {
+          await enforceIpRateLimit("analytics.track", ctx.ip, 600, 60_000);
+        }
 
         const db = await getDb();
         if (!db) return { ok: false };

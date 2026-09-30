@@ -58,9 +58,15 @@ const sanitizeMiddleware = t.middleware(async ({ next }) => {
 });
 
 export const router = t.router;
-// Every procedure goes through the sanitizer — attached at base so
-// query + mutation + public + protected all get it without opt-in.
-export const publicProcedure = t.procedure.use(sanitizeMiddleware);
+
+// Single base every visibility level builds on. Attaching sanitizeMiddleware
+// here (rather than only on publicProcedure) closes a real leak: protected
+// and admin mutations commonly RETURN `{ status: "failed", error: err.message }`
+// payloads instead of throwing, and those payloads never touched the
+// sanitizer — raw provider URLs/keys went straight to the client.
+const baseProcedure = t.procedure.use(sanitizeMiddleware);
+
+export const publicProcedure = baseProcedure;
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
@@ -77,9 +83,9 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = baseProcedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = baseProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 

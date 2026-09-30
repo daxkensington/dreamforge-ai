@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { getClientIp } from "./server/_core/context";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -40,10 +41,11 @@ const authMiddleware = auth;
 export default async function middleware(request: NextRequest) {
   // Rate-limit /api/auth paths by IP
   if (request.nextUrl.pathname.startsWith("/api/auth")) {
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "unknown";
+    // Spoof-resistant IP: prefers Vercel's platform-verified
+    // x-vercel-forwarded-for, else the last x-forwarded-for entry. The old
+    // x-forwarded-for[0] was client-supplied, so anyone could reset their
+    // limit by rotating a header value.
+    const ip = getClientIp(request.headers) || "unknown";
     if (isAuthRateLimited(ip)) {
       return NextResponse.json(
         { error: "Too many authentication requests. Please try again later." },
