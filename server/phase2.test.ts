@@ -1,7 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+import { invokeLLM } from "./_core/llm";
+
+// Stub the LLM module — generation.enhancePrompt must never make live
+// network calls in tests. Per-test behavior is set with mockInvokeLLM below.
+vi.mock("./_core/llm", () => ({
+  invokeLLM: vi.fn(),
+}));
+
+const mockInvokeLLM = vi.mocked(invokeLLM);
+
+function llmResult(content: string) {
+  return {
+    id: "chatcmpl-test",
+    created: 0,
+    model: "test-model",
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant" as const, content },
+        finish_reason: "stop",
+      },
+    ],
+  };
+}
 
 type CookieCall = {
   name: string;
@@ -236,20 +260,39 @@ describe("generation.enhancePrompt", () => {
   });
 
   it("returns enhanced prompt for valid input", async () => {
+    mockInvokeLLM.mockResolvedValue(
+      llmResult(
+        "A majestic dragon soaring over snow-capped mountains at golden hour, cinematic lighting"
+      )
+    );
+
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    try {
-      const result = await caller.generation.enhancePrompt({
-        prompt: "A dragon flying over mountains",
-      });
-      expect(result).toHaveProperty("enhanced");
-      expect(typeof result.enhanced).toBe("string");
-      expect(result.enhanced.length).toBeGreaterThan(0);
-    } catch {
-      // LLM may be unavailable in test, acceptable
-    }
-  }, 30000);
+    const result = await caller.generation.enhancePrompt({
+      prompt: "A dragon flying over mountains",
+    });
+
+    expect(result).toHaveProperty("enhanced");
+    expect(typeof result.enhanced).toBe("string");
+    expect(result.enhanced).toBe(
+      "A majestic dragon soaring over snow-capped mountains at golden hour, cinematic lighting"
+    );
+    expect(mockInvokeLLM).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to the original prompt when the LLM call fails", async () => {
+    mockInvokeLLM.mockRejectedValue(new Error("LLM unavailable"));
+
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.generation.enhancePrompt({
+      prompt: "A dragon flying over mountains",
+    });
+
+    expect(result.enhanced).toBe("A dragon flying over mountains");
+  });
 });
 
 // ─── User Profile Tests ─────────────────────────────────────────────────────
