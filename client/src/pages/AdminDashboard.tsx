@@ -113,6 +113,8 @@ export default function AdminDashboard() {
   const [notifMessage, setNotifMessage] = useState("");
   const [webhookPage, setWebhookPage] = useState(1);
   const [webhookStatusFilter, setWebhookStatusFilter] = useState<"processed" | "failed" | "ignored" | undefined>(undefined);
+  const [takedownFilter, setTakedownFilter] = useState<"open" | "actioned" | "rejected" | "all">("open");
+  const [takedownNotes, setTakedownNotes] = useState<Record<number, string>>({});
   const utils = trpc.useUtils();
 
   const { data: stats } = trpc.admin.getPlatformStats.useQuery(undefined, {
@@ -158,6 +160,19 @@ export default function AdminDashboard() {
     { page: webhookPage, limit: 20, status: webhookStatusFilter },
     { enabled: !!user && user.role === "admin" }
   );
+
+  const { data: takedownData } = trpc.admin.takedown.list.useQuery(
+    { status: takedownFilter === "all" ? undefined : takedownFilter },
+    { enabled: !!user && user.role === "admin" }
+  );
+
+  const resolveTakedown = trpc.admin.takedown.resolve.useMutation({
+    onSuccess: (result) => {
+      utils.admin.takedown.list.invalidate();
+      toast.success(result.itemRemoved ? "Content removed and request actioned" : "Takedown request resolved");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   // Chart data for Generation Volume
   const genChartData = useMemo(() => {
@@ -344,6 +359,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4 mr-2" />Analytics</TabsTrigger>
             <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Users</TabsTrigger>
             <TabsTrigger value="moderation"><Shield className="w-4 h-4 mr-2" />Moderation</TabsTrigger>
+            <TabsTrigger value="takedown"><AlertTriangle className="w-4 h-4 mr-2" />Takedown</TabsTrigger>
             <TabsTrigger value="broadcast"><Send className="w-4 h-4 mr-2" />Broadcast</TabsTrigger>
             <TabsTrigger value="webhooks"><Webhook className="w-4 h-4 mr-2" />Webhooks</TabsTrigger>
           </TabsList>
@@ -648,6 +664,127 @@ export default function AdminDashboard() {
                     <div className="text-center py-12 text-muted-foreground">
                       <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
                       <p>No {moderationFilter} items</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Takedown Tab */}
+          <TabsContent value="takedown">
+            <Card>
+              <CardHeader>
+                <CardTitle>Takedown Requests</CardTitle>
+                <CardDescription>
+                  Content-removal reports from the public /takedown form (TAKE IT DOWN Act intake)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2 mb-6">
+                  {(["open", "actioned", "rejected", "all"] as const).map((s) => (
+                    <Button key={s} variant={takedownFilter === s ? "default" : "outline"} size="sm" onClick={() => setTakedownFilter(s)}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="space-y-3">
+                  {takedownData?.requests?.map((req: any) => (
+                    <div key={req.id} className="p-4 rounded-lg bg-muted/50 space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-sm">{req.ticket}</span>
+                            <Badge variant={req.status === "open" ? "secondary" : req.status === "actioned" ? "default" : "destructive"}>
+                              {req.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{req.reason}</p>
+                          <div className="text-xs text-muted-foreground mt-1 space-x-2">
+                            <a href={req.url} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[360px] align-bottom">
+                              {req.url}
+                            </a>
+                            <span>· Reported {new Date(req.createdAt).toLocaleString()}</span>
+                            {req.contact && <span>· Contact: {req.contact}</span>}
+                          </div>
+                          {req.notes && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">Admin note: {req.notes}</p>
+                          )}
+                        </div>
+                        {req.item && (
+                          <div className="flex items-center gap-3 shrink-0">
+                            {(req.item.thumbnailUrl || req.item.imageUrl) && (
+                              <img
+                                src={req.item.thumbnailUrl || req.item.imageUrl}
+                                alt={req.item.title || "Reported item"}
+                                className="w-14 h-14 rounded-md object-cover border"
+                              />
+                            )}
+                            <div className="text-right">
+                              <div className="text-sm font-medium max-w-[200px] truncate">
+                                {req.item.title || "Untitled"}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Gallery #{req.item.id}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {!req.item && (
+                        <p className="text-xs text-muted-foreground">
+                          {req.status === "open"
+                            ? "No live gallery item matches this URL — it may already be removed, or the link is external/CDN."
+                          : "Linked gallery item no longer exists."}
+                        </p>
+                      )}
+
+                      {req.status === "open" && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Input
+                            placeholder="Note (optional)…"
+                            className="max-w-xs"
+                            value={takedownNotes[req.id] ?? ""}
+                            onChange={(e) => setTakedownNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={resolveTakedown.isPending}
+                            onClick={() =>
+                              resolveTakedown.mutate({
+                                id: req.id,
+                                action: "remove_content",
+                                note: takedownNotes[req.id]?.trim() || undefined,
+                              })
+                            }
+                          >
+                            <XCircle className="w-4 h-4 mr-1" />Remove Content
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resolveTakedown.isPending}
+                            onClick={() =>
+                              resolveTakedown.mutate({
+                                id: req.id,
+                                action: "reject",
+                                note: takedownNotes[req.id]?.trim() || undefined,
+                              })
+                            }
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {takedownData?.requests?.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p>No {takedownFilter === "all" ? "" : takedownFilter} takedown requests</p>
                     </div>
                   )}
                 </div>

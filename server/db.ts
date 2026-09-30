@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, like, lte, or, sql, asc, count } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import { createHash } from "crypto";
 import {
   InsertUser,
   users,
@@ -8,7 +9,11 @@ import {
   tags,
   generationTags,
   galleryItems,
+  galleryLikes,
+  galleryComments,
   moderationQueue,
+  moderationLog,
+  takedownRequests,
   videoProjects,
   projectCollaborators,
   projectShareTokens,
@@ -17,6 +22,7 @@ import {
   type InsertTag,
   type InsertGalleryItem,
   type InsertModerationItem,
+  type TakedownRequest,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -33,6 +39,15 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/**
+ * True when err is a Postgres unique-constraint violation (SQLSTATE 23505),
+ * including when a driver wraps the original error on `cause`.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  const code = (err as { code?: unknown })?.code ?? (err as { cause?: { code?: unknown } })?.cause?.code;
+  return code === "23505";
 }
 
 // ─── User Helpers ────────────────────────────────────────────────────────────
@@ -479,41 +494,95 @@ export async function getModerationQueue(
   };
 }
 
+/**
+ * Review outcome for one moderation-queue item.
+ *
+ * State machine: only `pending` items may transition — the guarded UPDATE
+ * matches `AND status = 'pending'`, so a rejected item can never be
+ * re-approved (or vice versa) by a second review; that second review is a
+ * no-op reported via `updated: false`.
+ *
+ * The approve path flips the status and publishes to the galleryItems table
+ * atomically (single non-interactive transaction via db.batch — the neon-http
+ * driver has no interactive transactions, but its batch API submits all
+ * statements as one Postgres transaction in a single HTTP round trip). A
+ * unique-constraint violation on the publish is treated as already-published
+ * success: another flow (e.g. publishGalleryItem's growth loop) got the
+ * generation into the gallery first, so the desired end state already holds.
+ */
 export async function reviewModerationItem(
   id: number,
   reviewerId: number,
   status: "approved" | "rejected",
   note?: string
-) {
+): Promise<{ updated: boolean; galleryItemId?: number }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(moderationQueue)
-    .set({
-      status,
-      reviewedBy: reviewerId,
-      reviewNote: note ?? null,
-      reviewedAt: new Date(),
-    })
-    .where(eq(moderationQueue.id, id));
+  const pendingGuard = and(
+    eq(moderationQueue.id, id),
+    eq(moderationQueue.status, "pending")
+  );
 
-  if (status === "approved") {
-    const modItem = await db
-      .select()
-      .from(moderationQueue)
-      .where(eq(moderationQueue.id, id))
+  const [modItem] = await db
+    .select()
+    .from(moderationQueue)
+    .where(pendingGuard)
+    .limit(1);
+  if (!modItem) return { updated: false };
+
+  const reviewSet = {
+    status,
+    reviewedBy: reviewerId,
+    reviewNote: note ?? null,
+    reviewedAt: new Date(),
+  };
+
+  if (status === "rejected") {
+    const rows = await db
+      .update(moderationQueue)
+      .set(reviewSet)
+      .where(pendingGuard)
+      .returning({ id: moderationQueue.id });
+    return { updated: rows.length > 0 };
+  }
+
+  try {
+    const [updated, inserted] = await db.batch([
+      db
+        .update(moderationQueue)
+        .set(reviewSet)
+        .where(pendingGuard)
+        .returning({ id: moderationQueue.id }),
+      db
+        .insert(galleryItems)
+        .values({
+          generationId: modItem.generationId,
+          userId: modItem.userId,
+          title: modItem.title,
+          description: modItem.description,
+          approvedBy: reviewerId,
+          approvedAt: new Date(),
+        })
+        .returning({ id: galleryItems.id }),
+    ]);
+    return { updated: updated.length > 0, galleryItemId: inserted[0]?.id };
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    // galleryItems(generationId) already satisfied: the generation is in the
+    // gallery, which is the state approval wanted. The batch rolled back the
+    // status flip too, so re-apply it alone and surface the existing row.
+    const rows = await db
+      .update(moderationQueue)
+      .set(reviewSet)
+      .where(pendingGuard)
+      .returning({ id: moderationQueue.id });
+    const existing = await db
+      .select({ id: galleryItems.id })
+      .from(galleryItems)
+      .where(eq(galleryItems.generationId, modItem.generationId))
       .limit(1);
-    if (modItem[0]) {
-      await db.insert(galleryItems).values({
-        generationId: modItem[0].generationId,
-        userId: modItem[0].userId,
-        title: modItem[0].title,
-        description: modItem[0].description,
-        approvedBy: reviewerId,
-        approvedAt: new Date(),
-      });
-    }
+    return { updated: rows.length > 0, galleryItemId: existing[0]?.id };
   }
 }
 
@@ -536,6 +605,250 @@ export async function getModerationStats() {
     if (row.status === "rejected") stats.rejected = row.count;
   }
   return stats;
+}
+
+// ─── Takedown Helpers ────────────────────────────────────────────────────────
+// Back-office review for the public /api/takedown intake. Reporters reference
+// content by URL only (see app/api/takedown/route.ts), so resolution maps the
+// two public content shapes back to gallery rows:
+//   /gallery/<id> → galleryItems.id
+//   /g/<id>       → generations.id → galleryItems.generationId (share links)
+// Anything else (CDN image URLs, external links) is surfaced as unresolvable
+// so an admin acts on it manually instead of trusting a blind action.
+
+export type GalleryRef = { kind: "item" | "generation"; id: number };
+
+function extractGalleryRef(url: string): GalleryRef | null {
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    // Reporters sometimes paste bare paths — treat the raw string as one.
+    path = url;
+  }
+  const galleryMatch = path.match(/\/gallery\/(\d+)(?:[/?#]|$)/);
+  if (galleryMatch) return { kind: "item", id: Number(galleryMatch[1]) };
+  const shareMatch = path.match(/\/g\/(\d+)(?:[/?#]|$)/);
+  if (shareMatch) return { kind: "generation", id: Number(shareMatch[1]) };
+  return null;
+}
+
+export type TakedownItemSummary = {
+  id: number;
+  generationId: number;
+  userId: number;
+  title: string | null;
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+};
+
+export type TakedownRequestWithItem = TakedownRequest & {
+  /** Live gallery row the reported URL points at, or null when it can't be mapped or no longer exists. */
+  item: TakedownItemSummary | null;
+};
+
+function toItemSummary(item: typeof galleryItems.$inferSelect, generation: { imageUrl: string | null; thumbnailUrl: string | null }): TakedownItemSummary {
+  return {
+    id: item.id,
+    generationId: item.generationId,
+    userId: item.userId,
+    title: item.title,
+    imageUrl: generation.imageUrl,
+    thumbnailUrl: generation.thumbnailUrl,
+  };
+}
+
+/**
+ * All takedown requests (newest first, capped at 200), each with the gallery
+ * item its URL resolves to when one exists. Gallery lookups are batched
+ * (two queries total), not per-request.
+ */
+export async function listTakedownRequests(status?: string): Promise<TakedownRequestWithItem[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const requests = await db
+    .select()
+    .from(takedownRequests)
+    .where(status ? eq(takedownRequests.status, status) : undefined)
+    .orderBy(desc(takedownRequests.createdAt))
+    .limit(200);
+
+  const itemIds = new Set<number>();
+  const generationIds = new Set<number>();
+  for (const request of requests) {
+    const ref = extractGalleryRef(request.url);
+    if (ref?.kind === "item") itemIds.add(ref.id);
+    if (ref?.kind === "generation") generationIds.add(ref.id);
+  }
+
+  const itemsById = new Map<number, TakedownItemSummary>();
+  const itemsByGenerationId = new Map<number, TakedownItemSummary>();
+  const collect = (rows: { item: typeof galleryItems.$inferSelect; imageUrl: string | null; thumbnailUrl: string | null }[]) => {
+    for (const row of rows) {
+      const summary = toItemSummary(row.item, row);
+      itemsById.set(summary.id, summary);
+      itemsByGenerationId.set(summary.generationId, summary);
+    }
+  };
+  if (itemIds.size > 0) {
+    collect(
+      await db
+        .select({ item: galleryItems, imageUrl: generations.imageUrl, thumbnailUrl: generations.thumbnailUrl })
+        .from(galleryItems)
+        .innerJoin(generations, eq(galleryItems.generationId, generations.id))
+        .where(inArray(galleryItems.id, [...itemIds]))
+    );
+  }
+  if (generationIds.size > 0) {
+    collect(
+      await db
+        .select({ item: galleryItems, imageUrl: generations.imageUrl, thumbnailUrl: generations.thumbnailUrl })
+        .from(galleryItems)
+        .innerJoin(generations, eq(galleryItems.generationId, generations.id))
+        .where(inArray(galleryItems.generationId, [...generationIds]))
+    );
+  }
+
+  return requests.map((request) => {
+    const ref = extractGalleryRef(request.url);
+    const item =
+      ref?.kind === "item"
+        ? itemsById.get(ref.id) ?? null
+        : ref?.kind === "generation"
+          ? itemsByGenerationId.get(ref.id) ?? null
+          : null;
+    return { ...request, item };
+  });
+}
+
+export type TakedownTarget =
+  | { kind: "gallery_item"; item: TakedownItemSummary }
+  | { kind: "already_removed"; ref: GalleryRef }
+  | { kind: "unresolvable" };
+
+/**
+ * Map one reported URL to the gallery row an admin would act on.
+ * `already_removed` means the URL is unambiguously our content but the
+ * gallery row is gone (removed earlier) — resolving such a request as
+ * remove_content is safe idempotently. `unresolvable` means the URL gives us
+ * nothing actionable (CDN/external links) and needs human judgment.
+ */
+export async function resolveTakedownTarget(url: string): Promise<TakedownTarget> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const ref = extractGalleryRef(url);
+  if (!ref) return { kind: "unresolvable" };
+
+  const rows = await db
+    .select({ item: galleryItems, imageUrl: generations.imageUrl, thumbnailUrl: generations.thumbnailUrl })
+    .from(galleryItems)
+    .innerJoin(generations, eq(galleryItems.generationId, generations.id))
+    .where(ref.kind === "item" ? eq(galleryItems.id, ref.id) : eq(galleryItems.generationId, ref.id))
+    .limit(1);
+
+  if (!rows[0]) return { kind: "already_removed", ref };
+  return { kind: "gallery_item", item: toItemSummary(rows[0].item, rows[0]) };
+}
+
+/**
+ * Transition an open takedown request to its resolution. The UPDATE carries
+ * `AND status = 'open'` so a request can be resolved exactly once — a second
+ * call (double-click, two admins) updates zero rows and reports it, instead
+ * of silently re-resolving or clobbering the first decision.
+ */
+export async function resolveTakedownRequest(data: {
+  id: number;
+  action: "remove_content" | "reject";
+  adminNote?: string;
+  adminUserId: number;
+}): Promise<{ updated: boolean; request?: TakedownRequest }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const rows = await db
+    .update(takedownRequests)
+    .set({
+      status: data.action === "remove_content" ? "actioned" : "rejected",
+      notes: data.adminNote ?? null,
+      resolvedAt: new Date(),
+    })
+    .where(and(eq(takedownRequests.id, data.id), eq(takedownRequests.status, "open")))
+    .returning();
+  return { updated: rows.length > 0, request: rows[0] };
+}
+
+/**
+ * Permanently remove one gallery item and everything that references it
+ * (likes, comments — the only dependent tables). All three deletes run as a
+ * single non-interactive Postgres transaction via db.batch (the neon-http
+ * driver has no interactive transactions, but batch submits every statement
+ * atomically in one HTTP round trip): either the item and all dependents
+ * disappear together or nothing does. The underlying generation row is
+ * intentionally kept — only its public gallery presence is removed.
+ */
+export async function removeGalleryItem(itemId: number): Promise<{
+  removed: boolean;
+  item: typeof galleryItems.$inferSelect | null;
+  likesRemoved: number;
+  commentsRemoved: number;
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [likes, comments, items] = await db.batch([
+    db
+      .delete(galleryLikes)
+      .where(eq(galleryLikes.galleryItemId, itemId))
+      .returning({ id: galleryLikes.id }),
+    db
+      .delete(galleryComments)
+      .where(eq(galleryComments.galleryItemId, itemId))
+      .returning({ id: galleryComments.id }),
+    db
+      .delete(galleryItems)
+      .where(eq(galleryItems.id, itemId))
+      .returning(),
+  ]);
+
+  return {
+    removed: items.length > 0,
+    item: items[0] ?? null,
+    likesRemoved: likes.length,
+    commentsRemoved: comments.length,
+  };
+}
+
+/**
+ * Best-effort audit trail for a takedown resolution, written to moderation_log
+ * (the same compliance log prompt refusals use). takedown_requests itself has
+ * no resolvedBy column, so the acting admin lands here. Follows the log's
+ * privacy posture — no content stored, the reported URL is hashed for
+ * correlation. Never throws: the takedown_requests row is the system of
+ * record and must not fail because the trail did.
+ */
+export async function logTakedownAction(entry: {
+  adminUserId: number;
+  action: "remove_content" | "reject";
+  ticket: string;
+  url: string;
+  ip?: string | null;
+}): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.insert(moderationLog).values({
+      category: "takedown",
+      surface: `admin.takedown.${entry.action}`,
+      userId: entry.adminUserId,
+      ip: entry.ip ?? null,
+      promptLen: 0,
+      promptSha256: createHash("sha256").update(entry.url, "utf8").digest("hex"),
+    });
+  } catch (err) {
+    console.warn("[takedown] moderation_log write failed:", err);
+  }
 }
 
 // ─── Export Helpers ──────────────────────────────────────────────────────────

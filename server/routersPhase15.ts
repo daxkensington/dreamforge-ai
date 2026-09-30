@@ -3,6 +3,14 @@ import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import {
+  listTakedownRequests,
+  resolveTakedownRequest,
+  resolveTakedownTarget,
+  removeGalleryItem,
+  logTakedownAction,
+  reviewModerationItem,
+} from "./db";
+import {
   creditBalances,
   creditTransactions,
   notifications,
@@ -11,6 +19,7 @@ import {
   generations,
   galleryItems,
   moderationQueue,
+  takedownRequests,
   webhookEvents,
 } from "../drizzle/schema";
 import { eq, sql, desc, and, like, count } from "drizzle-orm";
@@ -383,37 +392,118 @@ export const adminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      await db
-        .update(moderationQueue)
-        .set({
-          status: input.status,
-          reviewedBy: ctx.user.id,
-          reviewNote: input.reviewNote || null,
-          reviewedAt: new Date(),
-        })
-        .where(eq(moderationQueue.id, input.id));
-
-      // If approved, create gallery item
-      if (input.status === "approved") {
-        const [modItem] = await db
-          .select()
-          .from(moderationQueue)
-          .where(eq(moderationQueue.id, input.id));
-
-        if (modItem) {
-          await db.insert(galleryItems).values({
-            generationId: modItem.generationId,
-            userId: modItem.userId,
-            title: modItem.title,
-            description: modItem.description,
-            approvedBy: ctx.user.id,
-            approvedAt: new Date(),
-          });
-        }
+      // Delegates to the hardened db helper: pending-only state guard,
+      // transactional publish, duplicate-publish safe.
+      const result = await reviewModerationItem(
+        input.id,
+        ctx.user.id,
+        input.status,
+        input.reviewNote
+      );
+      if (!result.updated) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Moderation item is missing or was already reviewed",
+        });
       }
-
       return { success: true };
     }),
+
+  /**
+   * Takedown-request review (TAKE IT DOWN Act intake from /api/takedown).
+   * Nothing else in the codebase reads takedown_requests — these procedures
+   * are the actioning path.
+   */
+  takedown: router({
+    list: adminProcedure
+      .input(
+        z
+          .object({
+            status: z.enum(["open", "actioned", "rejected", "test"]).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { requests: [] };
+        const requests = await listTakedownRequests(input?.status);
+        return { requests };
+      }),
+
+    resolve: adminProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          action: z.enum(["remove_content", "reject"]),
+          note: z.string().trim().max(2000).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const [request] = await db
+          .select()
+          .from(takedownRequests)
+          .where(eq(takedownRequests.id, input.id))
+          .limit(1);
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Takedown request not found" });
+        }
+        if (request.status !== "open") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Request is already ${request.status}`,
+          });
+        }
+
+        // remove_content deletes the public gallery row FIRST and only then
+        // marks the request actioned — a request must never read "actioned"
+        // while its content is still up. Content the URL no longer resolves
+        // to (removed earlier / raced) is fine: the goal state — content
+        // absent — already holds. URLs that never pointed at a gallery item
+        // (CDN images, external links) can't be actioned automatically and
+        // must be rejected or handled out of band.
+        let itemRemoved = false;
+        if (input.action === "remove_content") {
+          const target = await resolveTakedownTarget(request.url);
+          if (target.kind === "unresolvable") {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message:
+                "The reported URL doesn't reference a gallery item we can remove (CDN or external link?). Reject the request or handle it manually.",
+            });
+          }
+          if (target.kind === "gallery_item") {
+            const removal = await removeGalleryItem(target.item.id);
+            itemRemoved = removal.removed;
+          }
+        }
+
+        const { updated, request: resolved } = await resolveTakedownRequest({
+          id: input.id,
+          action: input.action,
+          adminNote: input.note,
+          adminUserId: ctx.user.id,
+        });
+        if (!updated || !resolved) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Request was resolved concurrently — refresh the list",
+          });
+        }
+
+        await logTakedownAction({
+          adminUserId: ctx.user.id,
+          action: input.action,
+          ticket: resolved.ticket,
+          url: resolved.url,
+          ip: resolved.ip,
+        });
+
+        return { success: true, status: resolved.status, itemRemoved };
+      }),
+  }),
 
   getGenerationAnalytics: adminProcedure
     .input(
