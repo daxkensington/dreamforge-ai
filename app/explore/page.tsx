@@ -38,14 +38,17 @@ export default async function ExplorePage({ searchParams }: PageProps) {
 
   let items: any[] = [];
   let total = 0;
+  let loadFailed = false;
   try {
     const res = await getGalleryItems({ limit: PAGE_SIZE, offset, sort: "newest" });
     items = res.items ?? [];
     total = res.total ?? 0;
   } catch {
-    /* DB hiccup — render the shell, still a valid indexable page */
+    /* Render the shell with an explicit gallery-unavailable message. */
+    loadFailed = true;
   }
 
+  const visibleItems = items.filter((it) => it?.generation?.id && it?.generation?.imageUrl);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // ItemList JSON-LD so the feed is machine-readable for search.
@@ -54,10 +57,10 @@ export default async function ExplorePage({ searchParams }: PageProps) {
     "@type": "CollectionPage",
     name: "DreamForgeX AI Art Gallery",
     url: `${SITE}/explore`,
-    hasPart: items.slice(0, 30).map((it) => ({
+    hasPart: visibleItems.slice(0, 30).map((it) => ({
       "@type": "ImageObject",
-      contentUrl: it.generation?.imageUrl,
-      url: `${SITE}/g/${it.generation?.id}`,
+      contentUrl: it.generation.imageUrl,
+      url: `${SITE}/g/${it.generation.id}`,
       name: (it.title || it.generation?.prompt || "AI creation").slice(0, 120),
     })),
   };
@@ -79,7 +82,23 @@ export default async function ExplorePage({ searchParams }: PageProps) {
         </p>
       </header>
 
-      {items.length === 0 ? (
+      {loadFailed ? (
+        <p role="status" style={{ textAlign: "center", opacity: 0.6, padding: "3rem 0" }}>
+          We couldn't load the gallery right now.{" "}
+          <a href="/explore" style={{ color: "#f43f5e", textDecoration: "underline" }}>
+            Try again
+          </a>
+          .
+        </p>
+      ) : visibleItems.length === 0 && page > 1 ? (
+        <p style={{ textAlign: "center", opacity: 0.6, padding: "3rem 0" }}>
+          No more creations on this page.{" "}
+          <a href="/explore" style={{ color: "#f43f5e", textDecoration: "underline" }}>
+            Back to the first page
+          </a>
+          .
+        </p>
+      ) : visibleItems.length === 0 ? (
         <p style={{ textAlign: "center", opacity: 0.6, padding: "3rem 0" }}>
           The gallery is filling up.{" "}
           <a href="/demo/text-to-image" style={{ color: "#f43f5e", textDecoration: "underline" }}>
@@ -95,8 +114,8 @@ export default async function ExplorePage({ searchParams }: PageProps) {
             gap: "0.9rem",
           }}
         >
-          {items.map((it) => {
-            const gen = it.generation ?? {};
+          {visibleItems.map((it) => {
+            const gen = it.generation;
             const caption = (it.title || gen.prompt || "AI creation").slice(0, 100);
             return (
               <a

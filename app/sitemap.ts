@@ -163,7 +163,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...videoRoutes,
   ].map((route) => ({
     url: `${BASE_URL}${route.url}`,
-    lastModified: now,
+    lastModified: "lastModified" in route && route.lastModified instanceof Date ? route.lastModified : now,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));

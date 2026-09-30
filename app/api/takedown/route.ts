@@ -28,7 +28,7 @@ const takedownInput = z.object({
   // paths, or image CDN URLs; rejecting those loses real reports.
   url: z.string().trim().min(4, "Include the link to the content").max(2000),
   reason: z.string().trim().min(10, "Describe the problem in a sentence or two").max(5000),
-  contact: z.string().trim().max(320).optional().or(z.literal("").transform(() => undefined)),
+  contact: z.string().trim().max(320).optional().transform((v) => (v ? v : undefined)),
 });
 
 function extractIp(req: NextRequest): string | null {

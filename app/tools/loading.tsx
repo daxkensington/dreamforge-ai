@@ -1,7 +1,10 @@
 export default function Loading() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="container py-16 text-center">
+      <div role="status">
+        <span className="sr-only">Loading tools…</span>
+      </div>
+      <div className="container py-16 text-center" aria-hidden="true">
         <div className="h-12 w-64 bg-white/5 rounded-lg animate-pulse mx-auto mb-4" />
         <div className="h-6 w-96 bg-white/5 rounded-lg animate-pulse mx-auto mb-12" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
