@@ -21,6 +21,17 @@ export default defineConfig({
     video: "retain-on-failure",
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
+    // Vercel preview deployments sit behind Vercel Authentication (SSO).
+    // When a Protection Bypass for Automation secret is provided, send it
+    // so previews return the real app instead of the Vercel login page.
+    ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+      ? {
+          extraHTTPHeaders: {
+            "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+            "x-vercel-set-bypass-cookie": "true",
+          },
+        }
+      : {}),
   },
   projects: [
     {
