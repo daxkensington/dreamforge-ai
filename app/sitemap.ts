@@ -55,17 +55,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/explore", priority: 0.8, changeFrequency: "daily" as const },
     { url: "/marketplace", priority: 0.8, changeFrequency: "daily" as const },
     { url: "/pricing", priority: 0.8, changeFrequency: "monthly" as const },
-    { url: "/workspace", priority: 0.7, changeFrequency: "weekly" as const },
     { url: "/video-studio", priority: 0.7, changeFrequency: "weekly" as const },
     { url: "/api-docs", priority: 0.5, changeFrequency: "monthly" as const },
-    { url: "/batch", priority: 0.5, changeFrequency: "monthly" as const },
     { url: "/demo/text-to-image", priority: 0.9, changeFrequency: "monthly" as const },
     { url: "/story", priority: 0.8, changeFrequency: "weekly" as const },
     { url: "/uncensored", priority: 0.9, changeFrequency: "monthly" as const },
     { url: "/for", priority: 0.7, changeFrequency: "monthly" as const },
     { url: "/takedown", priority: 0.3, changeFrequency: "yearly" as const },
     { url: "/privacy", priority: 0.4, changeFrequency: "yearly" as const },
-    { url: "/account", priority: 0.3, changeFrequency: "yearly" as const },
   ];
 
   // Tool pages
