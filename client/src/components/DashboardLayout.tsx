@@ -45,7 +45,10 @@ export default function DashboardLayout({
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_WIDTH;
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+    const parsedWidth = saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+    return Number.isFinite(parsedWidth)
+      ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parsedWidth))
+      : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
 
