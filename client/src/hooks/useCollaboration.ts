@@ -182,17 +182,28 @@ export function useCollaboration(projectId: string | null) {
   const connect = useCallback(() => {
     if (!wsUrl || !projectId || !user) return;
 
-    // Clean up existing
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    // Cancel any pending reconnect before replacing the socket
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
     }
+
+    // Clean up existing. Detach first so its onclose sees a stale socket and is ignored.
+    if (wsRef.current) {
+      const oldWs = wsRef.current;
+      wsRef.current = null;
+      oldWs.close(1000, "Reconnecting");
+    }
+
+    // The stale socket's onclose is ignored, so reset the flag for the new socket here
+    setState((s) => (s.connected ? { ...s, connected: false } : s));
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       if (!mountedRef.current) return;
+      if (wsRef.current !== ws) return;
       reconnectAttemptRef.current = 0;
       setState((s) => ({ ...s, connected: true }));
 
@@ -206,20 +217,30 @@ export function useCollaboration(projectId: string | null) {
       }));
     };
 
-    ws.onmessage = handleMessage;
+    ws.onmessage = (event) => {
+      if (wsRef.current !== ws) return;
+      handleMessage(event);
+    };
 
     ws.onclose = (event) => {
       if (!mountedRef.current) return;
+      if (wsRef.current !== ws) return;
       setState((s) => ({ ...s, connected: false }));
 
-      // Don't reconnect on intentional close or auth failure
-      if (event.code === 4001 || event.code === 4003) return;
+      // Don't reconnect on normal close, intentional close or auth failure
+      if (event.code === 1000 || event.code === 4001 || event.code === 4003) return;
 
       // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
       const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
       reconnectAttemptRef.current++;
 
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+
       reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
         if (mountedRef.current) connect();
       }, delay);
     };
@@ -237,7 +258,10 @@ export function useCollaboration(projectId: string | null) {
 
     return () => {
       mountedRef.current = false;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       if (wsRef.current) {
         wsRef.current.close(1000, "Component unmounted");
         wsRef.current = null;
