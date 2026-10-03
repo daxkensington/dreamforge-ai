@@ -1,29 +1,37 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Zap, Image, Layers } from "lucide-react";
+import { ArrowLeft, Image, Layers } from "lucide-react";
 import { Link } from "wouter";
 
 export default function ModelComparison() {
   const { user } = useAuth();
   const [prompt, setPrompt] = useState("");
-  const [selectedModels, setSelectedModels] = useState<string[]>(["default", "artistic"]);
+  const [modelSelection, setModelSelection] = useState<string[] | null>(null);
 
   const models = trpc.models.list.useQuery();
   const compareMut = trpc.models.compare.useMutation();
+  const selectedModels = modelSelection === null
+    ? (models.data ?? []).slice(0, 2).map(model => model.id)
+    : modelSelection.filter(id => models.data?.some(model => model.id === id));
+  const trimmedPrompt = prompt.trim();
 
-  function toggleModel(id: string) {
-    setSelectedModels(prev =>
-      prev.includes(id) ? prev.filter(m => m !== id) : prev.length < 4 ? [...prev, id] : prev
-    );
+  function setModelChecked(id: string, checked: boolean) {
+    setModelSelection(prev => {
+      const current = prev === null
+        ? (models.data ?? []).slice(0, 2).map(model => model.id)
+        : prev.filter(modelId => models.data?.some(model => model.id === modelId));
+      if (!checked) return current.filter(modelId => modelId !== id);
+      if (!models.data?.some(model => model.id === id) || current.includes(id) || current.length >= 4) return current;
+      return [...current, id];
+    });
   }
 
   const speedIcons: Record<string, string> = { fastest: "⚡⚡⚡", fast: "⚡⚡", medium: "⚡", slow: "🐢" };
@@ -60,12 +68,16 @@ export default function ModelComparison() {
             {models.data?.map(model => (
               <div
                 key={model.id}
-                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                   selectedModels.includes(model.id) ? "border-primary bg-primary/5" : "hover:bg-muted/50"
                 }`}
-                onClick={() => toggleModel(model.id)}
               >
-                <Checkbox checked={selectedModels.includes(model.id)} />
+                <Checkbox
+                  checked={selectedModels.includes(model.id)}
+                  onCheckedChange={checked => setModelChecked(model.id, checked === true)}
+                  aria-label={`Compare ${model.name}`}
+                  disabled={!selectedModels.includes(model.id) && selectedModels.length >= 4}
+                />
                 <div>
                   <h4 className="font-medium text-sm">{model.name}</h4>
                   <p className="text-xs text-muted-foreground">{model.description}</p>
@@ -91,12 +103,20 @@ export default function ModelComparison() {
             className="mb-3"
           />
           <Button
-            onClick={() => compareMut.mutate({ prompt, modelIds: selectedModels })}
-            disabled={!prompt || selectedModels.length < 2 || compareMut.isPending}
+            onClick={() => {
+              if (!trimmedPrompt || selectedModels.length < 2 || compareMut.isPending) return;
+              compareMut.mutate({ prompt: trimmedPrompt, modelIds: selectedModels });
+            }}
+            disabled={!trimmedPrompt || selectedModels.length < 2 || compareMut.isPending}
             className="w-full"
           >
             {compareMut.isPending ? "Generating..." : `Compare ${selectedModels.length} Models`}
           </Button>
+          {compareMut.isError && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {compareMut.error.message || "Unable to compare models. Please try again."}
+            </p>
+          )}
         </CardContent>
       </Card>
 
