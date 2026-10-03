@@ -63,6 +63,7 @@ export default function GalleryDetail() {
     if (!gen?.imageUrl) return;
     try {
       const response = await fetch(gen.imageUrl);
+      if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
