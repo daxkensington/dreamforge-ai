@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import type { Message } from "../_core/llm";
@@ -115,15 +116,22 @@ export const supportChatRouter = router({
       // This endpoint burns a paid Anthropic key — cap each IP at 10
       // messages/minute so a pasted curl loop can't run up the bill.
       // Same Postgres-backed limiter the demo/newsletter routers use.
-      if (ctx.ip) {
-        await enforceIpRateLimit(
-          "supportChat.send",
-          ctx.ip,
-          10,
-          ONE_MINUTE_MS,
-          "You're sending messages too quickly — please wait a moment and try again.",
-        );
+      // Fail closed: without an IP the limiter can't count, and an
+      // uncountable paid endpoint is a free-money bug (demo.generate uses
+      // the same deny-when-unknown policy).
+      if (!ctx.ip) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Could not determine your connection. Please try again from a standard browser connection.",
+        });
       }
+      await enforceIpRateLimit(
+        "supportChat.send",
+        ctx.ip,
+        10,
+        ONE_MINUTE_MS,
+        "You're sending messages too quickly — please wait a moment and try again.",
+      );
 
       // Prepend the system prompt
       const messages: Message[] = [

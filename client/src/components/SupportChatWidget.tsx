@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { MessageCircle, X } from "lucide-react";
-import { AIChatBox, type Message } from "./AIChatBox";
+import type { Message } from "./AIChatBox";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+
+// Loaded on demand so the markdown/streamdown stack stays out of the global
+// bundle — the chat panel only renders after the user opens it.
+const AIChatBox = dynamic(() => import("./AIChatBox").then((m) => m.AIChatBox), {
+  ssr: false,
+});
 
 const SUGGESTED_PROMPTS = [
   "What can DreamForgeX do?",

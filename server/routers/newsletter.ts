@@ -28,15 +28,21 @@ export const newsletterRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Soft limit: 5 signups per IP per day. Prevents list-stuffing
       // without annoying a family/office that shares an outbound IP.
-      if (ctx.ip) {
-        await enforceIpRateLimit(
-          "newsletter.subscribe",
-          ctx.ip,
-          5,
-          ONE_DAY_MS,
-          "You've signed up enough for today — try again tomorrow.",
-        );
+      // Fail closed when the IP is unknown — an uncountable limiter is
+      // no limiter at all.
+      if (!ctx.ip) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Could not determine your connection. Please try again from a standard browser connection.",
+        });
       }
+      await enforceIpRateLimit(
+        "newsletter.subscribe",
+        ctx.ip,
+        5,
+        ONE_DAY_MS,
+        "You've signed up enough for today — try again tomorrow.",
+      );
 
       const db = await getDb();
       if (!db) {

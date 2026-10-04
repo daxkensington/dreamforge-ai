@@ -17,11 +17,12 @@ vi.mock("./stripe", async () => {
   return {
     ...actual,
     deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 90, needed: 10 }),
+    refundCredits: vi.fn().mockResolvedValue(undefined),
   };
 });
 
 import { viralRouter } from "./routers/viral";
-import { deductCredits } from "./stripe";
+import { deductCredits, refundCredits } from "./stripe";
 import { requireToolActive } from "./_core/toolStatus";
 
 const authCtx = { user: { id: 42, email: "u@test" } as any, session: null, ip: "1.2.3.4" };
@@ -80,5 +81,35 @@ describe("viral.transform", () => {
     expect(call.prompt).toMatch(/human/i);
     expect(call.prompt).toContain("grumpy orange cat energy");
     expect(call.originalImages?.[0]?.url).toBe("https://cdn.example.com/pet.jpg");
+  });
+
+  it("does not refund when generation succeeds", async () => {
+    const caller = viralRouter.createCaller(authCtx);
+    const res = await caller.transform({
+      preset: "lego-mini",
+      imageUrl: "https://cdn.example.com/face.jpg",
+    });
+    expect(res.status).toBe("completed");
+    expect(refundCredits).not.toHaveBeenCalled();
+  });
+
+  it("refunds the exact charge once when generation fails", async () => {
+    const { generateImage } = await import("./_core/imageGeneration");
+    (generateImage as any).mockRejectedValueOnce(new Error("img2img provider down"));
+    const caller = viralRouter.createCaller(authCtx);
+    const res = await caller.transform({
+      preset: "action-figure",
+      imageUrl: "https://cdn.example.com/face.jpg",
+    });
+    expect(res.status).toBe("failed");
+    expect(res.url).toBeNull();
+    // action-figure costs 10 credits — refund exactly that, exactly once.
+    expect(deductCredits).toHaveBeenCalledTimes(1);
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(refundCredits).toHaveBeenCalledWith(
+      42,
+      10,
+      expect.stringContaining("Refund"),
+    );
   });
 });

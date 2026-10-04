@@ -9,7 +9,7 @@ import {
   creditTransactions,
 } from "../../drizzle/schema";
 import { eq, sql, desc, and } from "drizzle-orm";
-import { getOrCreateBalance } from "../stripe";
+import { getOrCreateBalance, sanitizeRedirectOrigin, requestOriginFromCtx } from "../stripe";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
 import Stripe from "stripe";
 
@@ -231,6 +231,19 @@ export const pricingRouter = router({
         });
       }
 
+      // Client-supplied origin is allowlisted server-side (open redirect +
+      // session-id leak); a bad origin falls back to APP_URL, never rejects.
+      const safeOrigin = sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx));
+
+      // Meta Pixel Purchase attribution: success_url carries the price/credits
+      // actually being purchased so the client can fire a valued conversion.
+      const sharedPlan = SUBSCRIPTION_PLANS.find((p) => p.name === plan.name);
+      const amountCents =
+        input.billingInterval === "year"
+          ? sharedPlan?.yearlyPrice ?? plan.price * 12
+          : plan.price;
+      const purchaseValue = (amountCents / 100).toFixed(2);
+
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
@@ -251,8 +264,8 @@ export const pricingRouter = router({
             billing_interval: input.billingInterval,
           },
         },
-        success_url: `${input.origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${input.origin}/pricing?canceled=true`,
+        success_url: `${safeOrigin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}&value=${purchaseValue}&currency=usd&credits=${plan.monthlyCredits}`,
+        cancel_url: `${safeOrigin}/pricing?canceled=true`,
       });
 
       return { url: session.url };
@@ -328,11 +341,14 @@ export const pricingRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not find subscription item" });
       }
 
-      // Update with proration
+      // Update with proration. Merge metadata instead of replacing it:
+      // customer.subscription.deleted reads user_id from it, and replacing
+      // the map with only plan keys would orphan cancellations.
       await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
         items: [{ id: itemId, price: newPlan.stripePriceId! }],
         proration_behavior: "create_prorations",
         metadata: {
+          ...(stripeSub.metadata ?? {}),
           plan_id: newPlan.id.toString(),
           plan_name: newPlan.name,
         },
@@ -423,6 +439,9 @@ export const pricingRouter = router({
         ctx.user.name || "User"
       );
 
+      const safeOrigin = sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx));
+      const packValue = (pack.price / 100).toFixed(2);
+
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
@@ -447,8 +466,8 @@ export const pricingRouter = router({
           credits: pack.credits.toString(),
           type: "credit_pack",
         },
-        success_url: `${input.origin}/pricing?credit_success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${input.origin}/pricing?canceled=true`,
+        success_url: `${safeOrigin}/pricing?credit_success=true&session_id={CHECKOUT_SESSION_ID}&value=${packValue}&currency=usd&credits=${pack.credits}`,
+        cancel_url: `${safeOrigin}/pricing?canceled=true`,
       });
 
       return { url: session.url };
@@ -552,7 +571,10 @@ export async function handleSubscriptionUpdated(
   };
 
   const updateData: Record<string, any> = {
-    status: statusMap[status] || "active",
+    // Unknown Stripe statuses (unpaid, paused, incomplete_expired, anything
+    // future) must not map to "active" — default to "canceled" so a broken
+    // or lapsed subscription never keeps granting entitlements.
+    status: statusMap[status] || "canceled",
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
   };
@@ -618,13 +640,16 @@ export async function handleMonthlyReset(stripeSubscriptionId: string) {
   const plan = await getPlanById(sub.planId);
   if (!plan) return;
 
-  // Reset balance to monthly allocation (keep bonus credits separate)
+  // Reset balance to monthly allocation plus purchased credits, then zero the
+  // bonusCredits counter — it has been folded into balance. Without the
+  // zeroing, the same purchased credits would be re-added on every reset.
   const balance = await getOrCreateBalance(sub.userId);
 
   await db
     .update(creditBalances)
     .set({
       balance: sql`${plan.monthlyCredits} + ${creditBalances.bonusCredits}`,
+      bonusCredits: 0,
       monthlyAllocation: plan.monthlyCredits,
       lastResetAt: new Date(),
     })

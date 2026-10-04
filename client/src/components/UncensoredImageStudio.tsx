@@ -143,9 +143,6 @@ export default function UncensoredImageStudio({
     {
       enabled: pendingIds.length > 0,
       refetchInterval: (q) => (q.state.data?.allSettled ? false : 3000),
-      // react-query pauses intervals in hidden tabs; a buyer who tabs away
-      // mid-render would otherwise never see the result.
-      refetchIntervalInBackground: true,
     },
   );
   useEffect(() => {

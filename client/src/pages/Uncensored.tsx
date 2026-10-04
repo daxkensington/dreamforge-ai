@@ -141,9 +141,6 @@ export default function Uncensored() {
     {
       enabled: pendingFreeId != null,
       refetchInterval: (q) => (q.state.data && q.state.data.status !== "processing" ? false : 3000),
-      // react-query pauses intervals in hidden tabs by default; a visitor who
-      // tabs away mid-render would otherwise never see the result.
-      refetchIntervalInBackground: true,
     },
   );
   useEffect(() => {

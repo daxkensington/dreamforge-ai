@@ -44,6 +44,7 @@ vi.mock("./stripe", async () => {
   return {
     ...actual,
     deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 500, needed: 31 }),
+    refundCredits: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -68,8 +69,10 @@ vi.mock("./db", () => {
 });
 
 import { storyRouter } from "./routers/story";
-import { deductCredits } from "./stripe";
+import { deductCredits, refundCredits } from "./stripe";
 import { requireToolActive } from "./_core/toolStatus";
+import { invokeLLM } from "./_core/llm";
+import { generateImage } from "./_core/imageGeneration";
 
 const authCtx = { user: { id: 7, email: "a@b" } as any, session: null, ip: "1.2.3.4" };
 
@@ -120,5 +123,55 @@ describe("story.create", () => {
         withMusic: true,
       }),
     ).rejects.toMatchObject({ code: "PAYMENT_REQUIRED" });
+  });
+
+  it("refunds the whole bundle when the storyboard LLM step fails", async () => {
+    vi.mocked(invokeLLM).mockRejectedValueOnce(new Error("LLM provider down"));
+    const caller = storyRouter.createCaller(authCtx);
+    await expect(
+      caller.create({
+        idea: "A story that will never be written.",
+        sceneCount: 4,
+        style: "cinematic",
+        aspectRatio: "16:9",
+        withMusic: true,
+      }),
+    ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    // 5 (storyboard) + 4*5 (images) + 6 (music) = 31 — the user received nothing.
+    expect(deductCredits).toHaveBeenCalledTimes(1);
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(refundCredits).toHaveBeenCalledWith(7, 31, expect.stringContaining("Refund"));
+  });
+
+  it("refunds the per-scene image cost for scenes that fail to render", async () => {
+    vi.mocked(generateImage).mockRejectedValueOnce(new Error("scene render failed"));
+    const caller = storyRouter.createCaller(authCtx);
+    const res = await caller.create({
+      idea: "A story with one broken scene.",
+      sceneCount: 4,
+      style: "noir",
+      aspectRatio: "16:9",
+      withMusic: false,
+    });
+    expect(res.status).toBe("completed");
+    expect(res.scenes).toHaveLength(4);
+    expect(res.scenes.filter((s: any) => s.imageUrl === null)).toHaveLength(1);
+    // Exactly one of the four 5-credit scene images failed → refund 5, once.
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(refundCredits).toHaveBeenCalledWith(7, 5, expect.stringContaining("Refund"));
+  });
+
+  it("does not refund when every scene renders", async () => {
+    const caller = storyRouter.createCaller(authCtx);
+    const res = await caller.create({
+      idea: "A story where everything works.",
+      sceneCount: 3,
+      style: "anime",
+      aspectRatio: "16:9",
+      withMusic: false,
+    });
+    expect(res.status).toBe("completed");
+    expect(res.scenes.every((s: any) => s.imageUrl !== null)).toBe(true);
+    expect(refundCredits).not.toHaveBeenCalled();
   });
 });

@@ -53,7 +53,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How effective is the ad copy in terms of quality?`, a: `Copy is optimized for engagement with action-oriented language, but success depends on your audience targeting. Users report 20-30% higher click rates after tweaks. It's best for short-form ads under 150 characters.` },
-      { q: `Does using Ad Copy involve any costs?`, a: `Free tier allows 10 generations per day; pro access for unlimited use costs $5/month. No charges for exporting or basic edits. Small businesses can test without upfront payment.` },
+      { q: `Does using Ad Copy involve any costs?`, a: `Free tier allows 10 generations per day; unlimited use starts at $9/month. No charges for exporting or basic edits. Small businesses can test without upfront payment.` },
       { q: `What usage rights do I have over the generated ad copy?`, a: `You can use the copy commercially without restrictions, as it's based on your inputs. The tool grants full ownership for ads, emails, or social posts. Ensure it doesn't infringe on trademarks.` },
     ],
   },
@@ -75,7 +75,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What level of detail can I expect in architecture concepts?`, a: `Outputs include basic structural elements and stylistic renders, suitable for initial pitches but not construction blueprints. Detail improves with precise prompts, like specifying dimensions. Images are up to 4K resolution for clear viewing.` },
-      { q: `Is the tool free, or are there usage fees?`, a: `Free access covers 5 concepts daily; unlimited generations require a $12/month subscription. Downloads are included at no extra cost. Designers can experiment freely on the basic plan.` },
+      { q: `Is the tool free, or are there usage fees?`, a: `Free access covers 5 concepts daily; unlimited generations require a subscription starting at $9/month. Downloads are included at no extra cost. Designers can experiment freely on the basic plan.` },
       { q: `Can I use generated concepts commercially?`, a: `Yes, you hold rights to concepts for client projects, presentations, or portfolios. Commercial use is permitted as long as inputs are original. Consult professionals for final builds.` },
     ],
   },
@@ -97,7 +97,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How much does Audio Enhance improve sound quality?`, a: `It effectively removes common issues like hiss or wind noise, resulting in clearer audio comparable to studio basics. Results vary by original file quality; severe distortions may need manual edits. Enhanced files maintain original fidelity without artifacts.` },
-      { q: `What are the costs associated with using Audio Enhance?`, a: `Free for files under 5 minutes; pro tier at $7/month handles longer uploads unlimited. No fees for standard exports. Content creators can start with the free option for testing.` },
+      { q: `What are the costs associated with using Audio Enhance?`, a: `Free for files under 5 minutes; the Pro plan ($19/month) handles longer uploads without limits. No fees for standard exports. Content creators can start with the free option for testing.` },
       { q: `Do I own the rights to enhanced audio files?`, a: `You retain full rights to upload and download files for personal or commercial use, such as podcasts or videos. The tool doesn't watermark or claim ownership. Respect original source copyrights.` },
     ],
   },
@@ -119,7 +119,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality can I expect from generated avatars?`, a: `Avatars are high-resolution and customizable, capturing facial features accurately for professional use. Styles range from photorealistic to stylized, with minimal distortions. Refine with multiple generations if needed.` },
-      { q: `Is there a fee to create avatars?`, a: `Basic creations are free with watermarks; ad-free, high-res downloads start at $4/month subscription. Limit of 20 free per day. Users can build a library without ongoing costs for casual needs.` },
+      { q: `Is there a fee to create avatars?`, a: `Basic creations are free with watermarks; ad-free, high-res downloads start with plans at $9/month. Limit of 20 free per day. Users can build a library without ongoing costs for casual needs.` },
       { q: `What rights do I have to the avatar images?`, a: `You own the generated avatars for commercial or personal use, including social profiles or merchandise. No royalties apply. Avoid using real photos of others without permission.` },
     ],
   },
@@ -300,7 +300,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How long are the generated captions?`, a: `Captions range from 50-150 characters to fit platform limits. They include relevant hashtags and emojis for better reach. You can edit for length.` },
-      { q: `Is this tool free to use?`, a: `Yes, generate up to 10 captions daily for free. Unlimited access comes with a $5/month add-on. No costs for basic social media needs.` },
+      { q: `Is this tool free to use?`, a: `Yes, generate up to 10 captions daily for free. Unlimited access comes with plans starting at $9/month. No costs for basic social media needs.` },
       { q: `Can I reuse captions commercially?`, a: `You own all generated text for any use, including ads. AI draws from public patterns, so no originality issues. Attribute if desired, but not required.` },
     ],
   },
@@ -322,7 +322,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality level do certificates have?`, a: `They print at 300 DPI for crisp results on standard paper. Designs are vector-based for scalability. Test prints recommended for colors.` },
-      { q: `Are there usage fees?`, a: `Free for up to 5 certificates per month. Pro version at $7/month allows unlimited and advanced templates. Ideal for occasional needs.` },
+      { q: `Are there usage fees?`, a: `Free for up to 5 certificates per month. The Pro plan ($19/month) allows unlimited and advanced templates. Ideal for occasional needs.` },
       { q: `Who owns the certificate designs?`, a: `You do, with full rights to print or share digitally. Input your own text to ensure uniqueness. No licensing restrictions.` },
     ],
   },
@@ -344,7 +344,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How detailed are the generated sheets?`, a: `Sheets include 10-15 sections with balanced stats and narratives. Depth depends on your prompts; more input yields richer results. Suitable for both quick and deep dives.` },
-      { q: `Is there a limit on generations?`, a: `Free tier allows 3 sheets per day. Subscriptions from $6/month remove limits and add extras like image integration. Perfect for hobbyists.` },
+      { q: `Is there a limit on generations?`, a: `Free tier allows 3 sheets per day. Paid plans from $9/month remove limits and add extras like image integration. Perfect for hobbyists.` },
       { q: `Can I use these for commercial games?`, a: `Yes, you hold all rights to adapt or sell based on your inputs. AI elements are generic, so no conflicts. Credit the tool optionally.` },
     ],
   },
@@ -498,7 +498,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How detailed are the poster designs?`, a: `Designs include balanced layouts with readable text and relevant imagery. Outputs are professional-grade for print. Generation is fast, but complex prompts may need tweaks for perfection.` },
-      { q: `Does it cost money to generate posters?`, a: `Free tier allows a few daily creations; unlimited access via $12/month plan. Downloads are included without extra charges. Ideal for occasional event promoters.` },
+      { q: `Does it cost money to generate posters?`, a: `Free tier allows a few daily creations; unlimited access via plans starting at $9/month. Downloads are included without extra charges. Ideal for occasional event promoters.` },
       { q: `Can I use the posters commercially?`, a: `Yes, you retain rights for promotion and sales. Ensure event details are accurate to avoid issues. No royalties on AI-generated elements.` },
     ],
   },
@@ -520,7 +520,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Are the reference images high quality?`, a: `Images are clear and detailed, showing textures and proportions realistically. Suitable for scaling to life-size patterns. Speed ensures quick iterations.` },
-      { q: `What is the pricing for this tool?`, a: `Free for basic refs with watermarks; pro version at $10/month removes limits. No per-image fees. Affordable for hobbyist cosplayers.` },
+      { q: `What is the pricing for this tool?`, a: `Free for basic refs with watermarks; the Pro plan ($19/month) removes limits. No per-image fees. Affordable for hobbyist cosplayers.` },
       { q: `Do I own the rights to these references?`, a: `Full commercial rights for your projects. Use as inspiration only, not direct copies of originals. Prompts should avoid trademarked elements.` },
     ],
   },
@@ -542,7 +542,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What resolution do the covers have?`, a: `High-res outputs at 300 DPI for professional printing. Colors and elements align well. Quick generation keeps workflows smooth.` },
-      { q: `Is there a fee structure?`, a: `Free trials with limits; full access for $8/month. Includes unlimited downloads. Suited for one-off creators.` },
+      { q: `Is there a fee structure?`, a: `Free trials with limits; full access starting at $9/month. Includes unlimited downloads. Suited for one-off creators.` },
       { q: `What rights come with the covers?`, a: `You get complete ownership for commercial use. Edit freely post-generation. Steer clear of prompting branded content.` },
     ],
   },
@@ -564,7 +564,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How accurate are the depth maps?`, a: `Maps capture relative depths reliably for most scenes, though complex ones may need manual tweaks. Outputs are crisp and fast. Works well for standard photos.` },
-      { q: `What does it cost to generate depth maps?`, a: `Free for low-res; premium at $11/month for high-res and batch processing. No download fees. Practical for occasional users.` },
+      { q: `What does it cost to generate depth maps?`, a: `Free for low-res; premium plans starting at $9/month for high-res and batch processing. No download fees. Practical for occasional users.` },
       { q: `Can I use these maps commercially?`, a: `Yes, full rights for your projects. Integrate into apps or prints freely. Base images should be yours or licensed.` },
     ],
   },
@@ -587,7 +587,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What file formats can I export from Design Canvas?`, a: `You can export designs in PNG, JPEG, or PDF formats. These support high resolutions up to 300 DPI for print quality. Downloads are typically under 5MB for most projects.` },
-      { q: `Is there a cost to use Design Canvas?`, a: `Basic features are free with watermarks, while premium exports without watermarks start at $5 per design. Unlimited access is available via monthly subscription for frequent users.` },
+      { q: `Is there a cost to use Design Canvas?`, a: `Basic features are free with watermarks, while premium exports without watermarks start with plans at $9/month. Unlimited access is available via monthly subscription for frequent users.` },
       { q: `Can I use the designs commercially?`, a: `Yes, all generated designs grant full commercial usage rights upon export. You own the output and can use it for client work or sales without attribution.` },
     ],
   },
@@ -633,7 +633,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What sizes are available for Event Flyers?`, a: `Standard sizes include A4, A5, and square for social media, all at 300 DPI. Custom dimensions up to 11x17 inches are supported. Files download quickly, often under 2MB.` },
-      { q: `Is Event Flyer free to use?`, a: `Core generation is free for basic flyers; premium templates and ad-free exports cost $3 each. Subscriptions offer bulk creation for regular events.` },
+      { q: `Is Event Flyer free to use?`, a: `Core generation is free for basic flyers; premium templates and ad-free exports start with plans at $9/month. Subscriptions offer bulk creation for regular events.` },
       { q: `Can I edit flyers after generation?`, a: `Yes, download the editable source file in a compatible format like SVG for further tweaks in tools such as Canva. Commercial use is fully permitted.` },
     ],
   },
@@ -656,7 +656,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Does Face Enhancer preserve photo quality?`, a: `It retains the original resolution and avoids over-processing for realistic results. Enhancements are subtle, with options to adjust intensity. Processing handles files up to 10MB efficiently.` },
-      { q: `What are the costs for using Face Enhancer?`, a: `Free for one enhancement per image; unlimited access via $9 monthly plan. Batch processing for multiple faces adds a small fee per extra image.` },
+      { q: `What are the costs for using Face Enhancer?`, a: `Free for one enhancement per image; unlimited access via a $9/month plan. Batch processing for multiple faces adds a small fee per extra image.` },
       { q: `Are enhanced images usable commercially?`, a: `Absolutely, you own all rights to the processed photos for any purpose, including sales or advertising. No watermarks on paid outputs.` },
     ],
   },
@@ -701,7 +701,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How realistic is the film grain effect?`, a: `The tool applies grain based on common analog film characteristics, resulting in natural-looking texture that blends seamlessly with your image. It avoids over-processing to maintain original details. Users often report it matches professional edits closely.` },
-      { q: `Is there a cost to use this tool?`, a: `Basic usage is free with watermarks, while premium features like watermark removal cost $5 per month. Downloads are unlimited within your plan. No hidden fees apply.` },
+      { q: `Is there a cost to use this tool?`, a: `Basic usage is free with watermarks, while premium features like watermark removal start at $9/month. Downloads are unlimited within your plan. No hidden fees apply.` },
       { q: `What are the usage rights for generated images?`, a: `You own full rights to images you upload and enhance, for personal or commercial use. The tool doesn't claim ownership. Always check client agreements for specific needs.` },
     ],
   },
@@ -723,7 +723,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality can I expect from the designs?`, a: `Designs are generated at 300 DPI for sharp prints up to 8x10 inches. Colors and layouts adapt well to various themes. Most users find them suitable for professional use.` },
-      { q: `How much does it cost to generate cards?`, a: `Free tier allows 3 cards per day with basic templates. Pro access at $9/month unlocks unlimited generations and premium elements. Prints are handled via integrated partners.` },
+      { q: `How much does it cost to generate cards?`, a: `Free tier allows 3 cards per day with basic templates. Paid plans at $9/month unlock unlimited generations and premium elements. Prints are handled via integrated partners.` },
       { q: `Can I use these cards commercially?`, a: `Yes, all generated cards are yours for commercial purposes like selling on Etsy. Avoid reselling the raw AI templates. Ensure text doesn't infringe copyrights.` },
     ],
   },
@@ -745,7 +745,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Does it preserve original image quality?`, a: `Enhancements maintain the source resolution and avoid artifacts by focusing on tonal mapping. Results are comparable to mid-range HDR software. Test with your files for best fit.` },
-      { q: `What are the pricing options?`, a: `Free for up to 5 enhancements daily; unlimited access via $7/month subscription. Batch processing adds no extra cost. Outputs are watermark-free on paid plans.` },
+      { q: `What are the pricing options?`, a: `Free for up to 5 enhancements daily; unlimited access via subscriptions starting at $9/month. Batch processing adds no extra cost. Outputs are watermark-free on paid plans.` },
       { q: `Are there limits on file types or sizes?`, a: `Supports JPEG, PNG, and RAW up to 50MB per image. Processing time averages 10-30 seconds per file. Larger batches may queue during peak hours.` },
     ],
   },
@@ -767,7 +767,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How accurate are the generated headshots?`, a: `The tool uses your input to create likenesses that retain key facial features while improving professionalism. Results vary by photo quality but generally look natural. Edit prompts for better matches.` },
-      { q: `Is there a fee for using the tool?`, a: `Basic generations are free with limits; pro features like background customization cost $10/month. Includes unlimited downloads. No per-image charges.` },
+      { q: `Is there a fee for using the tool?`, a: `Basic generations are free with limits; pro features like background customization come on plans from $9/month. Includes unlimited downloads. No per-image charges.` },
       { q: `What rights do I have over the headshots?`, a: `You retain full commercial rights for personal branding or client work. The AI doesn't watermark outputs. Respect privacy if using others' likenesses.` },
     ],
   },
@@ -789,7 +789,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Are the icons high-quality and scalable?`, a: `All icons are vector-based SVGs, ensuring scalability without quality loss. They match common design standards for clean, modern looks. Export to PNG for raster needs.` },
-      { q: `What is the cost structure?`, a: `Free for 10 icons monthly; unlimited generations at $8/month. No additional fees for exports. Bulk requests process efficiently.` },
+      { q: `What is the cost structure?`, a: `Free for 10 icons monthly; unlimited generations on plans starting at $9/month. No additional fees for exports. Bulk requests process efficiently.` },
       { q: `Can I use these icons commercially?`, a: `Yes, generated icons are yours for commercial projects like apps or merchandise. Avoid direct resale of icons alone. Credit not required.` },
     ],
   },
@@ -811,7 +811,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What file formats does IG Carousel support?`, a: `It accepts common formats like JPG, PNG, and GIF for uploads. Exports are in PNG for static slides or MP4 for animated versions, keeping file sizes under 10MB for easy Instagram uploads. This ensures compatibility without quality loss.` },
-      { q: `Is there a cost to use this tool?`, a: `Basic features are free with watermarks, while premium removes them for a monthly fee starting at $9.99. Freelancers can produce unlimited carousels once subscribed. No hidden charges apply to downloads.` },
+      { q: `Is there a cost to use this tool?`, a: `Basic features are free with watermarks, while premium removes them for a monthly fee starting at $9. Freelancers can produce unlimited carousels once subscribed. No hidden charges apply to downloads.` },
       { q: `Who owns the rights to the carousels I create?`, a: `You retain full ownership and commercial rights to your designs. The tool doesn't claim usage rights, so small business owners can post freely on social media. Always check for any third-party image licenses.` },
     ],
   },
@@ -833,7 +833,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How does the blending quality compare to professional tools?`, a: `It delivers clean merges with adjustable resolution up to 4K, suitable for web and print. Results depend on input image quality, but most users get professional-looking outputs quickly. No advanced skills are required for good results.` },
-      { q: `Are there usage limits on free accounts?`, a: `Free users can blend up to 5 images per day, with premium unlocking unlimited access for $4.99 monthly. Downloads are capped at 1080p on free tiers. This keeps it accessible for occasional freelance needs.` },
+      { q: `Are there usage limits on free accounts?`, a: `Free users can blend up to 5 images per day, with premium plans unlocking unlimited access from $9/month. Downloads are capped at 1080p on free tiers. This keeps it accessible for occasional freelance needs.` },
       { q: `Can I use blended images commercially?`, a: `Yes, you own the rights to your creations for commercial use. Ensure source images are licensed appropriately, especially for stock photos. Small businesses can sell or promote with these without restrictions from the tool.` },
     ],
   },
@@ -855,7 +855,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How accurate are the generated captions?`, a: `Captions capture key elements like objects and moods with 80-90% relevance based on common scenes. Complex images may need tweaks, but they're a solid starting point for creators. Outputs are in natural English, adaptable to other languages.` },
-      { q: `Is there a fee for using Image Caption?`, a: `It's free for up to 10 captions daily, with pro access at $7.99/month for unlimited. No costs for basic downloads. Freelancers find the free tier sufficient for light use.` },
+      { q: `Is there a fee for using Image Caption?`, a: `It's free for up to 10 captions daily, with the Pro plan ($19/month) for unlimited. No costs for basic downloads. Freelancers find the free tier sufficient for light use.` },
       { q: `Do I have rights to use the captions commercially?`, a: `Absolutely, all generated text is yours for commercial purposes. No attribution to the tool is needed, so small businesses can integrate them into marketing freely. Original image rights still apply.` },
     ],
   },
@@ -877,7 +877,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What level of detail do the prompts provide?`, a: `Prompts include specifics like lighting, composition, and mood, suitable for most AI generators. They're concise yet descriptive, around 50-150 words. Users may edit for more precision in niche styles.` },
-      { q: `How much does Image To Prompt cost?`, a: `Free for 5 conversions per day; unlimited with a $5.99 monthly plan. Exports are instant with no additional fees. It's practical for occasional use by small business owners.` },
+      { q: `How much does Image To Prompt cost?`, a: `Free for 5 conversions per day; unlimited with plans starting at $9/month. Exports are instant with no additional fees. It's practical for occasional use by small business owners.` },
       { q: `Can I use these prompts for commercial projects?`, a: `Yes, the output prompts are fully yours for any use, including selling AI-generated art. No tool ownership claims apply. Ensure compliance with downstream AI service terms.` },
     ],
   },
@@ -899,7 +899,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality can I expect from the videos?`, a: `Videos output at 1080p resolution with smooth 30fps playback, suitable for social media. Animation quality varies by effect but remains professional for basic needs. Higher-res inputs yield better results.` },
-      { q: `Is there a pricing model for Image To Video?`, a: `Free tier allows 3 videos daily; pro version at $8.99/month offers unlimited renders. File sizes stay manageable for quick shares. Ideal for freelancers testing concepts.` },
+      { q: `Is there a pricing model for Image To Video?`, a: `Free tier allows 3 videos daily; the Pro plan ($19/month) offers unlimited renders. File sizes stay manageable for quick shares. Ideal for freelancers testing concepts.` },
       { q: `Who owns the rights to the generated videos?`, a: `You fully own the videos for commercial or personal use. The tool grants all rights upon creation, so small businesses can post or sell without issues. Source image licenses must be respected.` },
     ],
   },
@@ -943,7 +943,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How accurate are the generated interior designs?`, a: `Designs reflect real-world proportions and lighting based on your inputs, providing practical previews. They may not capture every structural detail perfectly. Refine with multiple generations for best results.` },
-      { q: `What costs are involved in using the tool?`, a: `Free tier offers limited daily renders, with pro plans at $12/month for unlimited use. Outputs are downloadable without extra charges. It's cost-effective for occasional freelance projects.` },
+      { q: `What costs are involved in using the tool?`, a: `Free tier offers limited daily renders, with the Pro plan at $19/month for unlimited use. Outputs are downloadable without extra charges. It's cost-effective for occasional freelance projects.` },
       { q: `Can I use the designs commercially?`, a: `Yes, generated images are yours to use in client work or marketing, with full ownership rights. Ensure source photos are your own or licensed. No attribution to the tool required.` },
     ],
   },
@@ -965,7 +965,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality can I expect from the invitations?`, a: `Outputs are high-resolution and scalable for print or screen, ensuring crisp details. Templates adapt well to customizations without distortion. Test previews help avoid issues.` },
-      { q: `Is the tool free or paid?`, a: `Access basic templates for free with watermarks; remove them via $7/month subscription. Unlimited designs suit frequent users like planners. No per-invitation fees.` },
+      { q: `Is the tool free or paid?`, a: `Access basic templates for free with watermarks; remove them via a subscription starting at $9/month. Unlimited designs suit frequent users like planners. No per-invitation fees.` },
       { q: `Who owns the rights to my invitation designs?`, a: `You retain full rights for personal or commercial use, including selling printed versions. Upload only your own images to comply. Designs are original creations.` },
     ],
   },
@@ -987,7 +987,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How realistic are the enhanced listing photos?`, a: `Edits integrate naturally with existing elements, mimicking professional photography. Virtual staging looks lived-in but may need tweaks for specifics. Results are suitable for online platforms.` },
-      { q: `What are the pricing options?`, a: `Free for up to 5 edits daily; unlimited with $10/month plan. Downloads are included without surcharges. Ideal for real estate pros handling multiple listings.` },
+      { q: `What are the pricing options?`, a: `Free for up to 5 edits daily; unlimited with plans starting at $9/month. Downloads are included without surcharges. Ideal for real estate pros handling multiple listings.` },
       { q: `Are there limits on commercial use?`, a: `No restrictions—you can use edited photos in ads, websites, or sales materials. Ensure original photos are yours or client-approved. Ownership transfers to you upon generation.` },
     ],
   },
@@ -1009,7 +1009,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality of animation does the tool produce?`, a: `Animations are smooth and professional, with frame rates supporting HD playback. Simple effects render cleanly; complex ones may vary by logo simplicity. Exports are ready for web use.` },
-      { q: `How much does logo animation cost?`, a: `Free for basic animations with a watermark; ad-free unlimited access at $8/month. No extra cost per export. Suits creators with ongoing branding needs.` },
+      { q: `How much does logo animation cost?`, a: `Free for basic animations with a watermark; ad-free unlimited access starting at $9/month. No extra cost per export. Suits creators with ongoing branding needs.` },
       { q: `Can I use the animated logos commercially?`, a: `Yes, you own the rights for all business purposes, including ads and products. Base your logo on original designs only. Animations are fully customizable and yours.` },
     ],
   },
@@ -1271,7 +1271,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What quality can I expect from the stitched panoramas?`, a: `The AI ensures smooth blending with minimal seams, preserving original details. For best results, use photos with 30% overlap; outputs are clear up to 8K resolution. Occasional adjustments may be needed for uneven lighting.` },
-      { q: `How much does Panorama cost, and are there usage limits?`, a: `Free tier allows 5 panoramas per day with lower resolution; pro access at $12/month unlocks unlimited high-res exports. File uploads are capped at 50MB total per session.` },
+      { q: `How much does Panorama cost, and are there usage limits?`, a: `Free tier allows 5 panoramas per day with lower resolution; the Pro plan ($19/month) unlocks unlimited high-res exports. File uploads are capped at 50MB total per session.` },
       { q: `Do I retain rights to the panoramic images I create?`, a: `Yes, you have complete usage rights, including commercial applications like selling prints. Just ensure your input photos don't infringe on third-party copyrights.` },
     ],
   },
@@ -1295,7 +1295,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How accurate is the portrait to my pet's appearance?`, a: `The AI retains key features like fur texture and expressions from your photo. Styles add artistic flair without losing recognizability. Higher-quality input photos yield better matches.` },
-      { q: `What are the costs and limits for Pet Portrait?`, a: `Free version adds a small watermark; remove it with a $10/month plan for unlimited generations. You can upload up to 20 photos daily on free, with each under 5MB.` },
+      { q: `What are the costs and limits for Pet Portrait?`, a: `Free version adds a small watermark; remove it with the Pro plan ($19/month) for unlimited generations. You can upload up to 20 photos daily on free, with each under 5MB.` },
       { q: `Can I use the generated portraits commercially?`, a: `Absolutely, you own the rights for sales or marketing, such as on merchandise. Avoid using photos of pets you don't own without consent.` },
     ],
   },
@@ -1319,7 +1319,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Is the coloring accurate and high-quality?`, a: `The AI uses context clues for realistic results, like skin tones and clothing. Quality matches the original photo's clarity; faded inputs may need pre-edits. Outputs are sharp and printable.` },
-      { q: `What's the pricing and any limits on Photo Colorize?`, a: `Free for up to 3 colorizations daily with basic resolution; upgrade to pro for $8/month unlimited access. Images must be under 8MB and not exceed 5000 pixels on the long side.` },
+      { q: `What's the pricing and any limits on Photo Colorize?`, a: `Free for up to 3 colorizations daily with basic resolution; upgrade to the Pro plan ($19/month) for unlimited access. Images must be under 8MB and not exceed 5000 pixels on the long side.` },
       { q: `What usage rights apply to colorized photos?`, a: `You retain full rights to use them personally or commercially, like in prints or ads. Ensure the original photo's ownership allows modifications.` },
     ],
   },
@@ -1343,7 +1343,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How effective is the restoration for severe damage?`, a: `It handles common issues like scratches and fading well, but extreme tears might require manual follow-up. Results keep the photo's natural look without over-smoothing. Test with scans for best outcomes.` },
-      { q: `Are there costs or limits to using Photo Restore?`, a: `Free tier processes 5 images per day at medium resolution; full features cost $11/month with no limits. Uploads are restricted to 10MB files in JPEG or TIFF.` },
+      { q: `Are there costs or limits to using Photo Restore?`, a: `Free tier processes 5 images per day at medium resolution; paid plans starting at $9/month unlock full features with no limits. Uploads are restricted to 10MB files in JPEG or TIFF.` },
       { q: `Do I own the rights to restored photos?`, a: `Yes, the tool grants you complete rights for any use, including commercial sales. Just confirm you have permission for the original damaged photo.` },
     ],
   },
@@ -1810,7 +1810,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What file formats are supported for downloads?`, a: `Templates download in common formats like PSD, PNG, and SVG for easy integration into tools like Adobe Photoshop or Canva. File sizes typically range from 1-5 MB depending on complexity. This ensures compatibility with most design workflows.` },
-      { q: `Is there a cost for using the Templates tool?`, a: `Access to basic template generation is included in DreamForgeX subscriptions starting at $10/month. Advanced customizations may require higher tiers. Free trials allow testing without upfront payment.` },
+      { q: `Is there a cost for using the Templates tool?`, a: `Access to basic template generation is included in DreamForgeX subscriptions starting at $9/month. Advanced customizations may require higher tiers. Free trials allow testing without upfront payment.` },
       { q: `What usage rights do I have over generated templates?`, a: `You own full commercial rights to templates created with your prompts, allowing resale or use in client work. AI-generated elements are original and free from copyright issues. Always check for any integrated stock assets.` },
     ],
   },
@@ -1854,7 +1854,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What is the quality of the generated speech?`, a: `Audio quality matches professional standards with clear, human-like intonation. Files are produced at 44.1 kHz sample rate for crisp playback. Accents vary in naturalness based on language support.` },
-      { q: `How much does Text To Speech cost?`, a: `Basic usage is free for up to 1,000 words per month; paid plans start at $15/month for unlimited. Per-word pricing applies for heavy users. No hidden fees for standard downloads.` },
+      { q: `How much does Text To Speech cost?`, a: `Basic usage is free for up to 1,000 words per month; paid plans start at $9/month for unlimited. Per-word pricing applies for heavy users. No hidden fees for standard downloads.` },
       { q: `Do I own the rights to the audio files?`, a: `You receive full ownership and commercial rights to generated speech files. They can be used in any project, including monetized content. The tool uses licensed voices without royalties.` },
     ],
   },
@@ -1876,7 +1876,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What video lengths and resolutions are available?`, a: `Videos range from 5 to 60 seconds, with standard 1080p HD output. File sizes average 10-50 MB for quick sharing. Higher resolutions may require premium access.` },
-      { q: `Is there a fee for video generation?`, a: `Free tier allows 3 videos per week; subscriptions from $20/month unlock unlimited. Generation time is 1-5 minutes per clip. Costs scale with length and complexity.` },
+      { q: `Is there a fee for video generation?`, a: `Free tier allows 3 videos per week; subscriptions from $9/month unlock unlimited. Generation time is 1-5 minutes per clip. Costs scale with length and complexity.` },
       { q: `Can I use these videos for commercial purposes?`, a: `Yes, you own full rights to commercially exploit the videos. They are original AI creations suitable for ads or sales. Avoid prompts infringing on existing copyrights.` },
     ],
   },
@@ -1898,7 +1898,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What is the maximum resolution for textures?`, a: `Textures generate up to 4K (4096x4096 pixels) for detailed work. Seamless versions tile without visible seams. Download sizes reach 10 MB for high-res files.` },
-      { q: `Are there costs associated with generating textures?`, a: `Free access provides 20 generations monthly; paid plans at $12/month offer unlimited. Processing takes 20-60 seconds per texture. No extra fees for standard exports.` },
+      { q: `Are there costs associated with generating textures?`, a: `Free access provides 20 generations monthly; paid plans starting at $9/month offer unlimited. Processing takes 20-60 seconds per texture. No extra fees for standard exports.` },
       { q: `What rights do I have to the generated textures?`, a: `Full commercial rights are granted, allowing use in products or client projects. Textures are AI-original and free of licensing issues. Ensure prompts don't reference protected designs.` },
     ],
   },
@@ -2008,7 +2008,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `What resolution are the postcards?`, a: `Outputs are at 300 DPI for sharp printing on standard postcard stock. Digital versions suit 1080p screens. File sizes stay under 3MB for easy sharing.` },
-      { q: `Is the tool free to use?`, a: `Yes, with 15 free generations daily; pro access at $12/month removes limits and adds templates. No costs for basic downloads. Processing is near-instant.` },
+      { q: `Is the tool free to use?`, a: `Yes, with 15 free generations daily; the Pro plan ($19/month) removes limits and adds templates. No costs for basic downloads. Processing is near-instant.` },
       { q: `Can I sell the postcards commercially?`, a: `Absolutely, you have rights to print and sell them. Ensure descriptions don't infringe on real trademarks, like specific hotel names.` },
     ],
   },
@@ -2123,7 +2123,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How realistic are the try-on renders?`, a: `They simulate fabric drape and lighting naturally, suitable for previews but not photorealistic for final ads. Best with clear garment uploads.` },
-      { q: `What costs are involved?`, a: `Free for 2 try-ons daily; subscription at $12/month for unlimited and custom model uploads.` },
+      { q: `What costs are involved?`, a: `Free for 2 try-ons daily; subscriptions starting at $9/month for unlimited and custom model uploads.` },
       { q: `Do I have rights to use the generated images?`, a: `Yes, for commercial purposes like your store or client work, provided the clothing design is original.` },
     ],
   },

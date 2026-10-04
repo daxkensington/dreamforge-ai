@@ -20,6 +20,30 @@ import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
 
+declare global {
+  interface Window {
+    fbq?: (event: string, name: string, params?: Record<string, unknown>) => void;
+  }
+}
+
+/**
+ * Meta custom conversion for demo activations, so paid campaigns can
+ * optimize on "person actually got a generation out of the demo", not just
+ * clicks. Guarded like the pixel code in app/MetaPixelConversions.tsx: the
+ * pixel may be blocked or absent, and that must never break the demo.
+ * Called from the mutation's onSuccess — i.e. once per completed demo
+ * generation, never per render.
+ */
+function trackDemoActivation(): void {
+  try {
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      window.fbq("trackCustom", "DemoGenerationCompleted", { content_type: "demo" });
+    }
+  } catch {
+    /* measurement failure must never surface to the visitor */
+  }
+}
+
 const DEMO_PROMPTS = [
   "An astronaut riding a horse on Mars at sunset, photorealistic",
   "A cyberpunk Tokyo street market in heavy rain, neon reflections",
@@ -50,6 +74,7 @@ export default function DemoTextToImage() {
         setResultUrl(data.url);
         setResultPrompt(data.prompt ?? prompt);
         track("generation_completed", { kind: "demo" });
+        trackDemoActivation();
         toast.success("Done! Sign up to make more.");
       } else {
         const err = ("error" in data && data.error) || "";

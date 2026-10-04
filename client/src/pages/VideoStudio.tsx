@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { exportStoryboardPdf, exportScriptPdf } from "@/lib/pdfExport";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
   Film, Clapperboard, Palette, Maximize, Music, FileText,
@@ -64,8 +63,9 @@ function StoryboardTab() {
     });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!storyboard.data || storyboard.data.status !== "completed") return;
+    const { exportStoryboardPdf } = await import("@/lib/pdfExport");
     exportStoryboardPdf({
       title: storyboard.data.title,
       synopsis: storyboard.data.synopsis,
@@ -457,8 +457,9 @@ function ScriptWriterTab() {
     });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!script.data || script.data.status !== "completed") return;
+    const { exportScriptPdf } = await import("@/lib/pdfExport");
     exportScriptPdf({
       title: script.data.title,
       logline: script.data.logline,

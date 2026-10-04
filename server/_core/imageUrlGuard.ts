@@ -178,12 +178,17 @@ async function readCapped(resp: Response, maxBytes: number): Promise<Buffer> {
  *     an SSRF canary poking an internal HTTP service — refuse either way)
  *   - declared Content-Length <= 20MB, and never buffers > 25MB of actual
  *     bytes (protects the lambda from memory exhaustion on huge bodies)
+ *
+ * `opts.signal` lets callers keep their own timeout/abort around the fetch;
+ * the signal is attached to the request, so an abort also stops the body
+ * read mid-stream.
  */
 export async function fetchGuardedImage(
   rawUrl: string,
+  opts?: { signal?: AbortSignal },
 ): Promise<{ buffer: Buffer; contentType: string }> {
   const url = assertSafeImageUrl(rawUrl);
-  const resp = await fetch(url, { redirect: "follow" });
+  const resp = await fetch(url, { redirect: "follow", signal: opts?.signal });
   if (!resp.ok) {
     throw badRequest(`Could not fetch image (HTTP ${resp.status}).`);
   }

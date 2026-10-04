@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+import fs from "fs";
+import path from "path";
 import { desc, eq, and, isNotNull } from "drizzle-orm";
 import { getDb } from "../server/db";
 import { galleryItems, generations } from "../drizzle/schema";
@@ -65,36 +67,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/for", priority: 0.7, changeFrequency: "monthly" as const },
     { url: "/takedown", priority: 0.3, changeFrequency: "yearly" as const },
     { url: "/privacy", priority: 0.4, changeFrequency: "yearly" as const },
-    { url: "/account", priority: 0.3, changeFrequency: "yearly" as const },
+    { url: "/terms", priority: 0.4, changeFrequency: "yearly" as const },
+    { url: "/about", priority: 0.4, changeFrequency: "yearly" as const },
   ];
 
-  // Tool pages
-  const toolRoutes = [
-    "upscaler", "background", "inpainting", "outpainting", "face-enhancer",
-    "color-grading", "style-transfer", "object-eraser", "image-blender",
-    "variations", "nl-edit", "photo-restore", "hdr-enhance", "transparent-png",
-    "panorama", "film-grain", "depth-map", "headshot", "logo-maker", "avatar",
-    "wallpaper", "qr-art", "product-photo", "text-effects", "sketch-to-image",
-    "vectorize", "texture", "icon-gen", "canvas", "mockup", "thumbnail",
-    "character-sheet", "meme", "interior-design", "collage", "text-to-video",
-    "image-to-video", "batch-prompts", "social-resize", "prompt-builder",
-    "color-palette", "image-to-prompt", "image-caption", "music-gen",
-    "text-to-speech", "audio-enhance", "sound-effects",
-    "song-creator", "music-video", "social-templates", "clip-maker",
-    "presentations", "templates", "ad-copy", "blog-writer", "caption-writer",
-    "pixel-art", "coloring-book", "tattoo-design", "cover-maker",
-    "pose-turnaround", "photo-colorize", "podcast-cover", "listing-photos",
-    "real-estate-twilight", "fashion-lookbook", "meme-template",
-    "yt-thumbnails", "ig-carousel", "sticker-pack", "recipe-card",
-    "invitation", "business-card", "pet-portrait", "tarot-card",
-    "movie-poster", "trading-card", "menu-design", "greeting-card",
-    "emoji-creator", "brand-style-guide", "event-flyer", "certificate",
-    "bookmark", "zine-spread", "concert-poster", "architecture-concept",
-    "cosplay-reference", "travel-postcard",
-    // Phase 39 Tier 2 — viral preset tools
-    "action-figure", "funko-pop", "chibi-figure", "lego-mini", "pet-to-person",
-    "barbie-box", "jellycat-plush", "pop-mart",
-  ].map((tool) => ({
+  // Tool pages — derived from the filesystem (one live route per app/tools/<slug>/dir)
+  // so the sitemap can never drift from the actual routes. Falls back to an
+  // empty list if the FS read fails; routes are validated again at emit time.
+  let toolSlugs: string[] = [];
+  try {
+    const toolsDir = path.join(process.cwd(), "app", "tools");
+    toolSlugs = fs
+      .readdirSync(toolsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith("["))
+      .map((d) => d.name)
+      .sort();
+  } catch (err) {
+    console.warn("[sitemap] could not read app/tools, omitting tool URLs:", err);
+  }
+  const toolRoutes = toolSlugs.map((tool) => ({
     url: `/tools/${tool}`,
     priority: 0.6,
     changeFrequency: "monthly" as const,
@@ -163,7 +154,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...videoRoutes,
   ].map((route) => ({
     url: `${BASE_URL}${route.url}`,
-    lastModified: "lastModified" in route && route.lastModified instanceof Date ? route.lastModified : now,
+    // Only emit lastmod when we know it (blog posts, gallery approvals).
+    // Claiming "today" for every static URL makes Google ignore lastmod.
+    ...("lastModified" in route && route.lastModified instanceof Date
+      ? { lastModified: route.lastModified }
+      : {}),
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));

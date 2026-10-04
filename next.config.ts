@@ -39,6 +39,13 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   // tRPC needs server actions or API routes
   serverExternalPackages: ["@neondatabase/serverless"],
+  // Baseline image optimization: serve AVIF/WebP from next/image where it's
+  // adopted. Remote R2/S3 gallery media stays on the default loader (https:
+  // CSP img-src already allows it) — remotePatterns intentionally not locked
+  // down yet to avoid breaking the 254 raw <img> galleries on remote URLs.
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
   async redirects() {
     return [
       // Forge (and leftover bookmarks) used to invent /tools/refine — Refine
