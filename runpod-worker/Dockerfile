@@ -24,6 +24,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir --no-deps audiocraft && \
     pip install --no-cache-dir lameenc num2words flashy torchaudio imageio-ffmpeg imageio \
     av julius spacy librosa torchmetrics
+# realesrgan/basicsr are also installed --no-deps: their declared dependencies
+# (notably tb-nightly) conflict with the protobuf pin and send pip's resolver
+# into backtracking that dies with resolution-too-deep. Inference needs none
+# of the training-only deps; the four real runtime gaps are backfilled by hand
+# (addict/future/lmdb/yapf — everything else they import is already pinned in
+# requirements.txt: numpy/opencv/Pillow/scipy/scikit-image/torch/torchvision).
+RUN pip install --no-cache-dir --no-deps realesrgan==0.3.0 basicsr==1.4.2 && \
+    pip install --no-cache-dir addict future lmdb yapf
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1

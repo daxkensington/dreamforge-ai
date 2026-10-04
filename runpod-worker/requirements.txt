@@ -14,8 +14,8 @@ ftfy==6.1.0
 safetensors==0.4.3  # transformers 4.44 requires >=0.4.1
 sentencepiece==0.2.0
 protobuf==4.25.0
-realesrgan==0.3.0
-basicsr==1.4.2
+# realesrgan/basicsr installed --no-deps in the Dockerfile (like audiocraft):
+# their dependency specs (tb-nightly vs protobuf) explode pip's resolver.
 opencv-python-headless==4.8.0.76  # 4.8.0.74 yanked from PyPI; next patch, same API
 torchvision==0.23.0  # pairs with the base image's torch 2.8; 0.17.0 pins torch==2.2.0 and would downgrade the image
 Pillow==10.0.0
