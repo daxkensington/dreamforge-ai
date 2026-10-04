@@ -8,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { exportStoryboardPdf } from "@/lib/pdfExport";
 import { Loader2, Download, LayoutGrid, Clapperboard, Sparkles, Save } from "lucide-react";
 
 const STYLES = [
@@ -63,8 +62,9 @@ export default function ToolStoryboard() {
     });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!storyboard.data || storyboard.data.status !== "completed") return;
+    const { exportStoryboardPdf } = await import("@/lib/pdfExport");
     exportStoryboardPdf({
       title: storyboard.data.title,
       synopsis: storyboard.data.synopsis,

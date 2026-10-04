@@ -86,7 +86,6 @@
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.89.0",
     "react-resizable-panels": "^3.0.6",
-    "recharts": "^2.15.4",
     "resend": "^6.30.0",
     "sharp": "0.35.4",
     "sonner": "^2.0.8",

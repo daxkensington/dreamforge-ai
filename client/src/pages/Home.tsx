@@ -58,8 +58,6 @@ const scaleIn = {
 };
 
 /* ── Data ── */
-const heroImages = ["/showcase/hero-forge.jpg", "/showcase/hero-2.jpg", "/showcase/hero-3.jpg"];
-
 const galleryImages = [
   { src: "/showcase/gallery-1.jpg", prompt: "Bioluminescent underwater cathedral with jellyfish stained glass" },
   { src: "/showcase/gallery-2.jpg", prompt: "Cyberpunk samurai in neon rain, holographic katana" },
@@ -271,7 +269,6 @@ export default function Home() {
   const { data: stats } = trpc.gallery.stats.useQuery();
   const { completed: onboardingDone, markCompleted } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [heroIdx, setHeroIdx] = useState(0);
   const [promptText, setPromptText] = useState("");
   /* Kling availability from /api/status/providers. undefined while loading or
      if the probe is unreachable — in that case we default to showing it. */
@@ -310,14 +307,6 @@ export default function Home() {
     if (isAuthenticated && !onboardingDone) setShowOnboarding(true);
   }, [isAuthenticated, onboardingDone]);
 
-  /* Hero rotation */
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setHeroIdx((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
   const handleGenerate = useCallback(() => {
     // Don't wall cold visitors at signup — hand the typed prompt to the
     // no-signup demo so they get a real generation before any account.
@@ -355,16 +344,6 @@ export default function Home() {
         >
           <source src="/video/hero-bg.mp4" type="video/mp4" />
         </video>
-        {/* Fallback rotating images (behind video, shows on poster/load) */}
-        {heroImages.map((src, i) => (
-          <img
-            key={src}
-            src={src}
-            alt="Hero background"
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out -z-10"
-            style={{ opacity: i === heroIdx ? 1 : 0 }}
-          />
-        ))}
         {/* Dark overlay — FIX 1: much darker */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/95" />
 
