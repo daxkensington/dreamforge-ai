@@ -1,6 +1,7 @@
 import { Wand2, Heart, Twitter, Mail, ExternalLink, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
+import Image from "next/image";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -113,7 +114,7 @@ export default function Footer() {
         <div className="flex gap-3 animate-footer-marquee">
           {[...galleryStrip, ...galleryStrip].map((img, i) => (
             <div key={i} className="flex-shrink-0 h-20 w-28 rounded-lg overflow-hidden opacity-60 hover:opacity-100 transition-opacity duration-300">
-              <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
+              <Image src={img} alt="AI generated showcase" width={112} height={80} sizes="112px" className="w-full h-full object-cover" />
             </div>
           ))}
         </div>
@@ -140,7 +141,7 @@ export default function Footer() {
           {/* Brand column */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <img src="/logo.png" alt="DreamForgeX" className="h-9 w-9 rounded-xl" />
+              <Image src="/logo.png" alt="DreamForgeX" width={36} height={36} className="h-9 w-9 rounded-xl" />
               <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                 DreamForgeX
               </span>
