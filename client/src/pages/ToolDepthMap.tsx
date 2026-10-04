@@ -22,13 +22,17 @@ export default function ToolDepthMap() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [style, setStyle] = useState("grayscale");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [engine, setEngine] = useState<"depth-anything" | "vision-model" | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = trpc.tools.depthMap.useMutation({
     onSuccess: (data) => {
-      if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Depth map generated!"); }
-      else toast.error(data.error || "Generation failed");
+      if (data.status === "completed" && data.url) {
+        setResultUrl(data.url);
+        setEngine(data.engine ?? null);
+        toast.success(data.engine === "depth-anything" ? "Depth map generated (Depth Anything V2)!" : "Depth map generated!");
+      } else toast.error(data.error || "Generation failed");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -92,7 +96,7 @@ export default function ToolDepthMap() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); mutation.mutate({ imageUrl, style: style as any }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={() => { setResultUrl(null); setEngine(null); mutation.mutate({ imageUrl, style: style as any }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Depth Map</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
@@ -141,7 +145,19 @@ export default function ToolDepthMap() {
                       </div>
                     </div>
                     {resultUrl && (
-                      <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
+                      <div className="p-4 border-t border-border/50 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          {engine && (
+                            <Badge variant="secondary" className={engine === "depth-anything" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : "bg-amber-500/15 text-amber-400 border-amber-500/30"}>
+                              {engine === "depth-anything" ? "Depth Anything V2 — true depth" : "Vision model — estimated depth"}
+                            </Badge>
+                          )}
+                          {engine === "vision-model" && style === "normal-map" && (
+                            <span className="text-xs text-amber-400/90">Preview only — not a true normal map for 3D use.</span>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button>
+                      </div>
                     )}
                   </div>
                 )}

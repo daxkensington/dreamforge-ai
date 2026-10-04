@@ -8,6 +8,7 @@ import { getLoginUrl } from "@/const";
 import { ToolSEOBlock } from "@/components/ToolSEOBlock";
 import { ToolPageSchemas } from "@/components/ToolPageSchemas";
 import { CreditCostBadge } from "@/components/CreditCostBadge";
+import ToolSamples from "@/components/ToolSamples";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolPageLayoutProps {
@@ -129,6 +130,10 @@ export default function ToolPageLayout({
         <section className="container py-8">
           {children}
         </section>
+
+        {/* Sample outputs — derived from the URL slug via TOOL_SAMPLES so
+            visitors see real results before signing up (design audit #3). */}
+        <ToolSamples slug={location.split("/")[2] ?? ""} />
 
         {/* Below-fold SEO copy — renders if this slug has entries in shared/toolSeoCopy.ts */}
         <ToolSEOBlock />
