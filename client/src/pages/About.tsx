@@ -23,6 +23,7 @@ import {
   Star,
 } from "lucide-react";
 import { Link } from "wouter";
+import NextImage from "next/image";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -119,11 +120,10 @@ export default function About() {
       {/* ═══════ HERO ═══════ */}
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0">
-          <img
+          <NextImage
             src="/showcase/hero-forge.jpg"
             alt=""
-            className="w-full h-full object-cover opacity-30"
-          />
+            className="w-full h-full object-cover opacity-30" width={1408} height={768} />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/85 to-black" />
         </div>
 
@@ -438,7 +438,7 @@ export default function About() {
       {/* ═══════ FINAL CTA ═══════ */}
       <section className="py-20 md:py-28 border-t border-white/10 relative overflow-hidden">
         <div className="absolute inset-0">
-          <img src="/showcase/hero-2.jpg" alt="" className="w-full h-full object-cover opacity-20" />
+          <NextImage src="/showcase/hero-2.jpg" alt="" className="w-full h-full object-cover opacity-20" width={1408} height={768} />
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/85 to-black" />
         </div>
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">

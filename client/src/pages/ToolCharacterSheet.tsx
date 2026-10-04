@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Users, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const characterStyles = [
   { value: "anime", label: "Anime", icon: "🌸" },
@@ -49,7 +50,7 @@ export default function ToolCharacterSheet() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-charsheet.jpg" alt="Character sheet example" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-charsheet.jpg" alt="Character sheet example" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

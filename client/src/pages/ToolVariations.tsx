@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const variationTypes = [
   { id: "subtle" as const, label: "Subtle", description: "Minor tweaks to color and lighting", color: "text-blue-400" },
@@ -91,7 +92,7 @@ export default function ToolVariations() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-variations.jpg" alt="Image variations" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-variations.jpg" alt="Image variations" className="w-full rounded-lg max-h-48 object-cover" width={1024} height={1024} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Controls */}

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const STYLES = [
   { value: "oil-painting" as const, label: "Oil Painting", emoji: "🎨", color: "from-amber-600 to-blue-500" },
@@ -112,7 +113,7 @@ export default function ToolStyleTransfer() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/example-style-1.jpg" alt="Style transfer examples" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/example-style-1.jpg" alt="Style transfer examples" className="w-full rounded-lg max-h-48 object-cover" width={1024} height={559} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Controls Panel */}

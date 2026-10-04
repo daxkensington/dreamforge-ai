@@ -5,7 +5,7 @@
 // missing. Run BEFORE validating the constraints (VALIDATE CONSTRAINT scans
 // the table and fails if orphans remain). SELECT-only — safe against prod.
 import { config } from "dotenv";
-import { neon } from "@neondatabase/serverless";
+import postgres from "postgres";
 
 const envFile = process.argv[2];
 if (!envFile) {
@@ -20,7 +20,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = neon(url);
+const sql = postgres(url, { max: 1 });
 
 // Must mirror drizzle/0013_foreign_keys_not_valid.sql exactly.
 const RELATIONSHIPS = [
@@ -34,13 +34,15 @@ const RELATIONSHIPS = [
 
 console.log("Orphan audit — child rows whose parent is missing (must be 0 before VALIDATE):\n");
 let total = 0;
+// Identifiers come only from the RELATIONSHIPS constants above (never user
+// input), so interpolating them into the query text is safe.
 for (const r of RELATIONSHIPS) {
-  const rows = await sql`
-    SELECT count(*)::int AS orphans
-    FROM "${sql.unsafe(r.child)}" c
-    LEFT JOIN "${sql.unsafe(r.parent)}" p ON p."${sql.unsafe(r.pk)}" = c."${sql.unsafe(r.col)}"
-    WHERE p."${sql.unsafe(r.pk)}" IS NULL
-  `;
+  const rows = await sql.unsafe(
+    `SELECT count(*)::int AS orphans
+     FROM "${r.child}" c
+     LEFT JOIN "${r.parent}" p ON p."${r.pk}" = c."${r.col}"
+     WHERE p."${r.pk}" IS NULL`
+  );
   const n = rows[0]?.orphans ?? 0;
   total += n;
   console.log(`${n.toString().padStart(8)}  ${r.child}.${r.col} -> ${r.parent}.${r.pk}  (${r.name})`);

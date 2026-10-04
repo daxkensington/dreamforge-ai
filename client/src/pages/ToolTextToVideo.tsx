@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Video, Loader2, Download, Sparkles, RotateCcw, Camera } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const cameraPresets = [
   { value: "static", label: "Static", desc: "Locked camera, no movement" },
@@ -76,7 +77,7 @@ export default function ToolTextToVideo() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-xs text-muted-foreground mb-3">Example output:</p>
-          <img loading="lazy" src="/showcase/example-video-1.jpg" alt="AI generated video frames" className="w-full rounded-lg" />
+          <NextImage src="/showcase/example-video-1.jpg" alt="AI generated video frames" className="w-full rounded-lg" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

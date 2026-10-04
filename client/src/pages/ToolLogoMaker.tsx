@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Hexagon, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const iconTypes = [
   { value: "wordmark", label: "Wordmark" },
@@ -76,8 +77,8 @@ export default function ToolLogoMaker() {
         <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-xs text-muted-foreground mb-3">Example AI-generated logos:</p>
           <div className="grid grid-cols-2 gap-3">
-            <img loading="lazy" src="/showcase/example-logo-1.jpg" alt="AI generated logo examples" className="w-full rounded-lg" />
-            <img loading="lazy" src="/showcase/example-logo-2.jpg" alt="AI generated logo mockups" className="w-full rounded-lg" />
+            <NextImage src="/showcase/example-logo-1.jpg" alt="AI generated logo examples" className="w-full rounded-lg" width={1408} height={768} />
+            <NextImage src="/showcase/example-logo-2.jpg" alt="AI generated logo mockups" className="w-full rounded-lg" width={1408} height={768} />
           </div>
         </div>
 

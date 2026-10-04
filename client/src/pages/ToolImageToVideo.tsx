@@ -12,6 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Film, Upload, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const motionTypes = [
   { value: "subtle", label: "Subtle", desc: "Gentle parallax" },
@@ -77,7 +78,7 @@ export default function ToolImageToVideo() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-i2v.jpg" alt="Image to video animation" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-i2v.jpg" alt="Image to video animation" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

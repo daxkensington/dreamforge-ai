@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { QrCode, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const qrStyles = [
   { value: "cyberpunk", label: "Cyberpunk", color: "from-cyan-500 to-blue-600" },
@@ -44,7 +45,7 @@ export default function ToolQrArt() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-xs text-muted-foreground mb-3">Example output:</p>
-          <img loading="lazy" src="/showcase/example-qrart-1.jpg" alt="AI artistic QR code" className="w-full rounded-lg" />
+          <NextImage src="/showcase/example-qrart-1.jpg" alt="AI artistic QR code" className="w-full rounded-lg" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">

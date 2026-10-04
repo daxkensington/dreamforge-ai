@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
 import { useLocation } from "wouter";
+import NextImage from "next/image";
 
 export default function NotFound() {
   const [, setLocation] = useLocation();
@@ -9,11 +10,10 @@ export default function NotFound() {
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
       {/* Background showcase image */}
       <div className="absolute inset-0">
-        <img
+        <NextImage
           src="/showcase/hero-forge.jpg"
           alt="DreamForgeX background"
-          className="w-full h-full object-cover"
-        />
+          className="w-full h-full object-cover" width={1408} height={768} />
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       </div>
 
