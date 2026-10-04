@@ -145,7 +145,7 @@ describe("checkAndSendBudgetAlerts", () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     // Already alerted today - should skip
-    const lastAlertToday = new Date(now.getTime() - 3600000); // 1 hour ago
+    const lastAlertToday = new Date(todayStart.getTime() + 3600000); // 1 hour after midnight today
     expect(lastAlertToday >= todayStart).toBe(true);
     
     // Last alert was yesterday - should send

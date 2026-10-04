@@ -78,6 +78,20 @@
       "when": 1790748108447,
       "tag": "0010_missing_schema_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791095193581,
+      "tag": "0011_webhook_idempotency_clawback",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791096082034,
+      "tag": "0012_hot_path_indexes",
+      "breakpoints": true
     }
   ]
 }

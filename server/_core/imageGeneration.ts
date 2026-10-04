@@ -20,6 +20,7 @@ import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
+import { assertSafeImageUrl, fetchGuardedImage } from "./imageUrlGuard";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -614,21 +615,33 @@ export async function generateImage(
 
   let imageBuffer: Buffer | undefined;
 
+  // P1.8 (SSRF): every user-supplied source image URL must pass the shared
+  // guard BEFORE anything touches it. Two consumers fetch these URLs
+  // server-side: the RunPod img2img download below, and the vision-LLM
+  // handoff in describeOriginalImages. assertSafeImageUrl throws
+  // TRPCError(BAD_REQUEST) with a generic, URL-free message (see
+  // imageUrlGuard.ts), so the failure mode is clean and leaks nothing about
+  // the URL or provider internals. ~20 tools feed originalImages into this
+  // function; only a few guarded their own router input before this.
+  if (options.originalImages) {
+    for (const img of options.originalImages) {
+      if (img.url) assertSafeImageUrl(img.url);
+    }
+  }
+
   // If original images are provided, try real img2img on RunPod first
   // (dramatically better quality than the LLM describe-then-generate approach)
   if (options.originalImages && options.originalImages.length > 0 && isRunPodAvailable()) {
     try {
       const sourceImg = options.originalImages[0];
       if (sourceImg.url) {
-        const imgResp = await fetch(sourceImg.url);
-        if (imgResp.ok) {
-          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-          const imageB64 = imgBuffer.toString("base64");
-          imageBuffer = await runpodFluxImg2Img(imageB64, prompt, 0.7);
-          console.log("[ImageGen] Used RunPod Flux img2img (real diffusion)");
-        } else {
-          throw new Error("Failed to fetch source image");
-        }
+        // fetchGuardedImage re-validates (redundant after the loop above,
+        // cheap) and caps the download at 25MB while streaming — a hostile
+        // or oversized URL can no longer exhaust the lambda's memory.
+        const { buffer: imgBuffer } = await fetchGuardedImage(sourceImg.url);
+        const imageB64 = imgBuffer.toString("base64");
+        imageBuffer = await runpodFluxImg2Img(imageB64, prompt, 0.7);
+        console.log("[ImageGen] Used RunPod Flux img2img (real diffusion)");
       } else if (sourceImg.b64Json) {
         imageBuffer = await runpodFluxImg2Img(sourceImg.b64Json, prompt, 0.7);
         console.log("[ImageGen] Used RunPod Flux img2img (real diffusion, b64)");

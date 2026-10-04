@@ -6,6 +6,7 @@ import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import {
   createGeneration,
+  getDb,
   getGenerationById,
   getGalleryItems,
   getGalleryStats,
@@ -400,6 +401,127 @@ describe("generation.create", () => {
       TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
       expect.stringContaining("Refund"),
     );
+  });
+
+  it("keeps the flat tool cost for auto and unknown model ids", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.generation.create({
+      prompt: "A crystal dragon over a volcano",
+      mediaType: "image",
+      width: 768,
+      height: 768,
+      modelVersion: "some-future-model", // not in the registry → "auto"
+    });
+
+    expect(mockDeductCredits).toHaveBeenCalledWith(
+      ctx.user.id,
+      TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
+      expect.stringContaining("Generated image"),
+    );
+  });
+
+  it("charges the model's registry price for known premium models", async () => {
+    // Pro-plan user so the premium model gate (canAccessModel) passes.
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+    } as any);
+    try {
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      const result = await caller.generation.create({
+        prompt: "A crystal dragon over a volcano",
+        mediaType: "image",
+        width: 768,
+        height: 768,
+        modelVersion: "flux-pro", // registry premium image model, creditCost.base = 15
+      });
+
+      expect(result.status).toBe("completed");
+      expect(mockDeductCredits).toHaveBeenCalledWith(
+        ctx.user.id,
+        15,
+        expect.stringContaining("Generated image"),
+      );
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
+  });
+
+  it("does not charge an image model's price for video requests", async () => {
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+    } as any);
+    try {
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      const result = await caller.generation.create({
+        prompt: "A phoenix rising from flames",
+        mediaType: "video",
+        width: 768,
+        height: 768,
+        duration: 4,
+        modelVersion: "flux-pro", // image model → video request falls back to the flat tool cost
+      });
+
+      expect(result.status).toBe("completed");
+      expect(mockDeductCredits).toHaveBeenCalledWith(
+        ctx.user.id,
+        TOOL_CREDIT_COSTS["text-to-video"] ?? 1,
+        expect.stringContaining("Generated video"),
+      );
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
+  });
+
+  it("refunds the model's registry price when a premium generation fails", async () => {
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+    } as any);
+    try {
+      mockGenerateImage.mockRejectedValueOnce(new Error("provider exploded"));
+
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      const result = await caller.generation.create({
+        prompt: "A crystal dragon over a volcano",
+        mediaType: "image",
+        width: 768,
+        height: 768,
+        modelVersion: "flux-pro",
+      });
+
+      expect(result.status).toBe("failed");
+      // Refund matches the model-tier charge (15), not the flat 5-credit tool cost.
+      expect(mockRefundCredits).toHaveBeenCalledTimes(1);
+      expect(mockRefundCredits).toHaveBeenCalledWith(
+        ctx.user.id,
+        15,
+        expect.stringContaining("Refund"),
+      );
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
   });
 });
 

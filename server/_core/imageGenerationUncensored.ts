@@ -19,6 +19,7 @@
  */
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodSubmit, runpodJobStatus, getImageEndpointId } from "./runpod";
+import { fetchGuardedImage } from "./imageUrlGuard";
 import { storagePut, generateStorageKey } from "../storage";
 import { UNCENSORED_IMG2IMG_STEPS } from "./imageGeneration";
 
@@ -145,11 +146,20 @@ export async function collectUnfilteredImageJob(
     if (st.imageB64) {
       buffer = Buffer.from(st.imageB64, "base64");
     } else if (st.imageUrl) {
+      // Same raw-fetch pattern as the img2img source download in
+      // imageGeneration.ts: validate + cap via the shared guard instead of
+      // buffering an unbounded body. The URL comes from our own RunPod
+      // endpoint rather than the user, but a misbehaving worker must not be
+      // able to hang the collect loop past the 30s timeout or OOM the lambda.
+      // A failed/guarded download falls through to the shared no-image
+      // failure below — same behavior as the old non-ok response branch.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
-        const res = await fetch(st.imageUrl, { signal: controller.signal });
-        if (res.ok) buffer = Buffer.from(await res.arrayBuffer());
+        const res = await fetchGuardedImage(st.imageUrl, { signal: controller.signal });
+        buffer = res.buffer;
+      } catch {
+        /* fall through to the shared "GPU returned no image" failure */
       } finally {
         clearTimeout(timeout);
       }

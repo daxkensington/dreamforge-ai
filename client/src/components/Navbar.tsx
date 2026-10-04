@@ -41,6 +41,7 @@ import {
   Sun,
   Moon,
   Keyboard,
+  Zap,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 // LanguageSwitcher removed 2026-04-19 — the i18n dictionary exists but no
@@ -57,6 +58,7 @@ const navLinks = [
   { href: "/tools", label: "AI Tools", icon: Wrench },
   { href: "/video-studio", label: "Video Studio", icon: Film, auth: true },
   { href: "/gallery", label: "Gallery", icon: Image },
+  { href: "/demo/text-to-image", label: "Demo", icon: Zap },
   { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },

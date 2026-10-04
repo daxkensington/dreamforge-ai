@@ -29,6 +29,8 @@ import {
   addCredits,
   getCreditHistory,
   createCheckoutSession,
+  sanitizeRedirectOrigin,
+  requestOriginFromCtx,
   CREDIT_PACKAGES,
   CREDIT_COSTS,
 } from "./stripe";
@@ -105,7 +107,9 @@ export const creditsRouter = router({
         ctx.user.email || "",
         ctx.user.name || "User",
         input.packageId,
-        input.origin
+        // Allowlist the client origin (open redirect / session-id leak);
+        // mismatches fall back to APP_URL inside createCheckoutSession.
+        sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx))
       );
       return result;
     }),

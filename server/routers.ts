@@ -189,7 +189,7 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
     cost = TOOL_CREDIT_COSTS[tool] ?? LEGACY_CREDIT_COSTS[tool] ?? CREDIT_COSTS[tool] ?? 1;
   }
 
-  if (cost === 0) return { success: true, balance: 0, needed: 0 };
+  if (cost === 0) return { success: true, balance: 0, needed: 0, cost: 0 };
   try {
     const result = await deductCredits(userId, cost, description || `Used ${tool}${modelId ? ` (${modelId})` : ""}`);
     if (!result.success) {
@@ -198,7 +198,8 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
         message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
       });
     }
-    return result;
+    // `cost` lets callers refund exactly what was charged on failure.
+    return { ...result, cost };
   } catch (e: any) {
     if (e instanceof TRPCError) throw e;
     console.error("[tryDeductCredits] Credit deduction failed for user", userId, "tool", tool, ":", e);
@@ -614,7 +615,14 @@ export const appRouter = router({
 
         // Deduct credits
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
-        await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`);
+        // Model-aware pricing: bill at the registry model's creditCost.base when
+        // the request resolves to a known model of the same media type. Unknown
+        // ids and uncensored (forced "auto") keep the flat tool cost (5).
+        const billableModel =
+          !input.uncensored && requestedModel && requestedModel.type === input.mediaType
+            ? requestedModel
+            : undefined;
+        const deduction = await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`, billableModel?.id);
 
         // Create generation record
         const genId = await createGeneration({
@@ -727,8 +735,8 @@ export const appRouter = router({
             errorMessage: error?.message ?? "Generation failed",
             userId: ctx.user.id,
           }).catch(() => {});
-          // Refund credits on generation failure
-          const refundCost = CREDIT_COSTS[creditTool] || 1;
+          // Refund credits on generation failure — exactly what was deducted.
+          const refundCost = deduction.cost;
           try {
             await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${(error.message || "unknown error").slice(0, 100)}`);
           } catch (refundErr) {
@@ -4714,8 +4722,9 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
         await enforceRateLimit(`video.textToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
-        await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
 
+        try {
         const styleEnhancers: Record<string, string> = {
           "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
           "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
@@ -4758,7 +4767,7 @@ export const appRouter = router({
               return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
             } catch (err: any) {
               if (!process.env.REPLICATE_API_TOKEN) {
-                return { videoUrl: null, status: "failed" as const, error: `Minimax: ${err.message}` };
+                throw new Error(`Minimax: ${err.message}`);
               }
               console.warn("[Video] fal.ai hailuo failed, falling back to Replicate:", err.message);
             }
@@ -4772,7 +4781,7 @@ export const appRouter = router({
         // Direct CogVideoX selection
         if (input.model === "cogvideo") {
           const { isRunPodAvailable, runpodCogVideo } = await import("./_core/runpod");
-          if (!isRunPodAvailable()) return { videoUrl: null, status: "failed" as const, error: "RunPod not configured" };
+          if (!isRunPodAvailable()) throw new Error("RunPod not configured");
           const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
           const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
           const key = genKey("video", "mp4");
@@ -4807,11 +4816,11 @@ export const appRouter = router({
             const videoUrl = await generateVeo3Video({ prompt: enhancedPrompt, aspectRatio: input.aspectRatio, durationSeconds: parseInt(input.duration) });
             return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
           } catch (err: any) {
-            return { videoUrl: null, status: "failed" as const, error: err.message };
+            throw err;
           }
         }
         if (input.model === "veo-3") {
-          return { videoUrl: null, status: "failed" as const, error: "Veo 3 is currently unavailable on this account." };
+          throw new Error("Veo 3 is currently unavailable on this account.");
         }
 
         // Priority 3: Kling 2.0 (best value)
@@ -4876,7 +4885,16 @@ export const appRouter = router({
           }
         }
 
-        return { videoUrl: null, status: "failed" as const, error: `All video providers failed:\n${errors.join("\n")}` }
+        throw new Error(`All video providers failed:\n${errors.join("\n")}`);
+        } catch (error: any) {
+          // Refund credits on generation failure — the user received no video.
+          try {
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: text-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[video.textToVideo] Credit refund failed:", refundErr);
+          }
+          return { videoUrl: null, status: "failed" as const, error: error?.message || "Video generation failed" };
+        }
       }),
 
     // Image-to-Video — animate a still image into a video clip via Veo 3
@@ -4896,8 +4914,9 @@ export const appRouter = router({
         // forwarded to providers that fetch it themselves. Reject non-https
         // or private/loopback/metadata hosts before any credits are spent.
         assertSafeImageUrl(input.imageUrl);
-        await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
 
+        try {
         const motionDescriptions: Record<string, string> = {
           "subtle": "very subtle gentle motion, slight parallax, breathing effect",
           "moderate": "moderate natural motion, elements gently moving, ambient animation",
@@ -4991,11 +5010,20 @@ export const appRouter = router({
           provider: "veo+runway+kling+minimax",
           userId: ctx.user.id,
         });
-        return {
-          videoUrl: null,
-          status: "failed" as const,
-          error: `All image-to-video providers failed:\n${errors.join("\n")}`,
-        };
+        throw new Error(`All image-to-video providers failed:\n${errors.join("\n")}`);
+        } catch (error: any) {
+          // Refund credits on generation failure — the user received no video.
+          try {
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: image-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[video.imageToVideo] Credit refund failed:", refundErr);
+          }
+          return {
+            videoUrl: null,
+            status: "failed" as const,
+            error: error?.message || "Image-to-video generation failed",
+          };
+        }
       }),
   }),
 

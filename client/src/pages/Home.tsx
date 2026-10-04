@@ -288,13 +288,22 @@ export default function Home() {
   }, []);
 
   const showKling = klingConfigured !== false;
-  const visibleTools = showKling
+  const visibleTools = (showKling
     ? tools
     : tools.map((t) =>
         t.title === "AI Video"
           ? { ...t, desc: "Runway, Veo 3, Wan 2.5 — text or image to video" }
           : t
-      );
+      )
+  ).map((t) =>
+    // Signed-out visitors clicking "Text-to-Image" used to land in the
+    // sign-in-walled /workspace despite the hero's no-signup promise — send
+    // them to the free demo instead. The video tile keeps /video-studio:
+    // it's the honest destination and there is no video demo to offer.
+    !isAuthenticated && t.title === "Text-to-Image"
+      ? { ...t, href: "/demo/text-to-image" as const }
+      : t
+  );
   const visibleProviders = showKling ? marqueeProviders : marqueeProviders.filter((p) => p !== "Kling");
 
   useEffect(() => {

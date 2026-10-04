@@ -1,4 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
+import { installDomMutationGuard } from "@/lib/domMutationGuard";
+
+// Runs before the app hydrates so translated-DOM removals can't crash React commits.
+installDomMutationGuard();
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,

@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
+import { track } from "@/lib/analytics";
 
 declare global {
   interface Window {
@@ -41,6 +42,10 @@ export function MetaPixelConversions() {
     if (flagSeen(flagKey)) return;
     window.fbq("track", "Lead");
     window.fbq("track", "CompleteRegistration");
+    // First-party mirror of the pixel events — signup_completed is defined in
+    // analytics.ts but was never fired. The same localStorage flag keeps it
+    // to exactly once per user id.
+    track("signup_completed", { userId: session.user.id });
     markSeen(flagKey);
   }, [status, session?.user?.id]);
 
@@ -53,12 +58,19 @@ export function MetaPixelConversions() {
     if (!sessionId) return;
     const flagKey = `df_meta_purchase_${sessionId}`;
     if (flagSeen(flagKey)) return;
-    const value = Number(params.get("value")) || 0;
-    const currency = params.get("currency") || "usd";
+    // Server-side success URLs append value/currency/credits. Parse
+    // defensively: a missing or non-numeric value becomes 0, a missing or
+    // malformed currency falls back to USD — Purchase still fires (deduped
+    // by session_id) so the conversion is never dropped.
+    const rawValue = params.get("value");
+    const parsedValue = rawValue === null ? Number.NaN : Number(rawValue);
+    const value = Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0;
+    const rawCurrency = params.get("currency");
+    const currency = rawCurrency && /^[a-z]{3}$/i.test(rawCurrency) ? rawCurrency.toUpperCase() : "USD";
     const credits = params.get("credits");
     window.fbq("track", "Purchase", {
       value,
-      currency: currency.toUpperCase(),
+      currency,
       content_type: "product",
       content_ids: credits ? [credits] : [],
     });
