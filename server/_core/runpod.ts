@@ -379,17 +379,17 @@ export async function runpodDepth(
 
 /**
  * True raster→SVG vectorization with vtracer (self-hosted). Returns SVG text.
- * colorCount is the tool-level 2-32 slider; vtracer's color_precision is 1-8.
+ * colorCount is the tool-level 2-32 slider; the WORKER maps it to vtracer's
+ * 1-8 color_precision (job_input.color_precision carries the raw 2-32 value).
  */
 export async function runpodVectorize(
   imageB64: string,
   colorCount: number = 8,
 ): Promise<string> {
-  const color_precision = Math.min(8, Math.max(1, Math.round(colorCount / 4)));
   const out = await runpodRunRaw({
     task: "vtracer",
     image_b64: imageB64,
-    color_precision,
+    color_precision: colorCount,
     mode: "color",
   });
   if (!out.svg) throw new Error("RunPod returned no SVG data");

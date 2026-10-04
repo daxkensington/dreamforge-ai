@@ -27,13 +27,17 @@ export default function ToolVectorize() {
   const [style, setStyle] = useState("flat");
   const [colorCount, setColorCount] = useState(8);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [svgUrl, setSvgUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = trpc.tools.vectorize.useMutation({
     onSuccess: (data) => {
-      if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Image vectorized!"); }
-      else toast.error(data.error || "Vectorization failed");
+      if (data.status === "completed" && data.url) {
+        setResultUrl(data.url);
+        setSvgUrl(data.svgUrl ?? null);
+        toast.success(data.svgUrl ? "Vectorized — true SVG ready!" : "Image vectorized!");
+      } else toast.error(data.error || "Vectorization failed");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -101,7 +105,7 @@ export default function ToolVectorize() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); mutation.mutate({ imageUrl, style: style as any, colorCount }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={() => { setResultUrl(null); setSvgUrl(null); mutation.mutate({ imageUrl, style: style as any, colorCount }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Vectorizing...</> : <><Sparkles className="h-4 w-4 mr-2" />Vectorize</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
@@ -150,7 +154,16 @@ export default function ToolVectorize() {
                       </div>
                     </div>
                     {resultUrl && (
-                      <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
+                      <div className="p-4 border-t border-border/50 flex justify-end gap-2">
+                        {svgUrl && (
+                          <Button size="sm" className="bg-rose-600 hover:bg-rose-500 text-white" onClick={() => window.open(svgUrl, "_blank")}>
+                            <Download className="h-4 w-4 mr-2" />Download SVG
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}>
+                          <Download className="h-4 w-4 mr-2" />{svgUrl ? "Download Raster" : "Download"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}
