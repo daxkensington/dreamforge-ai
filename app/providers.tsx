@@ -13,6 +13,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { SupportChatWidget } from "@/components/SupportChatWidget";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -47,7 +48,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                100+ pages for light-mode readability and it looks broken. */}
           <ThemeProvider defaultTheme="dark">
             <TooltipProvider>
-              {children}
+              {/* Client-render crash containment — without this a throw in any
+                  page unmounted to the root error screen with no recovery. */}
+              <ErrorBoundary>{children}</ErrorBoundary>
               <Toaster />
               <PWAInstallPrompt />
               <ServiceWorkerRegistration />
