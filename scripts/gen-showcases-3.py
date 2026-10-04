@@ -1,4 +1,7 @@
-"""Generate showcase images for wave 3 — 10 new tools."""
+"""Generate showcase images for the 29 tools missing public/showcase/tool-<slug>.jpg.
+Same pattern as gen-showcases.py (Grok Imagine API). Run: python scripts/gen-showcases-3.py
+Idempotent: skips slugs whose file already exists.
+"""
 import json
 import pathlib
 import ssl
@@ -7,17 +10,50 @@ import urllib.error
 import urllib.request
 
 HOME = pathlib.Path.home()
-ENV_FILE = HOME / ".claude" / ".env"
 OUT_DIR = HOME / "genesis-synth-lab" / "public" / "showcase"
 ENDPOINT = "https://api.x.ai/v1/images/generations"
 MODEL = "grok-imagine-image"
 
+PROMPTS = {
+    "3d-generator": "A photorealistic product render of a cute low-poly 3D printed dragon figurine on a studio pedestal, soft studio lighting, 3D asset preview aesthetic, turntable presentation",
+    "ad-copy": "Elegant magazine advertisement layout for a luxury watch on dark marble, bold serif headline, premium branding mockup, professional advertising design, dramatic lighting",
+    "batch-prompts": "A neat grid collage of nine diverse AI-generated images (landscape, portrait, robot, food, space, city, animal, abstract, product) arranged 3x3 on a dark UI background, creative studio workflow aesthetic",
+    "blog-writer": "Cozy modern desk with laptop showing a beautifully formatted blog article, coffee cup, notebook with pen, warm ambient light, content creation lifestyle photography",
+    "caption-writer": "Smartphone mockup displaying an Instagram post of a golden retriever puppy with a witty caption and heart icons, social media marketing aesthetic, bright cheerful colors",
+    "character-sheet": "Professional anime character design reference sheet showing front, side and back views of a young heroine with blue hair and a red scarf, turnaround layout on white background, animation production art",
+    "color-palette": "Elegant color palette presentation card with five harmonious paint swatches in teal, coral, cream, navy and gold, color theory mood board with hex codes, graphic design branding aesthetic",
+    "comic-strip": "A colorful 4-panel comic strip page featuring a superhero cat saving a city, dynamic action poses, speech bubbles, halftone shading, vibrant comic book art style",
+    "depth-map": "The same street scene shown twice side by side: left in full color photography, right as a grayscale depth map where near objects are white and far objects fade to black, technical visualization aesthetic",
+    "design-canvas": "Overhead view of a digital design workspace with a graphics tablet showing an in-progress fantasy landscape painting, stylus, color picker UI visible, digital artist studio vibe",
+    "film-grain": "Nostalgic 35mm film photograph of a roadside diner at dusk with visible film grain texture, warm halation around neon signs, analog photography aesthetic, Kodak Portra tones",
+    "hdr-enhance": "Breathtaking HDR landscape photograph of a mountain valley at sunrise, rich detail in both shadowed foreground rocks and bright cloud highlights, vivid expanded tonal range, professional nature photography",
+    "icon-gen": "A grid of nine modern app icons on rounded squares (rocket, camera, music note, chat bubble, heart, folder, star, globe, lightning), flat design style with gradient accents, iOS app icon aesthetic",
+    "image-blender": "Surreal double-exposure artwork blending a wolf silhouette with a starry night forest inside it, dreamlike mashup composition, artistic blending, gallery-quality digital art",
+    "image-caption": "A framed gallery photograph of a bustling farmers market with an elegant museum-style description plaque beneath it, curation and accessibility aesthetic, warm documentary photography",
+    "image-to-prompt": "Creative concept visualization of imagination becoming reality: a pencil sketch of a castle on paper morphing into a fully rendered fantasy castle rising off the page, magical transformation art",
+    "image-to-video": "Film still showing motion blur light trails of a dancer in a dark studio, cinematic 24fps motion feel, anamorphic lens flare, video production aesthetic, storyboard frame markers at edges",
+    "logo-animator": "Modern minimalist logo of a phoenix with subtle motion trail frames suggesting animation frames around it, brand identity presentation on dark background, motion design studio aesthetic",
+    "music-gen": "Abstract visualization of music: flowing neon sound waves and glowing equalizer bars over a cosmic purple background, album cover art style, synesthesia-inspired digital art",
+    "photo-restore": "A split view of an old damaged sepia photograph from the 1950s family picnic: left half torn and faded with scratches, right half beautifully restored in full color, photo restoration comparison",
+    "product-photo": "Professional e-commerce product photography of wireless earbuds on a white pedestal with soft shadow, studio lighting, clean minimal background, Amazon listing quality",
+    "prompt-builder": "Futuristic AI control panel interface with glowing sliders, style chips, and mood dials being adjusted by a hand, creative prompt engineering dashboard aesthetic, sci-fi UI design",
+    "social-resize": "The same vibrant travel photo of Santorini shown resized across phone, tablet, and desktop mockups, responsive social media design presentation, modern marketing layout",
+    "templates": "A collection of professional design templates floating in 3D space: resume, flyer, business card, Instagram post, each with placeholder layouts, creative template marketplace aesthetic",
+    "train-model": "Futuristic AI training visualization: a glowing neural network core learning a painterly portrait style with progress rings and style samples orbiting it, high-tech ML aesthetic",
+    "transparent-png": "Product cutout collage on a transparent checkerboard background: a red sneaker, a succulent plant, a coffee mug, and headphones with crisp clean edges, e-commerce asset aesthetic",
+    "tshirt-designer": "A black t-shirt mockup on a wooden hanger featuring a bold geometric mountain sunset graphic print in orange and teal, print-on-demand product photography, apparel branding",
+    "vectorize": "Side-by-side comparison of a detailed photo of a hummingbird and its clean flat vector illustration counterpart with bold color regions and crisp paths, vectorization process visualization",
+    "virtual-tryon": "Fashion e-commerce virtual try-on visualization: a woman viewing herself in an augmented reality mirror wearing a digital floral dress overlay, modern retail technology aesthetic",
+}
+
 
 def load_key() -> str:
-    for line in ENV_FILE.read_text().splitlines():
-        line = line.strip()
-        if line.startswith("GROK_API_KEY="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    for candidate in (HOME / ".claude" / ".env", HOME / "genesis-synth-lab" / ".env.local"):
+        if candidate.exists():
+            for line in candidate.read_text().splitlines():
+                line = line.strip()
+                if line.startswith("GROK_API_KEY="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
     raise SystemExit("GROK_API_KEY not found")
 
 
@@ -31,7 +67,7 @@ def request_image(key: str, prompt: str) -> str:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(req, timeout=120, context=ctx) as resp:
+    with urllib.request.urlopen(req, timeout=180, context=ctx) as resp:
         payload = json.loads(resp.read())
     url = payload.get("data", [{}])[0].get("url")
     if not url:
@@ -44,58 +80,30 @@ def download(url: str, out_path: pathlib.Path) -> int:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(req, timeout=120, context=ctx) as resp:
+    with urllib.request.urlopen(req, timeout=180, context=ctx) as resp:
         data = resp.read()
     out_path.write_bytes(data)
     return len(data)
 
 
-def gen(key: str, slug: str, prompt: str) -> None:
-    out = OUT_DIR / f"tool-{slug}.jpg"
-    print(f"[{slug}] requesting...", flush=True)
-    try:
-        url = request_image(key, prompt)
-    except urllib.error.HTTPError as e:
-        print(f"[{slug}] HTTP error {e.code}: {e.read().decode()}", file=sys.stderr)
-        return
-    print(f"[{slug}] downloading", flush=True)
-    size = download(url, out)
-    print(f"[{slug}] saved {size:,} bytes", flush=True)
-
-
-TASKS = [
-    ("emoji-creator",
-     "Nine custom Discord/Slack-style emojis arranged in a 3x3 grid on deep purple gradient background: excited cat, partying dog, celebrating face, fire flame, sparkle heart, rainbow, thinking face, 100 points, shushing. Rich colors, chat app sticker aesthetic, rounded forms"),
-    ("brand-style-guide",
-     "Designer's brand style guide reference sheet pinned to wall: logo mark prominently centered, five color palette swatches with hex codes, typography pairing samples (serif headline and sans body), pattern texture element, minimalist Swiss design system aesthetic"),
-    ("event-flyer",
-     "Stack of colorful event promotional flyers on coffee shop bulletin board: rock concert flyer on top with bold graphic typography, underneath visible edges of club night and art show flyers, modern grunge poster aesthetic, event promotion vibe"),
-    ("certificate",
-     "Elegant certificate of achievement laid on dark wood desk with fountain pen and gold seal: classical formal design with ornate border, calligraphy title, ribbon banner, award ceremony aesthetic, diploma quality"),
-    ("bookmark",
-     "Three beautiful book bookmarks fanned out on open classic novel with decorative tassels: literary classic floral design one, fantasy dark academia one, watercolor nature one, readable quote text, Etsy seller aesthetic"),
-    ("zine-spread",
-     "Open indie zine lying on cluttered desk with scissors glue tape: collage cut-paste aesthetic, handwritten headlines, photocopied feel, two-page spread visible, DIY punk zine culture, editorial layout"),
-    ("concert-poster",
-     "Stack of silkscreen concert posters on merch table: psychedelic rock gig poster on top with bold typography and illustrated figure, visible edges of other indie and metal show posters underneath, poster art collection merch vibe"),
-    ("architecture-concept",
-     "Photorealistic architectural concept rendering: modern minimalist single-family home on hillside overlooking pine forest at golden hour, large glass walls, warm interior lights, landscape design, Archdaily magazine quality"),
-    ("cosplay-reference",
-     "Cosplay costume reference sheet pinned to corkboard: three-view character turnaround of cyberpunk street samurai character showing front side and back views with visible seams, fabric details, weapon accessories, costumer's reference"),
-    ("travel-postcard",
-     "Stack of vintage travel postcards laid on old map: illustrated 1950s-style postcards of Mount Fuji, Paris, New York, and tropical beach, with Greetings From headlines, vintage color palettes, collectible travel memorabilia aesthetic"),
-]
-
-
 def main() -> None:
     key = load_key()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for slug, prompt in TASKS:
+    done = skipped = failed = 0
+    for slug, prompt in PROMPTS.items():
+        out = OUT_DIR / f"tool-{slug}.jpg"
+        if out.exists() and out.stat().st_size > 10_000:
+            skipped += 1
+            continue
         try:
-            gen(key, slug, prompt)
-        except Exception as e:  # noqa: BLE001
-            print(f"[{slug}] ERROR: {e}", file=sys.stderr)
-    print("done")
+            url = request_image(key, prompt)
+            size = download(url, out)
+            print(f"[OK] {slug} {size:,} bytes", flush=True)
+            done += 1
+        except (urllib.error.HTTPError, RuntimeError, OSError) as e:
+            print(f"[FAIL] {slug}: {e}", flush=True)
+            failed += 1
+    print(f"done={done} skipped={skipped} failed={failed}")
 
 
 if __name__ == "__main__":

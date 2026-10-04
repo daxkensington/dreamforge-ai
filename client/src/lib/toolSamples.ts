@@ -1,8 +1,14 @@
 // Auto-generated from public/showcase conventions (tool-<slug>, example-<kw>, demo-<kw>-before/after).
 // Regenerate after adding showcase assets. Consumed by ToolSamples via usePathname.
 export const TOOL_SAMPLES: Record<string, string[]> = {
+  "3d-generator": [
+    "/showcase/tool-3d-generator.jpg"
+  ],
   "action-figure": [
     "/showcase/tool-action-figure.jpg"
+  ],
+  "ad-copy": [
+    "/showcase/tool-ad-copy.jpg"
   ],
   "architecture-concept": [
     "/showcase/tool-architecture-concept.jpg"
@@ -22,6 +28,12 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "barbie-box": [
     "/showcase/tool-barbie-box.jpg"
   ],
+  "batch-prompts": [
+    "/showcase/tool-batch-prompts.jpg"
+  ],
+  "blog-writer": [
+    "/showcase/tool-blog-writer.jpg"
+  ],
   "bookmark": [
     "/showcase/tool-bookmark.jpg"
   ],
@@ -34,8 +46,14 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "canvas": [
     "/showcase/tool-canvas.jpg"
   ],
+  "caption-writer": [
+    "/showcase/tool-caption-writer.jpg"
+  ],
   "certificate": [
     "/showcase/tool-certificate.jpg"
+  ],
+  "character-sheet": [
+    "/showcase/tool-character-sheet.jpg"
   ],
   "chibi-figure": [
     "/showcase/tool-chibi-figure.jpg"
@@ -49,8 +67,14 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "color-grading": [
     "/showcase/example-colorgrade-1.jpg"
   ],
+  "color-palette": [
+    "/showcase/tool-color-palette.jpg"
+  ],
   "coloring-book": [
     "/showcase/tool-coloring-book.jpg"
+  ],
+  "comic-strip": [
+    "/showcase/tool-comic-strip.jpg"
   ],
   "concert-poster": [
     "/showcase/tool-concert-poster.jpg"
@@ -60,6 +84,12 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   ],
   "cover-maker": [
     "/showcase/tool-cover-maker.jpg"
+  ],
+  "depth-map": [
+    "/showcase/tool-depth-map.jpg"
+  ],
+  "design-canvas": [
+    "/showcase/tool-design-canvas.jpg"
   ],
   "emoji-creator": [
     "/showcase/tool-emoji-creator.jpg"
@@ -73,18 +103,39 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "fashion-lookbook": [
     "/showcase/tool-fashion-lookbook.jpg"
   ],
+  "film-grain": [
+    "/showcase/tool-film-grain.jpg"
+  ],
   "funko-pop": [
     "/showcase/tool-funko-pop.jpg"
   ],
   "greeting-card": [
     "/showcase/tool-greeting-card.jpg"
   ],
+  "hdr-enhance": [
+    "/showcase/tool-hdr-enhance.jpg"
+  ],
   "headshot": [
     "/showcase/tool-headshot.jpg",
     "/showcase/example-headshot-1.jpg"
   ],
+  "icon-gen": [
+    "/showcase/tool-icon-gen.jpg"
+  ],
   "ig-carousel": [
     "/showcase/tool-ig-carousel.jpg"
+  ],
+  "image-blender": [
+    "/showcase/tool-image-blender.jpg"
+  ],
+  "image-caption": [
+    "/showcase/tool-image-caption.jpg"
+  ],
+  "image-to-prompt": [
+    "/showcase/tool-image-to-prompt.jpg"
+  ],
+  "image-to-video": [
+    "/showcase/tool-image-to-video.jpg"
   ],
   "inpainting": [
     "/showcase/example-inpaint-1.jpg"
@@ -103,6 +154,9 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   ],
   "listing-photos": [
     "/showcase/tool-listing-photos.jpg"
+  ],
+  "logo-animator": [
+    "/showcase/tool-logo-animator.jpg"
   ],
   "logo-maker": [
     "/showcase/example-logo-1.jpg",
@@ -123,6 +177,9 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   ],
   "movie-poster": [
     "/showcase/tool-movie-poster.jpg"
+  ],
+  "music-gen": [
+    "/showcase/tool-music-gen.jpg"
   ],
   "music-video": [
     "/showcase/tool-music-video.jpg",
@@ -149,6 +206,9 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "photo-colorize": [
     "/showcase/tool-photo-colorize.jpg"
   ],
+  "photo-restore": [
+    "/showcase/tool-photo-restore.jpg"
+  ],
   "pixel-art": [
     "/showcase/tool-pixel-art.jpg"
   ],
@@ -164,6 +224,12 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "presentations": [
     "/showcase/tool-presentations.jpg",
     "/showcase/example-presentation-1.jpg"
+  ],
+  "product-photo": [
+    "/showcase/tool-product-photo.jpg"
+  ],
+  "prompt-builder": [
+    "/showcase/tool-prompt-builder.jpg"
   ],
   "qr-art": [
     "/showcase/example-qrart-1.jpg"
@@ -182,6 +248,9 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   ],
   "sketch-to-image": [
     "/showcase/example-sketch-1.jpg"
+  ],
+  "social-resize": [
+    "/showcase/tool-social-resize.jpg"
   ],
   "social-templates": [
     "/showcase/tool-social-templates.jpg"
@@ -207,6 +276,9 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "tattoo-design": [
     "/showcase/tool-tattoo-design.jpg"
   ],
+  "templates": [
+    "/showcase/tool-templates.jpg"
+  ],
   "text-effects": [
     "/showcase/example-texteffect-1.jpg"
   ],
@@ -225,8 +297,17 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   "trading-card": [
     "/showcase/tool-trading-card.jpg"
   ],
+  "train-model": [
+    "/showcase/tool-train-model.jpg"
+  ],
+  "transparent-png": [
+    "/showcase/tool-transparent-png.jpg"
+  ],
   "travel-postcard": [
     "/showcase/tool-travel-postcard.jpg"
+  ],
+  "tshirt-designer": [
+    "/showcase/tool-tshirt-designer.jpg"
   ],
   "upscaler": [
     "/showcase/example-upscale-1.jpg",
@@ -235,6 +316,12 @@ export const TOOL_SAMPLES: Record<string, string[]> = {
   ],
   "variations": [
     "/showcase/tool-variations.jpg"
+  ],
+  "vectorize": [
+    "/showcase/tool-vectorize.jpg"
+  ],
+  "virtual-tryon": [
+    "/showcase/tool-virtual-tryon.jpg"
   ],
   "wallpaper": [
     "/showcase/tool-wallpaper.jpg",

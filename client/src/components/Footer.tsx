@@ -320,12 +320,9 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Product Hunt Badge */}
-        <div className="border-t border-white/5 pt-6 flex justify-center">
-          <a href="https://www.producthunt.com/products/dreamforgex?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-dreamforgex" target="_blank" rel="noopener noreferrer">
-            <img alt="DreamForgeX on Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1116609&theme=dark&t=1775446426701" />
-          </a>
-        </div>
+        {/* Product Hunt badge hidden 2026-10-04: the widget reads "0" upvotes,
+            which undercuts trust instead of adding it (design audit #4).
+            Restore this block once the launch has a non-zero vote count. */}
 
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-6 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">

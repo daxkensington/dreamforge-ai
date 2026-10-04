@@ -1154,12 +1154,31 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await reviewModerationItem(
+        const result = await reviewModerationItem(
           input.id,
           ctx.user.id,
           input.status,
           input.note
         );
+        // Gallery bounty: an approved public submission earns the creator
+        // credits — this is what seeds the social loop (1 submitter to date).
+        // Grant is best-effort: approval must never fail because credits did.
+        if (result.updated && input.status === "approved" && result.submitterUserId) {
+          try {
+            const { addCredits } = await import("./stripe");
+            await addCredits(result.submitterUserId, 25, "Gallery submission approved (+25 credits)");
+            const { createNotification } = await import("./routersPhase15");
+            await createNotification(
+              result.submitterUserId,
+              "system",
+              "Gallery Submission Approved",
+              "Your creation was approved for the public gallery — 25 credits have been added to your balance. Share more to earn more!",
+              { galleryItemId: result.galleryItemId, creditsAwarded: 25 }
+            );
+          } catch (err) {
+            console.error("[moderation.review] gallery bounty grant failed:", err);
+          }
+        }
         return { success: true };
       }),
 
@@ -2624,10 +2643,29 @@ export const appRouter = router({
 
           const intensityLabel = input.intensity > 0.7 ? "strongly" : input.intensity > 0.4 ? "moderately" : "subtly";
 
-          const { url } = await generateImage({
+          let { url } = await generateImage({
             prompt: `${intensityLabel} ${effectDescriptions[input.effect]}. Preserve the original subject and composition while transforming the lighting. Professional quality.`,
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
+
+          // The "hdr" effect promises recovered detail — generative relighting
+          // can't do that alone, so run a real Real-ESRGAN pass over the
+          // result. Graceful: if RunPod is unavailable the relit image still
+          // returns, just without the pixel-level boost.
+          if (input.effect === "hdr") {
+            const { isRunPodAvailable, runpodUpscale } = await import("./_core/runpod");
+            if (isRunPodAvailable()) {
+              try {
+                const { buffer: relitBuf } = await fetchGuardedImage(url);
+                const enhanced = await runpodUpscale(relitBuf.toString("base64"), 2);
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const { url: enhancedUrl } = await storagePut(generateStorageKey("hdr", "png"), enhanced, "image/png");
+                url = enhancedUrl;
+              } catch (err: any) {
+                console.warn("[HdrEnhance] ESRGAN detail pass failed, returning relit image:", err.message);
+              }
+            }
+          }
 
           return { url, status: "completed" as const };
         } catch (error: any) {
