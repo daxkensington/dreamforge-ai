@@ -15,6 +15,7 @@ import { TIERS } from "../shared/tiers";
 const DAILY = TIERS.free.dailyCreditsForFree;
 
 function loadDatabaseUrl(): string | null {
+  if (process.env.TEST_LIVE_DB !== "true") return null;
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
   for (const f of [".env.test", ".env.local"]) {
     const p = path.resolve(process.cwd(), f);

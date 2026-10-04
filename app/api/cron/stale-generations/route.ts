@@ -1,5 +1,6 @@
 /**
- * Vercel Cron — reaps generations rows stuck in a non-terminal state.
+ * Vercel Cron — reaps generations and audioGenerations rows stuck in a
+ * non-terminal state.
  *
  * Long-running jobs (video.textToVideo, audio, story) run inline or
  * fire-and-forget; when serverless kills the invocation the row is left in
@@ -9,7 +10,9 @@
  * marks it "failed", and refunds the charge via refundCredits.
  *
  * generationStatusEnum has no "processing" value — the non-terminal states
- * are "pending" and "generating", so those are what we reap.
+ * are "pending" and "generating", so those are what we reap. audioStatusEnum
+ * rows are only ever written with "generating" (both writers insert the row
+ * already in that state), so that is the only audio status we reap.
  *
  * Auth: same as rate-limit-cleanup — "Authorization: Bearer <CRON_SECRET>",
  * with the secret mandatory in production (missing secret fails closed).
@@ -17,7 +20,7 @@
 import { NextResponse } from "next/server";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../../../../server/db";
-import { generations } from "../../../../drizzle/schema";
+import { generations, audioGenerations } from "../../../../drizzle/schema";
 import { refundCredits } from "../../../../server/stripe";
 import { TOOL_CREDIT_COSTS } from "../../../../shared/creditCosts";
 
@@ -27,7 +30,38 @@ export const runtime = "nodejs";
 const STALE_AFTER_MINUTES = 15;
 const BATCH_LIMIT = 200;
 const REAP_STATUSES = ["pending", "generating"] as const;
+const AUDIO_REAP_STATUSES = ["generating"] as const;
 const REFUND_DESCRIPTION = "Stale job reaper — automatic refund";
+
+// audioGenerations has no cost/credits column — the charge is implied by how
+// the row was created, so the reaper mirrors those exact amounts rather than
+// guessing a flat rate:
+//   - audio.generate deducts CREDIT_COSTS["audio-<type>"] BEFORE inserting
+//     the row (server/routers/audio.ts): sfx 2, music 4, voiceover 3,
+//     ambient 3.
+//   - story.create charges music as part of a bundled cost
+//     (STORY_MUSIC_COST, server/routers/story.ts) and marks its row with
+//     metadata.storyTitle.
+// No free/preview flow writes to this table (userId is NOT NULL and both
+// writers deduct first), so every stuck row was charged.
+const AUDIO_TYPE_COSTS: Record<string, number> = {
+  sfx: 2,
+  music: 4,
+  voiceover: 3,
+  ambient: 3,
+};
+const STORY_MUSIC_COST = 6;
+
+function audioRefundCost(row: typeof audioGenerations.$inferSelect): number {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  // Defensive: if a future free audio flow marks rows metadata.free, those
+  // were never charged — never refund them.
+  if (meta.free) return 0;
+  if (row.type === "music" && typeof meta.storyTitle === "string") {
+    return STORY_MUSIC_COST; // story.ts bundled music charge
+  }
+  return AUDIO_TYPE_COSTS[row.type] ?? 0;
+}
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
@@ -102,9 +136,46 @@ export async function GET(req: Request) {
     }
   }
 
+  const staleAudio = await db
+    .select()
+    .from(audioGenerations)
+    .where(
+      and(
+        inArray(audioGenerations.status, [...AUDIO_REAP_STATUSES]),
+        sql`${audioGenerations.updatedAt} < NOW() - ${STALE_AFTER_MINUTES} * INTERVAL '1 minute'`,
+      ),
+    )
+    .orderBy(asc(audioGenerations.updatedAt))
+    .limit(BATCH_LIMIT);
+
+  for (const row of staleAudio) {
+    try {
+      const claimed = await db
+        .update(audioGenerations)
+        .set({
+          status: "failed",
+          errorMessage: `Stale job reaper — no update for ${STALE_AFTER_MINUTES}+ minutes, job presumed dead`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(audioGenerations.id, row.id), inArray(audioGenerations.status, [...AUDIO_REAP_STATUSES])))
+        .returning({ id: audioGenerations.id });
+      if (claimed.length === 0) continue;
+      reaped++;
+
+      const cost = audioRefundCost(row);
+      if (cost <= 0) continue;
+
+      await refundCredits(row.userId, cost, REFUND_DESCRIPTION);
+      refunded++;
+    } catch (err) {
+      errors++;
+      console.error(`[cron/stale-generations] failed to reap audio generation ${row.id}:`, err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
-    scanned: stale.length,
+    scanned: stale.length + staleAudio.length,
     reaped,
     refunded,
     errors,
