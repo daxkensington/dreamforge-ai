@@ -41,8 +41,11 @@ import {
   Sun,
   Moon,
   Keyboard,
+  Zap,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+// next/image aliased: `Image` below is the lucide icon.
+import NextImage from "next/image";
 // LanguageSwitcher removed 2026-04-19 — the i18n dictionary exists but no
 // component actually reads from it, so picking a language did nothing.
 // Bring back once every string is wired through useTranslation().
@@ -57,6 +60,7 @@ const navLinks = [
   { href: "/tools", label: "AI Tools", icon: Wrench },
   { href: "/video-studio", label: "Video Studio", icon: Film, auth: true },
   { href: "/gallery", label: "Gallery", icon: Image },
+  { href: "/demo/text-to-image", label: "Demo", icon: Zap },
   { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/workspace", label: "Studio", icon: Sparkles, auth: true },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
@@ -201,7 +205,7 @@ export default function Navbar() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <img src="/logo.png" alt="DreamForgeX" className="h-9 w-9 rounded-lg shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/30 transition-all" />
+          <NextImage src="/logo.png" alt="DreamForgeX" width={36} height={36} className="h-9 w-9 rounded-lg shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/30 transition-all" />
           <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
             DreamForgeX
           </span>

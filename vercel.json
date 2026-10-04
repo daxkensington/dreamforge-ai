@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/rate-limit-cleanup",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/stale-generations",
+      "schedule": "4-54/10 * * * *"
     }
   ]
 }

@@ -26,10 +26,10 @@ export const collabRoleEnum = pgEnum("collabRole", ["viewer", "editor"]);
 export const sharePermissionEnum = pgEnum("sharePermission", ["viewer", "editor"]);
 export const revisionSourceEnum = pgEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]);
 export const subStatusEnum = pgEnum("subStatus", ["active", "canceled", "past_due", "trialing", "incomplete"]);
-export const txTypeEnum = pgEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral"]);
+export const txTypeEnum = pgEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral", "dispute"]);
 export const notifTypeEnum = pgEnum("notifType", ["collaboration", "generation", "comment", "system", "payment"]);
 export const prefTypeEnum = pgEnum("prefType", ["collaboration", "generation", "comment", "system", "payment"]);
-export const webhookStatusEnum = pgEnum("webhookStatus", ["processed", "failed", "ignored"]);
+export const webhookStatusEnum = pgEnum("webhookStatus", ["pending", "processed", "failed", "ignored"]);
 export const referralStatusEnum = pgEnum("referralStatus", ["pending", "completed", "expired"]);
 export const listingTypeEnum = pgEnum("listingType", ["prompt", "preset", "workflow", "asset_pack", "lora"]);
 export const listingStatusEnum = pgEnum("listingStatus", ["draft", "published", "suspended"]);
@@ -214,6 +214,9 @@ export const generations = pgTable("generations", {
   index("generations_userId_idx").on(table.userId),
   index("generations_status_idx").on(table.status),
   index("generations_createdAt_idx").on(table.createdAt),
+  // "My generations" feed: WHERE userId ORDER BY createdAt DESC — the two
+  // single-column indexes above can't drive the filter+sort together.
+  index("generations_user_createdAt_idx").on(table.userId, table.createdAt),
 ]);
 
 export type Generation = typeof generations.$inferSelect;
@@ -468,6 +471,9 @@ export const userSubscriptions = pgTable("userSubscriptions", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("userSubscriptions_stripeSubscriptionId_unique").on(table.stripeSubscriptionId),
+  // getUserTier inner-joins on userId for every generation; getUserSubscription
+  // queries per request. No query filters by status, so plain userId.
+  index("userSubscriptions_userId_idx").on(table.userId),
 ]);
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
@@ -502,6 +508,11 @@ export const creditTransactions = pgTable("creditTransactions", {
   metadata: jsonb("txMetadata"), // extra context (plan change, etc.)
   expiresAt: timestamp("expiresAt"), // null = never expires; set for bonus/signup credits
   expired: boolean("expired").default(false).notNull(), // true once credits have been deducted
+  // Cumulative credits clawed back from THIS purchase via refunds/disputes.
+  // Stripe sends one refund event per refund with CUMULATIVE amount_refunded,
+  // so handlers claw only (expectedTotal - this) per event — without the
+  // counter staged partial refunds would claw the full ratio every time.
+  clawedBackCredits: integer("clawedBackCredits").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("creditTransactions_userId_idx").on(table.userId),
@@ -509,6 +520,12 @@ export const creditTransactions = pgTable("creditTransactions", {
   // that list a user's transactions ordered by time. Much faster than the
   // userId-only index when users have many transactions.
   index("creditTransactions_user_time_idx").on(table.userId, table.createdAt),
+  // addCredits re-grant guard: look up a purchase by checkout session id
+  // before granting credits (webhook redelivery protection).
+  index("creditTransactions_stripeSessionId_idx").on(table.stripeSessionId),
+  // Refund/dispute clawback: findPurchaseByPaymentIntent looks up the original
+  // purchase by payment intent id.
+  index("creditTransactions_stripePaymentIntentId_idx").on(table.stripePaymentIntentId),
 ]);
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
@@ -594,7 +611,10 @@ export const referrals = pgTable("referrals", {
   creditsAwarded: integer("creditsAwarded").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
-});
+}, (table) => [
+  // Per-user referral stats (referralStats / leaderboard queries) filter by it.
+  index("referrals_referrerId_idx").on(table.referrerId),
+]);
 export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = typeof referrals.$inferInsert;
 
@@ -664,7 +684,12 @@ export const marketplacePurchases = pgTable("marketplacePurchases", {
   sellerPayout: integer("sellerPayout").notNull(), // 80% seller payout in cents
   stripePaymentId: varchar("stripePaymentId", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  // Purchase history filters by buyerId; hasPurchased filters by buyerId AND
+  // listingId before a download.
+  index("marketplacePurchases_buyerId_idx").on(table.buyerId),
+  index("marketplacePurchases_listingId_idx").on(table.listingId),
+]);
 
 export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
 export type InsertMarketplacePurchase = typeof marketplacePurchases.$inferInsert;

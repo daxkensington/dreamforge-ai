@@ -11,7 +11,7 @@ import {
 import { SyncLabsProvider } from "../_core/providers/synclabs";
 import { getDb } from "../db";
 import { audioGenerations, audioPresets, videoProjects } from "../../drizzle/schema";
-import { deductCredits, CREDIT_COSTS } from "../stripe";
+import { deductCredits, refundCredits, CREDIT_COSTS } from "../stripe";
 import { requireToolActive } from "../_core/toolStatus";
 
 // ─── Credit costs for audio tools ───────────────────────────────────────────
@@ -41,7 +41,8 @@ async function tryDeductAudioCredits(userId: number, tool: string, description?:
         message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
       });
     }
-    return result;
+    // `cost` lets callers refund exactly what was charged on failure.
+    return { ...result, cost };
   } catch (error: any) {
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({
@@ -97,7 +98,7 @@ export const audioRouter = router({
       await enforceRateLimit(`audio.generate:user:${ctx.user.id}`, 10, 60_000, "Audio generation rate limit exceeded — max 10 per minute.");
 
       const creditTool = `audio-${input.type}`;
-      await tryDeductAudioCredits(
+      const deduction = await tryDeductAudioCredits(
         ctx.user.id,
         creditTool,
         `Audio ${input.type}: ${input.prompt.slice(0, 50)}`
@@ -158,6 +159,12 @@ export const audioRouter = router({
             })
             .where(eq(audioGenerations.id, Number(audioId)));
         } catch (error: any) {
+          // The background job produced nothing — refund the exact charge.
+          try {
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: audio ${input.type} generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[audio.generate] Credit refund failed:", refundErr);
+          }
           await db
             .update(audioGenerations)
             .set({
@@ -366,8 +373,7 @@ export const audioRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      await tryDeductAudioCredits(ctx.user.id, "audio-merge", "Merge audio + video");
-
+      const mergeDeduction = await tryDeductAudioCredits(ctx.user.id, "audio-merge", "Merge audio + video");
       // Verify audio ownership and completion
       const [audio] = await db
         .select()
@@ -391,6 +397,12 @@ export const audioRouter = router({
       try {
         mergedUrl = await syncAudioToVideo(audio.audioUrl, input.videoUrl);
       } catch (error: any) {
+        // The merge produced nothing — refund the merge charge.
+        try {
+          await refundCredits(ctx.user.id, mergeDeduction.cost, `Refund: audio merge failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+        } catch (refundErr) {
+          console.error("[audio.mergeAudioVideo] Credit refund failed:", refundErr);
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Merge failed: ${error.message}`,
@@ -412,7 +424,7 @@ export const audioRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceRateLimit(`audio.lipSync:user:${ctx.user.id}`, 5, 60_000, "Lip sync rate limit exceeded — max 5 per minute.");
 
-      await tryDeductAudioCredits(
+      const lipSyncDeduction = await tryDeductAudioCredits(
         ctx.user.id,
         "video-lipsync",
         `Lip sync: ${input.model}`
@@ -420,20 +432,36 @@ export const audioRouter = router({
 
       const provider = new SyncLabsProvider();
       if (!provider.isAvailable) {
+        try {
+          await refundCredits(ctx.user.id, lipSyncDeduction.cost, "Refund: lip sync failed — Sync Labs is not configured");
+        } catch (refundErr) {
+          console.error("[audio.lipSync] Credit refund failed:", refundErr);
+        }
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Sync Labs is not configured. Lip sync is temporarily unavailable.",
         });
       }
 
-      const result = await provider.generate({
-        prompt: "",
-        model: input.model,
-        options: {
-          videoUrl: input.videoUrl,
-          audioUrl: input.audioUrl,
-        },
-      });
+      let result;
+      try {
+        result = await provider.generate({
+          prompt: "",
+          model: input.model,
+          options: {
+            videoUrl: input.videoUrl,
+            audioUrl: input.audioUrl,
+          },
+        });
+      } catch (error: any) {
+        // Lip sync produced nothing — refund the charge.
+        try {
+          await refundCredits(ctx.user.id, lipSyncDeduction.cost, `Refund: lip sync failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+        } catch (refundErr) {
+          console.error("[audio.lipSync] Credit refund failed:", refundErr);
+        }
+        throw error;
+      }
 
       return { url: result.url, status: "complete" as const };
     }),

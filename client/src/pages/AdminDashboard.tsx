@@ -107,6 +107,8 @@ const baseChartOptions = {
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [userSearch, setUserSearch] = useState("");
+  const [userPage, setUserPage] = useState(1);
+  const [moderationPage, setModerationPage] = useState(1);
   const [moderationFilter, setModerationFilter] = useState<"pending" | "approved" | "rejected">("pending");
   const [analyticsPeriod, setAnalyticsPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [notifTitle, setNotifTitle] = useState("");
@@ -122,12 +124,12 @@ export default function AdminDashboard() {
   });
 
   const { data: usersData } = trpc.admin.listUsers.useQuery(
-    { search: userSearch || undefined },
+    { search: userSearch || undefined, page: userPage, limit: 20 },
     { enabled: !!user && user.role === "admin" }
   );
 
   const { data: flaggedData } = trpc.admin.listFlaggedContent.useQuery(
-    { status: moderationFilter },
+    { status: moderationFilter, page: moderationPage, limit: 20 },
     { enabled: !!user && user.role === "admin" }
   );
 
@@ -566,7 +568,7 @@ export default function AdminDashboard() {
                       placeholder="Search users by name..."
                       className="pl-10"
                       value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
+                      onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
                     />
                   </div>
                 </div>
@@ -615,6 +617,33 @@ export default function AdminDashboard() {
                     Showing {usersData.users?.length || 0} of {usersData.total} users
                   </p>
                 )}
+
+                {/* Pagination */}
+                {usersData && usersData.total > 20 && (
+                  <div className="flex items-center justify-between pt-4">
+                    <span className="text-sm text-muted-foreground">
+                      Page {userPage} of {Math.ceil(usersData.total / 20)}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={userPage <= 1}
+                        onClick={() => setUserPage((p) => p - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={userPage >= Math.ceil(usersData.total / 20)}
+                        onClick={() => setUserPage((p) => p + 1)}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -629,7 +658,7 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="flex gap-2 mb-6">
                   {(["pending", "approved", "rejected"] as const).map((s) => (
-                    <Button key={s} variant={moderationFilter === s ? "default" : "outline"} size="sm" onClick={() => setModerationFilter(s)}>
+                    <Button key={s} variant={moderationFilter === s ? "default" : "outline"} size="sm" onClick={() => { setModerationFilter(s); setModerationPage(1); }}>
                       {s.charAt(0).toUpperCase() + s.slice(1)}
                     </Button>
                   ))}
@@ -667,6 +696,33 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+
+                {/* Pagination */}
+                {flaggedData && flaggedData.total > 20 && (
+                  <div className="flex items-center justify-between pt-4">
+                    <span className="text-sm text-muted-foreground">
+                      Page {moderationPage} of {Math.ceil(flaggedData.total / 20)}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={moderationPage <= 1}
+                        onClick={() => setModerationPage((p) => p - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={moderationPage >= Math.ceil(flaggedData.total / 20)}
+                        onClick={() => setModerationPage((p) => p + 1)}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

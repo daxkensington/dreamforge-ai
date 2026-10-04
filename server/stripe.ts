@@ -199,18 +199,37 @@ export async function addCredits(
   amount: number,
   description: string,
   stripeSessionId?: string,
-  stripePaymentIntentId?: string
+  stripePaymentIntentId?: string,
+  options?: { bonus?: boolean }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await getOrCreateBalance(userId);
 
-  await db
-    .update(creditBalances)
-    .set({
-      balance: sql`${creditBalances.balance} + ${amount}`,
-    })
-    .where(eq(creditBalances.userId, userId));
+  // Purchased top-ups/packs must survive the monthly reset, which rebuilds
+  // balance as plan credits + bonusCredits — so they also accumulate in
+  // bonusCredits. Payment webhooks (checkout.session.completed for credit
+  // packs) always pass a Stripe session/payment id; referral/signup/daily
+  // grants never do. That id is what separates the two classes here, with an
+  // explicit override for callers that know better.
+  const isBonus = options?.bonus ?? Boolean(stripeSessionId || stripePaymentIntentId);
+
+  if (isBonus) {
+    await db
+      .update(creditBalances)
+      .set({
+        balance: sql`${creditBalances.balance} + ${amount}`,
+        bonusCredits: sql`${creditBalances.bonusCredits} + ${amount}`,
+      })
+      .where(eq(creditBalances.userId, userId));
+  } else {
+    await db
+      .update(creditBalances)
+      .set({
+        balance: sql`${creditBalances.balance} + ${amount}`,
+      })
+      .where(eq(creditBalances.userId, userId));
+  }
 
   await db.insert(creditTransactions).values({
     userId,
@@ -261,6 +280,65 @@ export async function getCreditHistory(userId: number, limit = 50) {
 }
 
 // ─── Checkout Session ───────────────────────────────────────────────────────
+
+/**
+ * Validate a client-supplied redirect origin against an allowlist before it is
+ * interpolated into Stripe success/cancel URLs (open redirect + session-id
+ * leak). Never rejects the purchase — a mismatch falls back to APP_URL's
+ * origin, or the canonical production origin when APP_URL is unset.
+ *
+ * Allowed hosts: APP_URL's host (if set), the request's own Origin/Host
+ * (passed in from ctx when available), and localhost dev servers when not in
+ * production.
+ */
+export function sanitizeRedirectOrigin(origin: string, requestOrigin?: string | null): string {
+  const allowedHosts = new Set<string>();
+  if (process.env.APP_URL) {
+    try {
+      allowedHosts.add(new URL(process.env.APP_URL).host);
+    } catch {
+      // APP_URL malformed — treat as unset rather than crash checkout.
+    }
+  }
+  if (requestOrigin) {
+    try {
+      allowedHosts.add(new URL(requestOrigin).host);
+    } catch {
+      // ignore malformed request origin
+    }
+  }
+  if (process.env.NODE_ENV !== "production") {
+    allowedHosts.add("localhost:3000");
+    allowedHosts.add("127.0.0.1:3000");
+  }
+
+  try {
+    const parsed = new URL(origin);
+    if (allowedHosts.has(parsed.host)) {
+      return parsed.origin;
+    }
+  } catch {
+    // not a URL — fall through to the fallback
+  }
+
+  if (process.env.APP_URL) {
+    try {
+      return new URL(process.env.APP_URL).origin;
+    } catch {
+      // fall through
+    }
+  }
+  return "https://dreamforgex.ai";
+}
+
+/** Best-effort extraction of the caller's Origin/Host from a tRPC ctx object. */
+export function requestOriginFromCtx(ctx: unknown): string | null {
+  const headers: any = (ctx as any)?.req?.headers;
+  const raw: unknown = headers?.origin ?? headers?.host;
+  if (typeof raw !== "string" || !raw) return null;
+  return /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+}
+
 export async function createCheckoutSession(
   userId: number,
   userEmail: string,
@@ -270,6 +348,7 @@ export async function createCheckoutSession(
 ) {
   const pkg = CREDIT_PACKAGES.find((p) => p.id === packageId);
   if (!pkg) throw new Error(`Invalid package: ${packageId}`);
+  origin = sanitizeRedirectOrigin(origin);
 
   // Get or create Stripe customer
   const db = await getDb();
