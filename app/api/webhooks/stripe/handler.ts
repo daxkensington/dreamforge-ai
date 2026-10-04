@@ -750,18 +750,177 @@ export async function processStripeEvent(
       }
 
       // ─── Dispute Closed ──────────────────────────────────────────
-      // We claw at dispute.created, so 'lost' is already handled. 'won' is a
-      // deliberate no-op: the clawed amount can't be attributed reliably
-      // when refunds and disputes interleave on the same charge, so restoring
-      // credits is left as a manual support action (refundCredits).
+      // 'lost' is already handled at dispute.created (we clawed then).
+      // 'won' means the bank sided with us and the charge stands — return the
+      // credits that dispute.created removed. Restoration is bounded by the
+      // clawback ledger rows for THIS dispute (metadata.disputeId) and lowers
+      // the purchase row's clawedBackCredits counter (optimistic UPDATE, floor
+      // 0) so a later legitimate refund on the same charge can claw again.
       case "charge.dispute.closed": {
         const dispute = event.data.object as Stripe.Dispute;
+
+        if (dispute.status !== "won") {
+          console.log(
+            `[Stripe Webhook] Dispute ${dispute.id} closed with status ${dispute.status} — no balance change`
+          );
+          await logWebhookEvent(
+            "ignored",
+            `Dispute ${dispute.id} closed (${dispute.status}) — no balance change`
+          );
+          break;
+        }
+
+        const chargeId =
+          typeof dispute.charge === "string" ? dispute.charge : dispute.charge?.id;
+        let paymentIntentId: string | undefined =
+          typeof dispute.payment_intent === "string"
+            ? dispute.payment_intent
+            : dispute.payment_intent?.id ?? undefined;
+        if (!paymentIntentId && chargeId) {
+          try {
+            const charge = await getStripeClient().charges.retrieve(chargeId);
+            paymentIntentId =
+              typeof charge.payment_intent === "string"
+                ? charge.payment_intent
+                : charge.payment_intent?.id ?? undefined;
+          } catch (err: any) {
+            console.error(
+              `[Stripe Webhook] charge.dispute.closed: charge retrieve failed (${chargeId}):`,
+              err.message
+            );
+            Sentry.captureException(err, { extra: { disputeId: dispute.id, chargeId } });
+            await logWebhookEvent(
+              "failed",
+              `charge.dispute.closed: could not resolve charge ${chargeId} for dispute ${dispute.id}`
+            );
+            break;
+          }
+        }
+
+        if (!paymentIntentId) {
+          await logWebhookEvent(
+            "ignored",
+            `charge.dispute.closed: no payment intent for dispute ${dispute.id}`
+          );
+          break;
+        }
+        if (!db) {
+          await logWebhookEvent("failed", `charge.dispute.closed: no database (${dispute.id})`);
+          break;
+        }
+
+        const purchase = await findPurchaseByPaymentIntent(db, paymentIntentId);
+        if (!purchase) {
+          await logWebhookEvent(
+            "ignored",
+            `charge.dispute.closed: no matching credit purchase for ${paymentIntentId}`
+          );
+          break;
+        }
+
+        // Sum what THIS dispute clawed (negative-amount dispute ledger rows).
+        const clawRows = await db
+          .select({ amount: creditTransactions.amount })
+          .from(creditTransactions)
+          .where(
+            and(
+              eq(creditTransactions.stripePaymentIntentId, paymentIntentId),
+              eq(creditTransactions.type, "dispute"),
+              sql`${creditTransactions.metadata}->>'disputeId' = ${dispute.id}`
+            )
+          );
+        const restoreTotal = clawRows.reduce((s, r) => s + Math.max(0, -r.amount), 0);
+
+        if (restoreTotal <= 0) {
+          await logWebhookEvent(
+            "ignored",
+            `charge.dispute.closed: dispute ${dispute.id} won but nothing was clawed for it — no-op`
+          );
+          break;
+        }
+
+        // Give the credits back: counter first (optimistic, bounded by what's
+        // actually clawed on the row), then balance + ledger row.
+        let restored = 0;
+        for (let attempt = 0; attempt < 5 && restored === 0; attempt++) {
+          const rows = await db
+            .select({ clawedBackCredits: creditTransactions.clawedBackCredits })
+            .from(creditTransactions)
+            .where(eq(creditTransactions.id, purchase.id))
+            .limit(1);
+          const current = rows[0];
+          if (!current) break;
+          const clawed = current.clawedBackCredits ?? 0;
+          const delta = Math.min(restoreTotal, clawed);
+          if (delta <= 0) break;
+
+          const updated = await db
+            .update(creditTransactions)
+            .set({ clawedBackCredits: clawed - delta })
+            .where(
+              and(
+                eq(creditTransactions.id, purchase.id),
+                eq(creditTransactions.clawedBackCredits, clawed)
+              )
+            )
+            .returning({ id: creditTransactions.id });
+          if (updated.length === 0) continue;
+
+          try {
+            await db
+              .update(creditBalances)
+              .set({ balance: sql`${creditBalances.balance} + ${delta}` })
+              .where(eq(creditBalances.userId, purchase.userId));
+
+            await db.insert(creditTransactions).values({
+              userId: purchase.userId,
+              amount: delta,
+              type: "dispute",
+              description: `Stripe dispute won — ${delta} credits restored (dispute ${dispute.id})`,
+              stripePaymentIntentId: paymentIntentId,
+              metadata: {
+                disputeId: dispute.id,
+                chargeId,
+                paymentIntentId,
+                originalPurchaseTransactionId: purchase.id,
+                restored: true,
+              },
+            });
+          } catch (err) {
+            Sentry.captureException(err, {
+              extra: { disputeId: dispute.id, paymentIntentId, purchaseId: purchase.id },
+            });
+            throw err;
+          }
+
+          restored = delta;
+        }
+
+        if (restored <= 0) {
+          await logWebhookEvent(
+            "ignored",
+            `charge.dispute.closed: dispute ${dispute.id} won but purchase counter shows nothing clawed — no-op`
+          );
+          break;
+        }
+
+        try {
+          await createNotification(
+            purchase.userId,
+            "payment",
+            "Dispute Resolved in Your Favor",
+            `A disputed payment was resolved and ${restored} credit${restored === 1 ? "" : "s"} ` +
+              `have been returned to your balance.`,
+            { disputeId: dispute.id, chargeId, creditsRestored: restored }
+          );
+        } catch {}
+
         console.log(
-          `[Stripe Webhook] Dispute ${dispute.id} closed with status ${dispute.status} — no balance change`
+          `[Stripe Webhook] Dispute won: ${restored} credits restored to user ${purchase.userId} (dispute ${dispute.id})`
         );
         await logWebhookEvent(
-          "ignored",
-          `Dispute ${dispute.id} closed (${dispute.status}) — no balance change`
+          "processed",
+          `Dispute won: ${restored} credits restored to user ${purchase.userId} (dispute ${dispute.id})`
         );
         break;
       }

@@ -190,7 +190,7 @@ export type InsertTag = typeof tags.$inferInsert;
 // ─── Generations ─────────────────────────────────────────────────────────────
 export const generations = pgTable("generations", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   prompt: text("prompt").notNull(),
   negativePrompt: text("negativePrompt"),
   modelVersion: varchar("modelVersion", { length: 128 })
@@ -237,7 +237,7 @@ export type GenerationTag = typeof generationTags.$inferSelect;
 // ─── Gallery Items (approved generations) ────────────────────────────────────
 export const galleryItems = pgTable("galleryItems", {
   id: serial("id").primaryKey(),
-  generationId: integer("generationId").notNull(),
+  generationId: integer("generationId").notNull().references(() => generations.id),
   userId: integer("userId").notNull(),
   title: varchar("title", { length: 256 }),
   description: text("description"),
@@ -279,7 +279,7 @@ export type InsertModerationItem = typeof moderationQueue.$inferInsert;
 // ─── Video Projects ─────────────────────────────────────────────────────────
 export const videoProjects = pgTable("videoProjects", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   type: videoProjectTypeEnum("type").notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   description: text("description"),
@@ -460,7 +460,7 @@ export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
 // ─── User Subscriptions ─────────────────────────────────────────────────
 export const userSubscriptions = pgTable("userSubscriptions", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   planId: integer("planId").notNull(),
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
   status: subStatusEnum("subStatus").default("active").notNull(),
@@ -499,7 +499,7 @@ export type InsertCreditBalance = typeof creditBalances.$inferInsert;
 // ─── Credit Transactions ─────────────────────────────────────────────────
 export const creditTransactions = pgTable("creditTransactions", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   amount: integer("amount").notNull(), // positive = purchase, negative = usage
   type: txTypeEnum("txType").notNull(),
   description: varchar("description", { length: 512 }),
@@ -742,7 +742,7 @@ export type InsertSellerPayout = typeof sellerPayouts.$inferInsert;
 // ─── Audio Generations ──────────────────────────────────────────────────────
 export const audioGenerations = pgTable("audioGenerations", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   type: audioTypeEnum("audioType").notNull(),
   prompt: text("prompt").notNull(),
   duration: integer("duration").notNull(), // seconds

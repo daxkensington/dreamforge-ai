@@ -366,24 +366,95 @@ describe("Stripe webhook — processStripeEvent", () => {
       );
     });
 
-    it("charge.dispute.closed is a no-op for both won and lost outcomes", async () => {
-      for (const status of ["won", "lost"]) {
-        const { db, calls } = makeDb();
+    it("charge.dispute.closed restores exactly what the dispute clawed when won", async () => {
+      const { db, calls } = makeDb({
+        selectRows: (table, idx) => {
+          if (table !== "creditTransactions") return [];
+          // 0: purchase lookup, 1: this dispute's clawback rows, 2: counter read
+          if (idx === 0) return [PURCHASE];
+          if (idx === 1) return [{ amount: -100 }];
+          return [{ clawedBackCredits: 100 }];
+        },
+      });
 
-        const result = await processStripeEvent(
-          makeEvent(`evt_dp_closed_${status}`, "charge.dispute.closed", {
-            id: "dp_1",
-            status,
-          }),
-          db
-        );
+      const result = await processStripeEvent(
+        makeEvent("evt_dp_closed_won", "charge.dispute.closed", {
+          id: "dp_1",
+          status: "won",
+          payment_intent: "pi_1",
+          charge: { id: "ch_1" },
+        }),
+        db
+      );
 
-        expect(result).toBe("ignored");
-        expect(calls.updates.every((u) => u.table === "webhookEvents")).toBe(true);
-        expect(
-          calls.inserts.every((i) => i.table === "webhookEvents")
-        ).toBe(true);
-      }
+      expect(result).toBe("processed");
+      expect(balanceDeltaOf(calls)).toBe(100);
+      const counterUpdate = calls.updates.find((u) => u.table === "creditTransactions")!;
+      expect(counterUpdate.set.clawedBackCredits).toBe(0);
+      const restoreTx = calls.inserts.find((i) => i.table === "creditTransactions")!;
+      expect(restoreTx.values.amount).toBe(100);
+      expect(restoreTx.values.type).toBe("dispute");
+      expect(createNotification).toHaveBeenCalledWith(
+        42,
+        "payment",
+        "Dispute Resolved in Your Favor",
+        expect.any(String),
+        expect.objectContaining({ disputeId: "dp_1", creditsRestored: 100 })
+      );
+    });
+
+    it("charge.dispute.closed is a no-op when won but the dispute never clawed anything", async () => {
+      const { db, calls } = makeDb({
+        selectRows: (table, idx) => {
+          if (table !== "creditTransactions") return [];
+          if (idx === 0) return [PURCHASE];
+          return []; // no clawback ledger rows for this dispute
+        },
+      });
+
+      const result = await processStripeEvent(
+        makeEvent("evt_dp_closed_nowon", "charge.dispute.closed", {
+          id: "dp_1",
+          status: "won",
+          payment_intent: "pi_1",
+          charge: { id: "ch_1" },
+        }),
+        db
+      );
+
+      expect(result).toBe("ignored");
+      expect(calls.updates.some((u) => u.table === "creditBalances")).toBe(false);
+      expect(
+        calls.inserts.some((i) => i.table === "creditTransactions")
+      ).toBe(false);
+      expect(createNotification).not.toHaveBeenCalled();
+    });
+
+    it("charge.dispute.closed is a no-op when the dispute is lost", async () => {
+      const { db, calls } = makeDb({
+        selectRows: (table, idx) => {
+          if (table !== "creditTransactions") return [];
+          if (idx === 0) return [PURCHASE];
+          return [{ amount: -100 }];
+        },
+      });
+
+      const result = await processStripeEvent(
+        makeEvent("evt_dp_closed_lost", "charge.dispute.closed", {
+          id: "dp_1",
+          status: "lost",
+          payment_intent: "pi_1",
+          charge: { id: "ch_1" },
+        }),
+        db
+      );
+
+      expect(result).toBe("ignored");
+      expect(calls.updates.every((u) => u.table === "webhookEvents")).toBe(true);
+      expect(
+        calls.inserts.every((i) => i.table === "webhookEvents")
+      ).toBe(true);
+      expect(createNotification).not.toHaveBeenCalled();
     });
   });
 });

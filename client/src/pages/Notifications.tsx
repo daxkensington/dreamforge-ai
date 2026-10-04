@@ -41,11 +41,18 @@ export default function Notifications() {
   const { user } = useAuth() as any;
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const utils = trpc.useUtils();
+  const PAGE_SIZE = 30;
+  // "Load more" grows the query window — the server caps limit at 500, far
+  // deeper than any real notification history needs.
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
-  const { data } = trpc.notifications.list.useQuery(
-    { unreadOnly: filter === "unread" },
-    { enabled: !!user }
+  const { data, isFetching } = trpc.notifications.list.useQuery(
+    { unreadOnly: filter === "unread", limit },
+    { enabled: !!user, placeholderData: (prev) => prev }
   );
+
+  const items = data?.notifications ?? [];
+  const total = data?.total ?? 0;
 
   const { data: preferences } = trpc.notifications.getPreferences.useQuery(
     undefined,
@@ -136,26 +143,26 @@ export default function Notifications() {
               <Button
                 variant={filter === "all" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter("all")}
+                onClick={() => { setFilter("all"); setLimit(PAGE_SIZE); }}
               >
                 All
               </Button>
               <Button
                 variant={filter === "unread" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter("unread")}
+                onClick={() => { setFilter("unread"); setLimit(PAGE_SIZE); }}
               >
                 Unread
                 {data?.unreadCount ? (
                   <Badge variant="secondary" className="ml-2">
-                    {data.unreadCount}
+                    {data?.unreadCount ?? 0}
                   </Badge>
                 ) : null}
               </Button>
             </div>
 
             {/* Notification List */}
-            {!data?.notifications || data.notifications.length === 0 ? (
+            {items.length === 0 ? (
               <Card>
                 <CardContent className="py-16 text-center text-muted-foreground">
                   <Bell className="w-16 h-16 mx-auto mb-4 opacity-30" />
@@ -169,7 +176,7 @@ export default function Notifications() {
               </Card>
             ) : (
               <div className="space-y-2">
-                {data.notifications.map((n) => {
+                {items.map((n) => {
                   const Icon = typeIcons[n.type] || Info;
                   const colorClass =
                     typeColors[n.type] || "bg-muted text-muted-foreground";
@@ -223,6 +230,22 @@ export default function Notifications() {
                     </Card>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Pagination — older notifications load on demand by growing the window. */}
+            {filter === "all" && items.length < total && items.length > 0 && (
+              <div className="mt-4 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setLimit((l) => Math.min(l + PAGE_SIZE, 500))}
+                  disabled={isFetching}
+                >
+                  {isFetching ? "Loading..." : "Load older notifications"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Showing {items.length} of {total}
+                </p>
               </div>
             )}
           </TabsContent>
