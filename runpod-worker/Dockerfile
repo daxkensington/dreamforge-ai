@@ -32,6 +32,13 @@ RUN pip install --no-cache-dir --no-deps audiocraft && \
 # requirements.txt: numpy/opencv/Pillow/scipy/scikit-image/torch/torchvision).
 RUN pip install --no-cache-dir --no-deps realesrgan==0.3.0 basicsr==1.4.2 && \
     pip install --no-cache-dir addict future lmdb yapf
+# runpod SDK --no-deps for the same resolver reason: its declared fastapi[all]
+# tree backtracks pip to death against the base image's preinstalled packages.
+# serverless.start() at runtime needs only the HTTP/pydantic stack below; if a
+# future SDK version imports something else, the worker log will name it
+# (same find-missing-deps.sh workflow as the audiocraft backfill).
+RUN pip install --no-cache-dir --no-deps runpod==1.6.0 && \
+    pip install --no-cache-dir aiohttp requests tqdm pydantic click colorama
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1

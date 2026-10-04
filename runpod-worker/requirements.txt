@@ -2,7 +2,9 @@
 # (determinism pass 2026-09-30) — do not bump without a matching code change.
 # Any NEW package added here must be frozen with == as well (pin an exact
 # version — never add an unpinned or range dependency).
-runpod==1.6.0
+# runpod installed --no-deps in the Dockerfile: its fastapi[all] dependency
+# tree conflicts with the base image's preinstalled packages and sends pip
+# into resolution-too-deep backtracking. Runtime deps are backfilled by hand.
 # diffusers >=0.35 ships the Wan 2.2 pipelines (WanPipeline /
 # WanImageToVideoPipeline / AutoencoderKLWan) used by the uncensored video path.
 diffusers==0.35.0
