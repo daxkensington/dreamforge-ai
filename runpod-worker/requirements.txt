@@ -17,14 +17,17 @@ protobuf==4.25.0
 realesrgan==0.3.0
 basicsr==1.4.2
 opencv-python-headless==4.8.0.76  # 4.8.0.74 yanked from PyPI; next patch, same API
-torchvision==0.17.0
+torchvision==0.23.0  # pairs with the base image's torch 2.8; 0.17.0 pins torch==2.2.0 and would downgrade the image
 Pillow==10.0.0
 numpy==1.26.4  # 1.24.0 has no cp312 wheels (image runs Python 3.12); 1.26.4 does, same removed-alias surface
 kornia==0.7.0
 timm==1.0.3  # 1.0.0 removed from PyPI; nearest in-series
 einops==0.7.0
 peft==0.11.0
-xformers==0.0.27
+# xformers pin REMOVED 2026-10-04: it was never imported by the worker
+# (handler.py uses sdpa attention), and every xformers version pins an
+# exact torch that conflicts with the base image (torch 2.8). Re-add only
+# with a torch-2.8-compatible build and a real caller.
 scikit-image==0.22.0
 requests==2.31.0
 scipy==1.11.4  # first 1.11 patch with cp312 wheels
