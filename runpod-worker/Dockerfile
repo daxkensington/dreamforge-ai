@@ -50,8 +50,9 @@ RUN git clone --depth 1 https://github.com/Zheng-Chong/CatVTON.git /app/catvton 
     git checkout 7818397f25613beedb3d861a34769f607cfcf3b1 && \
     rm -rf .git
 
-# Flux + RMBG-2.0 + CatVTON (HF repo zhengchong/CatVTON) weights are downloaded
-# lazily on first request via huggingface_hub. Those downloads ARE integrity
+# Flux + RMBG-2.0 + CatVTON (HF repo zhengchong/CatVTON) + Depth Anything V2
+# Small (depth-anything/Depth-Anything-V2-Small-hf, the `depth` task) weights
+# are downloaded lazily on first request via huggingface_hub. Those downloads ARE integrity
 # checked (the client verifies LFS sha256 at download time) but NOT pinned to a
 # repo revision — an upstream repo change will change the weights.
 # HF_TOKEN must be set at runtime via RunPod endpoint env vars.

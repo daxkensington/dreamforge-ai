@@ -2176,14 +2176,38 @@ export const appRouter = router({
             "logo": "logo-ready vector design, bold shapes, perfect symmetry, brand-ready",
           };
 
+          // Step 1: generate the flat vector-STYLE raster (as before).
           const { url } = await generateImage({
-            prompt: `Convert this image into a ${styleDescriptions[input.style]}. Use approximately ${input.colorCount} colors. Clean vector-style output with crisp edges, no raster artifacts. Suitable for SVG conversion. Professional graphic design quality.`,
+            prompt: `Convert this image into a ${styleDescriptions[input.style]}. Use approximately ${input.colorCount} distinct colors. Clean vector-style output with crisp edges, no raster artifacts, large uniform color regions. Professional graphic design quality.`,
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
 
-          return { url, status: "completed" as const };
+          // Step 2: true vectorization — vtracer traces the raster into an
+          // actual SVG. colorCount drives vtracer's color_precision (1-8),
+          // so the slider is real now. svgUrl stays null when the worker
+          // doesn't have the vtracer task yet (old image) or tracing fails.
+          let svgUrl: string | null = null;
+          const { isRunPodAvailable } = await import("./_core/runpod");
+          if (isRunPodAvailable()) {
+            try {
+              const { runpodVectorize } = await import("./_core/runpod");
+              const { buffer: rasterBuf } = await fetchGuardedImage(url);
+              const svg = await runpodVectorize(rasterBuf.toString("base64"), input.colorCount);
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const { url: storedSvg } = await storagePut(
+                generateStorageKey("vectorized", "svg"),
+                Buffer.from(svg, "utf8"),
+                "image/svg+xml"
+              );
+              svgUrl = storedSvg;
+            } catch (err: any) {
+              console.warn("[Vectorize] vtracer SVG pass failed, returning raster only:", err.message);
+            }
+          }
+
+          return { url, svgUrl, status: "completed" as const };
         } catch (error: any) {
-          return { url: null, status: "failed" as const, error: error.message };
+          return { url: null, svgUrl: null, status: "failed" as const, error: error.message };
         }
       }),
 
@@ -2854,6 +2878,28 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "depth-map", "Depth map generation");
         try {
+          // Real path: Depth Anything V2 on the self-hosted worker — true
+          // monocular depth, and a true normal map derived from the depth
+          // field (usable in actual 3D/PBR workflows, not a picture of one).
+          const { isRunPodAvailable } = await import("./_core/runpod");
+          if (isRunPodAvailable()) {
+            try {
+              const { runpodDepth } = await import("./_core/runpod");
+              const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
+              const resultBuffer = await runpodDepth(
+                imgBuffer.toString("base64"),
+                input.style === "normal-map" ? "normal" : input.style
+              );
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const { url } = await storagePut(generateStorageKey("depth", "png"), resultBuffer, "image/png");
+              return { url, status: "completed" as const, style: input.style, engine: "depth-anything" as const };
+            } catch (err: any) {
+              console.warn("[DepthMap] RunPod Depth Anything failed, falling back to vision model:", err.message);
+            }
+          }
+
+          // Fallback: vision-model rendering of a depth map (bounded accuracy;
+          // normal-map output here is NOT usable as a true normal map).
           const styleDescriptions: Record<string, string> = {
             "grayscale": "Convert this image into a precise depth map. White represents closest objects, black represents the farthest. Smooth gradients for depth transitions. Accurate depth estimation for all objects in the scene. Professional 3D-ready depth map, grayscale only.",
             "colored": "Convert this image into a color-coded depth map. Use a rainbow/viridis color palette where warm colors (red/yellow) represent near objects and cool colors (blue/purple) represent far objects. Clear depth separation, professional visualization.",
@@ -2863,7 +2909,7 @@ export const appRouter = router({
             prompt: styleDescriptions[input.style],
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
-          return { url, status: "completed" as const, style: input.style };
+          return { url, status: "completed" as const, style: input.style, engine: "vision-model" as const };
         } catch (error: any) {
           return { url: null, status: "failed" as const, error: error.message };
         }

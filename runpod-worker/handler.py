@@ -5,6 +5,8 @@ Single endpoint serving multiple models:
   - Flux.1 Dev/Schnell (image generation)
   - Real-ESRGAN (image upscaling)
   - RMBG-2.0 (background removal)
+  - Depth Anything V2 Small (monocular depth estimation)
+  - VTracer (raster to SVG vectorization)
   - CatVTON (virtual try-on)
 
 Routes to the correct model via the `task` field in the input payload.
@@ -41,6 +43,7 @@ _flux_img2img_pipe = None
 _esrgan_model = None
 _rmbg_model = None
 _rmbg_transform = None
+_depth_model = None
 _catvton_pipe = None
 _catvton_masker = None
 _musicgen_model = None
@@ -184,6 +187,22 @@ def get_rmbg_model():
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
     return _rmbg_model, _rmbg_transform
+
+
+def get_depth_model():
+    """Load Depth Anything V2 Small depth-estimation pipeline."""
+    global _depth_model
+    if _depth_model is None:
+        from transformers import pipeline
+
+        print("[DreamForge] Loading Depth Anything V2 Small...")
+        _depth_model = pipeline(
+            "depth-estimation",
+            "depth-anything/Depth-Anything-V2-Small-hf",
+            device="cuda",
+        )
+        print("[DreamForge] Depth Anything V2 Small loaded")
+    return _depth_model
 
 
 def get_bark():
@@ -632,6 +651,117 @@ def handle_rmbg(job_input):
     return {"image_b64": image_b64, "inference_time": inference_time}
 
 
+def handle_depth(job_input):
+    """Estimate monocular depth with Depth Anything V2 Small.
+
+    variant "grayscale": 8-bit PNG, near=white, far=black (the pipeline's
+    depth output is a normalized disparity map, so this is a straight save).
+    variant "colored": cv2 colormap (jet/rainbow/hot) applied to the grayscale.
+    variant "normal": true normal map derived from the depth field.
+    """
+    import numpy as np
+    import cv2
+
+    image_b64 = job_input.get("image_b64", "")
+    variant = job_input.get("variant", "grayscale")
+    colormap = job_input.get("colormap", "jet")
+
+    if not image_b64:
+        raise ValueError("image_b64 is required for depth estimation")
+    if variant not in ("grayscale", "colored", "normal"):
+        raise ValueError(f"Unknown depth variant: {variant}")
+
+    img_bytes = base64.b64decode(image_b64)
+    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    original_size = image.size
+
+    pipe = get_depth_model()
+
+    start = time.time()
+    result = pipe(image)
+    inference_time = time.time() - start
+
+    # The pipeline's PIL depth is at the model's working resolution — resize
+    # back to the ORIGINAL input size.
+    depth = result["depth"].resize(original_size, Image.Resampling.BILINEAR)
+
+    if variant == "grayscale":
+        buf = io.BytesIO()
+        depth.save(buf, format="PNG")
+        out_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    elif variant == "colored":
+        gray = np.array(depth)
+        cmap = {
+            "jet": cv2.COLORMAP_JET,
+            "rainbow": cv2.COLORMAP_RAINBOW,
+            "hot": cv2.COLORMAP_HOT,
+        }.get(colormap, cv2.COLORMAP_JET)
+        # applyColorMap returns BGR, which is exactly what cv2.imencode wants.
+        colored = cv2.applyColorMap(gray, cmap)
+        _, buf = cv2.imencode(".png", colored)
+        out_b64 = base64.b64encode(buf.tobytes()).decode("utf-8")
+    else:  # normal
+        depth_f = np.array(depth).astype(np.float32)
+        # Normalize to 0..1 so the Sobel gradients don't depend on image size.
+        d_min, d_max = depth_f.min(), depth_f.max()
+        span = float(d_max - d_min) or 1.0
+        d = (depth_f - d_min) / span
+        dx = cv2.Sobel(d, cv2.CV_32F, 1, 0, ksize=3)
+        dy = cv2.Sobel(d, cv2.CV_32F, 0, 1, ksize=3)
+        # OpenGL convention: X=red, Y=green, Z=blue, Y-up. Image rows grow
+        # downward, hence -dy; -dx completes the right-handed frame.
+        strength = 8.0
+        n = np.dstack([-dx, -dy, np.full_like(d, 1.0 / strength)])
+        n = n / np.maximum(np.linalg.norm(n, axis=2, keepdims=True), 1e-8)
+        normal_rgb = ((n * 0.5 + 0.5) * 255).astype(np.uint8)
+        _, buf = cv2.imencode(".png", cv2.cvtColor(normal_rgb, cv2.COLOR_RGB2BGR))
+        out_b64 = base64.b64encode(buf.tobytes()).decode("utf-8")
+
+    print(f"[DreamForge] Depth ({variant}) completed in {inference_time:.1f}s")
+
+    return {"image_b64": out_b64, "inference_time": inference_time}
+
+
+def handle_vtracer(job_input):
+    """Vectorize a raster image to SVG with VTracer."""
+    import vtracer
+
+    image_b64 = job_input.get("image_b64", "")
+    if not image_b64:
+        raise ValueError("image_b64 is required for vectorization")
+
+    mode = job_input.get("mode", "color")
+    if mode not in ("color", "binary"):
+        raise ValueError(f"Unknown vtracer mode: {mode}")
+    # The server exposes a 2..32 color count; vtracer's color_precision is 1..8.
+    # Missing input maps to 16 (= 4 after clamping, the midpoint of 2..32).
+    color_precision = max(1, min(round(int(job_input.get("color_precision", 16)) / 4), 8))
+    filter_speckle = int(job_input.get("filter_speckle", 4))
+    corner_threshold = int(job_input.get("corner_threshold", 60))
+
+    img_bytes = base64.b64decode(image_b64)
+    image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    start = time.time()
+    # convert_raw_image_to_svg takes raw image bytes and returns the SVG text —
+    # no temp files needed (vtracer PyPI docs, "Convert from raw image bytes").
+    svg = vtracer.convert_raw_image_to_svg(
+        png_bytes,
+        img_format="png",
+        colormode=mode,
+        color_precision=color_precision,
+        filter_speckle=filter_speckle,
+        corner_threshold=corner_threshold,
+    )
+    inference_time = time.time() - start
+    print(f"[DreamForge] VTracer ({mode}) completed in {inference_time:.1f}s")
+
+    return {"svg": svg, "inference_time": inference_time}
+
+
 def handle_bark_tts(job_input):
     """Generate speech with Bark TTS."""
     import scipy.io.wavfile as wavfile
@@ -941,6 +1071,10 @@ def handler(job):
             return handle_esrgan(job_input)
         elif task == "rmbg":
             return handle_rmbg(job_input)
+        elif task == "depth":
+            return handle_depth(job_input)
+        elif task == "vtracer":
+            return handle_vtracer(job_input)
         elif task == "tryon":
             return handle_tryon(job_input)
         elif task == "bark-tts":
