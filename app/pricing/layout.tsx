@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/pricing" },
   title: "Pricing — DreamForgeX",
   description: "Free, Creator, Pro, and Studio plans for every AI creator. Start free with 1,500 credits. Upgrade for HD, video, batch processing, and more.",
   openGraph: {

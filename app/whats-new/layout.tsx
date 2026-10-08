@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/whats-new" },
   title: "What's New — DreamForgeX Changelog",
   description: "Every shipped phase on DreamForgeX — new tools, reliability work, auth, SEO, infrastructure. Build-in-public changelog.",
   openGraph: {
