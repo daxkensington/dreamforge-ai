@@ -51,6 +51,17 @@ const nextConfig: NextConfig = {
     // the sitemap. Scope this to public routes: auth, API/webhooks, account
     // pages and private project/invite URLs keep their existing host behavior.
     // Next.js carries the original query string through these redirects.
+    // Auth.js sessions are host-scoped. Keep requests with a session cookie on
+    // www, including secure names and numeric chunks of large session tokens.
+    // Next.js anchors header matchers to the whole header, so allow other cookies
+    // before and after the session cookie while requiring a cookie-name boundary.
+    const sessionCookieHeader =
+      "(?:\\s*|.*;\\s*)(?:__Secure-)?authjs\\.session-token(?:\\.\\d+)?=[^;]*(?:;.*)?";
+    const missingSessionCookie = [{
+      type: "header" as const,
+      key: "cookie",
+      value: sessionCookieHeader,
+    }];
     const publicPaths = [
       "/", "/tools/:path*", "/gallery/:path*", "/g/:id",
       "/marketplace", "/pricing", "/explore", "/api-docs",
@@ -63,17 +74,19 @@ const nextConfig: NextConfig = {
     return [
       // Forge (and leftover bookmarks) used to invent /tools/refine — Refine
       // lives on the uncensored page and needs a pass, not a standalone tool.
-      { source: "/tools/refine", destination: "https://dreamforgex.ai/uncensored", permanent: true },
-      { source: "/refine", destination: "https://dreamforgex.ai/uncensored", permanent: true },
+      { source: "/tools/refine", destination: "/uncensored", permanent: true },
+      { source: "/refine", destination: "/uncensored", permanent: true },
       ...publicPaths.map((source) => ({
         source,
         has: [{ type: "host" as const, value: "www.dreamforgex.ai" }],
+        missing: missingSessionCookie,
         destination: `https://dreamforgex.ai${source}`,
         permanent: true,
       })),
       {
         source: "/marketplace/:id(\\d+)",
         has: [{ type: "host" as const, value: "www.dreamforgex.ai" }],
+        missing: missingSessionCookie,
         destination: "https://dreamforgex.ai/marketplace/:id",
         permanent: true,
       },
