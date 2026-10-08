@@ -58,9 +58,13 @@ for (const path of SAMPLE_TOOLS) {
   });
 }
 
-test("homepage CTA reaches login", async ({ page }) => {
+test("homepage has a visible primary CTA", async ({ page }) => {
   await page.goto("/");
-  // The hero "Start Creating" button — when logged out it kicks to auth.
-  const cta = page.getByRole("button", { name: /start creating/i }).first();
+  // Hero CTA copy has changed over time ("Start Creating" -> "Try It Free"),
+  // so accept any of the primary call-to-action phrasings.
+  const cta = page
+    .getByRole("button", { name: /try it free|start creating|get started|start free/i })
+    .or(page.getByRole("link", { name: /try it free|start creating|get started|start free/i }))
+    .first();
   await expect(cta).toBeVisible();
 });
