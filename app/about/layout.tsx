@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/about" },
   title: "About — DreamForgeX",
   description:
     "DreamForgeX is the all-in-one creative AI studio: 100+ tools, 30+ models (Flux, Runway, Kling, Veo 3, Wan 2.5, MusicGen, Bark), self-hosted GPU workers, and exclusive LoRA styles — built for creators who ship.",

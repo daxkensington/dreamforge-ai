@@ -47,11 +47,36 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   async redirects() {
+    // Consolidate public pages on the same apex URLs emitted by metadata and
+    // the sitemap. Scope this to public routes: auth, API/webhooks, account
+    // pages and private project/invite URLs keep their existing host behavior.
+    // Next.js carries the original query string through these redirects.
+    const publicPaths = [
+      "/", "/tools/:path*", "/gallery/:path*", "/g/:id",
+      "/marketplace", "/pricing", "/explore", "/api-docs",
+      "/demo/text-to-image", "/story", "/uncensored/:path*",
+      "/for/:path*", "/privacy", "/terms", "/about", "/whats-new",
+      "/blog/:path*", "/vs/:path*", "/workspace", "/batch", "/video-studio",
+      ...["storyboard", "scene-director", "script", "style-transfer", "upscaler", "soundtrack"]
+        .map((tool) => `/video-studio/${tool}`),
+    ];
     return [
       // Forge (and leftover bookmarks) used to invent /tools/refine — Refine
       // lives on the uncensored page and needs a pass, not a standalone tool.
-      { source: "/tools/refine", destination: "/uncensored", permanent: true },
-      { source: "/refine", destination: "/uncensored", permanent: true },
+      { source: "/tools/refine", destination: "https://dreamforgex.ai/uncensored", permanent: true },
+      { source: "/refine", destination: "https://dreamforgex.ai/uncensored", permanent: true },
+      ...publicPaths.map((source) => ({
+        source,
+        has: [{ type: "host" as const, value: "www.dreamforgex.ai" }],
+        destination: `https://dreamforgex.ai${source}`,
+        permanent: true,
+      })),
+      {
+        source: "/marketplace/:id(\\d+)",
+        has: [{ type: "host" as const, value: "www.dreamforgex.ai" }],
+        destination: "https://dreamforgex.ai/marketplace/:id",
+        permanent: true,
+      },
     ];
   },
   async headers() {
