@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Auth-flow + tool-routing smoke tests — verifies that auth-gated routes
@@ -12,55 +12,48 @@ for (const path of AUTH_GATED) {
   test(`${path} requires auth`, async ({ page }) => {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response).toBeTruthy();
-    // After redirects, we should land on a login page (or be on the gated
-    // page rendered as a "please log in" shell — both are valid).
-    const url = page.url();
-    const body = (await page.locator("body").textContent()) || "";
-    const looksLikeAuth =
-      /\/auth|\/login|\/signin/i.test(url) ||
-      /sign in|log in|signin|login/i.test(body);
-    expect(
-      looksLikeAuth,
-      `${path} did not gate auth — landed on ${url}`,
-    ).toBe(true);
+    expect(response!.status()).toBeLessThan(400);
+    await expect(page).toHaveURL(url => url.pathname === '/auth/signin');
+    expect(new URL(page.url()).origin).toBe(new URL(test.info().project.use.baseURL!).origin);
+    await expect(page.getByRole('heading', { name: 'DreamForge', exact: true })).toBeVisible();
+    await expect(page.getByText('Sign in to start creating', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue with GitHub' })).toBeVisible();
   });
 }
 
 const SAMPLE_TOOLS = [
-  "/tools/virtual-tryon",
-  "/tools/3d-generator",
-  "/tools/comic-strip",
-  "/tools/relight",
-  "/tools/tshirt-designer",
-  "/tools/headshot",
-  "/tools/logo-maker",
-  "/tools/song-creator",
-  "/tools/upscaler",
+  { path: "/tools/virtual-tryon", heading: "Virtual Try-On" },
+  { path: "/tools/3d-generator", heading: "3D Model Generator" },
+  { path: "/tools/comic-strip", heading: "Comic Strip Generator" },
+  { path: "/tools/relight", heading: "AI Relighting" },
+  { path: "/tools/tshirt-designer", heading: "T-Shirt Designer" },
+  { path: "/tools/headshot", heading: "AI Headshot Generator" },
+  { path: "/tools/logo-maker", heading: "AI Logo Maker" },
+  { path: "/tools/song-creator", heading: "Create Original Songs" },
+  { path: "/tools/upscaler", heading: "AI Image Upscaler" },
 ];
 
-for (const path of SAMPLE_TOOLS) {
+for (const { path, heading } of SAMPLE_TOOLS) {
   test(`${path} loads with real content`, async ({ page }) => {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response, `no response for ${path}`).toBeTruthy();
     expect(response!.status(), `bad status for ${path}`).toBeLessThan(400);
 
-    // Real pages have a heading. The 404 page does not have an H1 with tool-relevant text.
-    const heading = await page.locator("h1, h2").first().textContent();
-    expect(heading, `${path} missing heading`).toBeTruthy();
-    expect(heading!.length, `${path} heading too short`).toBeGreaterThan(2);
-
-    // Hard fail if the page is the not-found shell.
-    const body = (await page.locator("body").textContent()) || "";
-    expect(
-      /404|page not found|not\s+found/i.test(body) && !/404 errors handled/i.test(body),
-      `${path} rendered 404 page`,
-    ).toBe(false);
+    const main = page.getByRole('main');
+    await expect(main.getByRole('heading', { level: 1, name: heading, exact: true })).toBeVisible();
+    await expect(main).toContainText('Sign in free');
+    // Check rendered content, not the hidden Next.js RSC not-found template.
+    await expect.poll(() => main.innerText()).not.toMatch(/404|page not found|not\s+found/i);
   });
 }
 
-test("homepage CTA reaches login", async ({ page }) => {
-  await page.goto("/");
-  // The hero "Start Creating" button — when logged out it kicks to auth.
-  const cta = page.getByRole("button", { name: /start creating/i }).first();
+test("anonymous homepage CTA reaches the no-signup demo", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const cta = page.getByRole("button", { name: "Try It Free — No Signup", exact: true });
   await expect(cta).toBeVisible();
+  await cta.click();
+  await expect(page).toHaveURL(url => url.pathname === '/demo/text-to-image' && !url.search);
+  await expect(page.getByRole('heading', { level: 1, name: 'Try AI image generation free', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generate (free)', exact: true })).toBeDisabled();
 });
