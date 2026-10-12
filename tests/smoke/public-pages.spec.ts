@@ -101,7 +101,7 @@ test("no broken images on homepage", async ({ page }) => {
       const rect = img.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth;
     });
-    return visible.length > 0 && visible.every(img => img.complete && img.naturalWidth > 0);
+    return visible.length > 0 && visible.every(img => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0);
   })).toBe(true);
   await page.waitForTimeout(2500);
   expect(broken, `broken images:\n${broken.join("\n")}`).toEqual([]);

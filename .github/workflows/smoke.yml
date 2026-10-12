@@ -22,6 +22,13 @@ on:
       expected_sha:
         description: "Exact deployed source SHA (defaults to the selected workflow revision)"
         required: false
+      diagnostic_mode:
+        description: "Owned manual diagnostic only; ordinary full58 remains the default"
+        required: false
+        default: ""
+      harness_sha:
+        description: "Exact separately reviewed diagnostic harness SHA"
+        required: false
 
 permissions:
   contents: read
@@ -34,7 +41,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ github.event.inputs.diagnostic_mode == 'webkit-foreground' && 10 || 30 }}
     # Skip deployment_status events that aren't successful preview deploys
     # or successful prod deploys. The expression on the schedule + dispatch
     # branches always passes; only filters deployment_status events.
@@ -49,14 +56,51 @@ jobs:
             const sha = context.payload.deployment?.sha || context.sha;
             if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid exact source SHA');
             const repo = `${context.repo.owner}/${context.repo.repo}`;
+            const mode = context.payload.inputs?.diagnostic_mode || '';
+            if (mode && mode !== 'webkit-foreground') throw new Error('Unknown diagnostic mode');
+            if (mode === 'webkit-foreground') {
+              if (context.eventName !== 'workflow_dispatch' || repo !== 'daxkensington/dreamforge-ai' || context.ref !== 'refs/heads/codex/dreamforge-webkit-foreground-20261012') throw new Error('Diagnostic is manual owned-branch only');
+              if (context.payload.inputs.harness_sha !== context.sha) throw new Error('Diagnostic harness revision changed');
+              if (context.payload.inputs.expected_sha !== '0962858e2ff946e62e4e3416531b01c0d940c064' || context.payload.inputs.base_url !== 'https://dreamforgex-le3wqt0zv-englandsfinest.vercel.app') throw new Error('Diagnostic app target changed');
+            }
             const branches = await github.rest.repos.listBranchesForHeadCommit({ ...context.repo, commit_sha: sha });
             if (!branches.data.length) throw new Error('Source is not the head of an owned repository branch');
+            if (branches.data.some(branch => branch.name === 'codex/dreamforge-webkit-foreground-20261012') && mode !== 'webkit-foreground') throw new Error('Owned diagnostic source requires explicit manual diagnostic mode');
             const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: sha });
             if (prs.data.some(pr => pr.head?.repo?.full_name !== repo)) throw new Error('Fork source cannot use deployment credentials');
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.deployment.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: ${{ github.event.inputs.diagnostic_mode == 'webkit-foreground' && 2 || 1 }}
+
+      - name: Verify diagnostic harness and unchanged staged app before credentials
+        if: github.event.inputs.diagnostic_mode == 'webkit-foreground'
+        env:
+          EXPECTED_HARNESS_SHA: ${{ github.event.inputs.harness_sha }}
+          EXPECTED_APP_SHA: ${{ github.event.inputs.expected_sha }}
+          DIAGNOSTIC_TARGET: ${{ github.event.inputs.base_url }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const base = '0962858e2ff946e62e4e3416531b01c0d940c064';
+          assert.equal(process.env.GITHUB_EVENT_NAME, 'workflow_dispatch');
+          assert.equal(process.env.GITHUB_REPOSITORY, 'daxkensington/dreamforge-ai');
+          assert.equal(process.env.GITHUB_REF, 'refs/heads/codex/dreamforge-webkit-foreground-20261012');
+          assert.match(process.env.EXPECTED_HARNESS_SHA || '', /^[a-f0-9]{40}$/);
+          assert.equal(git(['rev-parse','HEAD']), process.env.EXPECTED_HARNESS_SHA);
+          assert.equal(process.env.GITHUB_SHA, process.env.EXPECTED_HARNESS_SHA);
+          assert.equal(process.env.EXPECTED_APP_SHA, base);
+          assert.equal(process.env.DIAGNOSTIC_TARGET, 'https://dreamforgex-le3wqt0zv-englandsfinest.vercel.app');
+          assert.equal(git(['rev-parse','HEAD^']), base);
+          assert.equal(git(['rev-parse',base+'^{tree}']), '4d49f2f02dc73a3d07ce62dc339bc3ea3f63d73d');
+          assert.deepEqual(git(['diff','--name-only',base,'HEAD']).split('\n').sort(), [
+            '.github/workflows/smoke.yml', 'playwright.diagnostic.config.ts', 'tests/diagnostics/home-scroll.spec.ts',
+            'tests/smoke/public-pages.spec.ts',
+          ]);
+          NODE
 
       - uses: actions/setup-node@v4
         with:
@@ -84,6 +128,7 @@ jobs:
         run: node scripts/check-smoke-target.mjs
 
       - name: Run Playwright smoke tests
+        if: github.event.inputs.diagnostic_mode != 'webkit-foreground'
         env:
           BASE_URL: ${{ steps.base.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -92,8 +137,25 @@ jobs:
           echo "🧪 Smoke testing $BASE_URL"
           pnpm test:smoke
 
+      - name: Bounded native WebKit foreground control with unchanged consumer tests
+        if: github.event.inputs.diagnostic_mode == 'webkit-foreground'
+        env:
+          BASE_URL: ${{ steps.base.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          CI: "true"
+        run: pnpm exec playwright test --config playwright.diagnostic.config.ts
+
+      - name: Retain only bounded safe foreground observations
+        if: always() && github.event.inputs.diagnostic_mode == 'webkit-foreground'
+        uses: actions/upload-artifact@v4
+        with:
+          name: webkit-foreground-observations-${{ github.run_id }}
+          path: diagnostic-results/foreground-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload Playwright report on failure
-        if: failure()
+        if: failure() && github.event.inputs.diagnostic_mode != 'webkit-foreground'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ github.run_id }}
@@ -103,7 +165,7 @@ jobs:
           retention-days: 14
 
       - name: Record smoke failure
-        if: failure()
+        if: failure() && github.event.inputs.diagnostic_mode != 'webkit-foreground'
         run: |
           echo '### DreamForge smoke failed' >> "$GITHUB_STEP_SUMMARY"
           echo 'Read the failed assertions and downloadable report/screenshots in this run. Protected-preview network traces are omitted to protect authorization cookies.' >> "$GITHUB_STEP_SUMMARY"
