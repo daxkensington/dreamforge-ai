@@ -29,9 +29,17 @@ for (const page of PUBLIC_PAGES) {
     }
     if (page.path === '/pricing') {
       await expect(main.getByRole('heading', { level: 1, name: 'Plans for Every Creator', exact: true })).toBeVisible();
-      const plans = main.locator('#plans');
+      // The section also contains an enterprise upsell heading. Count the
+      // actual subscription card grid, retaining all six unique plan names.
+      const plans = main.locator('#plans > .container > .grid');
+      await expect(plans).toHaveCount(1);
+      await expect(plans.locator(':scope > div')).toHaveCount(6);
       await expect(plans.getByRole('heading', { level: 3 })).toHaveCount(6);
-      for (const name of ['Explorer', 'Creator', 'Pro', 'Studio', 'Business', 'Agency']) await expect(plans.getByRole('heading', { level: 3, name, exact: true })).toBeVisible();
+      for (const name of ['Explorer', 'Creator', 'Pro', 'Studio', 'Business', 'Agency']) {
+        const heading = plans.getByRole('heading', { level: 3, name, exact: true });
+        await expect(heading).toHaveCount(1);
+        await expect(heading).toBeVisible();
+      }
       await expect(main.getByRole('button', { name: 'Monthly', exact: true })).toBeVisible();
       await expect(main.getByRole('button', { name: /Annual/ })).toBeVisible();
     }
@@ -41,7 +49,13 @@ for (const page of PUBLIC_PAGES) {
 test("homepage What's New section is visible", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: "What's new this week", exact: true }) });
-  await section.getByRole('heading', { name: "What's new this week", exact: true }).scrollIntoViewIfNeeded();
+  const heading = section.getByRole('heading', { name: "What's new this week", exact: true });
+  // Preserve native driver stability checks. The scoped content-scroll budget
+  // covers the observed WebKit wait; total test and auth budgets stay fixed.
+  await heading.scrollIntoViewIfNeeded({ timeout: 30_000 });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeInViewport();
+  await expect(heading).toHaveCSS('opacity', '1');
   await expect(section.getByText('Just shipped', { exact: true })).toBeVisible();
   for (const [href, title] of [
     ['/tools/pet-portrait', 'Pet Portrait'], ['/tools/tarot-card', 'Tarot Card Designer'],
@@ -49,8 +63,12 @@ test("homepage What's New section is visible", async ({ page }) => {
     ['/tools/brand-style-guide', 'Brand Style Guide'], ['/tools/song-creator', 'Self-Hosted Audio'],
   ]) {
     const card = section.locator(`a[href="${href}"]`);
-    await card.scrollIntoViewIfNeeded();
+    await card.scrollIntoViewIfNeeded({ timeout: 30_000 });
+    await expect(card).toBeVisible();
     await expect(card).toBeInViewport();
+    const motionContent = card.locator(':scope > div');
+    await expect(motionContent).toHaveCount(1);
+    await expect(motionContent).toHaveCSS('opacity', '1');
     await expect(card.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
 });
@@ -62,7 +80,7 @@ test("footer renders with all link sections", async ({ page }) => {
   // Every footer-linked legal page must be reachable.
   for (const path of ["/about", "/terms", "/privacy"]) {
     const link = footer.locator(`a[href="${path}"]`).first();
-    await link.scrollIntoViewIfNeeded();
+    await link.scrollIntoViewIfNeeded({ timeout: 30_000 });
     await expect(link, `footer missing link to ${path}`).toBeVisible();
     await expect(link).toBeInViewport();
   }

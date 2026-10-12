@@ -52,12 +52,19 @@ for (const { path, heading } of SAMPLE_TOOLS) {
   });
 }
 
-test("anonymous homepage CTA reaches the no-signup demo", async ({ page }) => {
+test("anonymous homepage CTA reaches the no-signup demo", async ({ page, baseURL }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const cta = page.getByRole("button", { name: "Try It Free — No Signup", exact: true });
+  const cta = page.getByRole("link", { name: "Try It Free — No Signup", exact: true });
   await expect(cta).toBeVisible();
-  await cta.click();
-  await expect(page).toHaveURL(url => url.pathname === '/demo/text-to-image' && !url.search);
+  await expect(cta).toHaveAttribute('href', '/demo/text-to-image');
+  const expectedOrigin = new URL(baseURL || 'https://dreamforgex.ai').origin;
+  // Keep native-click actionability on its existing 10-second clock. Observe
+  // real document navigation separately with the existing navigation budget.
+  await Promise.all([
+    page.waitForURL(url => url.origin === expectedOrigin && url.pathname === '/demo/text-to-image' && !url.search, { waitUntil: 'domcontentloaded' }),
+    cta.click({ noWaitAfter: true }),
+  ]);
+  await expect(page).toHaveURL(url => url.origin === expectedOrigin && url.pathname === '/demo/text-to-image' && !url.search);
   await expect(page.getByRole('heading', { level: 1, name: 'Try AI image generation free', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Generate (free)', exact: true })).toBeDisabled();
 });

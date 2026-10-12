@@ -397,12 +397,14 @@ export default function Home() {
                 </Button>
               ) : (
                 <Button
+                  asChild
                   size="lg"
                   className="font-medium gap-2 px-8 h-13 text-base glow-primary"
-                  onClick={() => (window.location.href = "/demo/text-to-image")}
                 >
-                  <Zap className="h-5 w-5" />
-                  Try It Free — No Signup
+                  <Link href="/demo/text-to-image">
+                    <Zap className="h-5 w-5" />
+                    Try It Free — No Signup
+                  </Link>
                 </Button>
               )}
               <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-transparent border-white/20 hover:bg-white/10">
