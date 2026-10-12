@@ -1,7 +1,7 @@
 import { test as base, expect, request as apiRequest } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay } from '../../shared/smoke-target.mjs';
+import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay, CANONICAL_AUTH_ORIGIN } from '../../shared/smoke-target.mjs';
 
 let queue: Promise<void> = Promise.resolve();
 
@@ -46,7 +46,11 @@ export const test = base.extend<{ smokeGuard: void }>({
     if (reserved.delay) await new Promise(resolve => setTimeout(resolve, reserved.delay));
     await context.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.origin === target.origin && consumesAuthBudget(url.pathname)) {
+      if (target.protectedTarget && url.origin === CANONICAL_AUTH_ORIGIN && url.pathname === '/api/status/providers') {
+        await route.abort();
+        throw new Error('Staged canonical sign-in must not invoke the old canonical provider monitoring route');
+      }
+      if ([target.origin, CANONICAL_AUTH_ORIGIN].includes(url.origin) && consumesAuthBudget(url.pathname)) {
         const turn = queue.then(async () => {
           const starts = await readBudget();
           let budget = authBudgetDelay(starts, Date.now());

@@ -21,6 +21,24 @@ export function deployedRevision(value) {
   return typeof value === 'string' && /^[a-f0-9]{40}$/.test(value) ? value : null;
 }
 
+export const CANONICAL_AUTH_ORIGIN = 'https://dreamforgex.ai';
+
+/** Production-config staging intentionally uses the existing AUTH_URL. */
+export function assertCanonicalSignIn(input, originalPath) {
+  if (!gated.has(originalPath)) throw new Error('Unrecognized gated smoke path');
+  const url = new URL(input);
+  if (url.origin !== CANONICAL_AUTH_ORIGIN || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
+    throw new Error('Sign-in must use the existing canonical auth origin and exact path');
+  }
+  if ([...url.searchParams.keys()].length !== 1 || !url.searchParams.has('callbackUrl')) {
+    throw new Error('Sign-in must retain exactly the original canonical callback');
+  }
+  const callback = new URL(url.searchParams.get('callbackUrl'));
+  if (callback.origin !== CANONICAL_AUTH_ORIGIN || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
+    throw new Error('Sign-in callback does not match the original canonical gated path');
+  }
+}
+
 export function assertDeployedHealth(status, type, body, expected) {
   if (status !== 200 || !type?.includes('application/json') || body?.ok !== true) {
     throw new Error('Smoke target is not the healthy DreamForge app (deployment protection is not app acceptance)');

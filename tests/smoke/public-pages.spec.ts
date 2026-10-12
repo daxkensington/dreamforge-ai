@@ -11,7 +11,7 @@ const PUBLIC_PAGES = [
   { path: "/about", contains: ["About DreamForgeX", "Browse 100+ Tools"] },
   { path: "/terms", contains: ["Terms of Service", "Acceptable Use"] },
   { path: "/privacy", contains: ["Privacy Policy", "AI model training"] },
-  { path: "/pricing", contains: ["Pricing", "Creator"] },
+  { path: "/pricing", contains: ["Plans for Every Creator", "Start free with 50 credits/day"] },
   { path: "/tools", contains: ["Tools"] },
   { path: "/gallery", contains: ["Gallery"] },
   { path: "/marketplace", contains: ["Marketplace"] },
@@ -27,13 +27,21 @@ for (const page of PUBLIC_PAGES) {
     for (const phrase of page.contains) {
       await expect.poll(() => main.innerText(), { message: `${page.path} missing rendered text: "${phrase}"` }).toContain(phrase);
     }
+    if (page.path === '/pricing') {
+      await expect(main.getByRole('heading', { level: 1, name: 'Plans for Every Creator', exact: true })).toBeVisible();
+      const plans = main.locator('#plans');
+      await expect(plans.getByRole('heading', { level: 3 })).toHaveCount(6);
+      for (const name of ['Explorer', 'Creator', 'Pro', 'Studio', 'Business', 'Agency']) await expect(plans.getByRole('heading', { level: 3, name, exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: 'Monthly', exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: /Annual/ })).toBeVisible();
+    }
   });
 }
 
 test("homepage What's New section is visible", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: "What's new this week", exact: true }) });
-  await section.getByRole('heading').scrollIntoViewIfNeeded();
+  await section.getByRole('heading', { name: "What's new this week", exact: true }).scrollIntoViewIfNeeded();
   await expect(section.getByText('Just shipped', { exact: true })).toBeVisible();
   for (const [href, title] of [
     ['/tools/pet-portrait', 'Pet Portrait'], ['/tools/tarot-card', 'Tarot Card Designer'],
