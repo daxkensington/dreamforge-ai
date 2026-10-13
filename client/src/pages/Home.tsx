@@ -331,19 +331,15 @@ export default function Home() {
         />
       )}
 
-      {/* ═══════ SECTION 1: HERO WITH VIDEO BACKGROUND ═══════ */}
+      {/* ═══════ SECTION 1: HERO WITH DECORATIVE BACKGROUND ═══════ */}
       <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        {/* Video background */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster="/showcase/hero-forge.jpg"
+        {/* Decorative background */}
+        <img
+          src="/showcase/hero-forge.jpg"
+          alt=""
+          aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
-        >
-          <source src="/video/hero-bg.mp4" type="video/mp4" />
-        </video>
+        />
         {/* Dark overlay — FIX 1: much darker */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/95" />
 
