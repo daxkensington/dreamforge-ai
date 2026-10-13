@@ -15,6 +15,11 @@ on:
     - cron: "0 6 * * *" # 06:00 UTC = 02:00 EDT — quiet hours
   workflow_dispatch:
     inputs:
+      diagnostic_mode:
+        description: "Normal deployed suite or isolated credential-free static diagnostic"
+        type: choice
+        options: [normal, static-media-interception]
+        default: normal
       base_url:
         description: "Base URL to test (default: https://dreamforgex.ai)"
         required: false
@@ -39,8 +44,10 @@ jobs:
     # or successful prod deploys. The expression on the schedule + dispatch
     # branches always passes; only filters deployment_status events.
     if: |
-      github.event_name != 'deployment_status' ||
-      github.event.deployment_status.state == 'success'
+      github.ref != 'refs/heads/codex/dreamforge-offline-scroll-20261013' &&
+      github.event.inputs.diagnostic_mode != 'static-media-interception' &&
+      (github.event_name != 'deployment_status' ||
+       github.event.deployment_status.state == 'success')
     steps:
       - name: Verify trusted repository source before credential use
         uses: actions/github-script@v7
@@ -51,6 +58,7 @@ jobs:
             const repo = `${context.repo.owner}/${context.repo.repo}`;
             const branches = await github.rest.repos.listBranchesForHeadCommit({ ...context.repo, commit_sha: sha });
             if (!branches.data.length) throw new Error('Source is not the head of an owned repository branch');
+            if (branches.data.some(b => b.name === 'codex/dreamforge-offline-scroll-20261013')) throw new Error('Static diagnostic source cannot run deployed smoke or use deployment credentials');
             const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: sha });
             if (prs.data.some(pr => pr.head?.repo?.full_name !== repo)) throw new Error('Fork source cannot use deployment credentials');
       - uses: actions/checkout@v4
@@ -107,3 +115,74 @@ jobs:
         run: |
           echo '### DreamForge smoke failed' >> "$GITHUB_STEP_SUMMARY"
           echo 'Read the failed assertions and downloadable report/screenshots in this run. Protected-preview network traces are omitted to protect authorization cookies.' >> "$GITHUB_STEP_SUMMARY"
+
+  offline_static:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/dreamforge-offline-scroll-20261013' && github.event.inputs.diagnostic_mode == 'static-media-interception'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Verify exact owned static diagnostic before checkout
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = 'codex/dreamforge-offline-scroll-20261013';
+            const base = '632ca11de3c9944f337e1a305c24234a9e8d1b2a';
+            const inputs = context.payload.inputs || {};
+            if (context.eventName !== 'workflow_dispatch' || context.ref !== `refs/heads/${branch}` || inputs.diagnostic_mode !== 'static-media-interception') throw new Error('Static diagnostic event/ref mismatch');
+            if (context.repo.owner !== 'daxkensington' || context.repo.repo !== 'dreamforge-ai' || context.payload.repository?.id !== 1188896913) throw new Error('Static diagnostic repository mismatch');
+            if (!/^[a-f0-9]{40}$/.test(inputs.expected_sha || '') || inputs.expected_sha !== context.sha) throw new Error('Exact diagnostic revision required');
+            if (inputs.base_url !== 'https://dreamforgex.ai') throw new Error('Legacy target input must remain its ignored default');
+            const selected = await github.rest.repos.getBranch({ ...context.repo, branch });
+            if (selected.data.commit.sha !== context.sha) throw new Error('Static diagnostic branch drift');
+            const commit = await github.rest.repos.getCommit({ ...context.repo, ref: context.sha });
+            if (commit.data.parents.length !== 1 || commit.data.parents[0].sha !== base) throw new Error('Static diagnostic must have exact single632 parent');
+            const associated = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: context.sha });
+            if (associated.data.some(pr => pr.head?.repo?.full_name !== 'daxkensington/dreamforge-ai')) throw new Error('Fork source rejected');
+            const comparison = await github.rest.repos.compareCommitsWithBasehead({ ...context.repo, basehead: `${base}...${context.sha}` });
+            const exact = new Set(['.github/workflows/smoke.yml', 'vercel.json', 'playwright.offline-scroll.config.ts', 'tests/diagnostics/static-media-interception.spec.ts', ...['contract.mjs','build.mjs','server.mjs','reporter.mjs','verify-source.mjs','run.mjs','validate.mjs'].map(n => `scripts/diagnostics/static-media/${n}`), 'scripts/diagnostics/static-media/assets/manifest.json']);
+            const files = comparison.data.files || [];
+            if (comparison.data.total_commits !== 1 || files.length !== 27 || new Set(files.map(f => f.filename)).size !== 27) throw new Error('Static diagnostic scope/count mismatch');
+            for (const file of files) {
+              const snapshot = /^scripts\/diagnostics\/static-media\/assets\/_next\/static\/(css\/[a-f0-9]{16}\.css|media\/[a-f0-9]{16}-s(?:\.p)?\.woff2)$/.test(file.filename);
+              if (!exact.has(file.filename) && !snapshot) throw new Error('Unexpected static diagnostic source path');
+              const existing = ['.github/workflows/smoke.yml', 'vercel.json'].includes(file.filename);
+              if (file.status !== (existing ? 'modified' : 'added')) throw new Error('Unexpected static diagnostic path status');
+            }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - name: Install exact locked diagnostic dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build reduced SSR and closed local resources
+        run: node scripts/diagnostics/static-media/build.mjs
+      - name: Offline source callback range reporter and schema guards
+        run: node scripts/diagnostics/static-media/validate.mjs
+      - name: Install exact locked WebKit only
+        run: pnpm exec playwright install --with-deps webkit
+      - name: Run static media interception diagnostic
+        env:
+          STATIC_DIAGNOSTIC_REVISION: ${{ github.sha }}
+          CI: "true"
+        run: node scripts/diagnostics/static-media/run.mjs
+      - name: Validate strictly safe diagnostic output
+        if: always()
+        id: safe_output
+        run: node scripts/diagnostics/static-media/validate.mjs --result
+      - name: Upload only numeric enum diagnostic result
+        if: always() && steps.safe_output.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-media-interception-${{ github.run_id }}
+          path: test-results/static-media-interception/safe/RESULT.json
+          if-no-files-found: error
+          retention-days: 7
