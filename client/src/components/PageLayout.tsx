@@ -22,7 +22,7 @@ function ScrollToTopButton() {
     <button
       onClick={scrollToTop}
       aria-label="Back to top"
-      className={`fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center shadow-lg hover:bg-white/20 transition-all duration-300 ${
+      className={`fixed bottom-24 right-6 z-50 h-12 w-12 rounded-full bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center shadow-lg hover:bg-white/20 transition-all duration-300 ${
         visible
           ? "opacity-100 translate-y-0 pointer-events-auto"
           : "opacity-0 translate-y-4 pointer-events-none"

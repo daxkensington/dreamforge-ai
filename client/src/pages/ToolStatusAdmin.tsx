@@ -78,7 +78,7 @@ export default function ToolStatusAdmin() {
       {/* Provider health snapshot */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Provider Health</CardTitle>
+          <CardTitle className="text-base">Provider Monitoring</CardTitle>
           <Button size="sm" variant="outline" onClick={refreshProviders} disabled={loadingHealth}>
             <RefreshCw className={`size-3.5 mr-2 ${loadingHealth ? "animate-spin" : ""}`} />
             Refresh
@@ -86,13 +86,13 @@ export default function ToolStatusAdmin() {
         </CardHeader>
         <CardContent>
           {!providerHealth ? (
-            <p className="text-sm text-zinc-500">Click Refresh to probe RunPod, Replicate, fal.ai, Runway, Kling.</p>
+            <p className="text-sm text-zinc-500">Click Refresh to read provider configuration and reachability. Generation readiness is not tested.</p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {providerHealth.checks?.map((c: any) => {
-                const state = !c.configured ? "unconfigured" : c.ok ? "ok" : "down";
+                const state = !c.configured ? "unconfigured" : c.ok ? "reachable" : "down";
                 const color =
-                  state === "ok"
+                  state === "reachable"
                     ? "border-green-500/40 bg-green-500/5"
                     : state === "down"
                     ? "border-red-500/40 bg-red-500/5"
@@ -100,14 +100,16 @@ export default function ToolStatusAdmin() {
                 return (
                   <div key={c.name} className={`rounded border px-3 py-2 ${color}`}>
                     <div className="flex items-center gap-2">
-                      {state === "ok" && <CheckCircle2 className="size-4 text-green-400" />}
+                      {state === "reachable" && <CheckCircle2 className="size-4 text-green-400" />}
                       {state === "down" && <XCircle className="size-4 text-red-400" />}
                       {state === "unconfigured" && <AlertTriangle className="size-4 text-zinc-500" />}
                       <span className="text-sm font-medium capitalize">{c.name}</span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1">
-                      {!c.configured ? "not configured" : c.ok ? `${c.latencyMs}ms` : c.error ?? "down"}
+                      {!c.configured ? "not configured" : c.ok ? `reachable · ${c.latencyMs}ms` : c.error ?? "unavailable"}
                     </p>
+                    {c.configured && <p className="text-xs text-zinc-500 mt-1">{c.capacity ? `Capacity ${c.capacity}. ` : ""}Generation readiness not probed.</p>}
+                    {c.configured && <p className="text-xs text-zinc-500 mt-1">{c.authenticatedAccess === true ? "Metadata access validated." : c.authenticatedAccess === false ? "Metadata access rejected." : "Credentials not validated by this check."}</p>}
                   </div>
                 );
               })}
