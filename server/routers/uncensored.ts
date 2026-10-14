@@ -1354,9 +1354,6 @@ export const uncensoredRouter = router({
       }
       const person = await requireOwnUncensoredImage(ctx.user.id, input.personGenerationId);
       const garment = await requireOwnUncensoredImage(ctx.user.id, input.garmentGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
-      }
       const cost = UNCENSORED_IMAGE_COST.outfit;
       await enforceRateLimit(`uncensored.outfit:user:${ctx.user.id}`, 4, 60_000, "Slow down a moment between outfits.");
       const debit = await deductCredits(ctx.user.id, cost, "Uncensored outfit transfer", "usage", { uncensored: true, outfit: true });
@@ -1383,7 +1380,29 @@ export const uncensoredRouter = router({
         },
       });
       try {
-        const result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType);
+        let result: Buffer;
+        const style = (person.metadata as any)?.style ?? undefined;
+        const fallbackOutfitRefine = async () => {
+          const personB64 = await fetchAsBase64(person.imageUrl!);
+          const outfitPrompt = applyUncensoredStyle(
+            `same person identity, same face, same pose, wearing the ${input.clothType} outfit from reference (${garment.prompt || "stylish outfit"})`,
+            style,
+          );
+          return refineUnfiltered(personB64, outfitPrompt, {
+            strength: 0.55,
+            loraId: resolveUncensoredLora(style),
+          });
+        };
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType);
+          } catch (rpErr: any) {
+            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await fallbackOutfitRefine();
+          }
+        } else {
+          result = await fallbackOutfitRefine();
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });

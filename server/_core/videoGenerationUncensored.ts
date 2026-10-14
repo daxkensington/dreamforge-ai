@@ -19,6 +19,7 @@
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodWanSubmit, runpodJobStatus, getVideoEndpointId } from "./runpod";
 import { storagePut, generateStorageKey } from "../storage";
+import { ENV } from "./env";
 
 export interface UncensoredVideoParams {
   prompt: string;
@@ -93,19 +94,51 @@ export async function submitUncensoredVideoJob(
     ? await fetchAsBase64(params.sourceImageUrl)
     : undefined;
 
-  const jobId = await runpodWanSubmit({
-    prompt: enhancedPrompt,
-    imageB64,
-    width: params.width,
-    height: params.height,
-    numFrames: params.numFrames,
-    fps: params.fps,
-    seed: params.seed,
-    negativePrompt: params.negativePrompt,
-    loraId: params.loraId,
-    tier: params.tier,
-  });
-  return { jobId };
+  try {
+    const jobId = await runpodWanSubmit({
+      prompt: enhancedPrompt,
+      imageB64,
+      width: params.width,
+      height: params.height,
+      numFrames: params.numFrames,
+      fps: params.fps,
+      seed: params.seed,
+      negativePrompt: params.negativePrompt,
+      loraId: params.loraId,
+      tier: params.tier,
+    });
+    return { jobId };
+  } catch (rpErr: any) {
+    const msg = rpErr?.message ?? String(rpErr ?? "");
+    if (ENV.falApiKey && /\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(msg)) {
+      const falEndpoint = params.sourceImageUrl ? "wan-i2v" : "wan-t2v";
+      const falBody: Record<string, unknown> = {
+        prompt: enhancedPrompt,
+        enable_safety_checker: false,
+        ...(params.negativePrompt ? { negative_prompt: params.negativePrompt } : {}),
+        ...(params.seed !== undefined ? { seed: params.seed } : {}),
+        ...(params.sourceImageUrl ? { image_url: params.sourceImageUrl } : {}),
+      };
+      const submitRes = await fetch(`https://queue.fal.run/fal-ai/${falEndpoint}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Key ${ENV.falApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(falBody),
+      });
+      if (!submitRes.ok) {
+        const errText = await submitRes.text().catch(() => "");
+        throw new Error(`fal.ai ${falEndpoint} submit failed (${submitRes.status}): ${errText.slice(0, 200)}`);
+      }
+      const submitted = (await submitRes.json()) as { request_id?: string };
+      if (!submitted.request_id) {
+        throw new Error(`fal.ai ${falEndpoint} returned no request_id`);
+      }
+      return { jobId: `fal:${falEndpoint}:${submitted.request_id}` };
+    }
+    throw rpErr;
+  }
 }
 
 /**
@@ -114,6 +147,38 @@ export async function submitUncensoredVideoJob(
  * repeatedly; the caller owns the atomic generation-row transition + refund.
  */
 export async function collectUncensoredVideoJob(jobId: string): Promise<UncensoredVideoJobResult> {
+  if (jobId.startsWith("fal:")) {
+    const [, falEndpoint, requestId] = jobId.split(":");
+    if (!falEndpoint || !requestId || !ENV.falApiKey) {
+      return { status: "failed", error: "Invalid fal video job state" };
+    }
+    const baseUrl = `https://queue.fal.run/fal-ai/${falEndpoint}/requests/${requestId}`;
+    const statusRes = await fetch(`${baseUrl}/status`, {
+      headers: { Authorization: `Key ${ENV.falApiKey}` },
+    });
+    if (!statusRes.ok) return { status: "processing" };
+    const statusJson = (await statusRes.json()) as { status?: string; error?: string };
+    if (statusJson.status === "COMPLETED") {
+      const resultRes = await fetch(baseUrl, {
+        headers: { Authorization: `Key ${ENV.falApiKey}` },
+      });
+      if (!resultRes.ok) return { status: "failed", error: `Failed to fetch fal video result (${resultRes.status})` };
+      const resultJson = (await resultRes.json()) as { video?: { url?: string } };
+      const videoUrl = resultJson.video?.url;
+      if (!videoUrl) return { status: "failed", error: "fal returned no video URL" };
+      const dlRes = await fetch(videoUrl);
+      if (!dlRes.ok) return { status: "failed", error: `Failed to download video (${dlRes.status})` };
+      const videoBuf = Buffer.from(await dlRes.arrayBuffer());
+      const key = generateStorageKey("generations", "mp4");
+      const { url } = await storagePut(key, videoBuf, "video/mp4");
+      return { status: "completed", url, key };
+    }
+    if (statusJson.status === "FAILED" || statusJson.status === "CANCELLED") {
+      return { status: "failed", error: statusJson.error || "Video generation failed" };
+    }
+    return { status: "processing" };
+  }
+
   const st = await runpodJobStatus(jobId, getVideoEndpointId());
   if (st.status === "COMPLETED") {
     if (!st.videoB64) return { status: "failed", error: "GPU returned no video" };

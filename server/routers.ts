@@ -1340,8 +1340,17 @@ export const appRouter = router({
               // (see server/_core/imageUrlGuard).
               const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
               const imageB64 = imgBuffer.toString("base64");
-              const scale = input.scaleFactor === "4x" ? 4 : 2;
-              const resultBuffer = await runpodUpscale(imageB64, scale);
+              const scale = (input.scaleFactor === "4x" ? 4 : 2) as 2 | 4;
+              let resultBuffer: Buffer;
+              try {
+                resultBuffer = await runpodUpscale(imageB64, scale);
+              } catch (rpErr: any) {
+                if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                  throw rpErr;
+                }
+                const { upscaleBufferSharp } = await import("./_core/svgVectorize");
+                resultBuffer = await upscaleBufferSharp(imgBuffer, scale);
+              }
               const { storagePut, generateStorageKey } = await import("./storage");
               const key = generateStorageKey("upscaled", "png");
               const { url } = await storagePut(key, resultBuffer, "image/png");
@@ -1446,7 +1455,16 @@ export const appRouter = router({
                 // (see server/_core/imageUrlGuard).
                 const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
                 const imageB64 = imgBuffer.toString("base64");
-                const resultBuffer = await runpodRemoveBackground(imageB64);
+                let resultBuffer: Buffer;
+                try {
+                  resultBuffer = await runpodRemoveBackground(imageB64);
+                } catch (rpErr: any) {
+                  if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                    throw rpErr;
+                  }
+                  const { removeBackgroundBufferSharp } = await import("./_core/svgVectorize");
+                  resultBuffer = await removeBackgroundBufferSharp(imgBuffer);
+                }
                 const { storagePut, generateStorageKey } = await import("./storage");
                 const key = generateStorageKey("bg-removed", "png");
                 const { url } = await storagePut(key, resultBuffer, "image/png");
@@ -2834,7 +2852,16 @@ export const appRouter = router({
             if (isRunPodAvailable()) {
               try {
                 const { buffer: relitBuf } = await fetchGuardedImage(url);
-                const enhanced = await runpodUpscale(relitBuf.toString("base64"), 2);
+                let enhanced: Buffer;
+                try {
+                  enhanced = await runpodUpscale(relitBuf.toString("base64"), 2);
+                } catch (rpErr: any) {
+                  if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                    throw rpErr;
+                  }
+                  const { upscaleBufferSharp } = await import("./_core/svgVectorize");
+                  enhanced = await upscaleBufferSharp(relitBuf, 2);
+                }
                 const { storagePut, generateStorageKey } = await import("./storage");
                 const { url: enhancedUrl } = await storagePut(generateStorageKey("hdr", "png"), enhanced, "image/png");
                 url = enhancedUrl;
