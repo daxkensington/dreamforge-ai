@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 const mocks = vi.hoisted(() => ({
   subscription: {} as Record<string, unknown>, read: vi.fn(), claim: vi.fn(), begin: vi.fn(), complete: vi.fn(), fail: vi.fn(), reconcile: vi.fn(),
-  render: vi.fn(), createGeneration: vi.fn(), setTags: vi.fn(), active: vi.fn(), notify: vi.fn(), achievements: vi.fn(),
+  render: vi.fn(), createGeneration: vi.fn(), setTags: vi.fn(), active: vi.fn(), notify: vi.fn(), achievements: vi.fn(), deduct: vi.fn(),
 }));
 vi.mock("./db", async (original) => ({ ...(await original<Record<string, unknown>>()),
   getDb: vi.fn(async () => { const chain: Record<string, unknown> = {}; for (const key of ["select", "from", "innerJoin", "where", "orderBy"]) chain[key] = () => chain; chain.limit = async () => [mocks.subscription]; return chain; }),
@@ -16,6 +16,7 @@ vi.mock("./_core/generationBilling", () => ({
 vi.mock("./_core/imageGeneration", () => ({ generateImage: (...args: unknown[]) => mocks.render(...args), isAutomaticImageConfigured: () => true }));
 vi.mock("./_core/toolStatus", async (original) => ({ ...(await original<Record<string, unknown>>()), requireToolActive: (...args: unknown[]) => mocks.active(...args), logToolFailure: vi.fn(async () => {}) }));
 vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => {}) }));
+vi.mock("./stripe", async (original) => ({ ...(await original<Record<string, unknown>>()), deductCredits: (...args: unknown[]) => mocks.deduct(...args) }));
 vi.mock("./routersPhase15", async (original) => ({ ...(await original<Record<string, unknown>>()), createNotification: (...args: unknown[]) => mocks.notify(...args) }));
 vi.mock("./routers/phase22", async (original) => ({ ...(await original<Record<string, unknown>>()), autoCheckAchievements: (...args: unknown[]) => mocks.achievements(...args), checkAndSendBudgetAlerts: vi.fn(async () => {}) }));
 import { appRouter } from "./routers";
@@ -151,5 +152,12 @@ describe("generation request router ownership", () => {
     mocks.notify.mockRejectedValueOnce(new Error("Notification offline"));
     expect(await caller().generation.create(input())).toMatchObject({ status: "completed" });
     expect(mocks.fail).not.toHaveBeenCalled();
+  });
+  it.each(["grok-imagine-image-2.0", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare-2026-09-08", "gpt-image-2.5-sunburst-2026-09-08"])("refuses %s through legacy batch before a wallet or generation change", async (modelVersion) => {
+    await expect(caller().generation.batchCreate({ prompts: [{ prompt: "A fictional ceramic lamp", modelVersion }] })).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("image workspace") });
+    expect(mocks.createGeneration).not.toHaveBeenCalled();
+    expect(mocks.render).not.toHaveBeenCalled();
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.deduct).not.toHaveBeenCalled();
   });
 });
