@@ -557,11 +557,11 @@ describe("generation.create", () => {
         mediaType: "image",
         width: 768,
         height: 768,
-        modelVersion: "flux-pro", // registry premium image model, creditCost.base = 15
+        modelVersion: "flux-pro", // registry premium image model, creditCost.base = 210
       });
 
       expect(result.status).toBe("completed");
-      expectGenerationQuote(ctx.user.id, 15);
+      expectGenerationQuote(ctx.user.id, 210);
     } finally {
       vi.mocked(getDb).mockResolvedValue(null);
     }
@@ -624,7 +624,7 @@ describe("generation.create", () => {
 
       expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
       expect(result).not.toHaveProperty("refundedCredits");
-      expectGenerationQuote(ctx.user.id, 15);
+      expectGenerationQuote(ctx.user.id, 210);
       expect(generationBillingMocks.fail).not.toHaveBeenCalled();
       expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
     } finally {
@@ -637,7 +637,7 @@ describe("generation.create", () => {
     const catalog = await caller.generation.imageModels();
     expect(catalog).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "built-in-v1", creditCost: 5, requiredTier: "free", isConfigured: true }),
-      expect.objectContaining({ id: "flux-pro", creditCost: 15, requiredTier: "pro" }),
+      expect.objectContaining({ id: "flux-pro", creditCost: 210, requiredTier: "pro" }),
     ]));
     expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
@@ -660,9 +660,9 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     await caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion: "grok" });
     expect(mockGenerateImage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ model: "grok", userTier: "creator" }));
-    expectGenerationQuote(1, 5);
+    expectGenerationQuote(1, 105);
     expect(mockCreateGeneration).toHaveBeenCalledWith(expect.objectContaining({
-      metadata: expect.objectContaining({ requestedModelId: "grok", modelId: "grok-image", quotedCredits: 5 }),
+      metadata: expect.objectContaining({ requestedModelId: "grok", modelId: "grok-image", quotedCredits: 105 }),
     }));
     expect(generationBillingMocks.complete).toHaveBeenCalledWith(expect.objectContaining({ userId: 1 }), expect.objectContaining({
       metadata: expect.objectContaining({ imageGeneration: provenance }),
@@ -720,7 +720,7 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     const result = await caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" });
     expect(result.status).toBe("completed");
-    expectGenerationQuote(1, 15);
+    expectGenerationQuote(1, 210);
     expect(mockGenerateImage).toHaveBeenCalledWith(expect.objectContaining({ model: "flux-pro", userTier: "pro" }));
     expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
