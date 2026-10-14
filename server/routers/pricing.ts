@@ -12,6 +12,8 @@ import { eq, sql, desc, and } from "drizzle-orm";
 import { getOrCreateBalance, sanitizeRedirectOrigin, requestOriginFromCtx } from "../stripe";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
 import Stripe from "stripe";
+import { currentSubscriptionOrder } from "../_core/subscriptionSelection";
+import { getEffectiveSubscriptionTier } from "../../shared/subscriptionEntitlement";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripe: Stripe | null = null;
@@ -137,6 +139,7 @@ async function getUserSubscription(userId: number) {
     .select()
     .from(userSubscriptions)
     .where(eq(userSubscriptions.userId, userId))
+    .orderBy(...currentSubscriptionOrder())
     .limit(1);
   return rows[0] ?? null;
 }
@@ -481,13 +484,15 @@ export const pricingRouter = router({
 
 // ─── Exported Helpers for Webhook Use ──────────────────────────────────────
 
-/** Activate a subscription after Stripe confirms it */
+/** Persist provider state. Verified paid invoices alone allocate subscription credits. */
 export async function activateSubscription(
   userId: number,
   planId: number,
   stripeSubscriptionId: string,
-  periodStart: Date,
-  periodEnd: Date
+  periodStart: Date | null,
+  periodEnd: Date | null,
+  providerStatus: string = "active",
+  cancelAtPeriodEnd: boolean = false,
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -495,18 +500,24 @@ export async function activateSubscription(
   const plan = await getPlanById(planId);
   if (!plan) throw new Error(`Plan ${planId} not found`);
 
-  // Upsert user subscription
-  const existing = await getUserSubscription(userId);
+  const statusMap: Record<string, "active" | "canceled" | "past_due" | "trialing" | "incomplete"> = {
+    active: "active", canceled: "canceled", past_due: "past_due", trialing: "trialing", incomplete: "incomplete",
+  };
+  const status = statusMap[providerStatus] ?? "canceled";
+  const existingRows = await db.select().from(userSubscriptions)
+    .where(eq(userSubscriptions.stripeSubscriptionId, stripeSubscriptionId)).limit(1);
+  const existing = existingRows[0];
+  if (existing && existing.userId !== userId) throw new Error("Subscription user mapping does not match the saved account.");
   if (existing) {
     await db
       .update(userSubscriptions)
       .set({
         planId,
         stripeSubscriptionId,
-        status: "active",
+        status,
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
-        cancelAtPeriodEnd: false,
+        cancelAtPeriodEnd,
       })
       .where(eq(userSubscriptions.id, existing.id));
   } else {
@@ -514,30 +525,13 @@ export async function activateSubscription(
       userId,
       planId,
       stripeSubscriptionId,
-      status: "active",
+      status,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd,
     });
   }
 
-  // Allocate monthly credits
-  await db
-    .update(creditBalances)
-    .set({
-      balance: sql`${creditBalances.balance} + ${plan.monthlyCredits}`,
-      monthlyAllocation: plan.monthlyCredits,
-      lastResetAt: new Date(),
-    })
-    .where(eq(creditBalances.userId, userId));
-
-  // Record the transaction
-  await db.insert(creditTransactions).values({
-    userId,
-    amount: plan.monthlyCredits,
-    type: "subscription",
-    description: `${plan.displayName} plan — monthly credit allocation`,
-    metadata: { planId, planName: plan.name, stripeSubscriptionId },
-  });
 }
 
 /** Handle subscription update (plan change) */
@@ -545,8 +539,9 @@ export async function handleSubscriptionUpdated(
   stripeSubscriptionId: string,
   planName: string,
   status: string,
-  periodStart: Date,
-  periodEnd: Date
+  periodStart: Date | null,
+  periodEnd: Date | null,
+  cancelAtPeriodEnd?: boolean,
 ) {
   const db = await getDb();
   if (!db) return;
@@ -578,6 +573,7 @@ export async function handleSubscriptionUpdated(
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
   };
+  if (cancelAtPeriodEnd !== undefined) updateData.cancelAtPeriodEnd = cancelAtPeriodEnd;
   if (plan) updateData.planId = plan.id;
 
   await db
@@ -585,13 +581,6 @@ export async function handleSubscriptionUpdated(
     .set(updateData)
     .where(eq(userSubscriptions.id, sub.id));
 
-  // Update monthly allocation if plan changed
-  if (plan) {
-    await db
-      .update(creditBalances)
-      .set({ monthlyAllocation: plan.monthlyCredits })
-      .where(eq(creditBalances.userId, sub.userId));
-  }
 }
 
 /** Handle subscription cancellation */
@@ -612,6 +601,13 @@ export async function handleSubscriptionDeleted(stripeSubscriptionId: string) {
     .update(userSubscriptions)
     .set({ status: "canceled" })
     .where(eq(userSubscriptions.id, sub.id));
+
+  // Deleting an old subscription must not downgrade another current paid plan.
+  const current = await getUserSubscription(sub.userId);
+  if (current && current.id !== sub.id) {
+    const currentPlan = await getPlanById(current.planId);
+    if (getEffectiveSubscriptionTier({ ...current, planName: currentPlan?.name }) !== "free") return;
+  }
 
   // Reset monthly allocation to free tier
   const freePlan = await getPlanByName("free");

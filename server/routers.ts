@@ -1,11 +1,13 @@
 // @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
 import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
+import { beginGenerationRequest, claimGenerationRequest, completeGenerationRequest, failGenerationRequestAndRefund, markGenerationReconciliation, readGenerationRequest } from "./_core/generationBilling";
+import { hashGenerationRequest, pendingGenerationResponse, replayGenerationResponse } from "./_core/generationRequest";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -125,8 +127,10 @@ import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
 import { getDb } from "./db";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { currentSubscriptionOrder } from "./_core/subscriptionSelection";
 import { enforceRateLimit } from "./rate-limit";
-import { getTierConfig, resolveTierName } from "@shared/tiers";
+import { getTierConfig } from "@shared/tiers";
+import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
 import { LEGACY_CREDIT_COSTS, TOOL_CREDIT_COSTS } from "@shared/creditCosts";
 import { getModelById, canAccessModel } from "./_core/modelRegistry";
 
@@ -159,14 +163,19 @@ async function getUserTier(userId: number): Promise<string> {
     const db = await getDb();
     if (!db) return "free";
     const rows = await db
-      .select({ planName: subscriptionPlans.name })
+      .select({
+        planName: subscriptionPlans.name,
+        status: userSubscriptions.status,
+        currentPeriodStart: userSubscriptions.currentPeriodStart,
+        currentPeriodEnd: userSubscriptions.currentPeriodEnd,
+        cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+      })
       .from(userSubscriptions)
       .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
       .where(eq(userSubscriptions.userId, userId))
+      .orderBy(...currentSubscriptionOrder())
       .limit(1);
-    const rawTier = rows[0]?.planName ?? "free";
-    // Resolve legacy tier names (e.g. "enterprise" -> "business")
-    return resolveTierName(rawTier);
+    return getEffectiveSubscriptionTier(rows[0]);
   } catch {
     return "free";
   }
@@ -536,6 +545,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(
         z.object({
+          requestId: z.string().uuid().transform(value => value.toLowerCase()).default(() => randomUUID()),
           prompt: z.string().min(1).max(2000),
           negativePrompt: z.string().max(1000).optional(),
           mediaType: z.enum(["image", "video"]).default("image"),
@@ -551,6 +561,18 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 20 requests per minute per user
         await enforceRateLimit(`generation.create:user:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
+
+        // A retry reads the owned request before renewed plan/model checks.
+        // New eligibility cannot turn an old attempt into another charge.
+        const requestIdentity = { userId: ctx.user.id, requestId: input.requestId, payloadHash: hashGenerationRequest(input) };
+        let previousRequest;
+        try {
+          previousRequest = await readGenerationRequest(requestIdentity);
+        } catch (error) {
+          safeErrorMessage(error, "generation.create:request-read");
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Could not check your generation request. Retry with the same request ID." });
+        }
+        if (previousRequest) return replayGenerationResponse(previousRequest, requestIdentity.payloadHash, input.mediaType);
 
         // Uncensored mode requires an active crypto-paid entitlement + age
         // attestation. Image-only (no uncensored video providers).
@@ -640,7 +662,7 @@ export const appRouter = router({
           });
         }
 
-        // Deduct credits
+        // Reserve this logical request, debit and write its ledger together.
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
         // The immutable image plan quotes exactly what this invocation debits.
         // Existing special image/video branches keep their established pricing.
@@ -648,17 +670,41 @@ export const appRouter = router({
           !input.uncensored && requestedModel && requestedModel.type === input.mediaType
             ? requestedModel
             : undefined;
-        const deduction = await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`, imagePlan?.billableModelId ?? billableModel?.id, imagePlan?.creditCost);
+        try {
+          await requireToolActive(creditTool);
+        } catch (error) {
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: safeErrorMessage(error, "generation.create:tool-status") });
+        }
+        const quotedCost = imagePlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
+        const claim = await claimGenerationRequest({ ...requestIdentity, credits: quotedCost });
+        if (claim.kind === "conflict") throw new TRPCError({ code: "CONFLICT", message: "This request ID already belongs to a different generation. Start a new request." });
+        if (claim.kind === "replay") return replayGenerationResponse(claim.request, requestIdentity.payloadHash, input.mediaType);
+        if (claim.kind !== "owned") return pendingGenerationResponse(input.requestId, input.mediaType);
+        const requestOwner = claim.owner;
+        const deduction = { cost: claim.request.quotedCredits };
 
         let genId: number | undefined;
         let url: string | undefined;
+        let providerInvocationStarted = false;
         let delivered = false;
+        let savedResponse;
         let imageProvenance: Awaited<ReturnType<typeof executeImageCreation>>["provenance"];
         const generationMetadata = input.uncensored
-          ? { uncensored: true, style: input.uncensoredStyle ?? null }
+          ? { billingRequestId: input.requestId, uncensored: true, style: input.uncensoredStyle ?? null }
           : imagePlan
-            ? { requestedModelId: imagePlan.requestedModelId, modelId: imagePlan.modelId, quotedCredits: imagePlan.creditCost }
-            : null;
+            ? { billingRequestId: input.requestId, requestedModelId: imagePlan.requestedModelId, modelId: imagePlan.modelId, quotedCredits: imagePlan.creditCost }
+            : { billingRequestId: input.requestId };
+
+        const pendingForReview = async (errorCode: string) => {
+          try {
+            const review = await markGenerationReconciliation(requestOwner, { errorCode, generationId: genId });
+            if (review.kind === "reconciliation" || review.kind === "replay") {
+              const response = replayGenerationResponse(review.request, requestIdentity.payloadHash, input.mediaType);
+              return response.status === "generating" ? { ...response, reconciliationRequired: true } : response;
+            }
+          } catch (error) { safeErrorMessage(error, "generation.create:reconciliation"); }
+          return { ...pendingGenerationResponse(input.requestId, input.mediaType), reconciliationRequired: true };
+        };
 
         // Every operation after a successful debit shares the refund scope.
         try {
@@ -684,6 +730,12 @@ export const appRouter = router({
             await setGenerationTags(genId, input.tagIds);
           }
 
+          // A reservation may begin only once. An ambiguous CAS never launches
+          // another upstream operation; the durable state remains queryable.
+          const begun = await beginGenerationRequest(requestOwner, genId);
+          if (begun.kind === "replay") return replayGenerationResponse(begun.request, requestIdentity.payloadHash, input.mediaType);
+          if (begun.kind !== "begun") return pendingGenerationResponse(input.requestId, input.mediaType);
+
           // Generate media
           let enhancedPrompt: string;
           if (input.mediaType === "video") {
@@ -703,6 +755,7 @@ export const appRouter = router({
             if (isRunPodAvailable()) {
               const styleHint = input.modelVersion.replace("df-", "dreamforge ");
               const styledPrompt = `${styleHint} style. ${enhancedPrompt}`;
+              providerInvocationStarted = true;
               const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
               const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
               const key = gk("generations", "png");
@@ -711,6 +764,7 @@ export const appRouter = router({
           }
 
           if (!url && imagePlan) {
+            providerInvocationStarted = true;
             const rendered = await executeImageCreation(imagePlan, { prompt: enhancedPrompt });
             url = rendered.url;
             imageProvenance = rendered.provenance;
@@ -724,6 +778,7 @@ export const appRouter = router({
             // Uncensored ignores model selection — only the unfiltered chain
             // (self-hosted RunPod + fal) may serve it.
             const model = input.uncensored ? "auto" : (modelMap[input.modelVersion] || "auto");
+            providerInvocationStarted = true;
             ({ url } = await generateImage({
               prompt: enhancedPrompt,
               model: model as any,
@@ -738,12 +793,24 @@ export const appRouter = router({
 
           if (!url?.trim()) throw new Error("The image provider returned no downloadable image.");
 
-          await updateGeneration(genId, {
-            status: "completed",
-            imageUrl: url ?? null,
-            thumbnailUrl: url ?? null,
-            ...(imagePlan ? { metadata: { ...generationMetadata, imageGeneration: imageProvenance ?? null } } : {}),
-          });
+          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
+          // The completed generation and immutable replay result commit together.
+          // A lost acknowledgement must not enter the failure-refund path.
+          let completion;
+          try {
+            completion = await completeGenerationRequest(requestOwner, {
+              result, imageUrl: url, thumbnailUrl: url,
+              metadata: imagePlan ? { ...generationMetadata, imageGeneration: imageProvenance ?? null } : generationMetadata,
+            });
+          } catch (error) {
+            safeErrorMessage(error, "generation.create:completion-uncertain");
+            completion = { kind: "uncertain" };
+          }
+          if (completion.kind === "replay") return replayGenerationResponse(completion.request, requestIdentity.payloadHash, input.mediaType);
+          if (completion.kind !== "completed") {
+            return pendingForReview("completion-uncertain");
+          }
+          savedResponse = replayGenerationResponse(completion.request, requestIdentity.payloadHash, input.mediaType);
           delivered = true;
 
           // Notify on completion
@@ -756,23 +823,14 @@ export const appRouter = router({
           }
 
           // Auto-check achievements and budget alerts (fire-and-forget)
-          const achievementPromise = autoCheckAchievements(ctx.user.id).catch(() => []);
+          autoCheckAchievements(ctx.user.id).catch(() => []);
           checkAndSendBudgetAlerts(ctx.user.id).catch(() => {});
-          const newAchievements = await achievementPromise;
-
-          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements, ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
+          return savedResponse!;
         } catch (error: any) {
           const failureMessage = safeErrorMessage(error, "generation.create");
           // Cosmetic follow-up failures must never undo a delivered result.
-          if (delivered) {
-            return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
-          }
-          if (genId !== undefined) {
-            try {
-              await updateGeneration(genId, { status: "failed", errorMessage: failureMessage });
-            } catch (statusError) {
-              safeErrorMessage(statusError, "generation.create:failed-status");
-            }
+          if (delivered && savedResponse) {
+            return savedResponse;
           }
           // Telemetry — drives auto-degrade + admin failure dashboard
           logToolFailure({
@@ -780,17 +838,18 @@ export const appRouter = router({
             errorMessage: failureMessage,
             userId: ctx.user.id,
           }).catch(() => {});
-          // Refund credits on generation failure — exactly what was deducted.
-          const refundCost = deduction.cost;
+          // Existing renderers throw generic errors. After invocation, a lost
+          // response, polling timeout or storage failure cannot prove a terminal
+          // provider failure. Hold for review until a verified outcome exists.
+          if (providerInvocationStarted) return pendingForReview("provider-outcome-uncertain");
+          // State, exact refund and refund ledger are one guarded operation.
           try {
-            await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${failureMessage.slice(0, 100)}`);
+            const settled = await failGenerationRequestAndRefund(requestOwner, { confirmedFailure: true, errorCode: "generation-failed", errorMessage: failureMessage, generationId: genId });
+            if (settled.kind === "refunded" || settled.kind === "replay") return replayGenerationResponse(settled.request, requestIdentity.payloadHash, input.mediaType);
           } catch (refundErr) {
-            safeErrorMessage(refundErr, "generation.create:refund");
+            safeErrorMessage(refundErr, "generation.create:settlement-uncertain");
           }
-          if (genId === undefined) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start your generation. Please try again." });
-          }
-          return { id: genId, status: "failed", error: failureMessage };
+          return pendingForReview("settlement-uncertain");
         }
       }),
 

@@ -107,9 +107,14 @@ async function applyDailyFreeCredits(userId: number): Promise<void> {
          OR cb."lastResetAt" < date_trunc('day', now() AT TIME ZONE 'UTC')
        )
        AND NOT EXISTS (
-         SELECT 1 FROM "userSubscriptions" us
+         SELECT 1 FROM "userSubscriptions" us JOIN "subscriptionPlans" sp ON sp.id = us."planId"
           WHERE us."userId" = cb."userId"
+            AND sp.name IN ('creator', 'pro', 'studio', 'business', 'agency', 'enterprise')
             AND us."subStatus" IN ('active', 'trialing')
+            AND us."currentPeriodStart" IS NOT NULL
+            AND us."currentPeriodEnd" IS NOT NULL
+            AND us."currentPeriodStart" <= (now() AT TIME ZONE 'UTC')
+            AND us."currentPeriodEnd" > (now() AT TIME ZONE 'UTC')
        )
   `);
 }

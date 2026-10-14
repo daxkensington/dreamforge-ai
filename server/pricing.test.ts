@@ -42,7 +42,8 @@ vi.mock("./stripe", async (importOriginal) => {
 
 import { getDb } from "./db";
 import { addCredits, createCheckoutSession, getOrCreateBalance, sanitizeRedirectOrigin, CREDIT_PACKAGES } from "./stripe";
-import { pricingRouter, handleMonthlyReset, handleSubscriptionUpdated } from "./routers/pricing";
+import { pricingRouter, activateSubscription, handleMonthlyReset, handleSubscriptionUpdated, handleSubscriptionDeleted } from "./routers/pricing";
+import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../shared/creditCosts";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────
@@ -168,6 +169,54 @@ beforeEach(() => {
     ],
   });
   vi.mocked(getOrCreateBalance).mockResolvedValue(balanceRow as any);
+});
+
+describe("provider subscription state persistence", () => {
+  const start = new Date(Date.now() - 86_400_000);
+  const end = new Date(Date.now() + 86_400_000);
+
+  it("records incomplete creation with null dates and no credit allocation", async () => {
+    const { db, captured } = makeDb({ selectQueue: [[planRow("pro")], []] });
+    installDb(db);
+    await activateSubscription(1, 2, "sub_incomplete", null, null, "incomplete", false);
+    expect(captured.values).toEqual([expect.objectContaining({
+      userId: 1, status: "incomplete", currentPeriodStart: null, currentPeriodEnd: null,
+    })]);
+    expect(captured.updateCount).toBe(0);
+    expect(captured.insertCount).toBe(1);
+    expect(getEffectiveSubscriptionTier({ planName: "pro", ...captured.values[0] })).toBe("free");
+  });
+
+  it("persists active/trial state and scheduled cancellation without granting credits", async () => {
+    const { db, captured } = makeDb({ selectQueue: [[planRow("pro")], []] });
+    installDb(db);
+    await activateSubscription(1, 2, "sub_trial", start, end, "trialing", true);
+    expect(captured.values).toEqual([expect.objectContaining({ status: "trialing", cancelAtPeriodEnd: true })]);
+    expect(captured.updateCount).toBe(0);
+    expect(getEffectiveSubscriptionTier({ planName: "pro", ...captured.values[0] })).toBe("pro");
+  });
+
+  it("promotes a saved incomplete row after current provider confirmation while leaving allocation to paid invoices", async () => {
+    const subscription = { id: 5, userId: 1, planId: 2, stripeSubscriptionId: "sub_incomplete", status: "incomplete" };
+    const { db, captured } = makeDb({ selectQueue: [[subscription], [{ id: 2 }], [planRow("pro")]] });
+    installDb(db);
+    await handleSubscriptionUpdated("sub_incomplete", "pro", "active", start, end, true);
+    expect(captured.sets).toEqual([expect.objectContaining({ status: "active", currentPeriodStart: start, currentPeriodEnd: end, cancelAtPeriodEnd: true })]);
+    expect(captured.updateCount).toBe(1);
+    expect(captured.insertCount).toBe(0);
+    expect(getEffectiveSubscriptionTier({ planName: "pro", ...captured.sets[0] })).toBe("pro");
+  });
+
+  it("preserves wallet allocation when an old subscription is deleted after another eligible plan became current", async () => {
+    const oldSubscription = { id: 5, userId: 1, planId: 2, stripeSubscriptionId: "sub_old", status: "active" };
+    const currentSubscription = { id: 6, userId: 1, planId: 2, stripeSubscriptionId: "sub_current", status: "active", currentPeriodStart: start, currentPeriodEnd: end };
+    const { db, captured } = makeDb({ selectQueue: [[oldSubscription], [currentSubscription], [planRow("pro")]] });
+    installDb(db);
+    await handleSubscriptionDeleted("sub_old");
+    expect(captured.sets).toEqual([{ status: "canceled" }]);
+    expect(captured.updateCount).toBe(1);
+    expect(captured.insertCount).toBe(0);
+  });
 });
 
 // ─── P0.2 — pack-credit carryover ───────────────────────────────────────────

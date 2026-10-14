@@ -19,6 +19,7 @@ import {
   handleSubscriptionDeleted,
   handleMonthlyReset,
 } from "../../../../server/routers/pricing";
+import { allocatePaidSubscriptionInvoice, hasPaidSubscriptionInvoiceAllocation } from "../../../../server/_core/subscriptionBilling";
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -38,28 +39,80 @@ export function getStripeClient(): Stripe {
  * prod on 2026-09-12, the subscription was active and paid and the customer
  * got no plan row and no credits.
  *
- * Prefer the item, fall back to the legacy top-level field, then to sensible
- * defaults — a future shape change must never again cost a payer their plan.
+ * Current item/legacy billing dates and explicit trial dates are authoritative.
+ * Missing eligible dates fail for reconciliation instead of inventing paid time.
  */
-function subscriptionPeriod(sub: Stripe.Subscription): { start: Date; end: Date } {
+function subscriptionPeriod(sub: Stripe.Subscription): { start: Date | null; end: Date | null } {
   const anySub = sub as any;
   const item = anySub.items?.data?.[0];
-  const rawStart = item?.current_period_start ?? anySub.current_period_start ?? anySub.start_date;
-  const rawEnd = item?.current_period_end ?? anySub.current_period_end;
-
-  const start = Number.isFinite(rawStart) ? new Date(rawStart * 1000) : new Date();
-  const end = Number.isFinite(rawEnd)
-    ? new Date(rawEnd * 1000)
-    : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) {
-    console.warn(
-      "[Stripe Webhook] Subscription period missing on",
-      sub.id,
-      "- falling back so the entitlement is still granted"
-    );
+  const trialing = sub.status === "trialing";
+  const rawStart = (trialing ? anySub.trial_start : undefined) ?? item?.current_period_start ?? anySub.current_period_start;
+  const rawEnd = (trialing ? anySub.trial_end : undefined) ?? item?.current_period_end ?? anySub.current_period_end;
+  const valid = Number.isSafeInteger(rawStart) && Number.isSafeInteger(rawEnd)
+    && rawStart >= 0 && rawEnd > rawStart
+    && Number.isFinite(new Date(rawStart * 1000).getTime()) && Number.isFinite(new Date(rawEnd * 1000).getTime());
+  if (!valid) {
+    if (sub.status === "active" || trialing) {
+      throw new Error("Subscription period missing or invalid; no entitlement granted. Reconcile Stripe period data before retrying this event.");
+    }
+    return { start: null, end: null };
   }
-  return { start, end };
+  return { start: new Date(rawStart * 1000), end: new Date(rawEnd * 1000) };
+}
+
+async function currentSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+  const sub = await getStripeClient().subscriptions.retrieve(subscriptionId);
+  if (sub.id !== subscriptionId) throw new Error("Stripe subscription retrieval returned a different subscription.");
+  return sub;
+}
+
+async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
+  const userId = Number(sub.metadata?.user_id);
+  const planId = Number(sub.metadata?.plan_id);
+  if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(planId) || planId <= 0) {
+    throw new Error("Stripe subscription requires verified user and plan metadata before reconciliation.");
+  }
+  const period = subscriptionPeriod(sub);
+  await activateSubscription(userId, planId, sub.id, period.start, period.end, sub.status, sub.cancel_at_period_end);
+}
+
+function invoiceServiceMapping(invoice: any, subscriptionId: string) {
+  const id = (value: any) => typeof value === "string" ? value : value?.id;
+  const lines = (invoice.lines?.data ?? []) as any[];
+  const matches = lines.filter(line => {
+    const details = line.parent?.subscription_item_details;
+    const subscriptionItem = details?.subscription_item ?? line.subscription_item;
+    const lineSubscription = id(details?.subscription ?? line.subscription);
+    const price = line.pricing?.price_details?.price ?? line.price;
+    const recurring = line.parent?.type === "subscription_item_details" || line.type === "subscription";
+    return recurring && typeof subscriptionItem === "string" && (!lineSubscription || lineSubscription === subscriptionId)
+      && !(details?.proration ?? line.proration) && typeof id(price) === "string";
+  });
+  if (invoice.lines?.has_more || matches.length !== 1) throw new Error("Invoice service period is missing or ambiguous; reconcile before allocation.");
+  const rawStart = matches[0].period?.start;
+  const rawEnd = matches[0].period?.end;
+  if (!Number.isSafeInteger(rawStart) || !Number.isSafeInteger(rawEnd) || rawStart < 0 || rawEnd <= rawStart
+    || !Number.isFinite(new Date(rawStart * 1000).getTime()) || !Number.isFinite(new Date(rawEnd * 1000).getTime())) {
+    throw new Error("Invoice service period is missing or invalid; reconcile before allocation.");
+  }
+  const details = matches[0].parent?.subscription_item_details;
+  return {
+    invoiceId: invoice.id, subscriptionId,
+    subscriptionItemId: details?.subscription_item ?? matches[0].subscription_item,
+    priceId: id(matches[0].pricing?.price_details?.price ?? matches[0].price),
+    periodStart: new Date(rawStart * 1000), periodEnd: new Date(rawEnd * 1000),
+  };
+}
+
+function admitInvoicePeriod(mapping: ReturnType<typeof invoiceServiceMapping>, sub: Stripe.Subscription): void {
+  const id = (value: any) => typeof value === "string" ? value : value?.id;
+  const items = (sub.items?.data ?? []) as any[];
+  const current = subscriptionPeriod(sub);
+  if (items.length !== 1 || sub.items?.has_more || items[0].id !== mapping.subscriptionItemId || id(items[0].price) !== mapping.priceId
+    || !current.start || !current.end || current.start.getTime() !== mapping.periodStart.getTime() || current.end.getTime() !== mapping.periodEnd.getTime()
+    || mapping.periodStart.getTime() > Date.now() || mapping.periodEnd.getTime() <= Date.now()) {
+    throw new Error("Invoice service period is old or does not match the current verified subscription; reconcile before allocation.");
+  }
 }
 
 type WebhookDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -214,8 +267,23 @@ export async function processStripeEvent(
       .returning({ id: webhookEvents.id });
 
     if (claimed.length === 0) {
+      // These paths are now idempotent state sync or atomic invoice allocation.
+      // Their failed events can be retried without reopening unrelated payment paths.
+      const retryable = ["invoice.paid", "invoice.payment_succeeded", "customer.subscription.created", "customer.subscription.updated"].includes(event.type);
+      if (retryable) {
+        const retried = await db.update(webhookEvents)
+          .set({ status: "pending", summary: "Retry claimed after failed subscription processing", errorMessage: null })
+          .where(and(eq(webhookEvents.eventId, event.id), eq(webhookEvents.eventType, event.type), eq(webhookEvents.status, "failed")))
+          .returning({ id: webhookEvents.id });
+        if (retried.length === 1) {
+          // Continue through the same processing/logging scope below.
+        } else {
+          return "duplicate";
+        }
+      } else {
       console.log("[Stripe Webhook] Duplicate event, skipping:", event.id);
       return "duplicate";
+      }
     }
   }
 
@@ -437,13 +505,13 @@ export async function processStripeEvent(
 
       // ─── Subscription Created ────────────────────────────────────
       case "customer.subscription.created": {
-        const sub = event.data.object as Stripe.Subscription;
+        const incoming = event.data.object as Stripe.Subscription;
+        const sub = await currentSubscription(incoming.id);
         const userId = parseInt(sub.metadata?.user_id || "0");
         const planId = parseInt(sub.metadata?.plan_id || "0");
 
         if (userId && planId) {
-          const period = subscriptionPeriod(sub);
-          await activateSubscription(userId, planId, sub.id, period.start, period.end);
+          await syncSubscription(sub);
           console.log(
             `[Stripe Webhook] Subscription created for user ${userId}, plan ${sub.metadata?.plan_name}`
           );
@@ -451,22 +519,23 @@ export async function processStripeEvent(
             await createNotification(
               userId,
               "payment",
-              "Subscription Active",
-              `Your ${sub.metadata?.plan_name || "new"} plan is now active. Credits have been allocated!`,
+              "Subscription Updated",
+              `Your subscription status is ${sub.status}. Credits are allocated after a verified paid invoice.`,
               { planId, subscriptionId: sub.id }
             );
           } catch {}
         }
         await logWebhookEvent(
           "processed",
-          `Subscription created for user ${userId}, plan ${planId}`
+          `Subscription created for user ${userId}, plan ${planId}, providerStatus=${sub.status}`
         );
         break;
       }
 
       // ─── Subscription Updated ────────────────────────────────────
       case "customer.subscription.updated": {
-        const sub = event.data.object as Stripe.Subscription;
+        const incoming = event.data.object as Stripe.Subscription;
+        const sub = await currentSubscription(incoming.id);
         const planName = sub.metadata?.plan_name || "";
         const updatedPeriod = subscriptionPeriod(sub);
         await handleSubscriptionUpdated(
@@ -474,7 +543,8 @@ export async function processStripeEvent(
           planName,
           sub.status,
           updatedPeriod.start,
-          updatedPeriod.end
+          updatedPeriod.end,
+          sub.cancel_at_period_end,
         );
         console.log(`[Stripe Webhook] Subscription updated: ${sub.id} → ${sub.status}`);
         await logWebhookEvent(
@@ -506,16 +576,23 @@ export async function processStripeEvent(
       }
 
       // ─── Invoice / Monthly Reset ─────────────────────────────────
+      case "invoice.paid":
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as any;
-        const subId =
-          typeof invoice.subscription === "string"
-            ? invoice.subscription
-            : invoice.subscription?.id;
-        if (subId && invoice.billing_reason === "subscription_cycle") {
-          await handleMonthlyReset(subId);
-          console.log(`[Stripe Webhook] Monthly credit reset for subscription ${subId}`);
-          await logWebhookEvent("processed", `Monthly credit reset for subscription ${subId}`);
+        const linked = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
+        const subId = typeof linked === "string" ? linked : linked?.id;
+        const paid = invoice.status === "paid" || (invoice.status == null && invoice.paid === true);
+        if (subId && paid && ["subscription_create", "subscription_cycle"].includes(invoice.billing_reason)) {
+          const mapping = invoiceServiceMapping(invoice, subId);
+          if (await hasPaidSubscriptionInvoiceAllocation(mapping)) {
+            await logWebhookEvent("processed", `Subscription invoice ${invoice.id}: duplicate allocation`);
+            break;
+          }
+          const subscription = await currentSubscription(subId);
+          admitInvoicePeriod(mapping, subscription);
+          await syncSubscription(subscription);
+          const result = await allocatePaidSubscriptionInvoice(mapping);
+          await logWebhookEvent("processed", `Subscription invoice ${invoice.id}: ${result}`);
         } else {
           await logWebhookEvent("processed", `Invoice payment succeeded: ${invoice.id}`);
         }

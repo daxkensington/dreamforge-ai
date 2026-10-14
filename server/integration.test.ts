@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const billing = vi.hoisted(() => ({ read: vi.fn(), claim: vi.fn(), begin: vi.fn(), complete: vi.fn(), fail: vi.fn(), reconcile: vi.fn(), records: new Map<string, any>() }));
+vi.mock("./_core/generationBilling", () => ({
+  readGenerationRequest: (...args: any[]) => billing.read(...args), claimGenerationRequest: (...args: any[]) => billing.claim(...args),
+  beginGenerationRequest: (...args: any[]) => billing.begin(...args), completeGenerationRequest: (...args: any[]) => billing.complete(...args),
+  failGenerationRequestAndRefund: (...args: any[]) => billing.fail(...args), markGenerationReconciliation: (...args: any[]) => billing.reconcile(...args),
+}));
+
 // Mock image generation
 vi.mock("./_core/imageGeneration", () => ({
   // This suite assumes a configured renderer; real configuration admission
@@ -154,6 +161,21 @@ const caller = appRouter.createCaller(mockCtx as any);
 describe("Credit Deduction Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    billing.records.clear();
+    billing.read.mockResolvedValue(null);
+    billing.claim.mockImplementation(async input => {
+      const request = { ...input, id: 1, quotedCredits: input.credits, state: "reserved", generationId: null, result: null };
+      billing.records.set(input.requestId, request);
+      return { kind: "owned", request, owner: { ...input, id: 1, executionToken: "11111111-1111-4111-8111-111111111111" } };
+    });
+    billing.begin.mockImplementation(async (owner, generationId) => {
+      const request = { ...billing.records.get(owner.requestId), state: "rendering", generationId };
+      billing.records.set(owner.requestId, request);
+      return { kind: "begun", request };
+    });
+    billing.complete.mockImplementation(async (owner, input) => ({ kind: "completed", request: { ...billing.records.get(owner.requestId), state: "completed", result: input.result } }));
+    billing.fail.mockResolvedValue({ kind: "uncertain" });
+    billing.reconcile.mockResolvedValue({ kind: "uncertain" });
   });
 
   it("should deduct credits when generating an image", async () => {
@@ -164,10 +186,11 @@ describe("Credit Deduction Integration", () => {
     });
     // Actual cost comes from MODEL_CREDIT_COSTS (defaults to image.standard=5);
     // the local CREDIT_COSTS override doesn't apply to model-tier-aware paths.
-    expect(deductCredits).toHaveBeenCalledWith(1, expect.any(Number), expect.any(String));
+    expect(billing.claim).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: 1, credits: 5 }));
     expect(result).toMatchObject({ id: 1, status: "completed", imageUrl: "https://cdn.example.com/result.png" });
     expect(generateImage).toHaveBeenCalledTimes(1);
     expect(refundCredits).not.toHaveBeenCalled();
+    expect(billing.fail).not.toHaveBeenCalled();
   });
 
   it("should deduct credits when upscaling an image", async () => {

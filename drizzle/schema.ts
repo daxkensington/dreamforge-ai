@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -11,6 +12,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -221,6 +223,38 @@ export const generations = pgTable("generations", {
 
 export type Generation = typeof generations.$inferSelect;
 export type InsertGeneration = typeof generations.$inferInsert;
+
+// Durable request identity for generation.create only. Existing generations remain unchanged.
+export const generationRequests = pgTable("generationRequests", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  requestId: uuid("requestId").notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  executionToken: uuid("executionToken").notNull(), // internal owner capability, never returned to clients
+  quotedCredits: integer("quotedCredits").notNull(),
+  state: varchar("state", { length: 24 }).notNull(),
+  generationId: integer("generationId").references(() => generations.id),
+  result: jsonb("result"),
+  errorCode: varchar("errorCode", { length: 128 }),
+  debitedAt: timestamp("debitedAt"),
+  refundedAt: timestamp("refundedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("generationRequests_user_request_unique").on(table.userId, table.requestId),
+  uniqueIndex("generationRequests_generation_unique").on(table.generationId),
+  index("generationRequests_state_updated_idx").on(table.state, table.updatedAt),
+  check("generationRequests_positive_quote", sql`${table.quotedCredits} > 0`),
+  check("generationRequests_payload_hash", sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`),
+  check("generationRequests_state_valid", sql`${table.state} IN ('reserved', 'rendering', 'completed', 'rejected', 'refunded', 'reconciliation')`),
+  check("generationRequests_debit_state", sql`(${table.state} = 'rejected' AND ${table.debitedAt} IS NULL) OR (${table.state} <> 'rejected' AND ${table.debitedAt} IS NOT NULL)`),
+  check("generationRequests_refund_state", sql`(${table.state} = 'refunded') = (${table.refundedAt} IS NOT NULL)`),
+  check("generationRequests_result_state", sql`(${table.state} IN ('completed', 'rejected', 'refunded')) = (${table.result} IS NOT NULL)`),
+  check("generationRequests_result_object", sql`${table.result} IS NULL OR jsonb_typeof(${table.result}) = 'object'`),
+  check("generationRequests_render_owner", sql`${table.state} NOT IN ('rendering', 'completed') OR ${table.generationId} IS NOT NULL`),
+]);
+
+export type GenerationRequest = typeof generationRequests.$inferSelect;
 
 // ─── Generation Tags (join table) ────────────────────────────────────────────
 export const generationTags = pgTable("generationTags", {
