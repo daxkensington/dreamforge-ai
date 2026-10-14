@@ -42,9 +42,14 @@ async function topUp(userId: number) {
         AND (cb."lastResetAt" IS NULL
              OR cb."lastResetAt" < date_trunc('day', now() AT TIME ZONE 'UTC'))
         AND NOT EXISTS (
-          SELECT 1 FROM "userSubscriptions" us
+          SELECT 1 FROM "userSubscriptions" us JOIN "subscriptionPlans" sp ON sp.id = us."planId"
            WHERE us."userId" = cb."userId"
+             AND sp.name IN ('creator','pro','studio','business','agency','enterprise')
              AND us."subStatus" IN ('active','trialing')
+             AND us."currentPeriodStart" IS NOT NULL
+             AND us."currentPeriodEnd" IS NOT NULL
+             AND us."currentPeriodStart" <= (now() AT TIME ZONE 'UTC')
+             AND us."currentPeriodEnd" > (now() AT TIME ZONE 'UTC')
         )
       RETURNING cb.balance`,
     [userId, DAILY],
@@ -120,9 +125,12 @@ describe.skipIf(!sql)("daily free credits", () => {
 
   it("does not refill an active subscriber (they draw on monthlyAllocation)", async () => {
     await setRow(userId, 0, "2020-01-01 00:00:00");
+    const paidPlan = (await sql!(`SELECT id FROM "subscriptionPlans" WHERE name='pro' ORDER BY id LIMIT 1`))[0];
+    expect(paidPlan).toBeDefined();
     await sql!(
-      `INSERT INTO "userSubscriptions" ("userId","planId","subStatus") VALUES ($1,$2,'active')`,
-      [userId, 1],
+      `INSERT INTO "userSubscriptions" ("userId","planId","subStatus","currentPeriodStart","currentPeriodEnd")
+       VALUES ($1,$2,'active', (now() AT TIME ZONE 'UTC') - interval '1 day', (now() AT TIME ZONE 'UTC') + interval '1 day')`,
+      [userId, paidPlan.id],
     );
     try {
       await topUp(userId);

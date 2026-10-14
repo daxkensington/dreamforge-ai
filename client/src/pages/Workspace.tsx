@@ -60,13 +60,34 @@ import { StylePresets } from "@/components/StylePresets";
 import { ShareButton } from "@/components/ShareButton";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { getTierConfig, resolveTierName } from "@shared/tiers";
+import { getTierConfig } from "@shared/tiers";
+import { getSubscriptionEntitlement } from "@shared/subscriptionEntitlement";
 import {
   getWorkspaceImageSelectionError,
   hasWorkspaceModelAccess,
   WORKSPACE_AUTO_IMAGE_MODEL,
   WORKSPACE_AUTO_VIDEO_MODEL,
+  fingerprintGenerationInput,
+  isGenerationRequestRetry,
+  isTerminalGenerationResult,
+  resolveGenerationRequestIdentity,
+  readGenerationRequestIdentity,
+  persistGenerationRequestIdentity,
+  clearGenerationRequestIdentity,
+  type GenerationRequestIdentity,
 } from "@shared/workspaceModelSelection";
+
+type WorkspaceGenerationPayload = {
+  prompt: string;
+  negativePrompt?: string;
+  mediaType: "image" | "video";
+  width: number;
+  height: number;
+  duration?: number;
+  modelVersion: string;
+  tagIds?: number[];
+  uncensored: boolean;
+};
 
 // Existing style presets retain their separate execution path.
 const DF_IMAGE_PRESETS = [
@@ -144,6 +165,17 @@ export default function Workspace() {
   const [animateStyle, setAnimateStyle] = useState<string>("smooth-pan");
   const [uncensored, setUncensored] = useState(false);
   const generationInFlight = useRef(false);
+  const generationUser = useRef(user?.id);
+  generationUser.current = user?.id;
+  const pendingRequestRef = useRef<GenerationRequestIdentity | null>(null);
+  const pendingPayloadRef = useRef<WorkspaceGenerationPayload | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<GenerationRequestIdentity | null>(null);
+  const [preparingSubmission, setPreparingSubmission] = useState(false);
+  const [draftMatchesPending, setDraftMatchesPending] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<"processing" | "review" | "uncertain" | "retry">("uncertain");
+  const [retryAvailable, setRetryAvailable] = useState(true);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [entitlementNow, setEntitlementNow] = useState(() => Date.now());
 
   // Uncensored entitlement (crypto-paid tier). Drives the toggle's enabled
   // state + the "activate" CTA.
@@ -160,29 +192,91 @@ export default function Workspace() {
     enabled: isAuthenticated,
     retry: 1,
   });
-  const userTier = resolveTierName(subscriptionQuery.data?.plan?.name ?? "free");
+  const subscriptionInput = useMemo(() => ({
+    planName: subscriptionQuery.data?.plan?.name,
+    status: subscriptionQuery.data?.subscription?.status,
+    currentPeriodStart: subscriptionQuery.data?.subscription?.currentPeriodStart,
+    currentPeriodEnd: subscriptionQuery.data?.subscription?.currentPeriodEnd,
+    cancelAtPeriodEnd: subscriptionQuery.data?.subscription?.cancelAtPeriodEnd,
+  }), [subscriptionQuery.data]);
+  const subscriptionEntitlement = getSubscriptionEntitlement(subscriptionInput, entitlementNow);
+  const userTier = subscriptionEntitlement.tier;
+  useEffect(() => { setEntitlementNow(Date.now()); }, [subscriptionInput]);
+  useEffect(() => {
+    if (subscriptionEntitlement.expiresAt === null) return;
+    const wait = Math.min(2_147_483_647, Math.max(1, subscriptionEntitlement.expiresAt - Date.now() + 1));
+    const timer = setTimeout(() => setEntitlementNow(Date.now()), wait);
+    return () => clearTimeout(timer);
+  }, [subscriptionEntitlement.expiresAt, entitlementNow]);
+  useEffect(() => {
+    const updateTime = () => setEntitlementNow(Date.now());
+    window.addEventListener("focus", updateTime);
+    document.addEventListener("visibilitychange", updateTime);
+    return () => { window.removeEventListener("focus", updateTime); document.removeEventListener("visibilitychange", updateTime); };
+  }, []);
   const planReady = subscriptionQuery.isSuccess && !subscriptionQuery.isError && !subscriptionQuery.isFetching;
   const imageCatalogReady = imageModelsQuery.isSuccess && !imageModelsQuery.isError && !imageModelsQuery.isFetching;
   const uncensoredEnabled = uncensored && uncensoredActive && mediaType === "image";
   const selectedDFPreset = DF_IMAGE_PRESETS.some((preset) => preset.value === modelVersion);
   const selectedImageModel = imageModelsQuery.data?.find((model) => model.id === modelVersion);
-  const imageSelectionError = mediaType !== "image" || uncensoredEnabled
+  const getCurrentImageSelectionError = (tier = userTier) => mediaType !== "image" || uncensoredEnabled
     ? null
     : selectedDFPreset
       ? !planReady
         ? "Your subscription is still being checked. Try again or choose Auto."
-        : !hasWorkspaceModelAccess(userTier, "creator")
+        : !hasWorkspaceModelAccess(tier, "creator")
           ? "DreamForge style presets require Creator or higher."
           : null
       : getWorkspaceImageSelectionError({
           modelId: modelVersion,
           catalog: imageModelsQuery.data,
           catalogReady: imageCatalogReady,
-          userTier,
+          userTier: tier,
           planReady,
           width,
           height,
         });
+  const imageSelectionError = getCurrentImageSelectionError();
+  const draftPayload = useMemo<WorkspaceGenerationPayload>(() => ({
+    prompt: prompt.trim(),
+    negativePrompt: negativePrompt.trim() || undefined,
+    mediaType, width, height,
+    duration: mediaType === "video" ? duration : undefined,
+    modelVersion,
+    tagIds: selectedTags.length > 0 ? [...selectedTags].sort((left, right) => left - right) : undefined,
+    uncensored: uncensoredEnabled,
+  }), [prompt, negativePrompt, mediaType, width, height, duration, modelVersion, selectedTags, uncensoredEnabled]);
+
+  useEffect(() => {
+    const identity = user ? readGenerationRequestIdentity(user.id) : null;
+    pendingRequestRef.current = identity;
+    pendingPayloadRef.current = null;
+    setPendingRequest(identity);
+    setPendingStatus("uncertain");
+  }, [user?.id]);
+  useEffect(() => {
+    let current = true;
+    setDraftMatchesPending(false);
+    if (pendingRequest) {
+      fingerprintGenerationInput(draftPayload).then((fingerprint) => {
+        if (current) setDraftMatchesPending(isGenerationRequestRetry(pendingRequest, user?.id ?? 0, fingerprint));
+      }).catch(() => { if (current) setDraftMatchesPending(false); });
+    }
+    return () => { current = false; };
+  }, [pendingRequest, draftPayload, user?.id]);
+  useEffect(() => () => { if (retryTimer.current) clearTimeout(retryTimer.current); }, []);
+
+  const clearConfirmedRequest = (requestId: string | undefined) => {
+    const identity = pendingRequestRef.current;
+    if (!identity || identity.requestId !== requestId) return;
+    clearGenerationRequestIdentity(identity);
+    pendingRequestRef.current = null;
+    pendingPayloadRef.current = null;
+    setPendingRequest(null);
+    setDraftMatchesPending(false);
+    setRetryAvailable(true);
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+  };
 
   const { data: tags } = trpc.tags.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: generations, refetch: refetchGens } = trpc.generation.list.useQuery(
@@ -196,7 +290,10 @@ export default function Workspace() {
     onSettled: () => {
       generationInFlight.current = false;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables) => {
+      if (isTerminalGenerationResult(data)) {
+        clearConfirmedRequest(data.requestId ?? variables?.requestId);
+      }
       if (data.status === "completed") {
         track("generation_completed", { source: "workspace", mediaType: data.mediaType });
         toast.success(`${data.mediaType === "video" ? "Video" : "Image"} generation completed!`);
@@ -213,10 +310,19 @@ export default function Workspace() {
         }
       } else if (data.status === "failed") {
         toast.error(`Generation failed: ${data.error || "Unknown error"}`);
+      } else if (data.status === "generating") {
+        setPendingStatus(data.reconciliationRequired ? "review" : "processing");
+        setRetryAvailable(false);
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        const wait = Number.isFinite(data.retryAfterMs) ? Math.max(250, Math.min(data.retryAfterMs, 60_000)) : 1500;
+        retryTimer.current = setTimeout(() => setRetryAvailable(true), wait);
+        toast.info(data.reconciliationRequired ? "This generation needs review before a final result can be confirmed." : "Your earlier generation is still processing. Check it again shortly.");
       }
       refetchGens();
     },
     onError: (err) => {
+      setPendingStatus((current) => current === "review" ? "review" : !err.data?.code || err.data.code === "INTERNAL_SERVER_ERROR" ? "uncertain" : "retry");
+      setRetryAvailable(true);
       // Adult prompt on the standard chain — send them to the metered funnel
       // with the prompt intact rather than making them retype it.
       if (isAdultRedirect(err.message)) {
@@ -281,41 +387,76 @@ export default function Workspace() {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (generateMutation.isPending || generationInFlight.current) return;
+    if (!user || !isAuthenticated) {
+      toast.error("Sign in to generate");
+      return;
+    }
     if (!prompt.trim()) {
       toast.error("Please enter a prompt");
       return;
     }
-    if (imageSelectionError) {
-      toast.error(imageSelectionError);
-      return;
-    }
-    track("generation_started", { source: "workspace" });
+    const actorId = user.id;
+    // Guard synchronously: digesting the draft must not open a second click window.
     generationInFlight.current = true;
-    generateMutation.mutate({
-      prompt: prompt.trim(),
-      negativePrompt: negativePrompt.trim() || undefined,
-      mediaType,
-      width,
-      height,
-      duration: mediaType === "video" ? duration : undefined,
-      modelVersion,
-      tagIds: selectedTags.length > 0 ? selectedTags : undefined,
-      uncensored: uncensoredEnabled,
-    });
+    setPreparingSubmission(true);
+    try {
+      const fingerprint = await fingerprintGenerationInput(draftPayload);
+      if (generationUser.current !== actorId) {
+        generationInFlight.current = false;
+        toast.error("Your account changed. Start this generation again.");
+        return;
+      }
+      const previous = pendingRequestRef.current ?? readGenerationRequestIdentity(actorId);
+      const isRetry = isGenerationRequestRetry(previous, actorId, fingerprint);
+      if (isRetry && !retryAvailable) {
+        generationInFlight.current = false;
+        toast.info("Your generation is still processing. Check it again shortly.");
+        return;
+      }
+      // Replays may retrieve a confirmed result after eligibility changes.
+      // Only a new logical generation needs current model/plan eligibility.
+      if (!isRetry) {
+        const currentTier = getSubscriptionEntitlement(subscriptionInput, Date.now()).tier;
+        const selectionError = getCurrentImageSelectionError(currentTier);
+        if (selectionError) {
+          generationInFlight.current = false;
+          toast.error(selectionError);
+          return;
+        }
+      }
+      const identity = resolveGenerationRequestIdentity(previous, actorId, fingerprint);
+      const payload = isRetry && pendingPayloadRef.current ? pendingPayloadRef.current : draftPayload;
+      if (previous && !isRetry) toast.info("The changed settings start a new generation. The earlier attempt remains unconfirmed.");
+      pendingRequestRef.current = identity;
+      pendingPayloadRef.current = payload;
+      persistGenerationRequestIdentity(identity);
+      setPendingRequest(identity);
+      if (!isRetry) setPendingStatus("uncertain");
+      setDraftMatchesPending(true);
+      setRetryAvailable(true);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      if (!isRetry) track("generation_started", { source: "workspace" });
+      generateMutation.mutate({ ...payload, requestId: identity.requestId });
+    } catch {
+      generationInFlight.current = false;
+      toast.error("Could not prepare this generation. Try again.");
+    } finally {
+      setPreparingSubmission(false);
+    }
   };
 
   useEffect(() => {
     if (!workspaceAutogenArmed || authLoading || !isAuthenticated) return;
     if (generateMutation.isPending || generationInFlight.current) return;
-    if (mediaType === "image" && (!imageCatalogReady || imageSelectionError)) return;
+    if (mediaType === "image" && !draftMatchesPending && (!imageCatalogReady || imageSelectionError)) return;
     const p = prompt.trim();
     if (p.length < 3) return;
     workspaceAutogenArmed = false;
     handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, prompt, mediaType, imageCatalogReady, imageSelectionError, generateMutation.isPending]);
+  }, [authLoading, isAuthenticated, prompt, mediaType, imageCatalogReady, imageSelectionError, generateMutation.isPending, draftMatchesPending]);
 
   useKeyboardShortcuts([
     { key: "Enter", ctrl: true, handler: handleGenerate, description: "Generate image or video" },
@@ -923,16 +1064,22 @@ export default function Workspace() {
                 )}
 
                 {/* Generate Button */}
+                {pendingRequest && !generateMutation.isPending && !preparingSubmission && (
+                  <p className="mb-3 text-xs text-muted-foreground" role="status" aria-live="polite">
+                    {pendingStatus === "review" ? "This generation needs review before a final result can be confirmed. Check its status again later." : pendingStatus === "processing" ? "Your previous generation is still processing. Check it again with the same settings." : pendingStatus === "uncertain" ? "The previous generation has not been confirmed. Retry the same settings to check it." : "You can retry this generation with the same settings."}
+                    {!draftMatchesPending && " Changed settings start a new generation."}
+                  </p>
+                )}
                 <Button
                   onClick={handleGenerate}
-                  disabled={!prompt.trim() || generateMutation.isPending || !!imageSelectionError}
+                  disabled={!prompt.trim() || generateMutation.isPending || preparingSubmission || (draftMatchesPending ? !retryAvailable : !!imageSelectionError)}
                   className="w-full font-medium h-12 text-base glow-primary"
                   size="lg"
                 >
-                  {generateMutation.isPending ? (
+                  {generateMutation.isPending || preparingSubmission ? (
                     <>
                       <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Generating {mediaType === "video" ? "Video" : "Image"}...
+                      {preparingSubmission ? "Preparing generation…" : `Generating ${mediaType === "video" ? "Video" : "Image"}...`}
                     </>
                   ) : (
                     <>
@@ -941,7 +1088,7 @@ export default function Workspace() {
                       ) : (
                         <Sparkles className="h-5 w-5 mr-2" />
                       )}
-                      Generate {mediaType === "video" ? `${duration}s Video Clip` : "Image"}
+                      {draftMatchesPending ? pendingStatus === "review" ? "Check status" : pendingStatus === "retry" ? "Retry generation" : "Check generation" : `Generate ${mediaType === "video" ? `${duration}s Video Clip` : "Image"}`}
                     </>
                   )}
                 </Button>

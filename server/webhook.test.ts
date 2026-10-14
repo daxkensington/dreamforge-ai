@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTableName } from "drizzle-orm";
+const subscriptionsRetrieve = vi.hoisted(() => vi.fn());
+vi.mock("stripe", () => ({ default: class StripeMock { subscriptions = { retrieve: subscriptionsRetrieve }; } }));
+vi.mock("./_core/subscriptionBilling", () => ({
+  allocatePaidSubscriptionInvoice: vi.fn(async () => "allocated"),
+  hasPaidSubscriptionInvoiceAllocation: vi.fn(async () => false),
+}));
 
 // The webhook handler receives a drizzle db instance from the route; these
 // mocks stand in for the server modules it imports (same convention as
@@ -36,6 +42,8 @@ vi.mock("@sentry/nextjs", () => ({
 import { processStripeEvent } from "../app/api/webhooks/stripe/handler";
 import { addCredits } from "./stripe";
 import { createNotification } from "./routersPhase15";
+import { activateSubscription, handleSubscriptionUpdated, handleMonthlyReset } from "./routers/pricing";
+import { allocatePaidSubscriptionInvoice, hasPaidSubscriptionInvoiceAllocation } from "./_core/subscriptionBilling";
 
 // ─── Fluent drizzle mock ──────────────────────────────────────────────────
 // Chains every drizzle call the webhook handler makes and records the values
@@ -158,6 +166,126 @@ const balanceDeltaOf = (calls: ReturnType<typeof makeDb>["calls"]) => {
 describe("Stripe webhook — processStripeEvent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.STRIPE_SECRET_KEY = "sk_test_mocked_webhook_only";
+    subscriptionsRetrieve.mockReset();
+    vi.mocked(hasPaidSubscriptionInvoiceAllocation).mockReset().mockResolvedValue(false);
+  });
+
+  describe("verified subscription invoice allocation", () => {
+    const start = Math.floor(Date.now() / 1000) - 86_400;
+    const end = start + 30 * 86_400;
+    const activeSubscription = {
+      id: "sub_ordered", status: "active", cancel_at_period_end: true,
+      metadata: { user_id: "7", plan_id: "2", plan_name: "pro" },
+      items: { data: [{ id: "si_ordered", price: { id: "price_pro" }, current_period_start: start, current_period_end: end }] },
+    };
+    const paidInvoice = {
+      id: "in_ordered", status: "paid", amount_paid: 0, billing_reason: "subscription_create",
+      parent: { subscription_details: { subscription: "sub_ordered" } },
+      lines: { has_more: false, data: [{
+        parent: { type: "subscription_item_details", subscription_item_details: { subscription: "sub_ordered", subscription_item: "si_ordered", proration: false } },
+        pricing: { price_details: { price: "price_pro" } }, period: { start, end },
+      }] },
+    };
+
+    it("persists incomplete creation without granting credits or inventing a period", async () => {
+      subscriptionsRetrieve.mockResolvedValue({ ...activeSubscription, status: "incomplete", items: { data: [] } });
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent("evt_incomplete_creation", "customer.subscription.created", { id: "sub_ordered" }), db);
+      expect(activateSubscription).toHaveBeenCalledExactlyOnceWith(7, 2, "sub_ordered", null, null, "incomplete", true);
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+      expect(handleMonthlyReset).not.toHaveBeenCalled();
+      expect(addCredits).not.toHaveBeenCalled();
+    });
+
+    it("updates verified active state but waits for a paid invoice before allocating", async () => {
+      subscriptionsRetrieve.mockResolvedValue(activeSubscription);
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent("evt_active_update", "customer.subscription.updated", { id: "sub_ordered", status: "incomplete" }), db);
+      expect(handleSubscriptionUpdated).toHaveBeenCalledWith("sub_ordered", "pro", "active", expect.any(Date), expect.any(Date), true);
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it.each(["invoice.paid", "invoice.payment_succeeded"])("allocates a paid zero-value initial invoice through %s using current exact subscription mapping", async type => {
+      subscriptionsRetrieve.mockResolvedValue(activeSubscription);
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent(`evt_${type}`, type, paidInvoice), db);
+      expect(subscriptionsRetrieve).toHaveBeenCalledExactlyOnceWith("sub_ordered");
+      expect(activateSubscription).toHaveBeenCalledWith(7, 2, "sub_ordered", expect.any(Date), expect.any(Date), "active", true);
+      expect(allocatePaidSubscriptionInvoice).toHaveBeenCalledExactlyOnceWith({ invoiceId: "in_ordered", subscriptionId: "sub_ordered", subscriptionItemId: "si_ordered", priceId: "price_pro", periodStart: new Date(start * 1000), periodEnd: new Date(end * 1000) });
+      expect(handleMonthlyReset).not.toHaveBeenCalled();
+    });
+
+    it("handles a paid cycle invoice before creation and reconciles delayed creation to freshest provider state", async () => {
+      subscriptionsRetrieve.mockResolvedValue(activeSubscription);
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent("evt_paid_first", "invoice.paid", { ...paidInvoice, billing_reason: "subscription_cycle" }), db);
+      await processStripeEvent(makeEvent("evt_created_late", "customer.subscription.created", { ...activeSubscription, status: "incomplete" }), db);
+      expect(activateSubscription).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(activateSubscription).mock.calls.every(call => call[5] === "active")).toBe(true);
+      expect(allocatePaidSubscriptionInvoice).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses real legacy trial bounds without extending them to a billing period", async () => {
+      subscriptionsRetrieve.mockResolvedValue({ ...activeSubscription, status: "trialing", trial_start: 1_790_208_000, trial_end: 1_790_812_800 });
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent("evt_trial", "customer.subscription.created", { id: "sub_ordered" }), db);
+      expect(activateSubscription).toHaveBeenCalledWith(7, 2, "sub_ordered", new Date(1_790_208_000_000), new Date(1_790_812_800_000), "trialing", true);
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it("fails for reconciliation rather than granting thirty guessed days when an active period is absent", async () => {
+      subscriptionsRetrieve.mockResolvedValue({ ...activeSubscription, items: { data: [] } });
+      const { db, calls } = makeDb();
+      await expect(processStripeEvent(makeEvent("evt_no_period", "customer.subscription.created", { id: "sub_ordered" }), db)).rejects.toThrow(/reconcile Stripe period data/i);
+      expect(activateSubscription).not.toHaveBeenCalled();
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+      expect(calls.updates).toEqual(expect.arrayContaining([expect.objectContaining({ table: "webhookEvents", set: expect.objectContaining({ status: "failed" }) })]));
+    });
+
+    it("never allocates an unpaid or unrelated invoice", async () => {
+      const { db } = makeDb();
+      await processStripeEvent(makeEvent("evt_open_invoice", "invoice.paid", { ...paidInvoice, status: "open" }), db);
+      await processStripeEvent(makeEvent("evt_proration_invoice", "invoice.paid", { ...paidInvoice, billing_reason: "subscription_update" }), db);
+      expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it("rejects retrieval with a different subscription identity", async () => {
+      subscriptionsRetrieve.mockResolvedValue({ ...activeSubscription, id: "sub_other" });
+      const { db } = makeDb();
+      await expect(processStripeEvent(makeEvent("evt_wrong_sub", "invoice.paid", paidInvoice), db)).rejects.toThrow(/different subscription/i);
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it.each(["missing", "ambiguous", "old"])("holds %s invoice service periods without touching credits", async kind => {
+      subscriptionsRetrieve.mockResolvedValue(activeSubscription);
+      const invoice = kind === "missing" ? { ...paidInvoice, lines: { data: [] } }
+        : kind === "ambiguous" ? { ...paidInvoice, lines: { ...paidInvoice.lines, has_more: true } }
+        : { ...paidInvoice, lines: { data: [{ ...paidInvoice.lines.data[0], period: { start: start - 86_400, end: end - 86_400 } }] } };
+      await expect(processStripeEvent(makeEvent(`evt_${kind}_period`, "invoice.paid", invoice), makeDb().db)).rejects.toThrow(/reconcile/i);
+      expect(activateSubscription).not.toHaveBeenCalled();
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it("replays an already allocated invoice without renewed provider or period checks", async () => {
+      vi.mocked(hasPaidSubscriptionInvoiceAllocation).mockResolvedValueOnce(true);
+      await processStripeEvent(makeEvent("evt_paid_duplicate", "invoice.paid", paidInvoice), makeDb().db);
+      expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+      expect(allocatePaidSubscriptionInvoice).not.toHaveBeenCalled();
+    });
+
+    it("allows an atomic paid-invoice failure to reclaim its failed event while keeping successful/pending duplicates blocked", async () => {
+      subscriptionsRetrieve.mockResolvedValue(activeSubscription);
+      const { db, calls } = makeDb({ claimRows: [] });
+      await processStripeEvent(makeEvent("evt_retry_paid", "invoice.paid", paidInvoice), db);
+      expect(calls.updates[0].set).toMatchObject({ status: "pending" });
+      expect(allocatePaidSubscriptionInvoice).toHaveBeenCalledTimes(1);
+      vi.clearAllMocks();
+      const duplicateDb = makeDb({ claimRows: [], updateReturningRows: () => [] }).db;
+      await expect(processStripeEvent(makeEvent("evt_processed_paid", "invoice.paid", paidInvoice), duplicateDb)).resolves.toBe("duplicate");
+      expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+    });
   });
 
   // ─── 1. Atomic idempotency claim ──────────────────────────────────────

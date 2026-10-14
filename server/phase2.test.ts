@@ -21,6 +21,7 @@ import { deductCredits, refundCredits } from "./stripe";
 import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
 import { createNotification } from "./routersPhase15";
 import { autoCheckAchievements } from "./routers/phase22";
+import type { SubscriptionEntitlementInput } from "../shared/subscriptionEntitlement";
 
 const imageTestConfig = vi.hoisted(() => ({
   falApiKey: "test-fal-not-a-real-key",
@@ -34,6 +35,19 @@ const imageTestConfig = vi.hoisted(() => ({
   cfAccountId: "",
   runpodApiKey: "",
   runpodFluxEndpointId: "",
+}));
+
+const generationBillingMocks = vi.hoisted(() => ({
+  read: vi.fn(), claim: vi.fn(), begin: vi.fn(), complete: vi.fn(), fail: vi.fn(), reconcile: vi.fn(),
+  records: new Map<string, any>(),
+}));
+vi.mock("./_core/generationBilling", () => ({
+  readGenerationRequest: (...args: any[]) => generationBillingMocks.read(...args),
+  claimGenerationRequest: (...args: any[]) => generationBillingMocks.claim(...args),
+  beginGenerationRequest: (...args: any[]) => generationBillingMocks.begin(...args),
+  completeGenerationRequest: (...args: any[]) => generationBillingMocks.complete(...args),
+  failGenerationRequestAndRefund: (...args: any[]) => generationBillingMocks.fail(...args),
+  markGenerationReconciliation: (...args: any[]) => generationBillingMocks.reconcile(...args),
 }));
 
 // Provider configuration is synthetic. Render calls below are always mocked.
@@ -134,6 +148,25 @@ const mockAutoCheckAchievements = vi.mocked(autoCheckAchievements);
 // tests that need specific rows set them explicitly.
 beforeEach(() => {
   vi.clearAllMocks();
+  generationBillingMocks.records.clear();
+  generationBillingMocks.read.mockReset().mockResolvedValue(null);
+  generationBillingMocks.claim.mockReset().mockImplementation(async input => {
+    const request = { ...input, id: 1, quotedCredits: input.credits, state: "reserved", generationId: null, result: null };
+    generationBillingMocks.records.set(input.requestId, request);
+    return { kind: "owned", request, owner: { ...input, id: 1, executionToken: "11111111-1111-4111-8111-111111111111" } };
+  });
+  generationBillingMocks.begin.mockReset().mockImplementation(async (owner, generationId) => {
+    const request = { ...generationBillingMocks.records.get(owner.requestId), state: "rendering", generationId };
+    generationBillingMocks.records.set(owner.requestId, request);
+    return { kind: "begun", request };
+  });
+  generationBillingMocks.complete.mockReset().mockImplementation(async (owner, input) => ({
+    kind: "completed", request: { ...generationBillingMocks.records.get(owner.requestId), state: "completed", result: input.result },
+  }));
+  generationBillingMocks.fail.mockReset().mockImplementation(async (owner, input) => ({
+    kind: "refunded", request: { ...generationBillingMocks.records.get(owner.requestId), state: "refunded", generationId: input.generationId ?? null },
+  }));
+  generationBillingMocks.reconcile.mockReset().mockResolvedValue({ kind: "uncertain" });
   vi.mocked(getDb).mockResolvedValue(null);
   imageTestConfig.falApiKey = "test-fal-not-a-real-key";
   imageTestConfig.grokApiKey = "";
@@ -217,15 +250,40 @@ function createPublicContext(): { ctx: TrpcContext } {
   return { ctx };
 }
 
-function useSubscriptionPlan(planName: "creator" | "pro") {
+function subscriptionRow(planName: string, overrides: Partial<SubscriptionEntitlementInput> = {}) {
+  return {
+    planName,
+    status: "active",
+    currentPeriodStart: new Date(Date.now() - 86_400_000),
+    currentPeriodEnd: new Date(Date.now() + 86_400_000),
+    cancelAtPeriodEnd: false,
+    ...overrides,
+  };
+}
+
+function useSubscriptionPlan(planName: "creator" | "pro", overrides: Partial<SubscriptionEntitlementInput> = {}) {
   vi.mocked(getDb).mockResolvedValue({
     execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([{ planName }]),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([subscriptionRow(planName, overrides)]),
   } as any);
+}
+
+function expectGenerationQuote(userId: number, credits: number) {
+  expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+  expect(generationBillingMocks.claim).toHaveBeenCalledWith(expect.objectContaining({ userId, credits }));
+}
+
+function expectGenerationRefund(userId: number, credits: number) {
+  expectGenerationQuote(userId, credits);
+  expect(generationBillingMocks.fail).toHaveBeenCalledTimes(1);
+  expect(generationBillingMocks.fail).toHaveBeenCalledWith(
+    expect.objectContaining({ userId }), expect.objectContaining({ confirmedFailure: true, errorCode: "generation-failed" }),
+  );
 }
 
 /* Minimal generations row matching drizzle/schema.ts. Tests pass it (via
@@ -372,11 +430,7 @@ describe("generation.create", () => {
     });
 
     // Credits are charged up front for the requested tool...
-    expect(mockDeductCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
-      expect.stringContaining("Generated image"),
-    );
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-image"] ?? 1);
     // ...a "generating" row is inserted...
     expect(mockCreateGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -391,8 +445,7 @@ describe("generation.create", () => {
     );
     expect(mockGenerateImage).toHaveBeenCalledOnce();
     // ...and the row is flipped to completed with the provider URL.
-    expect(mockUpdateGeneration).toHaveBeenCalledWith(101, expect.objectContaining({
-      status: "completed",
+    expect(generationBillingMocks.complete).toHaveBeenCalledWith(expect.objectContaining({ userId: ctx.user.id }), expect.objectContaining({
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       thumbnailUrl: "https://cdn.example.com/phase2-generated.png",
     }));
@@ -401,6 +454,7 @@ describe("generation.create", () => {
       status: "completed",
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       mediaType: "image",
+      requestId: expect.any(String),
       newAchievements: [],
       modelId: "built-in-v1",
       creditCost: 5,
@@ -421,11 +475,7 @@ describe("generation.create", () => {
       modelVersion: "animatediff-v2",
     });
 
-    expect(mockDeductCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-video"] ?? 1,
-      expect.stringContaining("Generated video"),
-    );
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-video"] ?? 1);
     expect(mockCreateGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: ctx.user.id,
@@ -441,13 +491,14 @@ describe("generation.create", () => {
       status: "completed",
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       mediaType: "video",
+      requestId: expect.any(String),
       newAchievements: [],
     });
     expect(result.mediaType).toBe("video");
   });
 
-  it("marks the generation failed and refunds credits when the provider errors", async () => {
-    mockGenerateImage.mockRejectedValueOnce(new Error("provider exploded"));
+  it.each(["provider exploded", "provider poll timed out", "image download unavailable", "storage write unavailable"])("holds an unconfirmed renderer error for reconciliation (%s)", async message => {
+    mockGenerateImage.mockRejectedValueOnce(new Error(message));
 
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
@@ -460,18 +511,13 @@ describe("generation.create", () => {
       modelVersion: "built-in-v1",
     });
 
-    // The router maps provider errors to a failed row, not a thrown error...
-    expect(result).toEqual({ id: 101, status: "failed", error: "provider exploded" });
-    expect(mockUpdateGeneration).toHaveBeenCalledWith(101, {
-      status: "failed",
-      errorMessage: "provider exploded",
-    });
-    // ...and refunds the credit charge.
-    expect(mockRefundCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
-      expect.stringContaining("Refund"),
-    );
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-image"] ?? 1);
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an unknown explicit model before charging or creating a row", async () => {
@@ -486,7 +532,7 @@ describe("generation.create", () => {
       modelVersion: "some-future-model",
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
-    expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockCreateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
@@ -499,7 +545,8 @@ describe("generation.create", () => {
       from: vi.fn().mockReturnThis(),
       innerJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
     } as any);
     try {
       const { ctx } = createAuthContext();
@@ -514,11 +561,7 @@ describe("generation.create", () => {
       });
 
       expect(result.status).toBe("completed");
-      expect(mockDeductCredits).toHaveBeenCalledWith(
-        ctx.user.id,
-        15,
-        expect.stringContaining("Generated image"),
-      );
+      expectGenerationQuote(ctx.user.id, 15);
     } finally {
       vi.mocked(getDb).mockResolvedValue(null);
     }
@@ -531,7 +574,8 @@ describe("generation.create", () => {
       from: vi.fn().mockReturnThis(),
       innerJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
     } as any);
     try {
       const { ctx } = createAuthContext();
@@ -546,7 +590,7 @@ describe("generation.create", () => {
         modelVersion: "flux-pro",
       })).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
-      expect(mockDeductCredits).not.toHaveBeenCalled();
+      expect(generationBillingMocks.claim).not.toHaveBeenCalled();
       expect(mockCreateGeneration).not.toHaveBeenCalled();
       expect(mockGenerateImage).not.toHaveBeenCalled();
     } finally {
@@ -554,14 +598,15 @@ describe("generation.create", () => {
     }
   });
 
-  it("refunds the model's registry price when a premium generation fails", async () => {
+  it("holds the exact premium quote when the renderer outcome is uncertain", async () => {
     vi.mocked(getDb).mockResolvedValue({
       execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
       select: vi.fn().mockReturnThis(),
       from: vi.fn().mockReturnThis(),
       innerJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ planName: "pro" }]),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
     } as any);
     try {
       mockGenerateImage.mockRejectedValueOnce(new Error("provider exploded"));
@@ -577,14 +622,11 @@ describe("generation.create", () => {
         modelVersion: "flux-pro",
       });
 
-      expect(result.status).toBe("failed");
-      // Refund matches the model-tier charge (15), not the flat 5-credit tool cost.
-      expect(mockRefundCredits).toHaveBeenCalledTimes(1);
-      expect(mockRefundCredits).toHaveBeenCalledWith(
-        ctx.user.id,
-        15,
-        expect.stringContaining("Refund"),
-      );
+      expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+      expect(result).not.toHaveProperty("refundedCredits");
+      expectGenerationQuote(ctx.user.id, 15);
+      expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+      expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
     } finally {
       vi.mocked(getDb).mockResolvedValue(null);
     }
@@ -597,17 +639,17 @@ describe("generation.create", () => {
       expect.objectContaining({ id: "built-in-v1", creditCost: 5, requiredTier: "free", isConfigured: true }),
       expect.objectContaining({ id: "flux-pro", creditCost: 15, requiredTier: "pro" }),
     ]));
-    expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
   it.each(["built-in-v1", "auto"])("charges %s once at the fixed automatic price", async modelVersion => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     await caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion });
-    expect(mockDeductCredits).toHaveBeenCalledTimes(1);
-    expect(mockDeductCredits).toHaveBeenCalledWith(1, 5, expect.any(String));
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expectGenerationQuote(1, 5);
     expect(mockGenerateImage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ model: "auto" }));
-    expect(mockRefundCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 
   it("executes a selected model alias and stores its canonical identity and real provider receipt", async () => {
@@ -618,15 +660,14 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     await caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion: "grok" });
     expect(mockGenerateImage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ model: "grok", userTier: "creator" }));
-    expect(mockDeductCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    expectGenerationQuote(1, 5);
     expect(mockCreateGeneration).toHaveBeenCalledWith(expect.objectContaining({
       metadata: expect.objectContaining({ requestedModelId: "grok", modelId: "grok-image", quotedCredits: 5 }),
     }));
-    expect(mockUpdateGeneration).toHaveBeenCalledWith(101, expect.objectContaining({
-      status: "completed",
+    expect(generationBillingMocks.complete).toHaveBeenCalledWith(expect.objectContaining({ userId: 1 }), expect.objectContaining({
       metadata: expect.objectContaining({ imageGeneration: provenance }),
     }));
-    expect(mockRefundCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -637,7 +678,7 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     await expect(caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion }))
       .rejects.toMatchObject({ code });
-    expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockCreateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
@@ -647,28 +688,62 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     await expect(caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion: "grok-image" }))
       .rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
-    expect(mockDeductCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockCreateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
-  it("does not create, render or refund when the wallet declines the debit", async () => {
-    mockDeductCredits.mockResolvedValueOnce({ success: false, balance: 1, needed: 5 });
+  it.each(["canceled", "past_due", "incomplete", "unpaid", "paused"])("denies saved paid model access for %s before any debit", async status => {
+    useSubscriptionPlan("pro", { status });
     const caller = appRouter.createCaller(createAuthContext().ctx);
-    await expect(caller.generation.create({ prompt: "A mountain lake" }))
-      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
-    expect(mockDeductCredits).toHaveBeenCalledTimes(1);
+    await expect(caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
     expect(mockCreateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
-    expect(mockRefundCredits).not.toHaveBeenCalled();
+  });
+
+  it.each([null, new Date("2020-01-01T00:00:00Z")])("denies active paid model access without an unexpired end (%s)", async currentPeriodEnd => {
+    useSubscriptionPlan("pro", { currentPeriodEnd });
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: "active", cancelAtPeriodEnd: true },
+    { status: "trialing", cancelAtPeriodEnd: false },
+  ])("retains valid saved paid access for %j", async overrides => {
+    useSubscriptionPlan("pro", overrides);
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" });
+    expect(result.status).toBe("completed");
+    expectGenerationQuote(1, 15);
+    expect(mockGenerateImage).toHaveBeenCalledWith(expect.objectContaining({ model: "flux-pro", userTier: "pro" }));
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it("does not create, render or refund when the wallet declines the debit", async () => {
+    generationBillingMocks.claim.mockImplementationOnce(async input => ({
+      kind: "replay", request: { ...input, id: 1, quotedCredits: input.credits, state: "rejected", generationId: null, result: null },
+    }));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake" }))
+      .resolves.toMatchObject({ status: "failed", creditCost: 0, quotedCredits: 5, refundedCredits: 0 });
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 
   it("refunds a successful debit once if the generation record cannot be created", async () => {
     mockCreateGeneration.mockRejectedValueOnce(new Error("record insert unavailable"));
     const caller = appRouter.createCaller(createAuthContext().ctx);
-    await expect(caller.generation.create({ prompt: "A mountain lake" })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
-    expect(mockDeductCredits).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    await expect(caller.generation.create({ prompt: "A mountain lake" })).resolves.toMatchObject({ id: undefined, status: "failed", refundedCredits: 5, creditCost: 0 });
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expectGenerationRefund(1, 5);
     expect(mockUpdateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
@@ -676,8 +751,8 @@ describe("generation.create", () => {
   it("refunds and stops before rendering when record creation returns an invalid ID", async () => {
     mockCreateGeneration.mockResolvedValueOnce(0);
     const caller = appRouter.createCaller(createAuthContext().ctx);
-    await expect(caller.generation.create({ prompt: "A mountain lake" })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    await expect(caller.generation.create({ prompt: "A mountain lake" })).resolves.toMatchObject({ id: undefined, status: "failed", refundedCredits: 5, creditCost: 0 });
+    expectGenerationRefund(1, 5);
     expect(mockUpdateGeneration).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
@@ -688,35 +763,43 @@ describe("generation.create", () => {
     const result = await caller.generation.create({ prompt: "A mountain lake", tagIds: [1] });
     expect(result.status).toBe("failed");
     expect(mockGenerateImage).not.toHaveBeenCalled();
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    expectGenerationRefund(1, 5);
   });
 
-  it("still refunds once when persisting the provider failure also fails", async () => {
-    mockGenerateImage.mockRejectedValueOnce(new Error("provider unavailable"));
-    mockUpdateGeneration.mockRejectedValueOnce(new Error("failed status unavailable"));
+  it("retains pending reconciliation when the atomic failure settlement cannot be confirmed", async () => {
+    mockSetGenerationTags.mockRejectedValueOnce(new Error("tags unavailable"));
+    generationBillingMocks.fail.mockRejectedValueOnce(new Error("atomic settlement unavailable"));
     const caller = appRouter.createCaller(createAuthContext().ctx);
-    const result = await caller.generation.create({ prompt: "A mountain lake" });
-    expect(result.status).toBe("failed");
-    expect(mockDeductCredits).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    const result = await caller.generation.create({ prompt: "A mountain lake", tagIds: [1] });
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+    expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, "", "   "])("refunds a provider response with no downloadable URL (%s)", async url => {
+  it.each([undefined, "", "   "])("holds a provider response with no downloadable URL for reconciliation (%s)", async url => {
     mockGenerateImage.mockResolvedValueOnce({ url });
     const caller = appRouter.createCaller(createAuthContext().ctx);
     const result = await caller.generation.create({ prompt: "A mountain lake" });
-    expect(result.status).toBe("failed");
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
     expect(mockUpdateGeneration).not.toHaveBeenCalledWith(101, expect.objectContaining({ status: "completed" }));
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    expectGenerationQuote(1, 5);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
   });
 
-  it("refunds once if output completion cannot be persisted", async () => {
-    mockUpdateGeneration.mockRejectedValueOnce(new Error("completion unavailable"));
+  it("keeps uncertain completion pending and never enters the confirmed-failure refund path", async () => {
+    generationBillingMocks.complete.mockRejectedValueOnce(new Error("completion acknowledgment unavailable"));
     const caller = appRouter.createCaller(createAuthContext().ctx);
     const result = await caller.generation.create({ prompt: "A mountain lake" });
-    expect(result.status).toBe("failed");
+    expect(result.status).toBe("generating");
     expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).toHaveBeenCalledExactlyOnceWith(1, 5, expect.any(String));
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
     expect(mockCreateNotification).not.toHaveBeenCalled();
   });
 
@@ -725,8 +808,8 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     const result = await caller.generation.create({ prompt: "A mountain lake" });
     expect(result.status).toBe("completed");
-    expect(mockUpdateGeneration).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 
   it("preserves delivered output when achievement checks fail", async () => {
@@ -734,8 +817,8 @@ describe("generation.create", () => {
     const caller = appRouter.createCaller(createAuthContext().ctx);
     const result = await caller.generation.create({ prompt: "A mountain lake" });
     expect(result).toMatchObject({ status: "completed", newAchievements: [] });
-    expect(mockUpdateGeneration).toHaveBeenCalledTimes(1);
-    expect(mockRefundCredits).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 });
 

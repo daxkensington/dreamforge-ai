@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useGenerationRequestIdentity } from "@/hooks/useGenerationRequestIdentity";
 import { getLoginUrl } from "@/const";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,7 @@ const IMAGE_TEMPLATES = [
 
 export default function ImageTemplates() {
   const { user } = useAuth();
+  const requestIdentity = useGenerationRequestIdentity(user?.id, "image-templates");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
@@ -77,23 +79,30 @@ export default function ImageTemplates() {
   const filtered = selectedCategory === "all" ? IMAGE_TEMPLATES : IMAGE_TEMPLATES.filter((t) => t.category === selectedCategory);
 
   const generateMutation = trpc.generation.create.useMutation({
+    onSettled: requestIdentity.settled,
     onSuccess: (data) => {
+      requestIdentity.receive(data);
       if (data?.imageUrl) {
         setResultUrl(data.imageUrl);
         toast.success("Template generated!");
+      } else if (data.status === "generating") {
+        toast.info(data.reconciliationRequired
+          ? "This request needs review. Checking again retrieves the same attempt; it does not start another render."
+          : "Your generation is still pending. Check again to retrieve the same attempt.");
+      } else if (data.status === "failed") {
+        toast.error(data.error ?? "Generation failed.");
       }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => { requestIdentity.uncertain(); toast.error(err.message); },
   });
 
-  const handleGenerate = () => {
-    if (!template) return;
+  const handleGenerate = async () => {
+    if (!template || generateMutation.isPending) return;
     const fullPrompt = `${template.prompt}. ${customText ? `Custom content: ${customText}.` : ""} ${brandName ? `Brand: ${brandName}.` : ""} Size: ${template.size}. High quality, professional design.`;
-    generateMutation.mutate({
-      prompt: fullPrompt,
-      style: "photorealistic",
-      aspectRatio: template.aspect,
-    });
+    try {
+      const payload = await requestIdentity.prepare({ prompt: fullPrompt, style: "photorealistic", aspectRatio: template.aspect });
+      if (payload) generateMutation.mutate(payload);
+    } catch (error) { requestIdentity.settled(); toast.error(error instanceof Error ? error.message : "Could not prepare your generation."); }
   };
 
 
@@ -213,13 +222,13 @@ export default function ImageTemplates() {
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={generateMutation.isPending}
+                    disabled={generateMutation.isPending || requestIdentity.preparing}
                     className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
                   >
                     {generateMutation.isPending ? (
                       <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
                     ) : (
-                      <><Sparkles className="h-4 w-4" /> Generate {template?.name}</>
+                      <><Sparkles className="h-4 w-4" /> {requestIdentity.waiting ? "Retry generation" : `Generate ${template?.name}`}</>
                     )}
                   </Button>
                 </CardContent>

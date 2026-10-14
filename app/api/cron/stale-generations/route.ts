@@ -23,6 +23,7 @@ import { getDb } from "../../../../server/db";
 import { generations, audioGenerations } from "../../../../drizzle/schema";
 import { refundCredits } from "../../../../server/stripe";
 import { TOOL_CREDIT_COSTS } from "../../../../shared/creditCosts";
+import { sweepStaleGenerationRequests } from "../../../../server/_core/generationBilling";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -81,24 +82,38 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   }
 
+  // Durable generation requests own their exact debit/refund ledger. A stale
+  // rendering request requires reconciliation; this legacy reaper cannot refund
+  // it independently or declare an upstream request safe to run again.
+  let requestSweep;
+  try {
+    requestSweep = await sweepStaleGenerationRequests({ olderThanMinutes: STALE_AFTER_MINUTES, limit: BATCH_LIMIT });
+  } catch {
+    requestSweep = { kind: "uncertain" as const };
+  }
+
   const stale = await db
     .select()
     .from(generations)
     .where(
       and(
         inArray(generations.status, [...REAP_STATUSES]),
+        sql`${generations.metadata}->>'billingRequestId' IS NULL`,
+        sql`COALESCE(${generations.metadata}->>'deleted', 'false') <> 'true'`,
         sql`${generations.updatedAt} < NOW() - ${STALE_AFTER_MINUTES} * INTERVAL '1 minute'`,
       ),
     )
     .orderBy(asc(generations.updatedAt))
     .limit(BATCH_LIMIT);
 
-  let reaped = 0;
-  let refunded = 0;
-  let errors = 0;
+  let reaped = requestSweep.kind === "swept" ? requestSweep.refunded : 0;
+  let refunded = requestSweep.kind === "swept" ? requestSweep.refunded : 0;
+  let errors = requestSweep.kind === "uncertain" ? 1 : 0;
 
   for (const row of stale) {
     try {
+      const rowMetadata = row.metadata as Record<string, unknown> | null;
+      if (rowMetadata?.billingRequestId || rowMetadata?.deleted) continue;
       // Atomic claim — only act if this run actually moved the row out of a
       // non-terminal state; a job that finished (or another reaper instance
       // that got there first) returns zero rows and is skipped.
@@ -109,7 +124,7 @@ export async function GET(req: Request) {
           errorMessage: `Stale job reaper — no update for ${STALE_AFTER_MINUTES}+ minutes, job presumed dead`,
           updatedAt: new Date(),
         })
-        .where(and(eq(generations.id, row.id), inArray(generations.status, [...REAP_STATUSES])))
+        .where(and(eq(generations.id, row.id), inArray(generations.status, [...REAP_STATUSES]), sql`${generations.metadata}->>'billingRequestId' IS NULL`, sql`COALESCE(${generations.metadata}->>'deleted', 'false') <> 'true'`))
         .returning({ id: generations.id });
       if (claimed.length === 0) continue;
       reaped++;
@@ -179,6 +194,9 @@ export async function GET(req: Request) {
     reaped,
     refunded,
     errors,
+    requestReconciliation: requestSweep.kind === "swept" ? requestSweep.reconciliation : 0,
+    requestRefunded: requestSweep.kind === "swept" ? requestSweep.refunded : 0,
+    requestSweepUncertain: requestSweep.kind === "uncertain",
     ts: new Date().toISOString(),
   });
 }
