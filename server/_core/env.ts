@@ -11,6 +11,8 @@ export const ENV = {
   get forgeApiUrl() { return process.env.BUILT_IN_FORGE_API_URL ?? ""; },
   get forgeApiKey() { return process.env.BUILT_IN_FORGE_API_KEY ?? ""; },
   get openaiApiKey() { return process.env.OPENAI_API_KEY ?? ""; },
+  // Enable only after a funded account completes the pinned image-model check.
+  get openaiImage25Enabled() { return process.env.OPENAI_IMAGE_25_ENABLED === "true"; },
   get stripeSecretKey() { return process.env.STRIPE_SECRET_KEY ?? ""; },
   get stabilityApiKey() { return process.env.STABILITY_API_KEY ?? ""; },
   get replicateApiToken() { return process.env.REPLICATE_API_TOKEN ?? ""; },

@@ -22,6 +22,7 @@ import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptMod
 import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
 import { assertSafeImageUrl, fetchGuardedImage } from "./imageUrlGuard";
 import type { ImageExecutionKey, ImageGenerationProvenance } from "../../shared/imageModels";
+import { DIRECT_IMAGE_MODELS, DirectImageInputError, generateDirectImage } from "./directImageProviders";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -644,6 +645,12 @@ export async function generateImage(
     style = "vivid",
   } = options;
 
+  // These explicit creation models must never enter the legacy RunPod/vision
+  // replacement path. Native editing is a separate capability to integrate.
+  if (Object.hasOwn(DIRECT_IMAGE_MODELS, model) && (options.unfiltered || (options.originalImages?.length ?? 0) > 0)) {
+    throw new DirectImageInputError("The selected image model supports standard text-to-image creation only.");
+  }
+
   let imageBuffer: Buffer | undefined;
   let imageToImageFailed = false;
 
@@ -880,6 +887,23 @@ async function generateWithExplicitModel(
   const [w, h] = size.split("x").map(Number);
 
   switch (model) {
+    case "gpt-image-2.5-flare":
+    case "gpt-image-2.5-sunburst":
+    case "grok-imagine-image-2.0": {
+      const openai = model !== "grok-imagine-image-2.0";
+      if (openai && !ENV.openaiImage25Enabled) throw new DirectImageInputError("This image model is currently unavailable.");
+      const apiKey = openai ? ENV.openaiApiKey : ENV.grokApiKey;
+      if (!apiKey) throw new DirectImageInputError("The selected image provider is not configured.");
+      const result = await generateDirectImage({ modelId: model, prompt, width: w, height: h, apiKey });
+      imageRoutes.set(result.buffer, {
+        provider: result.provenance.provider === "xai" ? "grok" : "openai",
+        model: result.provenance.providerModel,
+        fallbackUsed: false,
+        direct: result.provenance,
+        ...(result.usage ? { usage: result.usage } : {}),
+      });
+      return result.buffer;
+    }
     case "runpod-flux-dev":
       if (!isRunPodAvailable()) throw new Error("RunPod not configured");
       return recordImageRoute(await runpodFluxDev(prompt, w || 1024, h || 1024), "runpod", "flux-dev");

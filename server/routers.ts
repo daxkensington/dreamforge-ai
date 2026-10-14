@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
 import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
+import { isConfirmedDirectImageRejection } from "./_core/directImageProviders";
 import { beginGenerationRequest, claimGenerationRequest, completeGenerationRequest, failGenerationRequestAndRefund, markGenerationReconciliation, readGenerationRequest } from "./_core/generationBilling";
 import { hashGenerationRequest, pendingGenerationResponse, replayGenerationResponse } from "./_core/generationRequest";
 import { invokeLLM } from "./_core/llm";
@@ -840,8 +841,9 @@ export const appRouter = router({
           }).catch(() => {});
           // Existing renderers throw generic errors. After invocation, a lost
           // response, polling timeout or storage failure cannot prove a terminal
-          // provider failure. Hold for review until a verified outcome exists.
-          if (providerInvocationStarted) return pendingForReview("provider-outcome-uncertain");
+          // provider failure. Only the direct adapter's typed terminal refusal
+          // authorizes refund after invocation; other outcomes stay for review.
+          if (providerInvocationStarted && !isConfirmedDirectImageRejection(error)) return pendingForReview("provider-outcome-uncertain");
           // State, exact refund and refund ledger are one guarded operation.
           try {
             const settled = await failGenerationRequestAndRefund(requestOwner, { confirmedFailure: true, errorCode: "generation-failed", errorMessage: failureMessage, generationId: genId });

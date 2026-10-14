@@ -11,6 +11,7 @@ import type { ModelTier } from "../../shared/creditCosts";
 import { resolveTierName, type TierName, TIERS } from "../../shared/tiers";
 import type { ImageExecutionKey } from "../../shared/imageModels";
 import { isRunPodAvailable } from "./runpod";
+import { DIRECT_IMAGE_MODELS } from "./directImageProviders";
 
 export interface AIModel {
   id: string;
@@ -89,6 +90,44 @@ function dalleModel(): AIModel {
     tier: "pro",
     description: "OpenAI GPT Image 1 for image creation with detailed prompt following.",
     costInfo: "15 credits (Pro+), 25 HD",
+  };
+}
+
+function grokImage20(): AIModel {
+  return {
+    id: "grok-imagine-image-2.0",
+    imageExecution: { key: "grok-imagine-image-2.0" },
+    name: "Grok Imagine Image 2.0",
+    provider: "grok",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 310 },
+    isAvailable: !!ENV.grokApiKey,
+    modelTier: "premium",
+    tier: "pro",
+    description: "xAI's Image 2.0 model for text-to-image creation.",
+    costInfo: "310 credits (Pro+) · Medium / 1K",
+  };
+}
+
+function gptImage25(modelId: "gpt-image-2.5-flare" | "gpt-image-2.5-sunburst"): AIModel {
+  const name = modelId === "gpt-image-2.5-flare" ? "GPT Image 2.5 Flare" : "GPT Image 2.5 Sunburst";
+  return {
+    id: modelId,
+    imageExecution: { key: modelId, aliases: [DIRECT_IMAGE_MODELS[modelId].model] },
+    name,
+    provider: "openai",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 900 },
+    // These new rows stay disabled until funded render verification enables them.
+    isAvailable: !!ENV.openaiImage25Enabled && !!ENV.openaiApiKey,
+    modelTier: "premium",
+    tier: "pro",
+    description: `OpenAI's ${name} model for text-to-image creation.`,
+    costInfo: "900 credits (Pro+) · Medium",
   };
 }
 
@@ -749,7 +788,10 @@ function buildModelList(): AIModel[] {
     ultraMode(),
     // Image models
     grokImage(),
+    grokImage20(),
     dalleModel(),
+    gptImage25("gpt-image-2.5-flare"),
+    gptImage25("gpt-image-2.5-sunburst"),
     geminiImage(),
     fluxPro(),
     fluxSchnell(),
