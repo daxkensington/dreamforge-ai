@@ -757,10 +757,15 @@ export const appRouter = router({
               const styleHint = input.modelVersion.replace("df-", "dreamforge ");
               const styledPrompt = `${styleHint} style. ${enhancedPrompt}`;
               providerInvocationStarted = true;
-              const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
-              const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
-              const key = gk("generations", "png");
-              ({ url } = await sp(key, buffer, "image/png"));
+              try {
+                const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
+                const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
+                const key = gk("generations", "png");
+                ({ url } = await sp(key, buffer, "image/png"));
+              } catch (err: any) {
+                console.warn("[ImageGen] RunPod Flux Dev preset failed, falling back to standard generation:", err.message);
+                enhancedPrompt = styledPrompt;
+              }
             }
           }
 
@@ -2006,6 +2011,46 @@ export const appRouter = router({
         }
       }),
 
+    // Live Canvas Render — Krea-style fast sketch-to-image streaming (Flux Schnell / Cloudflare)
+    liveCanvasRender: protectedProcedure
+      .input(
+        z.object({
+          sketchDataUrl: z.string().max(4_000_000).optional(),
+          prompt: z.string().min(1).max(1000),
+          outputStyle: z.enum(["realistic", "digital-art", "anime", "oil-painting", "watercolor", "3d-render"]).default("digital-art"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "sketch-to-image", "Live canvas render");
+        const styleDescriptions: Record<string, string> = {
+          "realistic": "photorealistic rendering, lifelike details, natural studio lighting",
+          "digital-art": "polished digital concept art, vibrant colors, crisp lines",
+          "anime": "anime illustration, cel-shaded, expressive Japanese animation style",
+          "oil-painting": "classical oil painting, rich textured brushstrokes",
+          "watercolor": "delicate watercolor painting, soft washes, paper texture",
+          "3d-render": "3D Octane render, volumetric lighting, smooth shading",
+        };
+        try {
+          let layoutGuide = "";
+          if (input.sketchDataUrl?.startsWith("data:image/")) {
+            const b64 = input.sketchDataUrl.split(",")[1];
+            if (b64) {
+              const { describeSketchBufferFast } = await import("./_core/svgVectorize");
+              layoutGuide = await describeSketchBufferFast(Buffer.from(b64, "base64"));
+            }
+          }
+          const fullPrompt = `${input.prompt}. ${layoutGuide ? `${layoutGuide} ` : ""}Style: ${styleDescriptions[input.outputStyle]}. Cohesive composition, high visual clarity.`;
+          const { url } = await generateImage({
+            prompt: fullPrompt,
+            size: "1024x1024",
+            userTier: await getUserTier(ctx.user.id),
+          });
+          return { url: url ?? null, status: "completed" as const, style: input.outputStyle };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
     // AI Color Grading — apply cinematic color grades to images
     colorGrade: protectedProcedure
       .input(
@@ -2325,16 +2370,25 @@ export const appRouter = router({
           });
 
           // Step 2: true vectorization — vtracer traces the raster into an
-          // actual SVG. colorCount drives vtracer's color_precision (1-8),
-          // so the slider is real now. svgUrl stays null when the worker
-          // doesn't have the vtracer task yet (old image) or tracing fails.
+          // actual SVG when RunPod is warm; otherwise our pure-Node sharp
+          // color-quantized SVG tracer guarantees a real downloadable .svg.
           let svgUrl: string | null = null;
-          const { isRunPodAvailable } = await import("./_core/runpod");
-          if (isRunPodAvailable()) {
+          if (url) {
             try {
-              const { runpodVectorize } = await import("./_core/runpod");
               const { buffer: rasterBuf } = await fetchGuardedImage(url);
-              const svg = await runpodVectorize(rasterBuf.toString("base64"), input.colorCount);
+              let svg: string | null = null;
+              const { isRunPodAvailable, runpodVectorize } = await import("./_core/runpod");
+              if (isRunPodAvailable()) {
+                try {
+                  svg = await runpodVectorize(rasterBuf.toString("base64"), input.colorCount);
+                } catch (err: any) {
+                  console.warn("[Vectorize] RunPod vtracer failed, using Node SVG fallback:", err.message);
+                }
+              }
+              if (!svg) {
+                const { vectorizeBufferToSvg } = await import("./_core/svgVectorize");
+                svg = await vectorizeBufferToSvg(rasterBuf, input.colorCount);
+              }
               const { storagePut, generateStorageKey } = await import("./storage");
               const { url: storedSvg } = await storagePut(
                 generateStorageKey("vectorized", "svg"),
@@ -2343,7 +2397,7 @@ export const appRouter = router({
               );
               svgUrl = storedSvg;
             } catch (err: any) {
-              console.warn("[Vectorize] vtracer SVG pass failed, returning raster only:", err.message);
+              console.warn("[Vectorize] SVG pass failed, returning raster only:", err.message);
             }
           }
 
@@ -3289,7 +3343,8 @@ export const appRouter = router({
         }
       }),
 
-    // Virtual Try-On — overlay a garment onto a person via self-hosted CatVTON on RunPod
+    // Virtual Try-On — overlay a garment onto a person via self-hosted CatVTON on RunPod,
+    // with fal.ai CatVTON and vision-composite fallback when RunPod is paused.
     virtualTryOn: protectedProcedure
       .input(
         z.object({
@@ -3302,16 +3357,53 @@ export const appRouter = router({
         await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
         try {
           const { isRunPodAvailable, runpodTryOn } = await import("./_core/runpod");
-          if (!isRunPodAvailable()) throw new Error("RunPod not configured");
+          if (isRunPodAvailable()) {
+            try {
+              const resultBuffer = await runpodTryOn(
+                input.personImageUrl,
+                input.garmentImageUrl,
+                input.clothType,
+              );
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const key = generateStorageKey("tryon", "png");
+              const { url } = await storagePut(key, resultBuffer, "image/png");
+              return { url, status: "completed" as const };
+            } catch (err: any) {
+              console.warn("[VirtualTryOn] RunPod CatVTON failed, falling back:", err.message);
+            }
+          }
 
-          const resultBuffer = await runpodTryOn(
-            input.personImageUrl,
-            input.garmentImageUrl,
-            input.clothType,
-          );
-          const { storagePut, generateStorageKey } = await import("./storage");
-          const key = generateStorageKey("tryon", "png");
-          const { url } = await storagePut(key, resultBuffer, "image/png");
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (isFalAvailable()) {
+            try {
+              const res = await falRun<{ image?: { url: string }; images?: Array<{ url: string }> }>(
+                "fal-ai/cat-vton",
+                {
+                  human_image_url: input.personImageUrl,
+                  garment_image_url: input.garmentImageUrl,
+                  cloth_type: input.clothType,
+                },
+                { pollInterval: 3000, maxPolls: 60 },
+              );
+              const remoteUrl = res.image?.url ?? res.images?.[0]?.url;
+              if (remoteUrl) {
+                const { buffer } = await fetchGuardedImage(remoteUrl);
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const { url } = await storagePut(generateStorageKey("tryon", "png"), buffer, "image/png");
+                return { url, status: "completed" as const };
+              }
+            } catch (err: any) {
+              console.warn("[VirtualTryOn] fal.ai CatVTON failed, falling back to generateImage:", err.message);
+            }
+          }
+
+          const { url } = await generateImage({
+            prompt: `Virtual try-on composite: dress the person from the first image in the ${input.clothType} garment from the second image. Preserve the person's identity, pose, and background while naturally fitting the garment with realistic fabric drape and lighting.`,
+            originalImages: [
+              { url: input.personImageUrl, mimeType: "image/png" },
+              { url: input.garmentImageUrl, mimeType: "image/png" },
+            ],
+          });
 
           return { url, status: "completed" as const };
         } catch (error: any) {
@@ -4985,15 +5077,31 @@ export const appRouter = router({
           return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
         }
 
-        // Direct CogVideoX selection
+        // Direct CogVideoX selection (falls back to fal.ai Hailuo when RunPod is paused)
         if (input.model === "cogvideo") {
           const { isRunPodAvailable, runpodCogVideo } = await import("./_core/runpod");
-          if (!isRunPodAvailable()) throw new Error("RunPod not configured");
-          const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
-          const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
-          const key = genKey("video", "mp4");
-          const { url } = await stPut(key, videoBuffer, "video/mp4");
-          return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (isRunPodAvailable()) {
+            try {
+              const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
+              const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
+              const key = genKey("video", "mp4");
+              const { url } = await stPut(key, videoBuffer, "video/mp4");
+              return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
+            } catch (err: any) {
+              if (!isFalAvailable()) throw err;
+              console.warn("[Video] CogVideoX RunPod failed, falling back to fal.ai Hailuo:", err.message);
+            }
+          } else if (!isFalAvailable()) {
+            throw new Error("RunPod not configured");
+          }
+          const result = await falRun<{ video: { url: string } }>(
+            "fal-ai/minimax/hailuo-02/standard/text-to-video",
+            { prompt: enhancedPrompt, prompt_optimizer: true, duration: parseInt(input.duration) > 6 ? "10" : "6" },
+            { pollInterval: 5000, maxPolls: 120 },
+          );
+          if (!result.video?.url) throw new Error("fal.ai hailuo returned no video");
+          return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
         }
 
         // Auto mode: try providers in priority order based on availability

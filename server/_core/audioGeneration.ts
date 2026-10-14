@@ -94,7 +94,29 @@ export async function generateSoundEffect(
         metadata: { type: "sfx", originalPrompt: request.prompt, style: request.options?.style ?? null },
       };
     } catch (err: any) {
-      console.warn("[AudioGen] RunPod failed, falling back to Replicate:", err.message);
+      console.warn("[AudioGen] RunPod failed, falling back:", err.message);
+    }
+  }
+
+  // Fallback: fal.ai sound effects / ACE-Step audio while Replicate token is dead
+  if (isFalAvailable()) {
+    try {
+      const result = await falRun<{ audio_file?: FalFile; audio?: FalFile }>(
+        "fal-ai/cassetteai/sound-effects-generator",
+        { prompt, duration },
+        { pollInterval: 2000, maxPolls: 60 },
+      );
+      const outputUrl = result.audio_file?.url ?? result.audio?.url ?? (await falInstrumentalMusic(prompt, Math.max(duration, 10)));
+      const storedUrl = await downloadAndStore(outputUrl, `sfx_${Date.now()}.wav`);
+      return {
+        audioUrl: storedUrl,
+        duration,
+        model: "cassetteai-sfx-fal",
+        metadata: { type: "sfx", originalPrompt: request.prompt, style: request.options?.style ?? null },
+      };
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[AudioGen] fal.ai sfx failed, falling back to Replicate:", err.message);
     }
   }
 
@@ -231,7 +253,30 @@ export async function generateVoiceover(
         metadata: { type: "voiceover", originalPrompt: request.prompt, voiceId: voicePreset },
       };
     } catch (err: any) {
-      console.warn("[Bark] RunPod failed, falling back to Replicate:", err.message);
+      console.warn("[Bark] RunPod failed, falling back:", err.message);
+    }
+  }
+
+  // Fallback: fal.ai Kokoro TTS while Replicate token is dead
+  if (isFalAvailable()) {
+    try {
+      const result = await falRun<{ audio?: FalFile; audio_url?: FalFile }>(
+        "fal-ai/kokoro/american-english",
+        { prompt: request.prompt, voice: "af_heart" },
+        { pollInterval: 2000, maxPolls: 45 },
+      );
+      const outputUrl = result.audio?.url ?? result.audio_url?.url;
+      if (!outputUrl) throw new Error("fal.ai kokoro returned no audio");
+      const storedUrl = await downloadAndStore(outputUrl, `voiceover_${Date.now()}.wav`);
+      return {
+        audioUrl: storedUrl,
+        duration: request.duration,
+        model: "kokoro-tts-fal",
+        metadata: { type: "voiceover", originalPrompt: request.prompt, voiceId: voicePreset },
+      };
+    } catch (err: any) {
+      if (!ENV.replicateApiToken) throw err;
+      console.warn("[Bark] fal.ai kokoro failed, falling back to Replicate:", err.message);
     }
   }
 

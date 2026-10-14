@@ -35,9 +35,10 @@ vi.mock("./promptModeration", () => ({
   PromptBlockedError: class extends Error { constructor() { super("Blocked prompt"); } },
 }));
 
-import { generateImage, isAutomaticImageConfigured } from "./imageGeneration";
+import { generateImage, hasTypographyIntent, isAutomaticImageConfigured } from "./imageGeneration";
 import { getModelById, listModels } from "./modelRegistry";
 import { DIRECT_IMAGE_MODELS, DirectImageConfirmedRejection, DirectImageInputError, DirectImageOutcomeUncertain } from "./directImageProviders";
+import { describeSketchBufferFast, vectorizeBufferToSvg } from "./svgVectorize";
 
 const fetchMock = vi.fn();
 const bytes = Buffer.from("generated image bytes");
@@ -342,4 +343,57 @@ describe("successful image execution provenance", () => {
     expect(mocks.guardedFetch).toHaveBeenCalledWith("https://input.example/image.png");
     expect(result.provenance).toEqual({ provider: "grok", model: "grok-imagine-image", requestedModel: "grok", fallbackUsed: true });
   });
+
+  it("fails over explicit runpod-flux-dev to fal.ai flux/dev when RunPod endpoint is paused", async () => {
+    mocks.runpodAvailable = true;
+    mocks.runpodDev.mockRejectedValue(new Error("RunPod run failed (409): ENDPOINT_PAUSED max_workers=0"));
+    mocks.env.falApiKey = "test-fal";
+    fetchMock.mockResolvedValueOnce(response({ request_id: "job", status_url: "https://queue.example/status", response_url: "https://queue.example/result" }))
+      .mockResolvedValueOnce(response({ status: "COMPLETED" }))
+      .mockResolvedValueOnce(response({ images: [{ url: "https://output.example/image.png" }] }))
+      .mockResolvedValueOnce(new Response(bytes.toString("utf8")));
+    const pending = generateImage({ prompt: "A lighthouse", model: "runpod-flux-dev", userTier: "pro" });
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await pending;
+    expect(result.provenance).toEqual({ provider: "fal", model: "fal-ai/flux/dev", requestedModel: "runpod-flux-dev", fallbackUsed: true });
+  });
+
+  it("fails over explicit dall-e-3 to fal.ai flux-pro/v1.1-ultra when OpenAI quota is exhausted", async () => {
+    mocks.env.openaiApiKey = "test-openai";
+    mocks.env.falApiKey = "test-fal";
+    fetchMock.mockResolvedValueOnce(response({ error: { code: "credit_balance_exhausted", message: "Billing hard limit" } }, 429))
+      .mockResolvedValueOnce(response({ request_id: "job", status_url: "https://queue.example/status", response_url: "https://queue.example/result" }))
+      .mockResolvedValueOnce(response({ status: "COMPLETED" }))
+      .mockResolvedValueOnce(response({ images: [{ url: "https://output.example/image.png" }] }))
+      .mockResolvedValueOnce(new Response(bytes.toString("utf8")));
+    const pending = generateImage({ prompt: "A lighthouse", model: "dall-e-3", userTier: "pro" });
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await pending;
+    expect(result.provenance).toEqual({ provider: "fal", model: "fal-ai/flux-pro/v1.1-ultra", requestedModel: "dall-e-3", fallbackUsed: true });
+  });
+
+  it("detects typography prompts and routes Auto to fal.ai Flux Schnell with typography guidance", async () => {
+    expect(hasTypographyIntent('A neon sign that reads "DREAMFORGE" at night')).toBe(true);
+    expect(hasTypographyIntent("A serene mountain lake at dawn")).toBe(false);
+    Object.assign(mocks.env, { cfAiToken: "test-cf", cfAccountId: "test-account", falApiKey: "test-fal" });
+    fetchMock.mockResolvedValueOnce(response({ request_id: "job", status_url: "https://queue.example/status", response_url: "https://queue.example/result" }))
+      .mockResolvedValueOnce(response({ status: "COMPLETED" }))
+      .mockResolvedValueOnce(response({ images: [{ url: "https://output.example/image.png" }] }))
+      .mockResolvedValueOnce(new Response(bytes.toString("utf8")));
+    const pending = generateImage({ prompt: 'A neon sign that reads "DREAMFORGE"', userTier: "pro" });
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await pending;
+    expect(result.provenance).toEqual({ provider: "fal", model: "fal-ai/flux/schnell", requestedModel: "auto", fallbackUsed: false });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://queue.fal.run/fal-ai/flux/schnell");
+  });
+
+  it("vectorizes raster buffers into valid SVG and describes sketch layout fast", async () => {
+    const svg = await vectorizeBufferToSvg(validJpeg, 4);
+    expect(svg).toContain("<svg xmlns=\"http://www.w3.org/2000/svg\"");
+    expect(svg).toContain("viewBox=\"0 0 16 12\"");
+    const sketchBuf = await sharp({ create: { width: 48, height: 48, channels: 3, background: "#ff2200" } }).png().toBuffer();
+    const layout = await describeSketchBufferFast(sketchBuf);
+    expect(layout).toContain("Composition layout from user sketch:");
+  });
 });
+

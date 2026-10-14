@@ -877,6 +877,17 @@ export async function refineUnfiltered(
 /**
  * Generate with an explicitly selected model (no fallback).
  */
+export function hasTypographyIntent(prompt: string): boolean {
+  if (/"[^"\n]{2,64}"/.test(prompt)) return true;
+  return /\b(with the text|that says|saying\s+['"]|sign that reads|banner reading|lettering|typography|logo text|poster titled|neon sign\s+['"])\b/i.test(prompt);
+}
+
+export function enhanceTypographyPrompt(prompt: string): string {
+  if (!hasTypographyIntent(prompt)) return prompt;
+  if (/spelled accurately|crisp, legible typography/i.test(prompt)) return prompt;
+  return `${prompt}. Render any quoted text or signage with exact spelling, crisp legible typography, and balanced kerning.`;
+}
+
 async function generateWithExplicitModel(
   model: ImageExecutionKey | "fal-flux-kontext",
   prompt: string,
@@ -905,18 +916,48 @@ async function generateWithExplicitModel(
       return result.buffer;
     }
     case "runpod-flux-dev":
-      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
-      return recordImageRoute(await runpodFluxDev(prompt, w || 1024, h || 1024), "runpod", "flux-dev");
+      if (isRunPodAvailable()) {
+        try {
+          return recordImageRoute(await runpodFluxDev(prompt, w || 1024, h || 1024), "runpod", "flux-dev");
+        } catch (err: any) {
+          if (!ENV.falApiKey) throw err;
+          console.warn("[ImageGen] RunPod flux-dev failed, falling back to fal.ai flux/dev:", err.message);
+        }
+      } else if (!ENV.falApiKey) {
+        throw new Error("RunPod not configured");
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux/dev", w, h), isRunPodAvailable());
     case "runpod-flux-schnell":
-      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
-      return recordImageRoute(await runpodFluxSchnell(prompt, w || 1024, h || 1024), "runpod", "flux-schnell");
+      if (isRunPodAvailable()) {
+        try {
+          return recordImageRoute(await runpodFluxSchnell(prompt, w || 1024, h || 1024), "runpod", "flux-schnell");
+        } catch (err: any) {
+          if (!ENV.falApiKey) throw err;
+          console.warn("[ImageGen] RunPod flux-schnell failed, falling back to fal.ai flux/schnell:", err.message);
+        }
+      } else if (!ENV.falApiKey) {
+        throw new Error("RunPod not configured");
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux/schnell", w, h), isRunPodAvailable());
     case "grok":
       if (!ENV.grokApiKey) throw new Error("Grok API key not configured");
       return generateWithGrok(prompt);
     case "dall-e-3":
       // Option key kept for UI/registry compat; routes to GPT Image now.
-      if (!ENV.openaiApiKey) throw new Error("OpenAI API key not configured");
-      return generateWithGptImage(prompt, size, quality);
+      // When OpenAI rejects with billing/quota exhaustion (429 credit_balance_exhausted)
+      // and fal.ai is configured, fall back to Flux Pro 1.1 Ultra (~$0.06, same 310-325 cr band).
+      if (!ENV.openaiApiKey && !ENV.falApiKey) throw new Error("OpenAI API key not configured");
+      if (ENV.openaiApiKey) {
+        try {
+          return await generateWithGptImage(prompt, size, quality);
+        } catch (err: any) {
+          const msg = String(err?.message ?? "");
+          const isQuotaExhausted = /credit_balance_exhausted|insufficient_quota|billing_hard_limit/i.test(msg);
+          if (!isQuotaExhausted || !ENV.falApiKey) throw err;
+          console.warn("[ImageGen] OpenAI GPT Image quota exhausted, falling back to fal.ai flux-pro/v1.1-ultra:", msg);
+        }
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux-pro/v1.1-ultra", w, h), !!ENV.openaiApiKey);
     case "gemini":
       if (process.env.IMAGEN_ENABLED !== "true" || !ENV.geminiApiKey) {
         throw new Error("Gemini Imagen is currently unavailable on this account");
@@ -986,9 +1027,9 @@ async function generateWithExplicitModel(
 /**
  * Try providers in cost-optimized order: free first, then cheap, then premium.
  *
- * Priority: Gemini (free) -> Together AI (free) -> Cloudflare (free) ->
- *           RunPod Flux Schnell (self-hosted) -> Grok -> Flux Schnell (Replicate) ->
- *           DALL-E 3 -> SD3 -> Flux Pro
+ * Priority: Cloudflare (free) -> fal.ai Flux Schnell (cheap + typography-capable) ->
+ *           RunPod Flux Schnell (self-hosted) -> Flux Schnell (Replicate) ->
+ *           Paid-tier backup (Grok / opt-in Gemini)
  */
 async function generateWithFallback(
   prompt: string,
@@ -1000,6 +1041,8 @@ async function generateWithFallback(
   const errors: string[] = [];
   const [w, h] = size.split("x").map(Number);
   const isPaidTier = Boolean(userTier && userTier !== "free");
+  const typographyMode = hasTypographyIntent(prompt);
+  const effectivePrompt = typographyMode ? enhanceTypographyPrompt(prompt) : prompt;
 
   const tryProvider = async (name: string, fn: () => Promise<Buffer>): Promise<Buffer | null> => {
     try {
@@ -1012,29 +1055,39 @@ async function generateWithFallback(
     }
   };
 
+  // Typography-specialist routing: when the prompt explicitly requests rendered
+  // text/lettering, try fal.ai Flux Schnell first (native dimension control +
+  // stronger text adherence than Cloudflare's fixed-resolution endpoint).
+  if (typographyMode && ENV.falApiKey) {
+    const result = await tryProvider("fal.ai Flux Schnell (Typography)", () =>
+      generateWithFal(effectivePrompt, "fal-ai/flux/schnell", w, h)
+    );
+    if (result) return result;
+  }
+
   // 1. FREE TIER: Cloudflare Workers AI (100K free/day)
   if (ENV.cfAiToken && ENV.cfAccountId) {
-    const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(prompt));
+    const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(effectivePrompt));
     if (result) return result;
   }
 
   // 2. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
-  if (ENV.falApiKey) {
+  if (!typographyMode && ENV.falApiKey) {
     const result = await tryProvider("fal.ai Flux Schnell", () =>
-      generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
+      generateWithFal(effectivePrompt, "fal-ai/flux/schnell", w, h)
     );
     if (result) return result;
   }
 
   // 3. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
   if (isRunPodAvailable()) {
-    const result = await tryProvider("RunPod Flux Schnell", async () => recordImageRoute(await runpodFluxSchnell(prompt, w, h), "runpod", "flux-schnell"));
+    const result = await tryProvider("RunPod Flux Schnell", async () => recordImageRoute(await runpodFluxSchnell(effectivePrompt, w, h), "runpod", "flux-schnell"));
     if (result) return result;
   }
 
   // 4. CHEAP: Flux Schnell via Replicate (~$0.003/image)
   if (ENV.replicateApiToken) {
-    const result = await tryProvider("Flux Schnell", () => generateWithFlux(prompt, "flux-schnell", w, h));
+    const result = await tryProvider("Flux Schnell", () => generateWithFlux(effectivePrompt, "flux-schnell", w, h));
     if (result) return result;
   }
 
@@ -1042,12 +1095,12 @@ async function generateWithFallback(
   // Never cascade 5-credit Auto into 210–325 credit models (GPT Image 1, SD3, Flux Pro),
   // and never cascade free-tier Auto requests into paid Grok/Gemini APIs.
   if (isPaidTier && ENV.grokApiKey) {
-    const result = await tryProvider("Grok", () => generateWithGrok(prompt));
+    const result = await tryProvider("Grok", () => generateWithGrok(effectivePrompt));
     if (result) return result;
   }
 
   if (isPaidTier && process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
-    const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
+    const result = await tryProvider("Gemini", () => generateWithGemini(effectivePrompt));
     if (result) return result;
   }
 
@@ -1059,3 +1112,4 @@ async function generateWithFallback(
     `All image providers failed:\n${errors.map((e) => `  - ${e}`).join("\n")}`,
   );
 }
+
