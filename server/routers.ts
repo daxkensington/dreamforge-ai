@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
+import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -144,6 +145,14 @@ const PREMIUM_MODEL_IDS = new Set([
   "fal-wan-video", "minimax-video", "stable-video",
 ]);
 
+const DF_LORA_MAP: Record<string, string> = {
+  "df-cinematic": "daxkensington/dreamforge-cinematic",
+  "df-anime": "daxkensington/dreamforge-anime",
+  "df-fantasy": "daxkensington/dreamforge-fantasy",
+  "df-product": "daxkensington/dreamforge-product",
+  "df-abstract": "daxkensington/dreamforge-abstract",
+};
+
 // ─── User Tier Helper ──────────────────────────────────────────────────────
 async function getUserTier(userId: number): Promise<string> {
   try {
@@ -169,7 +178,7 @@ async function getUserTier(userId: number): Promise<string> {
  * For model-based generations, pass the modelId to use model-tier-aware pricing.
  * For non-model tools, falls back to TOOL_CREDIT_COSTS or LEGACY_CREDIT_COSTS.
  */
-async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string) {
+async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string, quotedCost?: number) {
   // Kill-switch — block offline tools before we touch the wallet. Throws
   // TRPCError if the tool is in "offline" state; degraded passes through.
   try {
@@ -180,7 +189,9 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
 
   let cost: number;
 
-  if (modelId) {
+  if (quotedCost !== undefined) {
+    cost = quotedCost;
+  } else if (modelId) {
     // Model-aware pricing: use the model's creditCost.base
     const model = getModelById(modelId);
     cost = model?.creditCost.base ?? (LEGACY_CREDIT_COSTS[tool] || 1);
@@ -520,6 +531,8 @@ export const appRouter = router({
   }),
 
   generation: router({
+    imageModels: publicProcedure.query(() => listImageCreationModels()),
+
     create: protectedProcedure
       .input(
         z.object({
@@ -596,13 +609,27 @@ export const appRouter = router({
         const userTier = await getUserTier(ctx.user.id);
         const tierConfig = getTierConfig(userTier);
 
-        // Block models the user's tier can't access
+        // Standard image choices have one authoritative catalog, quote and
+        // executor mapping. Validate before any wallet or generation writes.
+        const isImagePreset = Object.hasOwn(DF_LORA_MAP, input.modelVersion);
+        if (isImagePreset && input.mediaType !== "image") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "DreamForge image styles support image creation only." });
+        }
+        const imagePlan = input.mediaType === "image" && !input.uncensored && !isImagePreset
+          ? prepareImageCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height })
+          : undefined;
         const requestedModel = getModelById(input.modelVersion);
-        if (requestedModel && !canAccessModel(userTier, requestedModel.tier)) {
+        if (!input.uncensored && requestedModel && requestedModel.type !== input.mediaType) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a model that supports the requested media type." });
+        }
+        if (!imagePlan && requestedModel && !canAccessModel(userTier, requestedModel.tier)) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: `Model "${input.modelVersion}" requires a ${requestedModel.tier} or higher subscription.`,
           });
+        }
+        if (!input.uncensored && isImagePreset && !canAccessModel(userTier, "creator")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "DreamForge styles require a creator or higher subscription." });
         }
 
         // Cap resolution for the user's tier
@@ -615,37 +642,49 @@ export const appRouter = router({
 
         // Deduct credits
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
-        // Model-aware pricing: bill at the registry model's creditCost.base when
-        // the request resolves to a known model of the same media type. Unknown
-        // ids and uncensored (forced "auto") keep the flat tool cost (5).
+        // The immutable image plan quotes exactly what this invocation debits.
+        // Existing special image/video branches keep their established pricing.
         const billableModel =
           !input.uncensored && requestedModel && requestedModel.type === input.mediaType
             ? requestedModel
             : undefined;
-        const deduction = await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`, billableModel?.id);
+        const deduction = await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`, imagePlan?.billableModelId ?? billableModel?.id, imagePlan?.creditCost);
 
-        // Create generation record
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: input.prompt,
-          negativePrompt: input.negativePrompt ?? null,
-          mediaType: input.mediaType,
-          width: input.width,
-          height: input.height,
-          duration: input.mediaType === "video" ? input.duration : null,
-          status: "generating",
-          modelVersion: input.modelVersion,
-          // Uncensored generations are flagged so they can never enter the
-          // public gallery (gallery.submit rejects them).
-          metadata: input.uncensored ? { uncensored: true, style: input.uncensoredStyle ?? null } : null,
-        });
+        let genId: number | undefined;
+        let url: string | undefined;
+        let delivered = false;
+        let imageProvenance: Awaited<ReturnType<typeof executeImageCreation>>["provenance"];
+        const generationMetadata = input.uncensored
+          ? { uncensored: true, style: input.uncensoredStyle ?? null }
+          : imagePlan
+            ? { requestedModelId: imagePlan.requestedModelId, modelId: imagePlan.modelId, quotedCredits: imagePlan.creditCost }
+            : null;
 
-        if (input.tagIds && input.tagIds.length > 0) {
-          await setGenerationTags(genId, input.tagIds);
-        }
-
-        // Generate media
+        // Every operation after a successful debit shares the refund scope.
         try {
+          genId = await createGeneration({
+            userId: ctx.user.id,
+            prompt: input.prompt,
+            negativePrompt: input.negativePrompt ?? null,
+            mediaType: input.mediaType,
+            width: input.width,
+            height: input.height,
+            duration: input.mediaType === "video" ? input.duration : null,
+            status: "generating",
+            modelVersion: input.modelVersion,
+            // Uncensored generations remain private-only.
+            metadata: generationMetadata,
+          });
+          if (!Number.isSafeInteger(genId) || genId <= 0) {
+            genId = undefined;
+            throw new Error("Could not create a generation record.");
+          }
+
+          if (input.tagIds && input.tagIds.length > 0) {
+            await setGenerationTags(genId, input.tagIds);
+          }
+
+          // Generate media
           let enhancedPrompt: string;
           if (input.mediaType === "video") {
             enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
@@ -657,17 +696,7 @@ export const appRouter = router({
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
 
-          // Map DreamForge exclusive styles to RunPod Flux + LoRA
-          const DF_LORA_MAP: Record<string, string> = {
-            "df-cinematic": "daxkensington/dreamforge-cinematic",
-            "df-anime": "daxkensington/dreamforge-anime",
-            "df-fantasy": "daxkensington/dreamforge-fantasy",
-            "df-product": "daxkensington/dreamforge-product",
-            "df-abstract": "daxkensington/dreamforge-abstract",
-          };
-
-          let url: string | undefined;
-          const loraId = DF_LORA_MAP[input.modelVersion];
+          const loraId = isImagePreset ? DF_LORA_MAP[input.modelVersion] : undefined;
           if (loraId) {
             // DreamForge exclusive style — use RunPod Flux Dev with LoRA
             const { isRunPodAvailable, runpodFluxDev } = await import("./_core/runpod");
@@ -681,8 +710,12 @@ export const appRouter = router({
             }
           }
 
-          if (!url) {
-            // Standard model — map UI model names to generateImage model param
+          if (!url && imagePlan) {
+            const rendered = await executeImageCreation(imagePlan, { prompt: enhancedPrompt });
+            url = rendered.url;
+            imageProvenance = rendered.provenance;
+          } else if (!url) {
+            // Compatibility path for existing video/preset/uncensored flows.
             const modelMap: Record<string, string> = {
               "built-in-v1": "auto", "grok": "grok", "flux-pro": "flux-pro",
               "flux-schnell": "flux-schnell", "dall-e-3": "dall-e-3", "sd3": "sd3",
@@ -703,11 +736,15 @@ export const appRouter = router({
             }));
           }
 
+          if (!url?.trim()) throw new Error("The image provider returned no downloadable image.");
+
           await updateGeneration(genId, {
             status: "completed",
             imageUrl: url ?? null,
             thumbnailUrl: url ?? null,
+            ...(imagePlan ? { metadata: { ...generationMetadata, imageGeneration: imageProvenance ?? null } } : {}),
           });
+          delivered = true;
 
           // Notify on completion
           try {
@@ -723,26 +760,37 @@ export const appRouter = router({
           checkAndSendBudgetAlerts(ctx.user.id).catch(() => {});
           const newAchievements = await achievementPromise;
 
-          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements };
+          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements, ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
         } catch (error: any) {
-          await updateGeneration(genId, {
-            status: "failed",
-            errorMessage: error.message || "Generation failed",
-          });
+          const failureMessage = safeErrorMessage(error, "generation.create");
+          // Cosmetic follow-up failures must never undo a delivered result.
+          if (delivered) {
+            return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
+          }
+          if (genId !== undefined) {
+            try {
+              await updateGeneration(genId, { status: "failed", errorMessage: failureMessage });
+            } catch (statusError) {
+              safeErrorMessage(statusError, "generation.create:failed-status");
+            }
+          }
           // Telemetry — drives auto-degrade + admin failure dashboard
           logToolFailure({
             toolId: creditTool,
-            errorMessage: error?.message ?? "Generation failed",
+            errorMessage: failureMessage,
             userId: ctx.user.id,
           }).catch(() => {});
           // Refund credits on generation failure — exactly what was deducted.
           const refundCost = deduction.cost;
           try {
-            await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${(error.message || "unknown error").slice(0, 100)}`);
+            await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${failureMessage.slice(0, 100)}`);
           } catch (refundErr) {
-            console.error("[generation.create] Credit refund failed:", refundErr);
+            safeErrorMessage(refundErr, "generation.create:refund");
           }
-          return { id: genId, status: "failed", error: error.message };
+          if (genId === undefined) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start your generation. Please try again." });
+          }
+          return { id: genId, status: "failed", error: failureMessage };
         }
       }),
 

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock image generation
 vi.mock("./_core/imageGeneration", () => ({
+  // This suite assumes a configured renderer; real configuration admission
+  // is exercised separately by image-gateway.test.ts without provider IO.
+  isAutomaticImageConfigured: vi.fn(() => true),
   generateImage: vi.fn().mockResolvedValue({ url: "https://cdn.example.com/result.png" }),
 }));
 
@@ -15,6 +18,7 @@ vi.mock("./_core/llm", () => ({
 // Mock credit deduction
 vi.mock("./stripe", () => ({
   deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 100, needed: 1 }),
+  refundCredits: vi.fn().mockResolvedValue({ success: true, refunded: 5 }),
   CREDIT_COSTS: {
     "text-to-image": 1,
     "image-to-image": 1,
@@ -52,7 +56,7 @@ vi.mock("./db", async () => {
   return {
     ...actual,
     getDb: vi.fn().mockResolvedValue(null),
-    createGeneration: vi.fn().mockResolvedValue({ id: 1 }),
+    createGeneration: vi.fn().mockResolvedValue(1),
     updateGeneration: vi.fn().mockResolvedValue(undefined),
     saveGeneration: vi.fn().mockResolvedValue({ id: 1 }),
     getGenerationById: vi.fn().mockResolvedValue({ id: 1, userId: 2, prompt: "test" }),
@@ -125,7 +129,8 @@ vi.mock("./routersPhase15", async () => {
   };
 });
 
-import { deductCredits } from "./stripe";
+import { deductCredits, refundCredits } from "./stripe";
+import { generateImage } from "./_core/imageGeneration";
 import { getGenerationById } from "./db";
 import { createNotification } from "./routersPhase15";
 import { toggleFollow, addComment } from "./dbExtended";
@@ -152,7 +157,7 @@ describe("Credit Deduction Integration", () => {
   });
 
   it("should deduct credits when generating an image", async () => {
-    await caller.generation.create({
+    const result = await caller.generation.create({
       prompt: "A beautiful sunset",
       style: "photorealistic",
       aspectRatio: "16:9",
@@ -160,6 +165,9 @@ describe("Credit Deduction Integration", () => {
     // Actual cost comes from MODEL_CREDIT_COSTS (defaults to image.standard=5);
     // the local CREDIT_COSTS override doesn't apply to model-tier-aware paths.
     expect(deductCredits).toHaveBeenCalledWith(1, expect.any(Number), expect.any(String));
+    expect(result).toMatchObject({ id: 1, status: "completed", imageUrl: "https://cdn.example.com/result.png" });
+    expect(generateImage).toHaveBeenCalledTimes(1);
+    expect(refundCredits).not.toHaveBeenCalled();
   });
 
   it("should deduct credits when upscaling an image", async () => {
