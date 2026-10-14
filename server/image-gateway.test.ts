@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const configuration = vi.hoisted(() => ({
   falApiKey: "test-fal-not-a-real-key",
   openaiApiKey: "",
+  openaiImage25Enabled: false,
   grokApiKey: "test-grok-not-a-real-key",
   stabilityApiKey: "",
   replicateApiToken: "",
@@ -37,7 +38,7 @@ const request = (modelId: string, userTier = "studio", width = 768, height = 768
 beforeEach(() => {
   Object.assign(configuration, {
     falApiKey: "test-fal-not-a-real-key", grokApiKey: "test-grok-not-a-real-key",
-    openaiApiKey: "", stabilityApiKey: "", replicateApiToken: "", togetherApiKey: "",
+    openaiApiKey: "", openaiImage25Enabled: false, stabilityApiKey: "", replicateApiToken: "", togetherApiKey: "",
     geminiApiKey: "", cfAiToken: "", cfAccountId: "", runpodApiKey: "", runpodFluxEndpointId: "",
   });
   vi.stubEnv("IMAGEN_ENABLED", "false");
@@ -70,6 +71,24 @@ describe("standard image creation gateway", () => {
       requestedModelId: "grok", modelId: "grok-image", executionKey: "grok",
       billableModelId: "grok-image", creditCost: 5,
     });
+  });
+  it("quotes the premium Grok choice separately and explains provider output settings", () => {
+    expect(prepareImageCreation(request("grok-imagine-image-2.0", "pro", 1536, 1024))).toMatchObject({
+      executionKey: "grok-imagine-image-2.0", creditCost: 310, modelId: "grok-imagine-image-2.0",
+    });
+    expect(listImageCreationModels().find(model => model.id === "grok-imagine-image-2.0")).toMatchObject({
+      requiredTier: "pro", outputInfo: expect.stringContaining("1K output"),
+    });
+    expect(() => prepareImageCreation(request("grok-imagine-image-2.0", "creator"))).toThrow(expect.objectContaining({ code: "FORBIDDEN" }));
+  });
+  it.each(["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"])("keeps %s unavailable until explicitly enabled on a funded account", (modelId) => {
+    configuration.openaiApiKey = "test-openai-not-a-real-key";
+    expect(() => prepareImageCreation(request(modelId))).toThrow(expect.objectContaining({ code: "SERVICE_UNAVAILABLE" }));
+    configuration.openaiImage25Enabled = true;
+    expect(prepareImageCreation(request(modelId))).toMatchObject({ executionKey: modelId });
+    configuration.openaiApiKey = "";
+    expect(() => prepareImageCreation(request(modelId))).toThrow(expect.objectContaining({ code: "SERVICE_UNAVAILABLE" }));
+    expect(render).not.toHaveBeenCalled();
   });
 
   it.each(["some-future-model", "gpt-4o-mini", "fal-flux-kontext"])("rejects unsupported creation choice %s without rendering", modelId => {

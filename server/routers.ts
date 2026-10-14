@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
 import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
+import { DIRECT_IMAGE_MODELS, isConfirmedDirectImageRejection } from "./_core/directImageProviders";
 import { beginGenerationRequest, claimGenerationRequest, completeGenerationRequest, failGenerationRequestAndRefund, markGenerationReconciliation, readGenerationRequest } from "./_core/generationBilling";
 import { hashGenerationRequest, pendingGenerationResponse, replayGenerationResponse } from "./_core/generationRequest";
 import { invokeLLM } from "./_core/llm";
@@ -840,8 +841,9 @@ export const appRouter = router({
           }).catch(() => {});
           // Existing renderers throw generic errors. After invocation, a lost
           // response, polling timeout or storage failure cannot prove a terminal
-          // provider failure. Hold for review until a verified outcome exists.
-          if (providerInvocationStarted) return pendingForReview("provider-outcome-uncertain");
+          // provider failure. Only the direct adapter's typed terminal refusal
+          // authorizes refund after invocation; other outcomes stay for review.
+          if (providerInvocationStarted && !isConfirmedDirectImageRejection(error)) return pendingForReview("provider-outcome-uncertain");
           // State, exact refund and refund ledger are one guarded operation.
           try {
             const settled = await failGenerationRequestAndRefund(requestOwner, { confirmedFailure: true, errorCode: "generation-failed", errorMessage: failureMessage, generationId: genId });
@@ -1094,6 +1096,11 @@ export const appRouter = router({
         const tierConfig = getTierConfig(userTier);
 
         for (const item of input.prompts) {
+          // The legacy batch renderer always uses Auto and cannot honor these
+          // explicit routes, their quotes, or durable request ownership.
+          if (Object.hasOwn(DIRECT_IMAGE_MODELS, item.modelVersion) || Object.values(DIRECT_IMAGE_MODELS).some(model => model.model === item.modelVersion)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Use the image workspace to create one image with this model." });
+          }
           const batchModel = getModelById(item.modelVersion);
           if (batchModel && !canAccessModel(userTier, batchModel.tier)) {
             throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a ${batchModel.tier} or higher subscription.` });

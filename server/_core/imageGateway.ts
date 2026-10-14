@@ -35,6 +35,11 @@ export function listImageCreationModels() {
       // Configuration is intentionally distinct from proven render health.
       isConfigured: model.isAvailable,
       maxResolution: { ...model.maxResolution },
+      outputInfo: model.id === "grok-imagine-image-2.0"
+        ? "Medium quality, 1K output; image settings select the nearest supported aspect ratio."
+        : model.id === "gpt-image-2.5-flare" || model.id === "gpt-image-2.5-sunburst"
+          ? "Medium quality; image settings map to 1024×1024, 1536×1024 or 1024×1536 output."
+          : undefined,
     })),
   ];
 }

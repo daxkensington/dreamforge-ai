@@ -711,7 +711,9 @@ export default function Workspace() {
                     ) : selectedImageModel ? (
                       <p className="text-xs text-muted-foreground">
                         {selectedImageModel.description}
-                        {" "}Max {selectedImageModel.maxResolution.width} × {selectedImageModel.maxResolution.height}.
+                        {" "}{"outputInfo" in selectedImageModel && selectedImageModel.outputInfo
+                          ? selectedImageModel.outputInfo
+                          : `Max ${selectedImageModel.maxResolution.width} × ${selectedImageModel.maxResolution.height}.`}
                       </p>
                     ) : null}
                     <div className="flex items-center justify-between gap-2">

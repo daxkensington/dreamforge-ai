@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 
 const mocks = vi.hoisted(() => ({
-  env: {} as Record<string, string>,
+  env: {} as Record<string, string | boolean>,
   runpodAvailable: false,
   runpodDev: vi.fn(),
   runpodSchnell: vi.fn(),
@@ -36,10 +37,13 @@ vi.mock("./promptModeration", () => ({
 
 import { generateImage, isAutomaticImageConfigured } from "./imageGeneration";
 import { getModelById, listModels } from "./modelRegistry";
+import { DIRECT_IMAGE_MODELS, DirectImageConfirmedRejection, DirectImageInputError, DirectImageOutcomeUncertain } from "./directImageProviders";
 
 const fetchMock = vi.fn();
 const bytes = Buffer.from("generated image bytes");
 const b64 = bytes.toString("base64");
+let validJpeg: Buffer;
+beforeAll(async () => { validJpeg = await sharp({ create: { width: 16, height: 12, channels: 3, background: "#336699" } }).jpeg().toBuffer(); });
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "content-type": "application/json" },
 });
@@ -98,8 +102,8 @@ describe("executable image registry", () => {
 
   it("advertises only existing standard creation executors, with unique keys and legacy aliases", () => {
     const executable = listModels().filter(model => model.imageExecution);
-    expect(executable).toHaveLength(15);
-    expect(new Set(executable.map(model => model.imageExecution!.key)).size).toBe(15);
+    expect(executable).toHaveLength(18);
+    expect(new Set(executable.map(model => model.imageExecution!.key)).size).toBe(18);
     expect(executable.every(model => model.type === "image" && model.capabilities.includes("text-to-image"))).toBe(true);
     for (const id of ["fal-flux-kontext", "runpod-esrgan", "runpod-rmbg", "veo-3", "openai-tts"]) {
       expect(getModelById(id)?.imageExecution).toBeUndefined();
@@ -139,9 +143,96 @@ describe("executable image registry", () => {
       maxResolution: { width: 1536, height: 1536 },
     });
   });
+
+  it("quotes Grok Image 2.0 at the fixed Medium/1K price and Pro entitlement", () => {
+    expect(getModelById("grok-imagine-image-2.0")).toMatchObject({
+      tier: "pro", creditCost: { base: 310 }, maxResolution: { width: 1536, height: 1536 }, isAvailable: false,
+    });
+    mocks.env.grokApiKey = "fixture-grok";
+    expect(getModelById("grok-imagine-image-2.0")?.isAvailable).toBe(true);
+    expect(getModelById("grok-imagine-image-2.0")?.costInfo).toContain("1K");
+  });
+
+  it("keeps both new GPT snapshots gated by the enable flag and credentials", () => {
+    mocks.env.openaiApiKey = "fixture-openai";
+    for (const modelId of ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const) {
+      expect(getModelById(modelId)).toMatchObject({ tier: "pro", creditCost: { base: 900 }, isAvailable: false });
+      expect(getModelById(modelId)?.imageExecution?.aliases).toEqual([DIRECT_IMAGE_MODELS[modelId].model]);
+    }
+    mocks.env.openaiImage25Enabled = true;
+    expect(getModelById("gpt-image-2.5-flare")?.isAvailable).toBe(true);
+    expect(getModelById("gpt-image-2.5-sunburst")?.isAvailable).toBe(true);
+    delete mocks.env.openaiApiKey;
+    expect(getModelById("gpt-image-2.5-flare")?.isAvailable).toBe(false);
+  });
 });
 
 describe("successful image execution provenance", () => {
+  it.each(["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "grok-imagine-image-2.0"] as const)("routes explicit %s through one pinned POST and stores real PNG with direct provenance", async (modelId) => {
+    Object.assign(mocks.env, { openaiApiKey: "fixture-openai", openaiImage25Enabled: true, grokApiKey: "fixture-grok", falApiKey: "fixture-fal", replicateApiToken: "fixture-replicate", cfAiToken: "fixture-cf", cfAccountId: "fixture-account" });
+    const providerModel = DIRECT_IMAGE_MODELS[modelId].model;
+    fetchMock.mockResolvedValue(response({ data: [{ b64_json: validJpeg.toString("base64") }], model: providerModel, quality: "medium", usage: { cost_in_usd_ticks: 600_000_000 } }));
+    const result = await generateImage({ prompt: "A fictional lighthouse", model: modelId, size: "512x768", quality: "hd", userTier: "pro" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ model: providerModel, n: 1, quality: "medium" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject(modelId === "grok-imagine-image-2.0" ? { resolution: "1k", aspect_ratio: "2:3", response_format: "b64_json" } : { size: "1024x1536", output_format: "png" });
+    expect(result.provenance).toMatchObject({ provider: modelId === "grok-imagine-image-2.0" ? "grok" : "openai", model: providerModel, requestedModel: modelId, fallbackUsed: false, usage: { cost_in_usd_ticks: 600_000_000 }, direct: { requestedSize: { width: 512, height: 768 }, decodedSize: { width: 16, height: 12 }, sourceMimeType: "image/jpeg", request: { model: providerModel, quality: "medium" }, response: { model: providerModel, quality: "medium" } } });
+    expect(mocks.store).toHaveBeenCalledTimes(1);
+    expect(mocks.store.mock.calls[0][0]).toBe("generations/test.png");
+    expect(mocks.store.mock.calls[0][2]).toBe("image/png");
+    expect((await sharp(mocks.store.mock.calls[0][1]).metadata()).format).toBe("png");
+    expect(mocks.watermark).not.toHaveBeenCalled();
+    expect(mocks.runpodDev).not.toHaveBeenCalled();
+    expect(mocks.predict).not.toHaveBeenCalled();
+  });
+
+  it.each(["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"] as const)("refuses %s in the executor when its flag is disabled even if a key exists", async (model) => {
+    Object.assign(mocks.env, { openaiApiKey: "fixture-openai", grokApiKey: "fixture-grok" });
+    await expect(generateImage({ prompt: "A lighthouse", model, userTier: "pro" })).rejects.toBeInstanceOf(DirectImageInputError);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mocks.store).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 429, 400, 422, 503])("preserves typed direct HTTP %i errors without cross-model fallback or storage", async (status) => {
+    Object.assign(mocks.env, { grokApiKey: "fixture-grok", openaiApiKey: "fixture-openai", falApiKey: "fixture-fal", replicateApiToken: "fixture-replicate" });
+    fetchMock.mockResolvedValue(response({ error: "Provider refused" }, status));
+    await expect(generateImage({ prompt: "A lighthouse", model: "grok-imagine-image-2.0", userTier: "pro" })).rejects.toBeInstanceOf(status === 401 || status === 429 ? DirectImageConfirmedRejection : DirectImageOutcomeUncertain);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mocks.store).not.toHaveBeenCalled();
+    expect(mocks.predict).not.toHaveBeenCalled();
+    expect(mocks.runpodSchnell).not.toHaveBeenCalled();
+  });
+
+  it("keeps the parent free watermark and PNG storage after direct generation", async () => {
+    mocks.env.grokApiKey = "fixture-grok";
+    fetchMock.mockResolvedValue(response({ data: [{ b64_json: validJpeg.toString("base64") }] }));
+    const result = await generateImage({ prompt: "A lighthouse", model: "grok-imagine-image-2.0", userTier: "free" });
+    expect(mocks.watermark).toHaveBeenCalledTimes(1);
+    expect((await sharp(mocks.watermark.mock.calls[0][0]).metadata()).format).toBe("png");
+    expect(mocks.store).toHaveBeenCalledWith("generations/test.png", Buffer.from("watermarked image bytes"), "image/png");
+    expect(result.provenance?.direct?.sourceMimeType).toBe("image/jpeg");
+  });
+
+  it("keeps Auto on its existing Grok model when the new options are configured", async () => {
+    Object.assign(mocks.env, { grokApiKey: "fixture-grok", openaiApiKey: "fixture-openai", openaiImage25Enabled: true });
+    fetchMock.mockResolvedValue(response({ data: [{ b64_json: b64 }] }));
+    const result = await generateImage({ prompt: "A lighthouse", userTier: "pro" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).model).toBe("grok-imagine-image");
+    expect(result.provenance?.direct).toBeUndefined();
+  });
+
+  it.each(["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "grok-imagine-image-2.0"] as const)("prevents %s from bypassing its explicit route through legacy original-image or unfiltered generation", async (model) => {
+    mocks.runpodAvailable = true;
+    for (const options of [{ originalImages: [{ url: "https://input.example/image.png" }] }, { unfiltered: true }]) {
+      await expect(generateImage({ prompt: "A lighthouse", model, userTier: "pro", ...options })).rejects.toBeInstanceOf(DirectImageInputError);
+    }
+    expect(mocks.runpodImg2Img).not.toHaveBeenCalled();
+    expect(mocks.runpodSchnell).not.toHaveBeenCalled();
+    expect(mocks.vision).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mocks.store).not.toHaveBeenCalled();
+  });
+
   it("reports GPT Image for the legacy DALL-E selection and preserves free watermark/storage", async () => {
     mocks.env.openaiApiKey = "test-openai";
     fetchMock.mockResolvedValue(response({ data: [{ b64_json: b64 }] }));
