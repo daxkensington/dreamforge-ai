@@ -87,6 +87,11 @@ const UNCENSORED_REFINE_COST = 10;
 const FREE_UNCENSORED_LIMIT = FREE_UNCENSORED_PREVIEWS;
 const FREE_UNCENSORED_GLOBAL_DAILY_CAP = 500;
 
+function isRunPodEndpointPausedError(err: unknown): boolean {
+  const msg = (err as any)?.message ?? String(err ?? "");
+  return /\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(msg);
+}
+
 async function countFreeUncensored(userId: number): Promise<number> {
   const db = await requireDb();
   const rows = await db
@@ -625,6 +630,27 @@ export const uncensoredRouter = router({
             await updateGeneration(genId, { metadata: { ...row.metadata, runpodJobId: jobId } });
             generationIds.push(genId);
           } catch (err: any) {
+            if (!characterUrl && isRunPodEndpointPausedError(err)) {
+              try {
+                const gen = await generateImage({
+                  prompt,
+                  model: "auto",
+                  size: `${aspect.width}x${aspect.height}`,
+                  userTier: "pro",
+                  unfiltered: true,
+                  unfilteredQuality: input.quality,
+                  loraId,
+                  seed,
+                });
+                const url = gen.url!;
+                await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url });
+                results.push({ generationId: genId, url, seed });
+                generationIds.push(genId);
+                continue;
+              } catch (syncErr: any) {
+                err = syncErr;
+              }
+            }
             failed += 1;
             await updateGeneration(genId, { status: "failed" });
             await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
@@ -640,8 +666,9 @@ export const uncensoredRouter = router({
         if (failed > 0) {
           await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate submit partial fail ×${failed}`);
         }
+        const allCompletedInline = results.length === generationIds.length;
         return {
-          status: "processing" as const,
+          status: allCompletedInline ? ("completed" as const) : ("processing" as const),
           generationIds,
           images: results,
           cost: unitCost * generationIds.length,
@@ -1613,15 +1640,18 @@ export const uncensoredRouter = router({
           await updateGeneration(genId, { metadata: { ...metadata, runpodJobId: jobId } });
           return { generationId: genId, status: "processing" as FreePreviewStatus, url: null, remaining };
         } catch (err: any) {
-          await updateGeneration(genId, { status: "failed" });
-          await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-          const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the preview — please try again.";
-          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          if (!isRunPodEndpointPausedError(err)) {
+            await updateGeneration(genId, { status: "failed" });
+            await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+            const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the preview — please try again.";
+            throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          }
+          console.warn("[Uncensored] RunPod endpoint paused on freeGenerate, falling back to synchronous unfiltered chain");
         }
       }
 
-      // No self-hosted GPU configured: the synchronous fallback chain (fal
-      // Schnell, safety checker off) is fast enough to answer inline.
+      // No self-hosted GPU configured (or RunPod endpoint is paused): the synchronous
+      // fallback chain (fal Schnell, safety checker off) is fast enough to answer inline.
       try {
         const { url } = await generateImage({
           prompt: enhancedPrompt,
@@ -1635,6 +1665,9 @@ export const uncensoredRouter = router({
         return { generationId: genId, status: "completed" as FreePreviewStatus, url: url ?? null, remaining };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
+        if (typeof err?.userMessage !== "string") {
+          await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        }
         // PromptBlockedError from the backstop carries a userMessage.
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Generation failed — please try again.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });

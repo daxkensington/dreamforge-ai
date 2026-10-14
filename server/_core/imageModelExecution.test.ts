@@ -139,7 +139,7 @@ describe("executable image registry", () => {
     expect(getModelById("runpod-flux-schnell")?.isAvailable).toBe(true);
     expect(getModelById("ultra")?.isAvailable).toBe(true);
     expect(getModelById("dall-e-3")).toMatchObject({
-      name: "GPT Image 1", creditCost: { base: 15, hd: 25 },
+      name: "GPT Image 1", creditCost: { base: 325, hd: 325 },
       maxResolution: { width: 1536, height: 1536 },
     });
   });

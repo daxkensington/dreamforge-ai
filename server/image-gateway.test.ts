@@ -52,8 +52,8 @@ describe("standard image creation gateway", () => {
     expect(new Set(catalog.map(model => model.id)).size).toBe(catalog.length);
     expect(catalog).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "built-in-v1", creditCost: 5, requiredTier: "free", isConfigured: true }),
-      expect.objectContaining({ id: "grok-image", creditCost: 5, requiredTier: "creator", isConfigured: true }),
-      expect.objectContaining({ id: "flux-pro", creditCost: 15, requiredTier: "pro", isConfigured: true }),
+      expect.objectContaining({ id: "grok-image", creditCost: 105, requiredTier: "creator", isConfigured: true }),
+      expect.objectContaining({ id: "flux-pro", creditCost: 210, requiredTier: "pro", isConfigured: true }),
     ]));
     expect(catalog.map(model => model.id)).not.toContain("fal-flux-kontext");
     expect(catalog.map(model => model.id)).not.toContain("gpt-4o-mini");
@@ -69,7 +69,7 @@ describe("standard image creation gateway", () => {
   it("resolves a legacy alias to its canonical registry identity and executor", () => {
     expect(prepareImageCreation(request("grok", "creator"))).toMatchObject({
       requestedModelId: "grok", modelId: "grok-image", executionKey: "grok",
-      billableModelId: "grok-image", creditCost: 5,
+      billableModelId: "grok-image", creditCost: 105,
     });
   });
   it("quotes the premium Grok choice separately and explains provider output settings", () => {

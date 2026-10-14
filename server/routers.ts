@@ -1119,7 +1119,16 @@ export const appRouter = router({
 
         // Deduct credits for entire batch upfront using actual total cost
         const totalCost = input.prompts.reduce((sum, p) => {
-          return sum + (CREDIT_COSTS[p.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1);
+          if (p.mediaType === "video") {
+            return sum + (CREDIT_COSTS["text-to-video"] || 1);
+          }
+          const matchedModel = p.modelVersion && p.modelVersion !== "built-in-v1" && p.modelVersion !== "auto"
+            ? getModelById(p.modelVersion)
+            : undefined;
+          const itemCost = matchedModel?.type === "image"
+            ? matchedModel.creditCost.base
+            : (CREDIT_COSTS["text-to-image"] || 1);
+          return sum + itemCost;
         }, 0);
         const batchResult = await deductCredits(ctx.user.id, totalCost, `Batch generation (${input.prompts.length} items)`);
         if (!batchResult.success) {

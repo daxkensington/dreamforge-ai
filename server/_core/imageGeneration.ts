@@ -712,7 +712,7 @@ export async function generateImage(
     } else if (model !== "auto") {
       imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
     } else {
-      imageBuffer = await generateWithFallback(prompt, size, quality, style);
+      imageBuffer = await generateWithFallback(prompt, size, quality, style, options.userTier);
     }
   }
 
@@ -993,11 +993,13 @@ async function generateWithExplicitModel(
 async function generateWithFallback(
   prompt: string,
   size: string,
-  quality: "standard" | "hd" | "ultra",
-  style: "natural" | "vivid",
+  _quality: "standard" | "hd" | "ultra",
+  _style: "natural" | "vivid",
+  userTier?: string,
 ): Promise<Buffer> {
   const errors: string[] = [];
   const [w, h] = size.split("x").map(Number);
+  const isPaidTier = Boolean(userTier && userTier !== "free");
 
   const tryProvider = async (name: string, fn: () => Promise<Buffer>): Promise<Buffer | null> => {
     try {
@@ -1010,27 +1012,13 @@ async function generateWithFallback(
     }
   };
 
-  // Gemini Imagen — gated. The Gemini image API has NO free quota and bills
-  // ~$0.039/image; the previous "free tier" comment was wrong and helped run
-  // up the April 2026 GCP bill. Enable per-deployment with IMAGEN_ENABLED=true.
-  if (process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
-    const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
-    if (result) return result;
-  }
-
-  // Together AI Flux Schnell — disabled until TOGETHER_API_KEY is rotated
-  // (confirmed 401 invalid_api_key in prod, scripts/prod-tool-sweep.ts
-  // 2026-04-20). Add the conditional back once a working key is in env.
-
-  // FREE TIER: Cloudflare Workers AI (100K free/day)
+  // 1. FREE TIER: Cloudflare Workers AI (100K free/day)
   if (ENV.cfAiToken && ENV.cfAccountId) {
     const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(prompt));
     if (result) return result;
   }
 
-  // 4. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
-  // Ahead of RunPod: RunPod is cheaper per image but a Flex cold start takes
-  // 2+ minutes, which is a terrible default for an interactive generation.
+  // 2. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
   if (ENV.falApiKey) {
     const result = await tryProvider("fal.ai Flux Schnell", () =>
       generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
@@ -1038,39 +1026,28 @@ async function generateWithFallback(
     if (result) return result;
   }
 
-  // 5. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
+  // 3. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
   if (isRunPodAvailable()) {
     const result = await tryProvider("RunPod Flux Schnell", async () => recordImageRoute(await runpodFluxSchnell(prompt, w, h), "runpod", "flux-schnell"));
     if (result) return result;
   }
 
-  // 6. CHEAP: Grok (xAI team must have credits — hit its spending limit 2026-06)
-  if (ENV.grokApiKey) {
-    const result = await tryProvider("Grok", () => generateWithGrok(prompt));
-    if (result) return result;
-  }
-
-  // 7. CHEAP: Flux Schnell via Replicate (~$0.003/image)
+  // 4. CHEAP: Flux Schnell via Replicate (~$0.003/image)
   if (ENV.replicateApiToken) {
     const result = await tryProvider("Flux Schnell", () => generateWithFlux(prompt, "flux-schnell", w, h));
     if (result) return result;
   }
 
-  // 8. PAID: GPT Image (OpenAI)
-  if (ENV.openaiApiKey) {
-    const result = await tryProvider("GPT Image", () => generateWithGptImage(prompt, size, quality));
+  // 5. PAID TIER BACKUP ONLY: Grok Imagine / opt-in Gemini Imagen
+  // Never cascade 5-credit Auto into 210–325 credit models (GPT Image 1, SD3, Flux Pro),
+  // and never cascade free-tier Auto requests into paid Grok/Gemini APIs.
+  if (isPaidTier && ENV.grokApiKey) {
+    const result = await tryProvider("Grok", () => generateWithGrok(prompt));
     if (result) return result;
   }
 
-  // 9. PAID: SD3
-  if (ENV.stabilityApiKey) {
-    const result = await tryProvider("SD3", () => generateWithSD3(prompt, w, h));
-    if (result) return result;
-  }
-
-  // 10. PREMIUM: Flux Pro (highest quality, last resort)
-  if (ENV.replicateApiToken) {
-    const result = await tryProvider("Flux Pro", () => generateWithFlux(prompt, "flux-pro", w, h));
+  if (isPaidTier && process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
+    const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
     if (result) return result;
   }
 
