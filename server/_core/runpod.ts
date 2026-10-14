@@ -333,13 +333,17 @@ export async function runpodFluxSchnell(
 export async function runpodUpscale(
   imageB64: string,
   scale: number = 4,
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "esrgan",
-      image_b64: imageB64,
-      scale,
-    }),
+    runpodRun(
+      {
+        task: "esrgan",
+        image_b64: imageB64,
+        scale,
+      },
+      opts,
+    ),
   );
 }
 
@@ -348,12 +352,16 @@ export async function runpodUpscale(
  */
 export async function runpodRemoveBackground(
   imageB64: string,
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "rmbg",
-      image_b64: imageB64,
-    }),
+    runpodRun(
+      {
+        task: "rmbg",
+        image_b64: imageB64,
+      },
+      opts,
+    ),
   );
 }
 
@@ -425,22 +433,26 @@ export async function runpodFluxImg2Img(
   loraId?: string,
   seed?: number,
   model?: "dev" | "schnell",
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "flux-img2img",
-      image_b64: imageB64,
-      prompt,
-      strength,
-      num_inference_steps: steps,
-      guidance_scale: guidanceScale,
-      ...(model ? { model } : {}),
-      // handle_flux_img2img already loads a LoRA per request; the app just
-      // never passed one, so uncensored refines lost the realism LoRA that
-      // text-to-image gets.
-      ...(loraId ? { lora_id: loraId } : {}),
-      ...(typeof seed === "number" ? { seed } : {}),
-    }),
+    runpodRun(
+      {
+        task: "flux-img2img",
+        image_b64: imageB64,
+        prompt,
+        strength,
+        num_inference_steps: steps,
+        guidance_scale: guidanceScale,
+        ...(model ? { model } : {}),
+        // handle_flux_img2img already loads a LoRA per request; the app just
+        // never passed one, so uncensored refines lost the realism LoRA that
+        // text-to-image gets.
+        ...(loraId ? { lora_id: loraId } : {}),
+        ...(typeof seed === "number" ? { seed } : {}),
+      },
+      opts,
+    ),
   );
 }
 
@@ -656,14 +668,18 @@ export async function runpodTryOn(
   personImageUrl: string,
   garmentImageUrl: string,
   clothType: string = "upper",
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "tryon",
-      person_image_url: personImageUrl,
-      garment_image_url: garmentImageUrl,
-      cloth_type: clothType,
-    }),
+    runpodRun(
+      {
+        task: "tryon",
+        person_image_url: personImageUrl,
+        garment_image_url: garmentImageUrl,
+        cloth_type: clothType,
+      },
+      opts,
+    ),
   );
 }
 

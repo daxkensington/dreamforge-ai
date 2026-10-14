@@ -42,6 +42,7 @@ import {
   Moon,
   Keyboard,
   Zap,
+  Flame,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 // next/image aliased: `Image` below is the lucide icon.
@@ -57,6 +58,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const navLinks = [
+  { href: "/uncensored", label: "Uncensored", icon: Flame },
   { href: "/tools", label: "AI Tools", icon: Wrench },
   { href: "/video-studio", label: "Video Studio", icon: Film, auth: true },
   { href: "/gallery", label: "Gallery", icon: Image },

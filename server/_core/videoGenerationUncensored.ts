@@ -84,7 +84,7 @@ export async function submitUncensoredVideoJob(
     throw new PromptBlockedError(verdict);
   }
 
-  if (!isRunPodAvailable()) {
+  if (!isRunPodAvailable() && !ENV.falApiKey) {
     throw new Error("Uncensored video is temporarily unavailable (no GPU worker configured).");
   }
 
@@ -94,51 +94,55 @@ export async function submitUncensoredVideoJob(
     ? await fetchAsBase64(params.sourceImageUrl)
     : undefined;
 
-  try {
-    const jobId = await runpodWanSubmit({
-      prompt: enhancedPrompt,
-      imageB64,
-      width: params.width,
-      height: params.height,
-      numFrames: params.numFrames,
-      fps: params.fps,
-      seed: params.seed,
-      negativePrompt: params.negativePrompt,
-      loraId: params.loraId,
-      tier: params.tier,
-    });
-    return { jobId };
-  } catch (rpErr: any) {
-    const msg = rpErr?.message ?? String(rpErr ?? "");
-    if (ENV.falApiKey && /\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(msg)) {
-      const falEndpoint = params.sourceImageUrl ? "wan-i2v" : "wan-t2v";
-      const falBody: Record<string, unknown> = {
+  if (isRunPodAvailable()) {
+    try {
+      const jobId = await runpodWanSubmit({
         prompt: enhancedPrompt,
-        enable_safety_checker: false,
-        ...(params.negativePrompt ? { negative_prompt: params.negativePrompt } : {}),
-        ...(params.seed !== undefined ? { seed: params.seed } : {}),
-        ...(params.sourceImageUrl ? { image_url: params.sourceImageUrl } : {}),
-      };
-      const submitRes = await fetch(`https://queue.fal.run/fal-ai/${falEndpoint}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Key ${ENV.falApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(falBody),
+        imageB64,
+        width: params.width,
+        height: params.height,
+        numFrames: params.numFrames,
+        fps: params.fps,
+        seed: params.seed,
+        negativePrompt: params.negativePrompt,
+        loraId: params.loraId,
+        tier: params.tier,
       });
-      if (!submitRes.ok) {
-        const errText = await submitRes.text().catch(() => "");
-        throw new Error(`fal.ai ${falEndpoint} submit failed (${submitRes.status}): ${errText.slice(0, 200)}`);
-      }
-      const submitted = (await submitRes.json()) as { request_id?: string };
-      if (!submitted.request_id) {
-        throw new Error(`fal.ai ${falEndpoint} returned no request_id`);
-      }
-      return { jobId: `fal:${falEndpoint}:${submitted.request_id}` };
+      return { jobId };
+    } catch (rpErr: any) {
+      if (!ENV.falApiKey) throw rpErr;
+      console.warn(
+        "[UncensoredVideo] RunPod Wan submit failed, falling back to fal.ai Wan:",
+        rpErr?.message ?? rpErr,
+      );
     }
-    throw rpErr;
   }
+
+  const falEndpoint = params.sourceImageUrl ? "wan-i2v" : "wan-t2v";
+  const falBody: Record<string, unknown> = {
+    prompt: enhancedPrompt,
+    enable_safety_checker: false,
+    ...(params.negativePrompt ? { negative_prompt: params.negativePrompt } : {}),
+    ...(params.seed !== undefined ? { seed: params.seed } : {}),
+    ...(params.sourceImageUrl ? { image_url: params.sourceImageUrl } : {}),
+  };
+  const submitRes = await fetch(`https://queue.fal.run/fal-ai/${falEndpoint}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${ENV.falApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(falBody),
+  });
+  if (!submitRes.ok) {
+    const errText = await submitRes.text().catch(() => "");
+    throw new Error(`fal.ai ${falEndpoint} submit failed (${submitRes.status}): ${errText.slice(0, 200)}`);
+  }
+  const submitted = (await submitRes.json()) as { request_id?: string };
+  if (!submitted.request_id) {
+    throw new Error(`fal.ai ${falEndpoint} returned no request_id`);
+  }
+  return { jobId: `fal:${falEndpoint}:${submitted.request_id}` };
 }
 
 /**

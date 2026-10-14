@@ -92,6 +92,15 @@ export default function Uncensored() {
     onError: (e) => toast.error(e.message),
   });
 
+  const unlockWithCredits = trpc.uncensored.unlockWithCredits.useMutation({
+    onSuccess: () => {
+      track("checkout_started", { kind: "uncensored_credits", plan: selectedPlanId });
+      refetch();
+      toast.success("Uncensored Pass unlocked! Entering the Studio…");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   // BTCPay's embedded checkout posts status messages to the parent window
   // (same protocol its official modal uses). Use them to refetch entitlement
   // immediately on payment instead of waiting for the next 8s poll tick.
@@ -288,6 +297,29 @@ export default function Uncensored() {
       await confirmAge.mutateAsync({ confirmed: true });
     }
     checkout.mutate({ planId: selectedPlanId });
+  };
+
+  const creditBalance = status?.creditBalance ?? 0;
+  const requiredCredits = selectedPlan?.creditPrice ?? 500;
+  const hasEnoughCredits = creditBalance >= requiredCredits;
+
+  const handleUnlockWithCredits = async () => {
+    if (!isAuthed) {
+      window.location.href = loginUrlKeepingIntent({ plan: selectedPlanId });
+      return;
+    }
+    if (!ageConfirmed) {
+      if (!ageChecked) {
+        toast.error("Please confirm you are 18 or older.");
+        return;
+      }
+      await confirmAge.mutateAsync({ confirmed: true });
+    }
+    if (!hasEnoughCredits) {
+      window.location.href = `/pricing?returnTo=${encodeURIComponent(`/uncensored?plan=${selectedPlanId}`)}`;
+      return;
+    }
+    unlockWithCredits.mutate({ planId: selectedPlanId });
   };
 
   return (
@@ -616,10 +648,13 @@ export default function Uncensored() {
                           Best value
                         </span>
                       )}
-                      <div className="text-2xl font-bold">${p.priceUsd}</div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-2xl font-bold">${p.priceUsd}</span>
+                        <span className="text-xs font-medium text-rose-300">or {p.creditPrice} cr</span>
+                      </div>
                       <div className="mt-1 text-sm font-medium">{p.label}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {p.durationDays} day{p.durationDays > 1 ? "s" : ""} · {p.bonusCredits} credits
+                        {p.durationDays} day{p.durationDays > 1 ? "s" : ""} · +{p.bonusCredits} bonus cr w/ BTC
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground/80">{p.tagline}</div>
                     </button>
@@ -627,8 +662,7 @@ export default function Uncensored() {
                 })}
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                One-time payment, no auto-renew. Pay anonymously with Bitcoin, on-chain or Lightning.
-                Invoice stays open 3 hours. Lightning settles as soon as it is paid. An on-chain payment unlocks the pass when it is seen — no waiting for a block.
+                One-time pass, no auto-renew. Unlock instantly using DreamForgeX platform credits (buy credits with Card / Apple Pay on Pricing) or pay anonymously with Bitcoin for +{selectedPlan?.bonusCredits ?? 500} bonus credits.
               </p>
 
               {!active && !ageConfirmed && (
@@ -638,28 +672,48 @@ export default function Uncensored() {
                 </label>
               )}
 
-              <Button
-                onClick={handleStart}
-                disabled={checkout.isPending || confirmAge.isPending || meLoading || status?.available === false}
-                size="lg"
-                className="mt-5 w-full bg-gradient-to-r from-rose-500 to-orange-500 text-base font-semibold hover:opacity-90"
-              >
-                {checkout.isPending || confirmAge.isPending ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating invoice…</>
-                ) : !isAuthed ? (
-                  <><Lock className="mr-2 h-5 w-5" /> Sign in to continue</>
-                ) : (
-                  <><Bitcoin className="mr-2 h-5 w-5" /> Pay ${selectedPlan?.priceUsd ?? 19} with crypto</>
-                )}
-              </Button>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <Button
+                  onClick={handleUnlockWithCredits}
+                  disabled={unlockWithCredits.isPending || confirmAge.isPending || meLoading}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-rose-500 to-orange-500 text-sm font-semibold hover:opacity-90"
+                >
+                  {unlockWithCredits.isPending || confirmAge.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Unlocking…</>
+                  ) : !isAuthed ? (
+                    <><Lock className="mr-2 h-4 w-4" /> Sign in to unlock</>
+                  ) : hasEnoughCredits ? (
+                    <><Sparkles className="mr-2 h-4 w-4" /> Unlock with {requiredCredits} Credits (You have {creditBalance})</>
+                  ) : (
+                    <><Sparkles className="mr-2 h-4 w-4" /> Get {requiredCredits} Credits to Unlock (Card / Apple Pay)</>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleStart}
+                  disabled={checkout.isPending || confirmAge.isPending || meLoading || status?.available === false}
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-rose-500/40 bg-rose-500/10 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
+                >
+                  {checkout.isPending || confirmAge.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating invoice…</>
+                  ) : !isAuthed ? (
+                    <><Bitcoin className="mr-2 h-4 w-4" /> Sign in for Bitcoin</>
+                  ) : (
+                    <><Bitcoin className="mr-2 h-4 w-4" /> Pay ${selectedPlan?.priceUsd ?? 19} BTC (+{selectedPlan?.bonusCredits ?? 500} cr)</>
+                  )}
+                </Button>
+              </div>
 
               {status?.available === false && (
                 <p className="mt-3 text-center text-xs text-amber-500">
-                  Crypto checkout is temporarily unavailable. Check back shortly.
+                  Crypto checkout is temporarily unavailable — use Credits above to unlock immediately.
                 </p>
               )}
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                This page unlocks as soon as we see your payment — usually seconds after you send.
+                Credits unlock the Studio immediately. Bitcoin payments unlock as soon as seen on-chain or Lightning.
               </p>
                 </>
               )}

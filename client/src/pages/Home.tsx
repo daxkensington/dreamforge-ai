@@ -33,6 +33,8 @@ import {
   Moon,
   Clapperboard,
   Gamepad2,
+  Flame,
+  Shield,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -403,12 +405,55 @@ export default function Home() {
                   </Link>
                 </Button>
               )}
+              <Button
+                asChild
+                size="lg"
+                className="font-semibold gap-2 px-8 h-13 text-base bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/25"
+              >
+                <Link href="/uncensored?start=1">
+                  <Flame className="h-5 w-5" />
+                  Uncensored Studio (3 Free)
+                </Link>
+              </Button>
               <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-transparent border-white/20 hover:bg-white/10">
                 <Link href="/gallery">
                   <Eye className="h-5 w-5" />
                   Explore Gallery
                 </Link>
               </Button>
+            </motion.div>
+
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              custom={4}
+              className="mt-8 mx-auto max-w-2xl"
+            >
+              <Link
+                href="/uncensored?start=1"
+                className="group flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-rose-500/35 bg-gradient-to-r from-rose-500/15 via-orange-500/10 to-rose-500/15 px-5 py-3.5 text-left backdrop-blur-md transition-all hover:border-rose-500/60 hover:bg-rose-500/20"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-md shadow-rose-500/30">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <span>Private Uncensored AI Studio</span>
+                      <span className="rounded-full bg-rose-500/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-200">
+                        18+ · No Filter
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/70">
+                      Unfiltered Flux + Wan 2.2 Video · Character Face Lock · Outfit Swap · 4-View Sheets · 100% Private
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-rose-300 group-hover:translate-x-0.5 transition-transform">
+                  Try 3 Free Previews <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </Link>
             </motion.div>
           </div>
         </div>

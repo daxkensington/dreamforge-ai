@@ -416,11 +416,19 @@ export const uncensoredRouter = router({
     } catch {
       /* default to unavailable */
     }
+    let creditBalance = 0;
+    try {
+      const bal = await getOrCreateBalance(ctx.user.id);
+      creditBalance = Number(bal?.balance ?? 0);
+    } catch {
+      /* balance lookup failure must not break status */
+    }
     return {
       ...ent,
       plan: UNCENSORED_PLAN,
       plans: UNCENSORED_PLANS,
       available: isBtcpayConfigured(),
+      creditBalance,
       freeUsed,
       freeLimit: FREE_UNCENSORED_LIMIT,
       freeRemaining: Math.max(0, FREE_UNCENSORED_LIMIT - freeUsed),
@@ -1178,9 +1186,8 @@ export const uncensoredRouter = router({
         let result: Buffer;
         if (isRunPodAvailable()) {
           try {
-            result = await runpodUpscale(buf.toString("base64"), scale);
-          } catch (rpErr: any) {
-            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await runpodUpscale(buf.toString("base64"), scale, { maxAttempts: 8 });
+          } catch {
             result = await upscaleBufferSharp(buf, scale as 2 | 4);
           }
         } else {
@@ -1243,42 +1250,49 @@ export const uncensoredRouter = router({
       let failed = 0;
       const imageB64 = await fetchAsBase64(lock.url);
 
-      for (const view of UNCENSORED_SHEET_VIEWS) {
-        let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
-        prompt = applyUncensoredStyle(prompt, style);
-        prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: view.label,
-          negativePrompt: null,
-          mediaType: "image",
-          width: aspect.width,
-          height: aspect.height,
-          duration: null,
-          status: "generating",
-          modelVersion: "uncensored-sheet",
-          parentGenerationId: lock.generationId,
-          metadata: {
-            uncensored: true,
-            sheet: true,
-            view: view.id,
-            style: style ?? null,
-            cost: unitCost,
-            savedCharacterId: lock.savedCharacterId,
-            character: true,
-          },
-        });
-        try {
-          const buffer = await refineUnfiltered(imageB64, prompt, { strength: 0.4, loraId });
-          const key = generateStorageKey("generations", "png");
-          const { url } = await storagePut(key, buffer, "image/png");
-          await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
-          results.push({ generationId: genId, url, view: view.id });
-        } catch (err: any) {
-          failed += 1;
-          await updateGeneration(genId, { status: "failed" });
-          await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        }
+      const viewOutcomes = await Promise.all(
+        UNCENSORED_SHEET_VIEWS.map(async (view) => {
+          let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
+          prompt = applyUncensoredStyle(prompt, style);
+          prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
+          const genId = await createGeneration({
+            userId: ctx.user.id,
+            prompt: view.label,
+            negativePrompt: null,
+            mediaType: "image",
+            width: aspect.width,
+            height: aspect.height,
+            duration: null,
+            status: "generating",
+            modelVersion: "uncensored-sheet",
+            parentGenerationId: lock.generationId,
+            metadata: {
+              uncensored: true,
+              sheet: true,
+              view: view.id,
+              style: style ?? null,
+              cost: unitCost,
+              savedCharacterId: lock.savedCharacterId,
+              character: true,
+            },
+          });
+          try {
+            const buffer = await refineUnfiltered(imageB64, prompt, { strength: 0.4, loraId });
+            const key = generateStorageKey("generations", "png");
+            const { url } = await storagePut(key, buffer, "image/png");
+            await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+            return { ok: true as const, item: { generationId: genId, url, view: view.id } };
+          } catch (err: any) {
+            await updateGeneration(genId, { status: "failed" });
+            await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+            return { ok: false as const };
+          }
+        }),
+      );
+
+      for (const outcome of viewOutcomes) {
+        if (outcome.ok) results.push(outcome.item);
+        else failed += 1;
       }
 
       if (results.length === 0) {
@@ -1333,9 +1347,8 @@ export const uncensoredRouter = router({
         let result: Buffer;
         if (isRunPodAvailable()) {
           try {
-            result = await runpodRemoveBackground(buf.toString("base64"));
-          } catch (rpErr: any) {
-            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await runpodRemoveBackground(buf.toString("base64"), { maxAttempts: 8 });
+          } catch {
             result = await removeBackgroundBufferSharp(buf);
           }
         } else {
@@ -1420,9 +1433,8 @@ export const uncensoredRouter = router({
         };
         if (isRunPodAvailable()) {
           try {
-            result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType);
-          } catch (rpErr: any) {
-            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType, { maxAttempts: 8 });
+          } catch {
             result = await fallbackOutfitRefine();
           }
         } else {
@@ -1793,6 +1805,50 @@ export const uncensoredRouter = router({
       // invoiceId lets the client listen for BTCPay's postMessage status
       // events from the embedded checkout iframe (faster than polling).
       return { checkoutLink, invoiceId };
+    }),
+
+  /**
+   * Unlock or extend an Uncensored Pass using DreamForgeX platform credits
+   * ("Civitai Buzz" model). Lets card / Apple Pay / Google Pay buyers purchase
+   * standard platform credit packs on /pricing and unlock the Uncensored Studio
+   * in 1 click without touching Stripe on the adult tier.
+   */
+  unlockWithCredits: protectedProcedure
+    .input(z.object({ planId: z.string().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Age confirmation required first." });
+      }
+      const plan = getUncensoredPlanById(input?.planId);
+      const cost = plan.creditPrice;
+      const debit = await deductCredits(
+        ctx.user.id,
+        cost,
+        `Uncensored ${plan.label} (${plan.durationDays}d pass)`,
+        "usage",
+        { uncensoredPass: true, planId: plan.id, durationDays: plan.durationDays },
+      );
+      if (!debit.success) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not enough credits — the ${plan.label} requires ${cost} credits and you have ${debit.balance}. Top up a credit pack to unlock instantly.`,
+        });
+      }
+      const db = await requireDb();
+      const baseMs = ent.until && ent.until.getTime() > Date.now() ? ent.until.getTime() : Date.now();
+      const newUntil = new Date(baseMs + plan.durationDays * 24 * 60 * 60 * 1000);
+      await db
+        .update(users)
+        .set({ uncensoredUntil: newUntil })
+        .where(eq(users.id, ctx.user.id));
+      return {
+        ok: true,
+        planId: plan.id,
+        until: newUntil,
+        creditsSpent: cost,
+        creditsRemaining: debit.balance,
+      };
     }),
 
   /** The caller's recent completed uncensored images — the I2V "animate" picker. */

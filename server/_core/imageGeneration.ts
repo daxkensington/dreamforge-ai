@@ -851,7 +851,7 @@ export async function refineUnfiltered(
     throw new PromptBlockedError(verdict);
   }
 
-  if (!isRunPodAvailable()) {
+  if (!isRunPodAvailable() && !ENV.falApiKey) {
     throw new Error("The refine GPU is unavailable right now — please try again shortly.");
   }
 
@@ -862,27 +862,40 @@ export async function refineUnfiltered(
   // Schnell LoRA, and the worker can't hold Dev next to Schnell on 48GB.
   // Img2img only runs the last strength×steps steps, so 10 total keeps ~4-6
   // real denoising steps at the strengths the studio uses (0.4–0.6).
-  try {
-    return await runpodFluxImg2Img(
-      imageB64,
-      prompt,
-      strength,
-      UNCENSORED_IMG2IMG_STEPS,
-      0,
-      opts?.loraId,
-      opts?.seed,
-      "schnell",
-    );
-  } catch (err: any) {
-    const msg = err?.message ?? String(err ?? "");
-    if (ENV.falApiKey && /\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(msg)) {
-      console.warn("[ImageGen] refineUnfiltered RunPod endpoint paused, falling back to fal.ai Flux Schnell:", msg);
-      return generateWithFal(prompt, "fal-ai/flux/schnell", 832, 1216, {
-        enable_safety_checker: false,
-        ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
-      });
+  if (isRunPodAvailable()) {
+    try {
+      return await runpodFluxImg2Img(
+        imageB64,
+        prompt,
+        strength,
+        UNCENSORED_IMG2IMG_STEPS,
+        0,
+        opts?.loraId,
+        opts?.seed,
+        "schnell",
+        { maxAttempts: 8 },
+      );
+    } catch (err: any) {
+      if (!ENV.falApiKey) throw err;
+      console.warn(
+        "[ImageGen] refineUnfiltered RunPod cold-started or failed, rescuing via fal.ai:",
+        err?.message ?? err,
+      );
     }
-    throw err;
+  }
+
+  try {
+    return await generateWithFal(prompt, "fal-ai/flux/dev/image-to-image", 832, 1216, {
+      image_url: `data:image/png;base64,${imageB64}`,
+      strength,
+      enable_safety_checker: false,
+      ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+    });
+  } catch {
+    return generateWithFal(prompt, "fal-ai/flux/schnell", 832, 1216, {
+      enable_safety_checker: false,
+      ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+    });
   }
 }
 
