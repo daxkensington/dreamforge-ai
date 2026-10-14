@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X } from "lucide-react";
+import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X, Film, Sparkles, Shirt, UserCheck } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,7 +13,7 @@ import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
-import UncensoredStudio from "@/components/UncensoredStudio";
+import UncensoredStudio, { type UncensoredStudioTab } from "@/components/UncensoredStudio";
 import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
 import RenderWaitHint, { newRequestId } from "@/components/RenderWaitHint";
 
@@ -48,9 +48,16 @@ export default function Uncensored() {
   // to authenticate from this page and land in the SFW studio, losing the thing
   // they came for; now they return here, to the exact card they clicked.
   const conversionCardRef = useRef<HTMLDivElement | null>(null);
+  const checkoutCardRef = useRef<HTMLDivElement | null>(null);
   const freePromptRef = useRef<HTMLTextAreaElement | null>(null);
   const [returnIntent, setReturnIntent] = useState<"free" | "buy" | null>(null);
   const restoredIntent = useRef(false);
+  const [studioIntent, setStudioIntent] = useState<{
+    tab: UncensoredStudioTab;
+    focusId: number | null;
+    label: string;
+  } | null>(null);
+  const [selectedPreviewId, setSelectedPreviewId] = useState<number | null>(null);
 
   const { data: me, isLoading: meLoading } = trpc.auth.me.useQuery();
   const isAuthed = !!me;
@@ -58,6 +65,10 @@ export default function Uncensored() {
   const { data: status, refetch } = trpc.uncensored.status.useQuery(undefined, {
     enabled: isAuthed,
     refetchInterval: (q) => (q.state.data?.active ? false : 8000), // poll until settled
+  });
+
+  const myImages = trpc.uncensored.myUncensoredImages.useQuery(undefined, {
+    enabled: isAuthed && !!status?.ageConfirmed && !status?.active,
   });
 
   const confirmAge = trpc.uncensored.confirmAge.useMutation({
@@ -118,8 +129,10 @@ export default function Uncensored() {
     onSuccess: (data) => {
       if (data.status === "completed" && data.url) {
         setFreeResultUrl(data.url);
+        setSelectedPreviewId(data.generationId);
         setFreeStartedAt(null);
         refetch();
+        myImages.refetch();
         track("generation_completed", { kind: "uncensored_free" });
         toast.success("Done — that's a free preview.");
         return;
@@ -146,17 +159,20 @@ export default function Uncensored() {
   useEffect(() => {
     const d = freeStatus.data;
     if (!d || pendingFreeId == null || d.status === "processing") return;
+    const finishedId = pendingFreeId;
     setPendingFreeId(null);
     setFreeStartedAt(null);
     refetch();
+    myImages.refetch();
     if (d.status === "completed" && d.url) {
       setFreeResultUrl(d.url);
+      setSelectedPreviewId(finishedId);
       track("generation_completed", { kind: "uncensored_free" });
       toast.success("Done — that's a free preview.");
     } else {
       toast.error("Generation failed — that preview wasn't counted. Please try again.");
     }
-  }, [freeStatus.data, pendingFreeId, refetch]);
+  }, [freeStatus.data, pendingFreeId, refetch, myImages]);
   const freeBusy = freeGen.isPending || pendingFreeId != null;
 
   const plans = status?.plans ?? FALLBACK_PLANS;
@@ -165,6 +181,17 @@ export default function Uncensored() {
   const ageConfirmed = !!status?.ageConfirmed;
   const freeLimit = status?.freeLimit ?? 3;
   const freeRemaining = status ? status.freeRemaining : freeLimit;
+  const previewHistory = myImages.data ?? [];
+  const activePreviewItem =
+    previewHistory.find((img) => img.id === selectedPreviewId) ?? previewHistory[0] ?? null;
+  const displayPreviewUrl = activePreviewItem?.imageUrl ?? freeResultUrl;
+  const displayPreviewId = activePreviewItem?.id ?? selectedPreviewId;
+
+  const triggerStudioUpsell = (tab: UncensoredStudioTab, label: string) => {
+    setStudioIntent({ tab, focusId: displayPreviewId ?? null, label });
+    track("paywall_viewed", { surface: "uncensored", upsellTab: tab });
+    checkoutCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   // Warm the GPU worker the moment we know this visitor can render (pass
   // holder, or a free preview left), so the ~1-2 minute weight load happens
@@ -286,7 +313,11 @@ export default function Uncensored() {
 
         {active ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <UncensoredStudio until={status?.until ?? null} />
+            <UncensoredStudio
+              until={status?.until ?? null}
+              initialTab={studioIntent?.tab}
+              initialFocusId={studioIntent?.focusId ?? displayPreviewId}
+            />
           </motion.div>
         ) : (
           <>
@@ -316,100 +347,176 @@ export default function Uncensored() {
                     )}
                   </Button>
                 </div>
-              ) : freeRemaining > 0 ? (
+              ) : (
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Free uncensored preview</h2>
-                    <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
-                  </div>
-                  <Textarea
-                    ref={freePromptRef}
-                    value={freePrompt}
-                    onChange={(e) => setFreePrompt(e.target.value)}
-                    placeholder="Describe what you want to create…"
-                    rows={3}
-                    maxLength={1000}
-                    disabled={freeBusy}
-                    className="mt-3 resize-none"
-                  />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {FREE_STARTERS.map((starter) => (
-                      <button
-                        key={starter}
-                        type="button"
+                  {freeRemaining > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold">Free uncensored preview</h2>
+                        <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
+                      </div>
+                      <Textarea
+                        ref={freePromptRef}
+                        value={freePrompt}
+                        onChange={(e) => setFreePrompt(e.target.value)}
+                        placeholder="Describe what you want to create…"
+                        rows={3}
+                        maxLength={1000}
                         disabled={freeBusy}
-                        onClick={() => handleFreeGenerate(starter)}
-                        className="rounded-full border border-border/60 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-50"
-                      >
-                        {starter.length > 72 ? `${starter.slice(0, 72)}…` : starter}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Aspect:</span>
-                    {UNCENSORED_ASPECTS.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => setFreeAspect(a.id)}
-                        disabled={freeBusy}
-                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeAspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
-                      >
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                  {(status?.styles?.length ?? 0) > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Style:</span>
-                      {status!.styles.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setFreeStyle(s.id)}
-                          disabled={freeBusy}
-                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeStyle === s.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <Button
-                    onClick={() => handleFreeGenerate()}
-                    disabled={freeBusy || freePrompt.trim().length < 3}
-                    className="mt-3 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
-                  >
-                    {freeBusy ? (
-                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating…</>
-                    ) : (
-                      <><Flame className="mr-2 h-5 w-5" /> Generate (free)</>
-                    )}
-                  </Button>
-                  {freeBusy && <RenderWaitHint startedAt={freeStartedAt} />}
-                  {freeResultUrl && (
-                    <div className="mt-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={freeResultUrl}
-                        alt="Your uncensored preview"
-                        className="mx-auto max-h-[420px] rounded-xl border border-border/60"
+                        className="mt-3 resize-none"
                       />
-                      <p className="mt-2 text-center text-xs text-muted-foreground">
-                        Watermarked preview · private. Get a pass below for full resolution, no watermark.
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {FREE_STARTERS.map((starter) => (
+                          <button
+                            key={starter}
+                            type="button"
+                            disabled={freeBusy}
+                            onClick={() => handleFreeGenerate(starter)}
+                            className="rounded-full border border-border/60 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-50"
+                          >
+                            {starter.length > 72 ? `${starter.slice(0, 72)}…` : starter}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Aspect:</span>
+                        {UNCENSORED_ASPECTS.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => setFreeAspect(a.id)}
+                            disabled={freeBusy}
+                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeAspect === a.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                      {(status?.styles?.length ?? 0) > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Style:</span>
+                          {status!.styles.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setFreeStyle(s.id)}
+                              disabled={freeBusy}
+                              className={`rounded-full border px-3 py-1 text-xs transition-colors ${freeStyle === s.id ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-border/60 text-muted-foreground hover:border-rose-500/40"}`}
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => handleFreeGenerate()}
+                        disabled={freeBusy || freePrompt.trim().length < 3}
+                        className="mt-3 w-full bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
+                      >
+                        {freeBusy ? (
+                          <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating…</>
+                        ) : (
+                          <><Flame className="mr-2 h-5 w-5" /> Generate (free)</>
+                        )}
+                      </Button>
+                      {freeBusy && <RenderWaitHint startedAt={freeStartedAt} />}
+                    </>
+                  ) : (
+                    <div className="text-center">
+                      <Flame className="mx-auto h-8 w-8 text-rose-500" />
+                      <h2 className="mt-2 text-lg font-semibold">You&apos;ve used your {freeLimit} free previews</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Grab a pass below to unlock unlimited full-resolution renders, 5s video animation, face lock, and outfit swap on your creations.
                       </p>
                     </div>
                   )}
+
+                  {displayPreviewUrl && (
+                    <div className="mt-5 rounded-xl border border-rose-500/30 bg-black/25 p-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={displayPreviewUrl}
+                        alt="Your uncensored preview"
+                        className="mx-auto max-h-[420px] rounded-xl border border-border/60"
+                      />
+                      {previewHistory.length > 1 && (
+                        <div className="mt-3 flex items-center justify-center gap-2">
+                          {previewHistory.slice(0, 6).map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreviewId(item.id);
+                                if (item.imageUrl) setFreeResultUrl(item.imageUrl);
+                              }}
+                              className={`overflow-hidden rounded-lg border transition-all ${
+                                displayPreviewId === item.id
+                                  ? "border-rose-500 ring-2 ring-rose-500/40"
+                                  : "border-border/60 opacity-70 hover:opacity-100"
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={item.imageUrl ?? ""} alt="" className="h-12 w-12 object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-4">
+                        <p className="text-center text-xs font-medium text-rose-300">
+                          Continue with this creation in the Uncensored Studio:
+                        </p>
+                        <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("video", "Animate this image into a 5s video")}
+                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Film className="h-4 w-4 text-rose-400" />
+                              Animate into 5s Video
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("sheet", "Lock this character's face for new scenes")}
+                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                          >
+                            <span className="flex items-center gap-2">
+                              <UserCheck className="h-4 w-4 text-rose-400" />
+                              Lock Character Face
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("outfit", "Change outfit or restyle this image")}
+                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Shirt className="h-4 w-4 text-rose-400" />
+                              Change Outfit / Edit
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("refine", "Render unwatermarked full-HD & refine")}
+                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4 text-rose-400" />
+                              Remove Watermark &amp; HD
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="mt-3 text-center text-xs text-muted-foreground">
                     No filter · private · watermarked. A pass unlocks unlimited, full-resolution, no-watermark generation.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 text-center">
-                  <Flame className="mx-auto h-8 w-8 text-rose-500" />
-                  <h2 className="mt-2 text-lg font-semibold">You&apos;ve used your free previews</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Grab a pass below for unlimited, full-resolution, watermark-free generation.
                   </p>
                 </div>
               )}
@@ -433,7 +540,25 @@ export default function Uncensored() {
             {/* Pricing ladder + CTA — swaps to the inline embedded invoice
                 once checkout starts (BTCPay checkout is iframe-embeddable;
                 same mechanism as its official modal). */}
-            <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 sm:p-8">
+            <div
+              ref={checkoutCardRef}
+              className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/10 to-transparent p-6 sm:p-8"
+            >
+              {studioIntent && (
+                <div className="mb-5 flex items-center justify-between rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-3 text-sm text-rose-200">
+                  <span className="flex items-center gap-2 font-medium">
+                    <Sparkles className="h-4 w-4 shrink-0 text-rose-400" />
+                    Unlocking pass to: {studioIntent.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStudioIntent(null)}
+                    className="text-xs text-rose-300/80 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
               {inlineInvoice ? (
                 <div>
                   <div className="flex items-center justify-between">

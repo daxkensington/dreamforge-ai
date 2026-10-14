@@ -170,7 +170,20 @@ async function finalizePaidImageRow(gen: GenerationRow, userId: number): Promise
     return { generationId: gen.id, status: "processing", url: null, seed };
   }
 
-  const result = await collectUnfilteredImageJob(jobId, { watermark: false });
+  const fallback =
+    typeof gen.prompt === "string" && gen.prompt.length > 0 && !meta.character
+      ? {
+          prompt: applyUncensoredStyle(gen.prompt, meta.style),
+          width: gen.width ?? 832,
+          height: gen.height ?? 1216,
+          seed,
+          createdAt: gen.createdAt ?? null,
+        }
+      : undefined;
+  const result = await collectUnfilteredImageJob(
+    jobId,
+    fallback ? { watermark: false, fallback } : { watermark: false },
+  );
   if (result.status === "completed") {
     await db
       .update(generations)
@@ -203,7 +216,19 @@ async function finalizeFreeRow(
     }
     return { status: "processing", url: null };
   }
-  const result = await collectUnfilteredImageJob(jobId, { watermark: true });
+  const fallback =
+    typeof gen.prompt === "string" && gen.prompt.length > 0
+      ? {
+          prompt: applyUncensoredStyle(gen.prompt, meta.style),
+          width: gen.width ?? 832,
+          height: gen.height ?? 1216,
+          createdAt: gen.createdAt ?? null,
+        }
+      : undefined;
+  const result = await collectUnfilteredImageJob(
+    jobId,
+    fallback ? { watermark: true, fallback } : { watermark: true },
+  );
   if (result.status === "completed") {
     await db
       .update(generations)

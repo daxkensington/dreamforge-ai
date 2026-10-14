@@ -9,7 +9,8 @@ import UncensoredSheetStudio from "./UncensoredSheetStudio";
 import UncensoredOutfitStudio from "./UncensoredOutfitStudio";
 import UncensoredLibrary from "./UncensoredLibrary";
 
-type Tab = "create" | "refine" | "inpaint" | "sheet" | "outfit" | "video" | "library";
+export type UncensoredStudioTab = "create" | "refine" | "inpaint" | "sheet" | "outfit" | "video" | "library";
+type Tab = UncensoredStudioTab;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "create", label: "Create" },
@@ -25,9 +26,17 @@ const TABS: { id: Tab; label: string }[] = [
  * Paid uncensored workspace. Tabs share a focused generation id so Create →
  * Refine / Inpaint / Animate is one click instead of re-picking the image.
  */
-export default function UncensoredStudio({ until }: { until: Date | string | null }) {
-  const [tab, setTab] = useState<Tab>("create");
-  const [focusId, setFocusId] = useState<number | null>(null);
+export default function UncensoredStudio({
+  until,
+  initialTab,
+  initialFocusId,
+}: {
+  until: Date | string | null;
+  initialTab?: UncensoredStudioTab;
+  initialFocusId?: number | null;
+}) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "create");
+  const [focusId, setFocusId] = useState<number | null>(initialFocusId ?? null);
   const [recreateId, setRecreateId] = useState<number | null>(null);
 
   const go = (next: Tab, id?: number) => {

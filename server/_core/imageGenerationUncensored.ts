@@ -21,7 +21,8 @@ import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptMod
 import { isRunPodAvailable, runpodSubmit, runpodJobStatus, getImageEndpointId } from "./runpod";
 import { fetchGuardedImage } from "./imageUrlGuard";
 import { storagePut, generateStorageKey } from "../storage";
-import { UNCENSORED_IMG2IMG_STEPS } from "./imageGeneration";
+import { UNCENSORED_IMG2IMG_STEPS, generateWithFal } from "./imageGeneration";
+import { ENV } from "./env";
 
 export interface UnfilteredImageJobParams {
   prompt: string;
@@ -40,6 +41,14 @@ export interface UnfilteredImageJobParams {
   imageB64?: string;
   /** img2img strength; clamped 0.2–0.9 like refineUnfiltered. */
   strength?: number;
+}
+
+export interface UnfilteredImageFallback {
+  prompt: string;
+  width: number;
+  height: number;
+  seed?: number | null;
+  createdAt?: Date | string | null;
 }
 
 export type UnfilteredImageJobResult =
@@ -132,13 +141,21 @@ export async function warmUnfilteredImageWorker(loraId?: string): Promise<boolea
 }
 
 /**
+ * If a RunPod worker is cold-starting beyond this threshold (a cold 34GB Flux
+ * boot takes ~140s when workersMin=0), fulfill the text-to-image request via
+ * unfiltered fal Schnell (~2.5s) while the RunPod job finishes warming the
+ * self-hosted worker in the background.
+ */
+const COLD_START_FAL_RESCUE_MS = 10_000;
+
+/**
  * Poll a submitted image job. On COMPLETED the PNG is (optionally)
  * watermarked and stored to R2; the caller owns the generating→completed
  * claim so concurrent polls can't double-write the row.
  */
 export async function collectUnfilteredImageJob(
   jobId: string,
-  opts: { watermark: boolean },
+  opts: { watermark: boolean; fallback?: UnfilteredImageFallback },
 ): Promise<UnfilteredImageJobResult> {
   const st = await runpodJobStatus(jobId, getImageEndpointId());
   if (st.status === "COMPLETED") {
@@ -173,6 +190,50 @@ export async function collectUnfilteredImageJob(
     const { url } = await storagePut(key, buffer, "image/png");
     return { status: "completed", url, key };
   }
+
+  const fb = opts.fallback;
+  const ageMs = fb?.createdAt ? Date.now() - new Date(fb.createdAt).getTime() : 0;
+  const shouldRescueWithFal =
+    !!fb &&
+    !!ENV.falApiKey &&
+    (st.status === "FAILED" ||
+      st.status === "CANCELLED" ||
+      ((st.status === "IN_QUEUE" || st.status === "IN_PROGRESS") && ageMs >= COLD_START_FAL_RESCUE_MS));
+
+  if (shouldRescueWithFal && fb) {
+    const verdict = checkPrompt(fb.prompt, { strictMinors: true });
+    if (!verdict.allowed) {
+      await logModerationBlock({
+        category: verdict.category,
+        promptLen: fb.prompt.length,
+        surface: "backstop:collectUnfilteredImageJob",
+        prompt: fb.prompt,
+      });
+      throw new PromptBlockedError(verdict);
+    }
+    try {
+      let buffer = await generateWithFal(
+        fb.prompt,
+        "fal-ai/flux/schnell",
+        fb.width || 832,
+        fb.height || 1216,
+        {
+          enable_safety_checker: false,
+          ...(typeof fb.seed === "number" ? { seed: fb.seed } : {}),
+        },
+      );
+      if (opts.watermark) {
+        const { addImageWatermark } = await import("./watermark");
+        buffer = await addImageWatermark(buffer);
+      }
+      const key = generateStorageKey("generations", "png");
+      const { url } = await storagePut(key, buffer, "image/png");
+      return { status: "completed", url, key };
+    } catch (err: any) {
+      console.warn("[Uncensored] fal rescue in collectUnfilteredImageJob failed:", err?.message ?? err);
+    }
+  }
+
   if (st.status === "FAILED" || st.status === "CANCELLED") {
     return { status: "failed", error: st.error };
   }

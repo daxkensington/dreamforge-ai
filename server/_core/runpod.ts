@@ -524,6 +524,9 @@ export async function runpodJobStatus(jobId: string, endpointId?: string): Promi
   } finally {
     clearTimeout(timeout);
   }
+  if (res.status === 404) {
+    return { status: "FAILED", error: "RunPod job expired or not found (404)" };
+  }
   if (!res.ok) return { status: "IN_PROGRESS" };
   const s = (await res.json()) as RunPodRunResponse;
   // The worker reports its own exceptions as a COMPLETED job whose output is

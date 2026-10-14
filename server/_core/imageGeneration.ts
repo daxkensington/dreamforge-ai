@@ -481,7 +481,7 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
  * Generate image via fal.ai queue API.
  * Supports Flux Dev, Flux Schnell, Flux Pro Ultra, Seedream, and Flux Kontext.
  */
-async function generateWithFal(
+export async function generateWithFal(
   prompt: string,
   falModel: string = "fal-ai/flux/dev",
   width?: number,
