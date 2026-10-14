@@ -319,3 +319,99 @@ export async function describeSketchBufferFast(sketchBuffer: Buffer): Promise<st
   }
 }
 
+/**
+ * Pure-Node Lanczos3 + unsharp-mask 2x/4x upscaler fallback when the self-hosted
+ * RunPod Real-ESRGAN endpoint is paused (`max_workers=0`). Runs locally on the
+ * serverless node so Uncensored Studio upscales never leak to third-party APIs.
+ */
+export async function upscaleBufferSharp(
+  inputBuffer: Buffer,
+  scale: 2 | 4 = 2,
+): Promise<Buffer> {
+  const meta = await sharp(inputBuffer).metadata();
+  const baseW = meta.width || 832;
+  const baseH = meta.height || 1216;
+  const targetWidth = Math.min(4096, Math.round(baseW * scale));
+  const targetHeight = Math.min(4096, Math.round(baseH * scale));
+
+  return sharp(inputBuffer)
+    .resize({
+      width: targetWidth,
+      height: targetHeight,
+      fit: "fill",
+      kernel: sharp.kernel.lanczos3,
+    })
+    .sharpen({ sigma: 1.1, m1: 1.0, m2: 2.0 })
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Pure-Node border-sampled RGBA alpha cutout fallback when the self-hosted
+ * RunPod RMBG endpoint is paused (`max_workers=0`). Runs locally on the
+ * serverless node so Uncensored Studio cutouts never leak to third-party APIs.
+ */
+export async function removeBackgroundBufferSharp(
+  inputBuffer: Buffer,
+): Promise<Buffer> {
+  const { data, info } = await sharp(inputBuffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const width = info.width;
+  const height = info.height;
+  const out = Buffer.from(data);
+
+  // Sample border pixels (outer 2px ring) to estimate dominant background color
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let borderSamples = 0;
+  const margin = Math.max(1, Math.min(2, Math.floor(Math.min(width, height) / 4)));
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (x < margin || x >= width - margin || y < margin || y >= height - margin) {
+        const idx = (y * width + x) * 4;
+        sumR += out[idx];
+        sumG += out[idx + 1];
+        sumB += out[idx + 2];
+        borderSamples++;
+      }
+    }
+  }
+
+  const bg: RgbColor = borderSamples > 0
+    ? {
+        r: Math.round(sumR / borderSamples),
+        g: Math.round(sumG / borderSamples),
+        b: Math.round(sumB / borderSamples),
+      }
+    : { r: 0, g: 0, b: 0 };
+
+  const lowDistSq = 28 * 28;
+  const highDistSq = 68 * 68;
+
+  for (let i = 0; i < width * height; i++) {
+    const idx = i * 4;
+    const dSq = colorDistSq(
+      { r: out[idx], g: out[idx + 1], b: out[idx + 2] },
+      bg,
+    );
+    if (dSq <= lowDistSq) {
+      out[idx + 3] = 0;
+    } else if (dSq < highDistSq) {
+      const ratio = (Math.sqrt(dSq) - 28) / (68 - 28);
+      out[idx + 3] = Math.round(out[idx + 3] * Math.max(0, Math.min(1, ratio)));
+    }
+  }
+
+  return sharp(out, {
+    raw: { width, height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
+

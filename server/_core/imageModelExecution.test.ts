@@ -38,7 +38,7 @@ vi.mock("./promptModeration", () => ({
 import { generateImage, hasTypographyIntent, isAutomaticImageConfigured } from "./imageGeneration";
 import { getModelById, listModels } from "./modelRegistry";
 import { DIRECT_IMAGE_MODELS, DirectImageConfirmedRejection, DirectImageInputError, DirectImageOutcomeUncertain } from "./directImageProviders";
-import { describeSketchBufferFast, vectorizeBufferToSvg } from "./svgVectorize";
+import { describeSketchBufferFast, removeBackgroundBufferSharp, upscaleBufferSharp, vectorizeBufferToSvg } from "./svgVectorize";
 
 const fetchMock = vi.fn();
 const bytes = Buffer.from("generated image bytes");
@@ -117,7 +117,7 @@ describe("executable image registry", () => {
 
   it("reflects fal routes without requiring Replicate credentials", () => {
     mocks.env.falApiKey = "test-fal";
-    for (const id of ["flux-pro", "flux-schnell", "together-flux", "ultra"]) {
+    for (const id of ["flux-pro", "flux-schnell", "together-flux", "ultra", "musicgen"]) {
       expect(getModelById(id)?.isAvailable).toBe(true);
     }
     expect(getModelById("minimax-video")?.isAvailable).toBe(false);
@@ -387,13 +387,22 @@ describe("successful image execution provenance", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://queue.fal.run/fal-ai/flux/schnell");
   });
 
-  it("vectorizes raster buffers into valid SVG and describes sketch layout fast", async () => {
+  it("vectorizes raster buffers into valid SVG, describes sketch layout fast, and runs sharp upscale/cutout fallbacks", async () => {
     const svg = await vectorizeBufferToSvg(validJpeg, 4);
     expect(svg).toContain("<svg xmlns=\"http://www.w3.org/2000/svg\"");
     expect(svg).toContain("viewBox=\"0 0 16 12\"");
     const sketchBuf = await sharp({ create: { width: 48, height: 48, channels: 3, background: "#ff2200" } }).png().toBuffer();
     const layout = await describeSketchBufferFast(sketchBuf);
     expect(layout).toContain("Composition layout from user sketch:");
+
+    const upscaled = await upscaleBufferSharp(validJpeg, 2);
+    const upMeta = await sharp(upscaled).metadata();
+    expect(upMeta.width).toBe(32);
+    expect(upMeta.height).toBe(24);
+
+    const cutout = await removeBackgroundBufferSharp(validJpeg);
+    const cutRaw = await sharp(cutout).ensureAlpha().raw().toBuffer();
+    expect(cutRaw[3]).toBe(0);
   });
 });
 

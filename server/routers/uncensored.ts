@@ -59,6 +59,7 @@ import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfiltere
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable, runpodUpscale, runpodRemoveBackground, runpodTryOn } from "../_core/runpod";
+import { upscaleBufferSharp, removeBackgroundBufferSharp } from "../_core/svgVectorize";
 import { deductCredits, refundCredits, getOrCreateBalance } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
@@ -1124,9 +1125,6 @@ export const uncensoredRouter = router({
       }
 
       const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The upscaler GPU is unavailable right now." });
-      }
 
       const cost = input.scale === "4x" ? UNCENSORED_IMAGE_COST.upscale4x : UNCENSORED_IMAGE_COST.upscale2x;
       await enforceRateLimit(`uncensored.upscale:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between upscales.");
@@ -1152,7 +1150,17 @@ export const uncensoredRouter = router({
 
       try {
         const buf = await fetchImageBuffer(src.imageUrl!);
-        const result = await runpodUpscale(buf.toString("base64"), scale);
+        let result: Buffer;
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodUpscale(buf.toString("base64"), scale);
+          } catch (rpErr: any) {
+            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await upscaleBufferSharp(buf, scale as 2 | 4);
+          }
+        } else {
+          result = await upscaleBufferSharp(buf, scale as 2 | 4);
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
@@ -1276,9 +1284,6 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
       }
       const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
-      }
       const cost = UNCENSORED_IMAGE_COST.cutout;
       await enforceRateLimit(`uncensored.cutout:user:${ctx.user.id}`, 8, 60_000, "Slow down a moment between cutouts.");
       const debit = await deductCredits(ctx.user.id, cost, "Uncensored cutout", "usage", { uncensored: true, cutout: true });
@@ -1300,7 +1305,17 @@ export const uncensoredRouter = router({
       });
       try {
         const buf = await fetchImageBuffer(src.imageUrl!);
-        const result = await runpodRemoveBackground(buf.toString("base64"));
+        let result: Buffer;
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodRemoveBackground(buf.toString("base64"));
+          } catch (rpErr: any) {
+            if (!isRunPodEndpointPausedError(rpErr)) throw rpErr;
+            result = await removeBackgroundBufferSharp(buf);
+          }
+        } else {
+          result = await removeBackgroundBufferSharp(buf);
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });

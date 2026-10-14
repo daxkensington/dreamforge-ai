@@ -430,7 +430,7 @@ function musicGen(): AIModel {
     capabilities: ["text-to-music"],
     maxResolution: { width: 0, height: 0 },
     creditCost: { base: 6 },
-    isAvailable: !!ENV.replicateApiToken,
+    isAvailable: isRunPodAvailable() || !!ENV.falApiKey || !!ENV.replicateApiToken,
     modelTier: "standard",
     tier: "creator",
     description: "Meta MusicGen — generate original music from text descriptions.",
