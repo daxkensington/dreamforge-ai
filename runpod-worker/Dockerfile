@@ -38,7 +38,10 @@ RUN pip install --no-cache-dir --no-deps realesrgan==0.3.0 basicsr==1.4.2 && \
 # future SDK version imports something else, the worker log will name it
 # (same find-missing-deps.sh workflow as the audiocraft backfill).
 RUN pip install --no-cache-dir --no-deps runpod==1.6.0 && \
-    pip install --no-cache-dir aiohttp requests tqdm pydantic click colorama
+    pip install --no-cache-dir aiohttp aiohttp-retry backoff boto3 botocore \
+    click colorama fastapi uvicorn py-cpuinfo paramiko prettytable \
+    inquirerpy requests tqdm tqdm-loggable pydantic tomli tomlkit urllib3 watchdog && \
+    python -c "import sys, torchvision.transforms, torchvision.transforms.functional as _F; torchvision.transforms.functional_tensor = _F; sys.modules['torchvision.transforms.functional_tensor'] = _F; import runpod, diffusers, transformers, realesrgan, vtracer, soundfile; print('Worker imports verified OK')"
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
