@@ -56,11 +56,38 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
         </div>
 
         {/* Hero */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 shadow-lg shadow-rose-500/30">
-            <Flame className="h-8 w-8 text-white" />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-3xl border border-rose-500/35 bg-black/60 px-6 py-10 sm:px-10 sm:py-12 text-center shadow-[0_0_50px_-15px_rgba(244,63,94,0.3)]"
+        >
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            poster="/showcase/uncensored-char-aria-nordic.jpg"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
+          >
+            <source src="/video/hero-bg.mp4" type="video/mp4" />
+          </video>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/90" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(244,63,94,0.28),transparent_65%)]" />
+          <div className="relative z-10">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 shadow-lg shadow-rose-500/30">
+              <Flame className="h-7 w-7 text-white" />
+            </div>
+            <h1
+              className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl"
+              style={{ textShadow: "0 4px 25px rgba(0,0,0,0.85)" }}
+            >
+              {page.h1}
+            </h1>
+            <p className="mx-auto mt-3 max-w-xl text-xs font-medium text-rose-200/90 sm:text-sm">
+              Self-Hosted Unfiltered GPUs · 3 Free Previews · Card / Apple Pay (via Credits) or Bitcoin
+            </p>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{page.h1}</h1>
         </motion.div>
 
         {/* 4-Card Hero Visual Showcase */}

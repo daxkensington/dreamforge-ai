@@ -134,19 +134,39 @@ export default function DemoTextToImage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
+          className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 p-6 md:p-10 text-center mb-10 shadow-2xl"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium mb-4">
-            <Sparkles className="h-3 w-3" />
-            Free demo — no signup, no card
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.18),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(6,182,212,0.16),transparent_60%)] pointer-events-none" />
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium mb-4 backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5" />
+              Free Instant Demo — No Signup, No Card Required
+            </div>
+            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
+              Try AI Image Generation{" "}
+              <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                Free
+              </span>
+            </h1>
+            <p className="text-base md:text-lg text-white/75 max-w-2xl mx-auto mb-6">
+              One free photorealistic generation per day. See what DreamForgeX can render in seconds — then unlock 100+ studio tools, 4K upscaling, and Uncensored Pro.
+            </p>
+            <div className="grid grid-cols-4 gap-2.5 max-w-2xl mx-auto">
+              {[
+                { src: "/showcase/gallery-cyberpunk-city.jpg", label: "Cyberpunk" },
+                { src: "/showcase/uncensored-char-aria-nordic.jpg", label: "Portrait" },
+                { src: "/showcase/gallery-dragon-rider.jpg", label: "Fantasy" },
+                { src: "/showcase/gallery-cosmic-queen.jpg", label: "Sci-Fi" },
+              ].map((art) => (
+                <div key={art.label} className="relative rounded-xl overflow-hidden aspect-[16/10] border border-white/15 group">
+                  <img src={art.src} alt={art.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end p-2">
+                    <span className="text-[10px] font-semibold text-white/90">{art.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
-            Try AI image generation free
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            One free generation per day. See what DreamForgeX can do before you
-            sign up — then unlock 100+ tools and 30+ models.
-          </p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

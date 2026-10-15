@@ -494,23 +494,58 @@ export default function Uncensored() {
 
   return (
     <PageLayout>
-      <div className={`mx-auto px-4 py-16 ${active ? "max-w-6xl" : "max-w-5xl"}`}>
+      <div className={`mx-auto px-4 py-12 sm:py-16 ${active ? "max-w-6xl" : "max-w-5xl"}`}>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          className="relative overflow-hidden rounded-3xl border border-rose-500/35 bg-black/60 px-6 py-10 sm:px-10 sm:py-14 text-center shadow-[0_0_60px_-15px_rgba(244,63,94,0.3)]"
         >
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 shadow-lg shadow-rose-500/30">
-            <Flame className="h-8 w-8 text-white" />
+          {/* Ambient looping video + radial rose/amber spotlight */}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            poster="/showcase/uncensored-char-aria-nordic.jpg"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
+          >
+            <source src="/video/hero-bg.mp4" type="video/mp4" />
+          </video>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/90" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(244,63,94,0.28),transparent_65%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(249,115,22,0.18),transparent_60%)]" />
+
+          <div className="relative z-10">
+            <div className="mx-auto mb-5 flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-200 backdrop-blur-md">
+                <Flame className="h-3.5 w-3.5 text-rose-400" />
+                18+ · Zero Content Filter
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200 backdrop-blur-md">
+                <Zap className="h-3.5 w-3.5 text-emerald-400" />
+                Card / Apple Pay + Bitcoin
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur-md">
+                <Shield className="h-3.5 w-3.5 text-cyan-300" />
+                100% Private Vault
+              </span>
+            </div>
+            <h1
+              className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl"
+              style={{ textShadow: "0 4px 30px rgba(0,0,0,0.85)" }}
+            >
+              Uncensored AI{" "}
+              <span className="bg-gradient-to-r from-rose-400 via-orange-300 to-amber-200 bg-clip-text text-transparent">
+                Image &amp; Video Studio
+              </span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
+              No content filter. 7 unfiltered open-source tools — Image Studio, 5–10s Video,
+              Character Sheet, Outfit Swap, Brush Inpaint, Refine &amp; 4K Upscale — private by
+              default. Unlock instantly with Card / Apple Pay (via Credits) or Bitcoin.
+            </p>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Uncensored AI Image &amp; Video Studio
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            No content filter. 7 unfiltered open-source tools — Image Studio, 5–10s Video,
-            Character Sheet, Outfit Swap, Brush Inpaint, Refine &amp; 4K Upscale — private by
-            default. Unlock instantly with Card / Apple Pay (via Credits) or Bitcoin.
-          </p>
         </motion.div>
 
         {active ? (

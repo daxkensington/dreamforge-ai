@@ -333,29 +333,42 @@ export default function Home() {
         />
       )}
 
-      {/* ═══════ SECTION 1: HERO WITH DECORATIVE BACKGROUND ═══════ */}
+      {/* ═══════ SECTION 1: HERO WITH VIDEO BACKGROUND ═══════ */}
       <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        {/* Decorative background */}
-        <img
-          src="/showcase/hero-forge.jpg"
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        {/* Dark overlay — FIX 1: much darker */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/95" />
+        {/* Live Hero Video background with instant poster + img fallback */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/showcase/hero-forge.jpg"
+          className="absolute inset-0 w-full h-full object-cover scale-[1.02]"
+        >
+          <source src="/video/hero-bg.mp4" type="video/mp4" />
+          <img
+            src="/showcase/hero-forge.jpg"
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover"
+          />
+        </video>
+        {/* Balanced cinematic vignette + radial neon spotlights so the video shines through */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/35 to-black/90" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.20),transparent_60%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.18),transparent_60%)] pointer-events-none" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 lg:py-40">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-28 lg:py-32">
           <div className="max-w-5xl mx-auto text-center">
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeUp}
               custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/15 backdrop-blur-md border border-cyan-400/30 shadow-[0_0_24px_rgba(6,182,212,0.2)] mb-8"
             >
-              <Sparkles className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-white/90">100+ AI Tools — One Platform</span>
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              <span className="text-sm font-semibold text-white">100+ AI Tools · 30+ Models · Self-Hosted GPU Fleet</span>
             </motion.div>
 
             <motion.h1
@@ -364,7 +377,7 @@ export default function Home() {
               variants={fadeUp}
               custom={1}
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tighter mb-6 leading-[1.05] text-white"
-              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.8)' }}
+              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.85)' }}
             >
               Create Stunning <CyclingWord />
             </motion.h1>
@@ -374,9 +387,9 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={2}
-              className="text-lg md:text-xl text-white/60 mb-12 max-w-2xl mx-auto"
+              className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl mx-auto drop-shadow"
             >
-              The all-in-one AI creative studio. Images, video, songs, music videos — powered by 30+ AI models.
+              The all-in-one AI creative studio. Photoreal images, cinema video, songs, music videos &amp; unfiltered pro tools — powered by 30+ AI models.
             </motion.p>
 
             <motion.div
@@ -408,14 +421,14 @@ export default function Home() {
               <Button
                 asChild
                 size="lg"
-                className="font-semibold gap-2 px-8 h-13 text-base bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/25"
+                className="font-semibold gap-2 px-8 h-13 text-base bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/30"
               >
                 <Link href="/uncensored?start=1">
                   <Flame className="h-5 w-5" />
                   Uncensored Studio (3 Free)
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-transparent border-white/20 hover:bg-white/10">
+              <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-black/35 backdrop-blur-md border-white/25 hover:bg-white/15">
                 <Link href="/gallery">
                   <Eye className="h-5 w-5" />
                   Explore Gallery
@@ -428,11 +441,11 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={4}
-              className="mt-8 mx-auto max-w-2xl"
+              className="mt-7 mx-auto max-w-2xl"
             >
               <Link
                 href="/uncensored?start=1"
-                className="group flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-rose-500/35 bg-gradient-to-r from-rose-500/15 via-orange-500/10 to-rose-500/15 px-5 py-3.5 text-left backdrop-blur-md transition-all hover:border-rose-500/60 hover:bg-rose-500/20"
+                className="group flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-rose-500/45 bg-gradient-to-r from-black/70 via-rose-950/60 to-black/70 px-5 py-3.5 text-left backdrop-blur-xl shadow-[0_8px_32px_rgba(244,63,94,0.2)] transition-all hover:border-rose-400 hover:shadow-[0_8px_36px_rgba(244,63,94,0.35)]"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-md shadow-rose-500/30">
@@ -441,12 +454,12 @@ export default function Home() {
                   <div>
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
                       <span>Private Uncensored AI Studio</span>
-                      <span className="rounded-full bg-rose-500/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-200">
+                      <span className="rounded-full bg-rose-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-200">
                         18+ · No Filter
                       </span>
                     </div>
-                    <p className="text-xs text-white/70">
-                      Unfiltered Flux + Wan 2.2 Video · Character Face Lock · Outfit Swap · 4-View Sheets · 100% Private
+                    <p className="text-xs text-white/75">
+                      Unfiltered Flux + Wan 2.2 Video · Character Face Lock · Outfit Swap · 4-View Sheets · Card/Apple Pay or Bitcoin
                     </p>
                   </div>
                 </div>
@@ -454,6 +467,66 @@ export default function Home() {
                   Try 3 Free Previews <ArrowRight className="h-3.5 w-3.5" />
                 </span>
               </Link>
+            </motion.div>
+
+            {/* 4-Card Live Studio Visual Showcase Dock */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              custom={5}
+              className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto text-left"
+            >
+              {[
+                {
+                  title: "Photoreal Studio",
+                  sub: "Flux Pro · DALL-E 3 · Grok",
+                  img: "/showcase/gallery-9.jpg",
+                  href: isAuthenticated ? "/workspace" : "/demo/text-to-image",
+                  badge: "Image",
+                },
+                {
+                  title: "AI Video & Cinema",
+                  sub: "Veo 3 · Runway · Wan 2.5",
+                  img: "/showcase/tool-t2v.jpg",
+                  href: "/video-studio",
+                  badge: "Video",
+                },
+                {
+                  title: "Uncensored Pro",
+                  sub: "Face Lock · Outfit · 4-View",
+                  img: "/showcase/uncensored-char-aria-nordic.jpg",
+                  href: "/uncensored?start=1",
+                  badge: "18+ No Filter",
+                },
+                {
+                  title: "100+ Creative Tools",
+                  sub: "Try-On · Upscale · Audio",
+                  img: "/showcase/gallery-2.jpg",
+                  href: "/tools",
+                  badge: "Suite",
+                },
+              ].map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  className="group relative h-28 sm:h-32 overflow-hidden rounded-2xl border border-white/15 bg-black/50 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-cyan-400/60 hover:shadow-[0_0_25px_rgba(6,182,212,0.25)]"
+                >
+                  <img
+                    src={card.img}
+                    alt={card.title}
+                    className="absolute inset-0 h-full w-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105 group-hover:opacity-85"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
+                  <span className="absolute top-2 right-2 rounded-full border border-white/20 bg-black/65 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
+                    {card.badge}
+                  </span>
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="text-xs sm:text-sm font-bold text-white leading-tight">{card.title}</div>
+                    <div className="text-[10px] text-white/70 truncate mt-0.5">{card.sub}</div>
+                  </div>
+                </Link>
+              ))}
             </motion.div>
           </div>
         </div>
@@ -463,9 +536,9 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5, duration: 1 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/40"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-white/50"
         >
-          <span className="text-xs uppercase tracking-widest">Scroll</span>
+          <span className="text-[10px] uppercase tracking-widest">Scroll</span>
           <ChevronDown className="h-4 w-4 animate-bounce" />
         </motion.div>
       </section>
@@ -578,7 +651,7 @@ export default function Home() {
                   viewport={{ once: true }}
                   variants={scaleIn}
                   custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 hover:border-cyan-500/40 transition-all duration-500 cursor-pointer min-h-[200px]"
+                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[210px]"
                 >
                   <div className="absolute inset-0">
                     <img
@@ -588,22 +661,22 @@ export default function Home() {
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "/showcase/hero-forge.jpg";
                       }}
-                      className="w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700"
+                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/15" />
                   </div>
-                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
+                  <div className="relative p-6 flex flex-col h-full min-h-[210px]">
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <item.icon className="h-6 w-6 text-cyan-400" />
+                      <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
+                        <item.icon className="h-6 w-6 text-cyan-300" />
                       </div>
-                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
+                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-black/70 backdrop-blur-md text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
                         {item.tag}
                       </span>
                     </div>
-                    <h3 className="text-lg font-semibold mb-1 text-white">{item.title}</h3>
-                    <p className="text-sm text-white/60 mb-4">{item.desc}</p>
-                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{item.title}</h3>
+                    <p className="text-sm text-white/75 mb-4">{item.desc}</p>
+                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
                       Try it now <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
@@ -863,23 +936,26 @@ export default function Home() {
                   viewport={{ once: true }}
                   variants={scaleIn}
                   custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-500 cursor-pointer min-h-[180px]"
+                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[200px]"
                 >
                   <div className="absolute inset-0">
                     <img
                       src={tool.bg}
-                      alt="Hero background"
+                      alt={tool.title}
                       loading="lazy"
-                      className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity duration-500"
+                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-black/50" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/15" />
                   </div>
-                  <div className="relative p-6">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4">
-                      <tool.icon className="h-6 w-6 text-cyan-400" />
+                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
+                    <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                      <tool.icon className="h-6 w-6 text-cyan-300" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-1 text-white">{tool.title}</h3>
-                    <p className="text-sm text-white/60">{tool.desc}</p>
+                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{tool.title}</h3>
+                    <p className="text-sm text-white/75 mb-4">{tool.desc}</p>
+                    <div className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
+                      Open studio <ArrowRight className="h-3.5 w-3.5" />
+                    </div>
                   </div>
                 </motion.div>
               </Link>

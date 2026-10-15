@@ -203,12 +203,24 @@ export default function Navbar() {
   const isCharactersActive = location === "/characters";
 
   return (
-    <header className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${scrolled ? "bg-black/80 backdrop-blur-xl border-white/5" : "bg-transparent border-transparent"}`}>
+    <header
+      className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${
+        scrolled
+          ? "bg-black/85 backdrop-blur-2xl border-cyan-500/15 shadow-[0_8px_32px_rgba(0,0,0,0.55)]"
+          : "bg-black/55 backdrop-blur-xl border-white/[0.08]"
+      }`}
+    >
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <NextImage src="/logo.png" alt="DreamForgeX" width={36} height={36} className="h-9 w-9 rounded-lg shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/30 transition-all" />
-          <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+          <NextImage
+            src="/logo.png"
+            alt="DreamForgeX"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-lg ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/25 group-hover:shadow-cyan-400/40 group-hover:scale-105 transition-all"
+          />
+          <span className="text-base font-extrabold tracking-tight bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
             DreamForgeX
           </span>
         </Link>
@@ -217,20 +229,39 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
+            const isUncensored = link.href === "/uncensored";
             const isActive =
               link.href === "/tools"
                 ? isToolsActive
                 : link.href === "/video-studio"
                 ? isVideoStudioActive
+                : isUncensored
+                ? location.startsWith("/uncensored")
                 : location === link.href;
+            if (isUncensored) {
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    isActive
+                      ? "bg-gradient-to-r from-rose-500/30 to-orange-500/25 text-rose-200 border border-rose-500/60 shadow-[0_0_16px_rgba(244,63,94,0.3)]"
+                      : "bg-gradient-to-r from-rose-500/15 to-orange-500/10 text-rose-200/90 border border-rose-500/30 hover:border-rose-500/50 hover:from-rose-500/25 hover:text-white"
+                  }`}
+                >
+                  <link.icon className="h-3.5 w-3.5 text-rose-400" />
+                  {link.label}
+                </Link>
+              );
+            }
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "bg-cyan-500/15 text-cyan-300 border-b-2 border-cyan-400"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 }`}
               >
                 <link.icon className="h-4 w-4" />
