@@ -14,11 +14,27 @@ export const metadata: Metadata = {
       "No content filter. 3 free previews. 7 unfiltered AI tools (Image, Video, Face Lock, Outfit Swap, Inpaint, 4-View Sheet). Unlock from $4.99 with Card / Apple Pay or Bitcoin. 18+.",
     url: "https://dreamforgex.ai/uncensored",
     siteName: "DreamForgeX",
-    images: ["/showcase/uncensored-char-aria-nordic.jpg"],
+    type: "website",
+    images: [
+      {
+        url: "https://dreamforgex.ai/showcase/uncensored-char-aria-nordic.jpg",
+        width: 1024,
+        height: 1024,
+        alt: "DreamForgeX Uncensored 18+ AI Image & Video Pro Studio",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Uncensored AI Image & Video Studio — No Filter | DreamForgeX",
+    description:
+      "3 free previews (no card). 7 unfiltered AI tools: Flux Image, Wan 2.2 Video, Face Lock, Outfit Swap, Brush Inpaint & 4-View Character Sheets. From $4.99 via Card / Apple Pay or Bitcoin.",
+    images: ["https://dreamforgex.ai/showcase/uncensored-char-aria-nordic.jpg"],
+    site: "@dreamforgex_ai",
   },
 };
 
-// Product + FAQPage structured data. Pricing ladder → AggregateOffer so rich
+// Product + FAQPage + BreadcrumbList structured data. Pricing ladder → AggregateOffer so rich
 // results show the full $4.99–$19 range, not just the 30-day anchor.
 const lowPrice = Math.min(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
 const highPrice = Math.max(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
@@ -27,8 +43,16 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "DreamForgeX", item: "https://dreamforgex.ai" },
+        { "@type": "ListItem", position: 2, name: "Uncensored 18+ Pro Studio", item: "https://dreamforgex.ai/uncensored" },
+      ],
+    },
+    {
       "@type": "Product",
       name: "DreamForgeX Uncensored Pro Studio Pass",
+      image: "https://dreamforgex.ai/showcase/uncensored-char-aria-nordic.jpg",
       description:
         "Uncensored AI image & video studio with no content filter — 7 pro tools unlocked with a Day, Week, or 30-Day pass via Card / Apple Pay (DreamForgeX Credits) or anonymously with Bitcoin. 18+ only. Three free watermarked previews with a free account.",
       brand: { "@type": "Brand", name: "DreamForgeX" },
@@ -48,7 +72,7 @@ const jsonLd = {
           priceCurrency: "USD",
           availability: "https://schema.org/InStock",
           url: "https://dreamforgex.ai/uncensored",
-          description: `${p.durationDays} day${p.durationDays > 1 ? "s" : ""} of uncensored access + ${p.bonusCredits} bonus credits. One-time, no auto-renew.`,
+          description: `${p.durationDays} day${p.durationDays > 1 ? "s" : ""} of uncensored access (${p.creditPrice} Credits or $${p.priceUsd} BTC) + ${p.bonusCredits} bonus credits. One-time, no auto-renew.`,
         })),
       },
     },

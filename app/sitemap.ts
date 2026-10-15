@@ -69,6 +69,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/privacy", priority: 0.4, changeFrequency: "yearly" as const },
     { url: "/terms", priority: 0.4, changeFrequency: "yearly" as const },
     { url: "/about", priority: 0.4, changeFrequency: "yearly" as const },
+    { url: "/llms.txt", priority: 0.8, changeFrequency: "weekly" as const },
+    { url: "/llms-full.txt", priority: 0.8, changeFrequency: "weekly" as const },
   ];
 
   // Tool pages — derived from the filesystem (one live route per app/tools/<slug>/dir)
