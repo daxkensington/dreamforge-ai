@@ -7,7 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
+import UncensoredResultActions, {
+  UncensoredBeforeAfterCompare,
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
 import {
   UNCENSORED_LIGHTING,
   UNCENSORED_IMAGE_COST,
@@ -124,6 +127,15 @@ export default function UncensoredRefineStudio({
 
       {/* Source picker — your own generations only. No upload by design. */}
       <div className="mt-5">
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={sourceId}
+          onSelectGeneration={(id) => {
+            setSourceId(id);
+            setResultUrl(null);
+            setResultId(null);
+          }}
+          disabled={isBusy}
+        />
         <p className="text-sm text-muted-foreground">1. Pick one of your uncensored images:</p>
         {images.isLoading ? (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -307,45 +319,30 @@ export default function UncensoredRefineStudio({
         )}
       </Button>
 
-      {(selected || resultUrl) && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {selected && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Original</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selected.imageUrl ?? ""}
-                alt="source"
-                className="w-full rounded-xl border border-border/60"
-              />
-            </div>
-          )}
-          {resultUrl && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Refined</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={resultUrl} alt="refined" className="w-full rounded-xl border border-rose-500/40" />
-              {resultId && (
-                <UncensoredResultActions
-                  generationId={resultId}
-                  url={resultUrl}
-                  onContinue={() => {
-                    setSourceId(resultId);
-                    setResultUrl(null);
-                    setResultId(null);
-                    toast.info("Now refining the new image.");
-                  }}
-                  onInpaint={onInpaint}
-                  onOutfit={onOutfit}
-                  onSheet={onSheet}
-                  onAnimate={onAnimate}
-                  onUseCharacter={onUseCharacter}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <UncensoredBeforeAfterCompare
+        beforeUrl={selected?.imageUrl ?? null}
+        afterUrl={resultUrl}
+        beforeLabel="Original"
+        afterLabel="Refined"
+      >
+        {resultId && resultUrl && (
+          <UncensoredResultActions
+            generationId={resultId}
+            url={resultUrl}
+            onContinue={() => {
+              setSourceId(resultId);
+              setResultUrl(null);
+              setResultId(null);
+              toast.info("Now refining the new image.");
+            }}
+            onInpaint={onInpaint}
+            onOutfit={onOutfit}
+            onSheet={onSheet}
+            onAnimate={onAnimate}
+            onUseCharacter={onUseCharacter}
+          />
+        )}
+      </UncensoredBeforeAfterCompare>
     </div>
   );
 }

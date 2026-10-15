@@ -20,6 +20,7 @@ import {
   pickRandomUncensoredVideoRecipe,
   type UncensoredVideoRecipe,
 } from "@shared/uncensoredStudio";
+import { UncensoredSourcePickerExtras } from "@/components/UncensoredResultActions";
 
 /**
  * Uncensored video studio — shown to holders of an active pass. Wan 2.2 on our
@@ -254,6 +255,12 @@ export default function UncensoredVideoStudio({
               </div>
             </div>
           )}
+          <UncensoredSourcePickerExtras
+            selectedGenerationId={sourceId}
+            onSelectGeneration={(id) => setSourceId(id)}
+            disabled={isBusy}
+            showSavedCharacters={false}
+          />
           <p className="text-sm text-muted-foreground">Pick one of your uncensored images to animate:</p>
           {images.isLoading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">

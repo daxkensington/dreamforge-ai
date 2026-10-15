@@ -7,7 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { UNCENSORED_IMAGE_COST, UNCENSORED_OUTFIT_PRESETS } from "@shared/uncensoredStudio";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
+import UncensoredResultActions, {
+  UncensoredBeforeAfterCompare,
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
 
 type Cloth = "upper" | "lower" | "overall";
 type OutfitMode = "quick" | "transfer";
@@ -173,6 +176,15 @@ export default function UncensoredOutfitStudio({
       </div>
 
       <div className="mt-4">
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={personId}
+          onSelectGeneration={(id) => {
+            setPersonId(id);
+            setResultUrl(null);
+            setResultId(null);
+          }}
+          disabled={isBusy}
+        />
         <p className="text-sm text-muted-foreground">1. Pick character image to restyle</p>
         {picker(personId, setPersonId, "Generate a character on the Create tab first.")}
       </div>
@@ -280,43 +292,30 @@ export default function UncensoredOutfitStudio({
         </>
       )}
 
-      {(selectedPerson || resultUrl) && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {selectedPerson && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Original</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedPerson.imageUrl ?? ""}
-                alt="Original"
-                className="w-full rounded-xl border border-border/60"
-              />
-            </div>
-          )}
-          {resultUrl && resultId && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-rose-300">New Outfit</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={resultUrl} alt="Outfit swap result" className="w-full rounded-xl border border-rose-500/40" />
-              <UncensoredResultActions
-                generationId={resultId}
-                url={resultUrl}
-                onContinue={() => {
-                  setPersonId(resultId);
-                  setResultUrl(null);
-                  setResultId(null);
-                  toast.info("Now restyling the new outfit image.");
-                }}
-                onRefine={onRefine}
-                onInpaint={onInpaint}
-                onSheet={onSheet}
-                onAnimate={onAnimate}
-                onUseCharacter={onUseCharacter}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      <UncensoredBeforeAfterCompare
+        beforeUrl={selectedPerson?.imageUrl ?? null}
+        afterUrl={resultUrl}
+        beforeLabel="Original"
+        afterLabel="New Outfit"
+      >
+        {resultUrl && resultId && (
+          <UncensoredResultActions
+            generationId={resultId}
+            url={resultUrl}
+            onContinue={() => {
+              setPersonId(resultId);
+              setResultUrl(null);
+              setResultId(null);
+              toast.info("Now restyling the new outfit image.");
+            }}
+            onRefine={onRefine}
+            onInpaint={onInpaint}
+            onSheet={onSheet}
+            onAnimate={onAnimate}
+            onUseCharacter={onUseCharacter}
+          />
+        )}
+      </UncensoredBeforeAfterCompare>
     </div>
   );
 }

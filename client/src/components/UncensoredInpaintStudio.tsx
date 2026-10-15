@@ -8,7 +8,10 @@ import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { UNCENSORED_IMAGE_COST, UNCENSORED_INPAINT_PRESETS } from "@shared/uncensoredStudio";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
+import UncensoredResultActions, {
+  UncensoredBeforeAfterCompare,
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
 
 /**
  * Paint-region inpaint. Overlay canvas sits on the original so strokes never
@@ -196,6 +199,15 @@ export default function UncensoredInpaintStudio({
       </div>
 
       <div className="mt-4">
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={sourceId}
+          onSelectGeneration={(id) => {
+            setSourceId(id);
+            setResultUrl(null);
+            setResultId(null);
+          }}
+          disabled={inpaint.isPending}
+        />
         <p className="text-sm text-muted-foreground">1. Pick one of your uncensored images:</p>
         {images.data && images.data.length > 0 ? (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -365,41 +377,30 @@ export default function UncensoredInpaintStudio({
       <p className="mt-2 text-center text-[11px] text-muted-foreground">Ctrl+Enter to run</p>
 
       {resultUrl && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {selected && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Original</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selected.imageUrl ?? ""}
-                alt="Original"
-                className="w-full rounded-xl border border-border/60"
-              />
-            </div>
+        <UncensoredBeforeAfterCompare
+          beforeUrl={selected?.imageUrl ?? null}
+          afterUrl={resultUrl}
+          beforeLabel="Original"
+          afterLabel="Inpainted Result"
+        >
+          {resultId && (
+            <UncensoredResultActions
+              generationId={resultId}
+              url={resultUrl}
+              onContinue={() => {
+                setSourceId(resultId);
+                setResultUrl(null);
+                setResultId(null);
+                toast.info("Now painting on the new image.");
+              }}
+              onRefine={onRefine}
+              onOutfit={onOutfit}
+              onSheet={onSheet}
+              onAnimate={onAnimate}
+              onUseCharacter={onUseCharacter}
+            />
           )}
-          <div>
-            <p className="mb-2 text-xs uppercase tracking-wide text-rose-300">Inpainted Result</p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={resultUrl} alt="Inpainted" className="w-full rounded-xl border border-rose-500/40" />
-            {resultId && (
-              <UncensoredResultActions
-                generationId={resultId}
-                url={resultUrl}
-                onContinue={() => {
-                  setSourceId(resultId);
-                  setResultUrl(null);
-                  setResultId(null);
-                  toast.info("Now painting on the new image.");
-                }}
-                onRefine={onRefine}
-                onOutfit={onOutfit}
-                onSheet={onSheet}
-                onAnimate={onAnimate}
-                onUseCharacter={onUseCharacter}
-              />
-            )}
-          </div>
-        </div>
+        </UncensoredBeforeAfterCompare>
       )}
     </div>
   );

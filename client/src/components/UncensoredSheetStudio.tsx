@@ -11,7 +11,9 @@ import {
   UNCENSORED_SHEET_VIEWS,
   UNCENSORED_WARDROBE,
 } from "@shared/uncensoredStudio";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
+import UncensoredResultActions, {
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
 
 /**
  * Four-view identity sheet from one of the caller's own uncensored gens.
@@ -172,6 +174,15 @@ export default function UncensoredSheetStudio({
       )}
 
       <div className="mt-4">
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={sourceId}
+          onSelectGeneration={(id) => {
+            setSourceId(id);
+            setSavedCharacterId(null);
+          }}
+          disabled={sheet.isPending}
+          showSavedCharacters={false}
+        />
         <p className="text-sm text-muted-foreground">1. Pick one of your uncensored images:</p>
         {images.data && images.data.length > 0 ? (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
