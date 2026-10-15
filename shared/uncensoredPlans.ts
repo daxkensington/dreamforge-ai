@@ -10,6 +10,9 @@ export interface UncensoredPlan {
   label: string;
   priceUsd: number;
   creditPrice: number;
+  creditPackId: string;
+  creditPackPriceUsd: number;
+  creditPackTotalCredits: number;
   bonusCredits: number;
   durationDays: number;
   tagline: string;
@@ -21,7 +24,10 @@ export const UNCENSORED_PLANS: UncensoredPlan[] = [
     id: "uncensored-day",
     label: "Day Pass",
     priceUsd: 4.99,
-    creditPrice: 100,
+    creditPrice: 400,
+    creditPackId: "pack-500",
+    creditPackPriceUsd: 4.99,
+    creditPackTotalCredits: 500,
     bonusCredits: 60,
     durationDays: 1,
     tagline: "Dip in for 24 hours",
@@ -30,7 +36,10 @@ export const UNCENSORED_PLANS: UncensoredPlan[] = [
     id: "uncensored-week",
     label: "Week Pass",
     priceUsd: 12,
-    creditPrice: 250,
+    creditPrice: 1200,
+    creditPackId: "pack-2500",
+    creditPackPriceUsd: 19.99,
+    creditPackTotalCredits: 2500,
     bonusCredits: 250,
     durationDays: 7,
     tagline: "A week, no commitment",
@@ -39,7 +48,10 @@ export const UNCENSORED_PLANS: UncensoredPlan[] = [
     id: "uncensored-30d",
     label: "30-Day Pass",
     priceUsd: 19,
-    creditPrice: 500,
+    creditPrice: 2000,
+    creditPackId: "pack-2500",
+    creditPackPriceUsd: 19.99,
+    creditPackTotalCredits: 2500,
     bonusCredits: 500,
     durationDays: 30,
     tagline: "Best value",

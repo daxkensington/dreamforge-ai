@@ -430,6 +430,7 @@ export const pricingRouter = router({
       z.object({
         packId: z.string(),
         origin: z.string().url(),
+        returnPath: z.string().max(200).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -444,6 +445,12 @@ export const pricingRouter = router({
 
       const safeOrigin = sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx));
       const packValue = (pack.price / 100).toFixed(2);
+      const rawReturn =
+        input.returnPath && /^\/[A-Za-z0-9/_?&=-]*$/.test(input.returnPath) && !input.returnPath.startsWith("//")
+          ? input.returnPath
+          : "/pricing";
+      const [returnPathname, returnSearch = ""] = rawReturn.split("?");
+      const extraQuery = returnSearch ? `&${returnSearch}` : "";
 
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
@@ -469,8 +476,8 @@ export const pricingRouter = router({
           credits: pack.credits.toString(),
           type: "credit_pack",
         },
-        success_url: `${safeOrigin}/pricing?credit_success=true&session_id={CHECKOUT_SESSION_ID}&value=${packValue}&currency=usd&credits=${pack.credits}`,
-        cancel_url: `${safeOrigin}/pricing?canceled=true`,
+        success_url: `${safeOrigin}${returnPathname}?credit_success=true&session_id={CHECKOUT_SESSION_ID}&value=${packValue}&currency=usd&credits=${pack.credits}${extraQuery}`,
+        cancel_url: `${safeOrigin}${returnPathname}?canceled=true${extraQuery}`,
       });
 
       return { url: session.url };

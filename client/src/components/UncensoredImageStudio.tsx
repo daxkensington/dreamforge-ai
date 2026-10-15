@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
   DEFAULT_CHARACTER_STRENGTH,
   getUncensoredAspectFromSize,
   formatUncensoredRecipe,
+  enhanceUncensoredPrompt,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 import RenderWaitHint, { newRequestId } from "./RenderWaitHint";
@@ -38,12 +39,16 @@ export default function UncensoredImageStudio({
   onRefine,
   onInpaint,
   onAnimate,
+  onSheet,
+  onOutfit,
 }: {
   focusCharacterId?: number | null;
   recreateId?: number | null;
   onRefine?: (id: number) => void;
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
+  onSheet?: (id: number) => void;
+  onOutfit?: (id: number) => void;
 } = {}) {
   const [prompt, setPrompt] = useState("");
   const [negative, setNegative] = useState("");
@@ -125,11 +130,13 @@ export default function UncensoredImageStudio({
     onSuccess: (data) => {
       if (data.status === "processing") {
         setPendingIds(data.generationIds);
+        utils.uncensored.status.invalidate();
         return;
       }
       setGenStartedAt(null);
       setResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
       utils.uncensored.myLibrary.invalidate();
     },
@@ -157,6 +164,7 @@ export default function UncensoredImageStudio({
     setGenStartedAt(null);
     utils.uncensored.myUncensoredImages.invalidate();
     utils.uncensored.myLibrary.invalidate();
+    utils.uncensored.status.invalidate();
     const failed = d.items.filter((i) => i.status === "failed").length;
     if (done.length === 0) toast.error("Generation failed — your credits were returned.");
     else if (failed > 0) toast.warning(`${done.length} ready · ${failed} failed (credits returned).`);
@@ -175,6 +183,7 @@ export default function UncensoredImageStudio({
     if (finished > 0) {
       utils.uncensored.myLibrary.invalidate();
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
     }
     if (stillRunning.length && pendingIds.length === 0) {
       setPendingIds(stillRunning);
@@ -190,6 +199,7 @@ export default function UncensoredImageStudio({
       setSheetResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Four-view sheet ready.");
     },
     onError: (e) => toast.error(e.message),
@@ -199,6 +209,7 @@ export default function UncensoredImageStudio({
       setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Cutout ready.");
     },
     onError: (e) => toast.error(e.message),
@@ -207,6 +218,7 @@ export default function UncensoredImageStudio({
     onSuccess: (data) => {
       setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Upscaled.");
     },
     onError: (e) => toast.error(e.message),
@@ -392,6 +404,20 @@ export default function UncensoredImageStudio({
         )}
       </div>
 
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Prompt</p>
+        <button
+          type="button"
+          disabled={busy || prompt.trim().length < 3}
+          onClick={() => {
+            setPrompt(enhanceUncensoredPrompt(prompt, style));
+            toast.success("Prompt enhanced with studio lighting & lens direction.");
+          }}
+          className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
+        >
+          <Wand2 className="h-3 w-3 text-rose-400" /> Enhance prompt
+        </button>
+      </div>
       <Textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -399,7 +425,7 @@ export default function UncensoredImageStudio({
         rows={4}
         maxLength={1000}
         disabled={busy}
-        className="mt-4 resize-none"
+        className="mt-2 resize-none"
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
@@ -774,6 +800,16 @@ export default function UncensoredImageStudio({
                   {onAnimate && (
                     <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onAnimate(r.generationId)}>
                       <Film className="mr-1 h-3 w-3" /> Animate
+                    </Button>
+                  )}
+                  {onOutfit && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onOutfit(r.generationId)}>
+                      <Shirt className="mr-1 h-3 w-3" /> Outfit
+                    </Button>
+                  )}
+                  {onSheet && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSheet(r.generationId)}>
+                      <LayoutGrid className="mr-1 h-3 w-3" /> Sheet
                     </Button>
                   )}
                   <Button

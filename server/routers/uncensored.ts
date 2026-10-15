@@ -52,7 +52,9 @@ import {
   uncensoredCharacterRef,
   isUncensoredCharacter,
   parseUncensoredCharacterRef,
+  enhanceUncensoredPrompt,
 } from "../../shared/uncensoredStudio";
+import { ENV } from "../_core/env";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfilteredImageJob, warmUnfilteredImageWorker } from "../_core/imageGenerationUncensored";
@@ -412,7 +414,7 @@ export const uncensoredRouter = router({
     let videoAvailable = false;
     try {
       const vs = await getToolStatus("uncensored-video");
-      videoAvailable = vs.status !== "offline" && isRunPodAvailable();
+      videoAvailable = vs.status !== "offline" && (isRunPodAvailable() || !!ENV.falApiKey);
     } catch {
       /* default to unavailable */
     }
@@ -450,6 +452,32 @@ export const uncensoredRouter = router({
       videoIntensities: UNCENSORED_VIDEO_INTENSITIES,
     };
   }),
+
+  /**
+   * 1-click Uncensored Studio Director — upgrades a short user prompt with
+   * style-matched lens, lighting, and anatomy direction (free, 0 credits).
+   */
+  enhancePrompt: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(3).max(900),
+        style: z.string().max(32).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const verdict = checkPrompt(input.prompt, { strictMinors: true });
+      if (!verdict.allowed) {
+        await logModerationBlock({
+          category: verdict.category,
+          promptLen: input.prompt.length,
+          userId: ctx.user.id,
+          surface: "uncensored.enhancePrompt",
+          prompt: input.prompt,
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+      return { prompt: enhanceUncensoredPrompt(input.prompt, input.style) };
+    }),
 
   /**
    * Paid uncensored image studio — the product pass-holders actually came for.

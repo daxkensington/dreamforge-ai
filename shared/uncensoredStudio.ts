@@ -686,3 +686,128 @@ export const UNCENSORED_PROMPT_CHIPS: { id: string; label: string; text: string 
 ];
 
 export type UncensoredImageQuality = keyof typeof UNCENSORED_IMAGE_COST;
+
+export interface UncensoredOutfitPreset {
+  id: string;
+  label: string;
+  prompt: string;
+}
+
+/**
+ * 1-click wardrobe swap presets for UncensoredOutfitStudio so pass-holders can
+ * restyle a single image immediately without needing a second garment image.
+ */
+export const UNCENSORED_OUTFIT_PRESETS: UncensoredOutfitPreset[] = [
+  {
+    id: "crimson-silk",
+    label: "Crimson silk slip",
+    prompt: "same person, face, pose, and lighting, wearing a crimson silk slip dress with delicate straps and soft fabric drape",
+  },
+  {
+    id: "black-lace",
+    label: "Black lace boudoir",
+    prompt: "same person, face, pose, and lighting, wearing intricate black lace boudoir lingerie, soft editorial fabric detail",
+  },
+  {
+    id: "sheer-robe",
+    label: "Silk robe",
+    prompt: "same person, face, pose, and lighting, wearing a flowing ivory silk robe draped off the shoulders",
+  },
+  {
+    id: "leather-corset",
+    label: "Leather corset",
+    prompt: "same person, face, pose, and lighting, wearing a tailored black leather corset with silver hardware",
+  },
+  {
+    id: "bikini-resort",
+    label: "Designer bikini",
+    prompt: "same person, face, pose, and lighting, wearing a minimalist designer swimsuit, warm sun-kissed skin highlights",
+  },
+  {
+    id: "evening-gown",
+    label: "Backless gown",
+    prompt: "same person, face, pose, and lighting, wearing a fitted emerald satin backless evening gown, luxury couture",
+  },
+  {
+    id: "oversized-shirt",
+    label: "Oversized shirt",
+    prompt: "same person, face, pose, and lighting, wearing an unbuttoned oversized white linen shirt, relaxed intimate styling",
+  },
+  {
+    id: "cyber-bodysuit",
+    label: "Cyber bodysuit",
+    prompt: "same person, face, pose, and lighting, wearing a sleek form-fitting cyberpunk bodysuit with subtle neon accents",
+  },
+  {
+    id: "latex-editorial",
+    label: "High-gloss editorial",
+    prompt: "same person, face, pose, and lighting, wearing a high-gloss black editorial catsuit with sharp specular highlights",
+  },
+  {
+    id: "fantasy-valkyrie",
+    label: "Fantasy armor",
+    prompt: "same person, face, pose, and lighting, wearing ornate gold-filigree dark fantasy leather and steel armor",
+  },
+];
+
+const STYLE_DIRECTOR_CUES: Record<string, string[]> = {
+  realistic: [
+    "shot on 85mm f/1.4 prime lens",
+    "shallow depth of field",
+    "natural skin micro-texture and subsurface scattering",
+    "soft directional key light with warm rim lighting",
+    "editorial magazine photography",
+  ],
+  cinematic: [
+    "35mm anamorphic cinema frame",
+    "dramatic chiaroscuro lighting with volumetric atmosphere",
+    "rich film color grading",
+    "shallow depth of field with cinematic bokeh",
+  ],
+  analog: [
+    "shot on Kodak Portra 400 35mm film",
+    "authentic film grain and subtle halation",
+    "intimate available light photography",
+    "natural lifelike skin tones",
+  ],
+  anime: [
+    "masterpiece anime key visual",
+    "expressive detailed eyes and crisp linework",
+    "vibrant cel shading with dramatic rim light",
+    "high-detail studio illustration",
+  ],
+  render3d: [
+    "Unreal Engine 5 and Octane render",
+    "physically based skin subsurface scattering",
+    "ray-traced studio lighting and reflections",
+    "hyper-detailed 8k character render",
+  ],
+  fantasy: [
+    "masterpiece dark fantasy concept art",
+    "dramatic volumetric god rays and atmospheric haze",
+    "intricate textures and painterly brushwork",
+  ],
+  artistic: [
+    "museum-grade fine-art figure study",
+    "dramatic Caravaggio chiaroscuro lighting",
+    "rich oil-on-canvas texture and masterful composition",
+  ],
+};
+
+/**
+ * Upgrade a short user prompt into a rich, studio-grade uncensored prompt
+ * without repeating cues already present in the user's text.
+ */
+export function enhanceUncensoredPrompt(rawPrompt: string, styleId?: string | null): string {
+  const base = rawPrompt.trim().replace(/\s+/g, " ").replace(/\.+$/, "");
+  if (!base) return "";
+  const lower = base.toLowerCase();
+  const cues = STYLE_DIRECTOR_CUES[styleId ?? "realistic"] ?? STYLE_DIRECTOR_CUES.realistic;
+  const additions = cues.filter((cue) => {
+    const words = cue.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
+    return !words.some((w) => lower.includes(w));
+  });
+  if (additions.length === 0) return base;
+  return `${base}, ${additions.slice(0, 4).join(", ")}`.slice(0, 980);
+}
+

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Flame, Wand2, Paintbrush, LayoutGrid, Shirt, Film, FolderHeart, Zap, Plus, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import UncensoredImageStudio from "./UncensoredImageStudio";
 import UncensoredRefineStudio from "./UncensoredRefineStudio";
 import UncensoredInpaintStudio from "./UncensoredInpaintStudio";
@@ -12,15 +15,21 @@ import UncensoredLibrary from "./UncensoredLibrary";
 export type UncensoredStudioTab = "create" | "refine" | "inpaint" | "sheet" | "outfit" | "video" | "library";
 type Tab = UncensoredStudioTab;
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "create", label: "Create" },
-  { id: "refine", label: "Refine" },
-  { id: "inpaint", label: "Inpaint" },
-  { id: "sheet", label: "Sheet" },
-  { id: "outfit", label: "Outfit" },
-  { id: "video", label: "Video" },
-  { id: "library", label: "Library" },
+const TABS: { id: Tab; label: string; icon: typeof Flame }[] = [
+  { id: "create", label: "Create", icon: Flame },
+  { id: "refine", label: "Refine & Relight", icon: Wand2 },
+  { id: "inpaint", label: "Inpaint", icon: Paintbrush },
+  { id: "sheet", label: "4-View Sheet", icon: LayoutGrid },
+  { id: "outfit", label: "Outfit Swap", icon: Shirt },
+  { id: "video", label: "Animate Video", icon: Film },
+  { id: "library", label: "Library", icon: FolderHeart },
 ];
+
+const QUICK_TOPUP_PACKS = [
+  { id: "pack-500", label: "+500 cr", price: "$4.99" },
+  { id: "pack-2500", label: "+2,500 cr", price: "$19.99" },
+  { id: "pack-7500", label: "+7,500 cr", price: "$49.99" },
+] as const;
 
 /**
  * Paid uncensored workspace. Tabs share a focused generation id so Create →
@@ -38,6 +47,16 @@ export default function UncensoredStudio({
   const [tab, setTab] = useState<Tab>(initialTab ?? "create");
   const [focusId, setFocusId] = useState<number | null>(initialFocusId ?? null);
   const [recreateId, setRecreateId] = useState<number | null>(null);
+  const [showTopUp, setShowTopUp] = useState(false);
+
+  const { data: status } = trpc.uncensored.status.useQuery();
+  const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
+    onSuccess: (res) => {
+      if (res.url) window.location.href = res.url;
+      else toast.error("Couldn't open checkout.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const go = (next: Tab, id?: number) => {
     if (typeof id === "number") setFocusId(id);
@@ -45,27 +64,82 @@ export default function UncensoredStudio({
   };
 
   return (
-    <div className="mt-12 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 sm:p-8">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold">Uncensored studio</h2>
-        <p className="mt-2 text-muted-foreground">
-          Active until {until ? new Date(until).toLocaleDateString() : "—"}. Private, unfiltered, no watermark.
-        </p>
-      </div>
-      <div className="mt-6 flex flex-wrap justify-center gap-1 rounded-lg border border-border/60 p-1">
-        {TABS.map((t) => (
+    <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/5 via-card/30 to-card/20 p-4 sm:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <h2 className="text-xl font-bold sm:text-2xl">Uncensored Pro Studio</h2>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            Pass active until {until ? new Date(until).toLocaleDateString() : "—"} · Private · Unfiltered · Zero Watermark
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-black/30 px-3.5 py-1.5 text-xs font-semibold text-rose-100">
+            <Zap className="h-3.5 w-3.5 text-amber-400" />
+            <span>{(status?.creditBalance ?? 0).toLocaleString()} credits</span>
+          </div>
           <button
-            key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              tab === t.id ? "bg-rose-500/20 text-rose-200" : "text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => setShowTopUp((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-3.5 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
           >
-            {t.label}
+            <Plus className="h-3.5 w-3.5" /> Top Up Credits
           </button>
-        ))}
+        </div>
       </div>
+
+      {showTopUp && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-black/30 p-3">
+          <span className="text-xs text-muted-foreground">
+            Instant credit top-up (Card / Apple Pay / Google Pay):
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_TOPUP_PACKS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={purchaseCredits.isPending}
+                onClick={() =>
+                  purchaseCredits.mutate({
+                    packId: p.id,
+                    origin: window.location.origin,
+                    returnPath: "/uncensored",
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-500/25 disabled:opacity-50"
+              >
+                {purchaseCredits.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3 text-amber-400" />}
+                {p.label} · {p.price}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-1.5 rounded-xl border border-border/60 bg-black/25 p-1.5">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm ${
+                tab === t.id
+                  ? "bg-gradient-to-r from-rose-500/25 to-orange-500/20 text-rose-100 ring-1 ring-rose-500/40"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              }`}
+            >
+              <Icon className={`h-3.5 w-3.5 ${tab === t.id ? "text-rose-400" : "opacity-70"}`} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="text-left">
         {tab === "create" && (
           <UncensoredImageStudio
@@ -74,6 +148,8 @@ export default function UncensoredStudio({
             onRefine={(id) => go("refine", id)}
             onInpaint={(id) => go("inpaint", id)}
             onAnimate={(id) => go("video", id)}
+            onSheet={(id) => go("sheet", id)}
+            onOutfit={(id) => go("outfit", id)}
           />
         )}
         {tab === "refine" && (
@@ -133,3 +209,4 @@ export default function UncensoredStudio({
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X, Film, Sparkles, Shirt, UserCheck } from "lucide-react";
+import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X, Film, Sparkles, Shirt, UserCheck, Wand2 } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +14,7 @@ import { track } from "@/lib/analytics";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredStudio, { type UncensoredStudioTab } from "@/components/UncensoredStudio";
-import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT } from "@shared/uncensoredStudio";
+import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT, enhanceUncensoredPrompt } from "@shared/uncensoredStudio";
 import RenderWaitHint, { newRequestId } from "@/components/RenderWaitHint";
 
 /** One-tap starters so age-confirmed visitors don't stall on an empty box. */
@@ -52,6 +52,8 @@ export default function Uncensored() {
   const freePromptRef = useRef<HTMLTextAreaElement | null>(null);
   const [returnIntent, setReturnIntent] = useState<"free" | "buy" | null>(null);
   const restoredIntent = useRef(false);
+  const [autoUnlockPlanId, setAutoUnlockPlanId] = useState<string | null>(null);
+  const autoUnlockedRef = useRef(false);
   const [studioIntent, setStudioIntent] = useState<{
     tab: UncensoredStudioTab;
     focusId: number | null;
@@ -64,7 +66,7 @@ export default function Uncensored() {
 
   const { data: status, refetch } = trpc.uncensored.status.useQuery(undefined, {
     enabled: isAuthed,
-    refetchInterval: (q) => (q.state.data?.active ? false : 8000), // poll until settled
+    refetchInterval: (q) => (q.state.data?.active ? false : autoUnlockPlanId ? 2500 : 8000),
   });
 
   const myImages = trpc.uncensored.myUncensoredImages.useQuery(undefined, {
@@ -95,8 +97,20 @@ export default function Uncensored() {
   const unlockWithCredits = trpc.uncensored.unlockWithCredits.useMutation({
     onSuccess: () => {
       track("checkout_started", { kind: "uncensored_credits", plan: selectedPlanId });
+      setAutoUnlockPlanId(null);
       refetch();
       toast.success("Uncensored Pass unlocked! Entering the Studio…");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
+    onSuccess: (res) => {
+      if (res.url) {
+        window.location.href = res.url;
+      } else {
+        toast.error("Couldn't open checkout. Please try again.");
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -217,12 +231,22 @@ export default function Uncensored() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed, status, ageConfirmed, active, freeRemaining]);
 
-  // Read the intent the sign-in round-trip carried back.
+  // Read the intent the sign-in or Stripe round-trip carried back.
   useEffect(() => {
     track("paywall_viewed", { surface: "uncensored" });
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
+    const autoUnlock = params.get("auto_unlock");
+    if (autoUnlock && UNCENSORED_PLANS.some((p) => p.id === autoUnlock)) {
+      setSelectedPlanId(autoUnlock);
+      setAutoUnlockPlanId(autoUnlock);
+      setReturnIntent("buy");
+      if (params.get("credit_success") === "true") {
+        track("checkout_completed", { kind: "credit_pack", surface: "uncensored" });
+        toast.success("Credits added! Unlocking your Uncensored Pass…");
+      }
+    }
     // A prompt handed over from the Workspace or demo (see shared/adultRouting)
     // — carry it in so they don't retype what they already wrote.
     const carried = params.get("prompt");
@@ -230,6 +254,18 @@ export default function Uncensored() {
     if (params.get("start") === "1") setReturnIntent("free");
     else if (plan) setReturnIntent("buy");
   }, []);
+
+  // Automatically unlock the pass once Stripe webhook settles the credit pack.
+  useEffect(() => {
+    if (!autoUnlockPlanId || autoUnlockedRef.current || !isAuthed || !status || active) return;
+    if (!status.ageConfirmed) return;
+    const targetPlan = plans.find((p) => p.id === autoUnlockPlanId);
+    if (!targetPlan) return;
+    if ((status.creditBalance ?? 0) >= targetPlan.creditPrice && !unlockWithCredits.isPending) {
+      autoUnlockedRef.current = true;
+      unlockWithCredits.mutate({ planId: autoUnlockPlanId });
+    }
+  }, [autoUnlockPlanId, isAuthed, status, active, plans, unlockWithCredits]);
 
   // Once entitlement has loaded, put the visitor ON the free preview — that is
   // the leak: 21 age-confirmed accounts never generated because the hero sat
@@ -300,7 +336,7 @@ export default function Uncensored() {
   };
 
   const creditBalance = status?.creditBalance ?? 0;
-  const requiredCredits = selectedPlan?.creditPrice ?? 500;
+  const requiredCredits = selectedPlan?.creditPrice ?? 2000;
   const hasEnoughCredits = creditBalance >= requiredCredits;
 
   const handleUnlockWithCredits = async () => {
@@ -316,7 +352,13 @@ export default function Uncensored() {
       await confirmAge.mutateAsync({ confirmed: true });
     }
     if (!hasEnoughCredits) {
-      window.location.href = `/pricing?returnTo=${encodeURIComponent(`/uncensored?plan=${selectedPlanId}`)}`;
+      const packId = selectedPlan?.creditPackId ?? "pack-2500";
+      track("checkout_started", { kind: "credit_pack", pack: packId, surface: "uncensored", plan: selectedPlanId });
+      purchaseCredits.mutate({
+        packId,
+        origin: window.location.origin,
+        returnPath: `/uncensored?auto_unlock=${selectedPlanId}`,
+      });
       return;
     }
     unlockWithCredits.mutate({ planId: selectedPlanId });
@@ -324,7 +366,7 @@ export default function Uncensored() {
 
   return (
     <PageLayout>
-      <div className="mx-auto max-w-3xl px-4 py-16">
+      <div className={`mx-auto px-4 py-16 ${active ? "max-w-6xl" : "max-w-3xl"}`}>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -383,9 +425,22 @@ export default function Uncensored() {
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6">
                   {freeRemaining > 0 ? (
                     <>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <h2 className="text-lg font-semibold">Free uncensored preview</h2>
-                        <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={freeBusy || freePrompt.trim().length < 3}
+                            onClick={() => {
+                              setFreePrompt(enhanceUncensoredPrompt(freePrompt, freeStyle));
+                              toast.success("Prompt enhanced with studio lighting & lens direction.");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
+                          >
+                            <Wand2 className="h-3 w-3 text-rose-400" /> Enhance prompt
+                          </button>
+                          <span className="text-xs text-muted-foreground">{freeRemaining} of {freeLimit} left</span>
+                        </div>
                       </div>
                       <Textarea
                         ref={freePromptRef}
@@ -662,7 +717,7 @@ export default function Uncensored() {
                 })}
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                One-time pass, no auto-renew. Unlock instantly using DreamForgeX platform credits (buy credits with Card / Apple Pay on Pricing) or pay anonymously with Bitcoin for +{selectedPlan?.bonusCredits ?? 500} bonus credits.
+                One-time pass, no auto-renew. Unlock in 1 click with Card / Apple Pay (via DreamForgeX credit pack — includes leftover Studio credits) or pay anonymously with Bitcoin for +{selectedPlan?.bonusCredits ?? 500} bonus credits.
               </p>
 
               {!active && !ageConfirmed && (
@@ -675,18 +730,20 @@ export default function Uncensored() {
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <Button
                   onClick={handleUnlockWithCredits}
-                  disabled={unlockWithCredits.isPending || confirmAge.isPending || meLoading}
+                  disabled={unlockWithCredits.isPending || purchaseCredits.isPending || confirmAge.isPending || meLoading}
                   size="lg"
                   className="w-full bg-gradient-to-r from-rose-500 to-orange-500 text-sm font-semibold hover:opacity-90"
                 >
                   {unlockWithCredits.isPending || confirmAge.isPending ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Unlocking…</>
+                  ) : purchaseCredits.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening checkout…</>
                   ) : !isAuthed ? (
                     <><Lock className="mr-2 h-4 w-4" /> Sign in to unlock</>
                   ) : hasEnoughCredits ? (
                     <><Sparkles className="mr-2 h-4 w-4" /> Unlock with {requiredCredits} Credits (You have {creditBalance})</>
                   ) : (
-                    <><Sparkles className="mr-2 h-4 w-4" /> Get {requiredCredits} Credits to Unlock (Card / Apple Pay)</>
+                    <><Sparkles className="mr-2 h-4 w-4" /> Unlock w/ Card / Apple Pay · ${selectedPlan?.creditPackPriceUsd ?? 19.99}</>
                   )}
                 </Button>
 

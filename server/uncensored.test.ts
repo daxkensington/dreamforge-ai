@@ -103,12 +103,12 @@ describe("uncensored.unlockWithCredits", () => {
     expect(dbState.updated).toHaveLength(0);
   });
 
-  it("unlocks Day Pass for 100 credits and extends uncensoredUntil", async () => {
+  it("unlocks Day Pass for 400 credits and extends uncensoredUntil", async () => {
     dbState.user = { uncensoredUntil: null, ageConfirmedAt: new Date() };
     const res = await uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" });
     expect(res.ok).toBe(true);
-    expect(res.creditsSpent).toBe(100);
-    expect(res.creditsRemaining).toBe(500);
+    expect(res.creditsSpent).toBe(400);
+    expect(res.creditsRemaining).toBe(200);
     expect(dbState.updated[0].uncensoredUntil).toBeInstanceOf(Date);
   });
 
@@ -117,6 +117,17 @@ describe("uncensored.unlockWithCredits", () => {
     dbState.creditBalance = 40;
     await expect(uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" })).rejects.toThrow(/Not enough credits/i);
     expect(dbState.updated).toHaveLength(0);
+  });
+});
+
+describe("uncensored.enhancePrompt", () => {
+  it("enriches a short prompt with studio camera and lighting cues", async () => {
+    const res = await uncensoredRouter.createCaller(ctx()).enhancePrompt({
+      prompt: "woman in crimson silk dress on hotel balcony",
+      style: "realistic",
+    });
+    expect(res.prompt).toContain("woman in crimson silk dress on hotel balcony");
+    expect(res.prompt).toContain("85mm");
   });
 });
 
