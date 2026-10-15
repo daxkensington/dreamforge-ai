@@ -85,6 +85,16 @@ export default function UncensoredImageStudio({
   const utils = trpc.useUtils();
 
   const appliedRecreate = useRef<number | null>(null);
+  const appliedQueryPrompt = useRef(false);
+
+  useEffect(() => {
+    if (appliedQueryPrompt.current || recreateId || typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search).get("prompt");
+    if (p && p.trim()) {
+      appliedQueryPrompt.current = true;
+      setPrompt(p.trim());
+    }
+  }, [recreateId]);
 
   useEffect(() => {
     if (focusCharacterId) {

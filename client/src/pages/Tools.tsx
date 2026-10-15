@@ -343,6 +343,49 @@ export default function Tools() {
               </div>
             </Link>
           </motion.div>
+
+          {/* Uncensored Pro Studio (18+) */}
+          <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.25 }}>
+            <Link href="/uncensored">
+              <div className="group relative rounded-2xl overflow-hidden border border-rose-500/30 bg-gradient-to-r from-rose-950/60 via-zinc-950/90 to-orange-950/40 p-8 lg:p-10 hover:border-rose-500/60 hover:scale-[1.01] transition-all duration-300">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="max-w-2xl">
+                    <div className="flex flex-wrap items-center gap-2.5 mb-3">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center shadow-lg shadow-rose-500/25">
+                        <Flame className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold uppercase tracking-wider">
+                        18+ · Unfiltered Suite
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                        3 Free Previews
+                      </span>
+                    </div>
+                    <h3 className="text-2xl lg:text-3xl font-bold text-white mb-2">Uncensored Pro Studio</h3>
+                    <p className="text-white/75 text-sm sm:text-base mb-4">
+                      7 unfiltered creative tools on dedicated GPUs — Create & Face Lock, Refine & Relight, Brush Inpaint, 4-View Character Sheet, Virtual Outfit Swap, and Uncensored Video (Wan 2.1).
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 text-[11px] text-rose-200/80">
+                      {["Create & Face Lock", "Refine & Relight", "Brush Inpaint", "4-View Sheet", "Outfit Swap", "Uncensored Video", "100% Private Library"].map((chip) => (
+                        <span key={chip} className="rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-0.5">
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
+                    <Button className="gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90">
+                      <Flame className="h-4 w-4" />
+                      Try 3 Free Previews <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                    <span className="text-[11px] text-center text-white/50">
+                      From $4.99 Day Pass · Credits or Bitcoin
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </motion.div>
         </section>
 
         {/* Viral Trend Tools — placed first because they're the highest-intent traffic */}

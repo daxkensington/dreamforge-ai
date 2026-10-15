@@ -1055,8 +1055,8 @@ export default function Workspace() {
                           </span>
                           <p className="text-[11px] text-muted-foreground">
                             {mediaType === "video"
-                              ? "No content filter · self-hosted GPU · 18+"
-                              : "No content filter · pay with crypto · 18+"}
+                              ? "No content filter · self-hosted GPU · 3 free previews · 18+"
+                              : "No content filter · 3 free previews · Credits or Bitcoin · 18+"}
                           </p>
                         </div>
                       </div>

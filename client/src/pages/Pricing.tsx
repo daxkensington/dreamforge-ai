@@ -611,7 +611,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ======= UNCENSORED TIER (18+, crypto-only — never touches Stripe) ======= */}
+      {/* ======= UNCENSORED TIER (18+, Credits or Bitcoin) ======= */}
       <section className="pb-2">
         <div className="container">
           <motion.div
@@ -626,28 +626,46 @@ export default function Pricing() {
               <Flame className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold">Uncensored Pass</h3>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold">Uncensored Pro Studio Pass</h3>
                 <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-300">
-                  18+
+                  18+ · 7 Unfiltered Tools
+                </span>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  3 Free Previews
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                No content filter. Unfiltered open-source models, private by default.{" "}
-                <span className="text-foreground/80">$19 / 30 days · pay with crypto</span> — separate
-                from the plans above.
+                No content filter — Create, Face Lock, Brush Inpaint, Outfit Swap, 4-View Sheet & Uncensored Video.{" "}
+                <span className="text-foreground/85 font-medium">
+                  From $4.99 Day Pass (400 credits) · $12 Week Pass · $19 / 30 days
+                </span>{" "}
+                — unlock in 1 click using any Credit Pack above (Card / Apple Pay) or pay anonymously with Bitcoin.
               </p>
             </div>
-            <Button
-              asChild
-              variant="outline"
-              className="shrink-0 border-rose-500/30 hover:bg-rose-500/10"
-            >
-              <Link href="/uncensored">
-                <Bitcoin className="h-4 w-4 mr-2" />
-                View Uncensored
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button
+                asChild
+                size="sm"
+                className="bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90"
+              >
+                <Link href="/uncensored?start=1">
+                  <Flame className="h-4 w-4 mr-1.5" />
+                  Try 3 Free Previews
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="border-rose-500/30 hover:bg-rose-500/10"
+              >
+                <Link href="/uncensored">
+                  <Bitcoin className="h-4 w-4 mr-1.5" />
+                  View Studio & Passes
+                </Link>
+              </Button>
+            </div>
           </motion.div>
         </div>
       </section>
