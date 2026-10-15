@@ -1110,14 +1110,34 @@ export default function Uncensored() {
               )}
             </div>
 
-            {/* How crypto payment works — kills the "I don't know how to pay" objection */}
+            {/* Dual-rail payment explainer — Card / Apple Pay (via Stripe Credits) + Anonymous Bitcoin */}
             <div className="mt-14">
-              <h2 className="text-center text-xl font-semibold">Pay with crypto in about 2 minutes</h2>
+              <h2 className="text-center text-xl font-semibold">
+                Two ways to unlock — Card / Apple Pay in 30s or Anonymous Bitcoin
+              </h2>
+              <p className="mx-auto mt-1.5 max-w-2xl text-center text-sm text-muted-foreground">
+                Choose instant Visa / Mastercard / Apple Pay checkout via universal DreamForgeX Studio credits, or pay 100% anonymously with Bitcoin for bonus credits.
+              </p>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 {[
-                  { icon: Wallet, step: "1", title: "Get a little Bitcoin", body: "A few dollars in any wallet or app works — Cash App, Strike, Coinbase, River, or an exchange you already use. Buy ~$5–$20 of BTC." },
-                  { icon: QrCode, step: "2", title: "Scan the invoice", body: "Tap Pay with crypto — the invoice appears right here with a QR code. Scan it or paste the Bitcoin address into your wallet. Send the exact amount shown." },
-                  { icon: Zap, step: "3", title: "Unlock automatically", body: "The page unlocks as soon as the payment appears (usually seconds). No waiting on a block or on support. Invoice window is 3 hours." },
+                  {
+                    icon: Sparkles,
+                    step: "A",
+                    title: "Card / Apple Pay (30 Seconds)",
+                    body: "Tap 'Unlock w/ Card / Apple Pay' above. Stripe bills a standard DreamForgeX compute credit pack (discreet 'DREAMFORGEX AI' descriptor), auto-unlocks your pass on return, and keeps leftover credits in your wallet.",
+                  },
+                  {
+                    icon: QrCode,
+                    step: "B",
+                    title: "Or Scan Bitcoin QR (Anonymous)",
+                    body: "Prefer zero card or bank footprint? Tap 'Pay BTC' above — the BTCPay invoice appears inline with a QR code. Pay from Cash App, Strike, Coinbase, or any Lightning / on-chain wallet.",
+                  },
+                  {
+                    icon: Zap,
+                    step: "✓",
+                    title: "Instant Studio Activation",
+                    body: "Card / Credit unlocks are immediate. Bitcoin unlocks as soon as seen on Lightning or in the mempool (usually seconds) and includes up to +500 bonus Studio credits.",
+                  },
                 ].map((s) => (
                   <div key={s.step} className="relative rounded-xl border border-border/60 bg-card/40 p-5">
                     <div className="absolute -top-3 left-5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-xs font-bold text-white">

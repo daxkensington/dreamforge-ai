@@ -4,17 +4,17 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 
 export const metadata: Metadata = {
-  title: "Uncensored AI Image Generator — No Filter, Pay with Crypto | DreamForgeX",
+  title: "Uncensored AI Image & Video Studio — No Filter, Card or Crypto | DreamForgeX",
   description:
-    "Generate uncensored AI images with no content filter. 3 free previews after free sign-in (no card). Day pass $4.99 · week $12 · 30 days $19. Pay anonymously with Bitcoin. 18+ only.",
+    "Generate uncensored AI images & 5–10s videos with no content filter. 3 free previews (no card). Unlock all 7 Pro Studio tools from $4.99 with Card / Apple Pay (Credits) or Bitcoin. 18+ only.",
   alternates: { canonical: "https://dreamforgex.ai/uncensored" },
   openGraph: {
-    title: "Uncensored AI Image Generator — No Filter | DreamForgeX",
+    title: "Uncensored AI Image & Video Studio — No Filter | DreamForgeX",
     description:
-      "No content filter. 3 free previews (free account, no card). Passes from $4.99. Private. Crypto. 18+.",
+      "No content filter. 3 free previews. 7 unfiltered AI tools (Image, Video, Face Lock, Outfit Swap, Inpaint, 4-View Sheet). Unlock from $4.99 with Card / Apple Pay or Bitcoin. 18+.",
     url: "https://dreamforgex.ai/uncensored",
     siteName: "DreamForgeX",
-    images: ["/showcase/gallery-1.jpg"],
+    images: ["/showcase/uncensored-char-aria-nordic.jpg"],
   },
 };
 
@@ -28,9 +28,9 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "Product",
-      name: "DreamForgeX Uncensored Pass",
+      name: "DreamForgeX Uncensored Pro Studio Pass",
       description:
-        "Uncensored AI image generation with no content filter — day, week, or 30-day pass plus bonus credits, paid anonymously with Bitcoin. 18+ only. Three free watermarked previews with a free account.",
+        "Uncensored AI image & video studio with no content filter — 7 pro tools unlocked with a Day, Week, or 30-Day pass via Card / Apple Pay (DreamForgeX Credits) or anonymously with Bitcoin. 18+ only. Three free watermarked previews with a free account.",
       brand: { "@type": "Brand", name: "DreamForgeX" },
       url: "https://dreamforgex.ai/uncensored",
       offers: {
