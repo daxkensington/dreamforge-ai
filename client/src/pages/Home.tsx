@@ -343,9 +343,9 @@ export default function Home() {
           playsInline
           preload="auto"
           poster="/showcase/hero-forge.jpg"
-          className="absolute inset-0 w-full h-full object-cover scale-[1.02]"
+          className="absolute inset-0 w-full h-full object-cover"
         >
-          <source src="/video/hero-bg.mp4" type="video/mp4" />
+          <source src="/video/hero-bg.mp4?v=1080p" type="video/mp4" />
           <img
             src="/showcase/hero-forge.jpg"
             alt=""
@@ -1039,9 +1039,9 @@ export default function Home() {
               <div className="lg:col-span-5 grid grid-cols-2 gap-3">
                 {[
                   { src: "/showcase/uncensored-char-aria-nordic.jpg", name: "Aria · Nordic Muse", tag: "Face Lock" },
-                  { src: "/showcase/uncensored-char-valentina-latina.jpg", name: "Valentina · Golden Hour", tag: "Photoreal" },
-                  { src: "/showcase/uncensored-char-yuki-tokyo.jpg", name: "Yuki · Neo-Tokyo", tag: "Outfit Swap" },
-                  { src: "/showcase/uncensored-char-zara-afro.jpg", name: "Zara · Editorial", tag: "4K Studio" },
+                  { src: "/showcase/uncensored-char-valentina-glam.jpg", name: "Valentina · Golden Hour", tag: "Photoreal" },
+                  { src: "/showcase/uncensored-char-sora-cyber.jpg", name: "Sora · Neo-Tokyo", tag: "Outfit Swap" },
+                  { src: "/showcase/uncensored-char-chloe-california.jpg", name: "Chloe · Sunset Editorial", tag: "4K Studio" },
                 ].map((char) => (
                   <Link
                     key={char.name}
@@ -1051,7 +1051,6 @@ export default function Home() {
                     <img
                       src={char.src}
                       alt={char.name}
-                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />

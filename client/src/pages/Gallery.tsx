@@ -162,7 +162,7 @@ export default function Gallery() {
         {/* Hero Banner */}
         <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 p-6 md:p-9 mb-8 shadow-2xl">
           <img
-            src="/showcase/gallery-cosmic-queen.jpg"
+            src="/showcase/gallery-1.jpg"
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover opacity-35"

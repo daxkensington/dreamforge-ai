@@ -247,7 +247,7 @@ function StoryboardTab() {
                     title: "Cyberpunk Neon Pursuit",
                     styleId: "cinematic",
                     ratio: "16:9",
-                    img: "/showcase/gallery-cyberpunk-city.jpg",
+                    img: "/showcase/gallery-2.jpg",
                     prompt: "A rain-slicked Neo-Tokyo alley at midnight; a lone courier on a glowing cyber-bike races past holographic billboards while drones sweep searchlights overhead.",
                   },
                   {
@@ -261,14 +261,14 @@ function StoryboardTab() {
                     title: "Dark Fantasy Dragon Trailer",
                     styleId: "cinematic",
                     ratio: "16:9",
-                    img: "/showcase/gallery-dragon-rider.jpg",
+                    img: "/showcase/gallery-10.jpg",
                     prompt: "An armored valkyrie standing atop a volcanic cliff as a colossalobsidian dragon emerges through storm clouds, lightning illuminating ancient runes.",
                   },
                   {
                     title: "Synthwave Music Video",
                     styleId: "music-video",
                     ratio: "16:9",
-                    img: "/showcase/gallery-cosmic-queen.jpg",
+                    img: "/showcase/gallery-4.jpg",
                     prompt: "A cosmic vocalist performing on a floating glass stage orbiting a neon-ringed planet, with bass-reactive starlight ripples and dynamic crane camera sweeps.",
                   },
                 ].map((preset) => (
@@ -1279,7 +1279,7 @@ export default function VideoStudio() {
           poster="/showcase/hero-forge.jpg"
           className="absolute inset-0 w-full h-full object-cover opacity-35 pointer-events-none"
         >
-          <source src="/video/hero-bg.mp4" type="video/mp4" />
+          <source src="/video/hero-bg.mp4?v=1080p" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/65" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.20),transparent_60%)]" />
@@ -1304,7 +1304,7 @@ export default function VideoStudio() {
               {[
                 { src: "/showcase/tool-t2v.jpg", label: "Text-to-Video" },
                 { src: "/showcase/tool-video.jpg", label: "Storyboard" },
-                { src: "/showcase/uncensored-char-kaelen-rogue.jpg", label: "Character Motion" },
+                { src: "/showcase/uncensored-char-sora-cyber.jpg", label: "Character Motion" },
               ].map((item) => (
                 <div key={item.label} className="relative h-24 w-28 rounded-xl overflow-hidden border border-white/15 shadow-lg group">
                   <img src={item.src} alt={item.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />

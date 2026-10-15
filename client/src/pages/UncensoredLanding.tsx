@@ -70,7 +70,7 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
             poster="/showcase/uncensored-char-aria-nordic.jpg"
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
           >
-            <source src="/video/hero-bg.mp4" type="video/mp4" />
+            <source src="/video/hero-bg.mp4?v=1080p" type="video/mp4" />
           </video>
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/90" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(244,63,94,0.28),transparent_65%)]" />

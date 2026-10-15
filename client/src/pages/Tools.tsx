@@ -171,11 +171,11 @@ const audioTools: GridTool[] = [
 // ─── Uncensored 18+ Studio Tools ─────────────────────────────────────────────
 const uncensoredTools: GridTool[] = [
   { title: "Uncensored Text-to-Image", desc: "Zero-filter Flux Dev, Pony XL & SDXL renders", icon: Flame, href: "/uncensored?start=1&tab=create", img: "/showcase/uncensored-char-aria-nordic.jpg", badge: "18+ Pro" },
-  { title: "Character Face Lock", desc: "Keep the exact same face across unlimited scenes", icon: Users, href: "/uncensored?start=1&tab=create", img: "/showcase/uncensored-char-valentina-latina.jpg", badge: "18+ Pro" },
-  { title: "Virtual Outfit Swap", desc: "Change clothing, style, or material on any subject", icon: Shirt, href: "/uncensored?start=1&tab=outfit", img: "/showcase/uncensored-char-yuki-tokyo.jpg", badge: "18+ Pro" },
-  { title: "Brush Inpainting", desc: "Paint over any region to edit or replace details", icon: Paintbrush, href: "/uncensored?start=1&tab=inpaint", img: "/showcase/uncensored-char-zara-afro.jpg", badge: "18+ Pro" },
-  { title: "4-View Character Sheet", desc: "Front, side, back & close-up turnaround sheet", icon: RotateCw, href: "/uncensored?start=1&tab=sheet", img: "/showcase/uncensored-char-seraphina-elf.jpg", badge: "18+ Pro" },
-  { title: "Uncensored Video Motion", desc: "Animate any portrait into 5-second Wan 2.2 video", icon: Video, href: "/uncensored?start=1&tab=video", img: "/showcase/uncensored-char-kaelen-rogue.jpg", badge: "18+ Pro" },
+  { title: "Character Face Lock", desc: "Keep the exact same face across unlimited scenes", icon: Users, href: "/uncensored?start=1&tab=create", img: "/showcase/uncensored-char-valentina-glam.jpg", badge: "18+ Pro" },
+  { title: "Virtual Outfit Swap", desc: "Change clothing, style, or material on any subject", icon: Shirt, href: "/uncensored?start=1&tab=outfit", img: "/showcase/uncensored-char-sora-cyber.jpg", badge: "18+ Pro" },
+  { title: "Brush Inpainting", desc: "Paint over any region to edit or replace details", icon: Paintbrush, href: "/uncensored?start=1&tab=inpaint", img: "/showcase/uncensored-char-chloe-california.jpg", badge: "18+ Pro" },
+  { title: "4-View Character Sheet", desc: "Front, side, back & close-up turnaround sheet", icon: RotateCw, href: "/uncensored?start=1&tab=sheet", img: "/showcase/uncensored-char-nyx-fantasy.jpg", badge: "18+ Pro" },
+  { title: "Uncensored Video Motion", desc: "Animate any portrait into 5-second Wan 2.2 video", icon: Video, href: "/uncensored?start=1&tab=video", img: "/showcase/uncensored-char-mei-noir.jpg", badge: "18+ Pro" },
 ];
 
 const allToolCount = uncensoredTools.length + viralTools.length + imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;

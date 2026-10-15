@@ -153,10 +153,10 @@ export default function DemoTextToImage() {
             </p>
             <div className="grid grid-cols-4 gap-2.5 max-w-2xl mx-auto">
               {[
-                { src: "/showcase/gallery-cyberpunk-city.jpg", label: "Cyberpunk" },
+                { src: "/showcase/gallery-2.jpg", label: "Cyberpunk" },
                 { src: "/showcase/uncensored-char-aria-nordic.jpg", label: "Portrait" },
-                { src: "/showcase/gallery-dragon-rider.jpg", label: "Fantasy" },
-                { src: "/showcase/gallery-cosmic-queen.jpg", label: "Sci-Fi" },
+                { src: "/showcase/gallery-10.jpg", label: "Fantasy" },
+                { src: "/showcase/gallery-4.jpg", label: "Sci-Fi" },
               ].map((art) => (
                 <div key={art.label} className="relative rounded-xl overflow-hidden aspect-[16/10] border border-white/15 group">
                   <img src={art.src} alt={art.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />

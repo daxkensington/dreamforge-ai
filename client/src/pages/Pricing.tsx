@@ -679,9 +679,9 @@ export default function Pricing() {
               <div className="flex items-center gap-2 shrink-0">
                 {[
                   "/showcase/uncensored-char-aria-nordic.jpg",
-                  "/showcase/uncensored-char-valentina-latina.jpg",
-                  "/showcase/uncensored-char-yuki-tokyo.jpg",
-                  "/showcase/uncensored-char-zara-afro.jpg",
+                  "/showcase/uncensored-char-valentina-glam.jpg",
+                  "/showcase/uncensored-char-sora-cyber.jpg",
+                  "/showcase/uncensored-char-chloe-california.jpg",
                 ].map((src, idx) => (
                   <img
                     key={idx}
