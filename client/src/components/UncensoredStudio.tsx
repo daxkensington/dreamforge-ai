@@ -173,7 +173,7 @@ export default function UncensoredStudio({
                         purchaseCredits.mutate({
                           packId: plan.creditPackId,
                           origin: window.location.origin,
-                          returnPath: `/uncensored?autounlock=${encodeURIComponent(plan.id)}`,
+                          returnPath: `/uncensored?auto_unlock=${encodeURIComponent(plan.id)}`,
                         });
                       }
                     }}

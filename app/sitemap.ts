@@ -112,8 +112,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Uncensored SEO silo — one landing page per winnable uncensored-AI query.
   const uncensoredSiloRoutes = UNCENSORED_LANDING_SLUGS.map((s) => ({
     url: `/uncensored/${s}`,
-    priority: 0.7,
-    changeFrequency: "monthly" as const,
+    priority: 0.85,
+    changeFrequency: "weekly" as const,
   }));
 
   // Blog posts — one route per published guide.

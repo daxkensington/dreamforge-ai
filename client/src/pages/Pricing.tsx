@@ -175,7 +175,7 @@ const faqs = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "We accept all major credit cards, debit cards, and PayPal. Business and Agency customers can also pay via invoice with net-30 terms.",
+    a: "We accept all major credit and debit cards (Visa, Mastercard, Amex), Apple Pay, and Google Pay via Stripe for all subscriptions and Credit Packs. For the Uncensored Pro Studio (18+), you can unlock passes in 1 click using Credit Packs or pay anonymously with Bitcoin (On-Chain and Lightning).",
   },
   {
     q: "Is there a free trial for paid plans?",
@@ -197,8 +197,15 @@ const faqs = [
 
 /* -- Credit pack helpers -- */
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
+  return cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
 }
+
+const UNCENSORED_PACK_HINTS: Record<string, { badge: string; planId: string }> = {
+  "pack-500": { badge: "Unlocks 24h Uncensored Pass + 100 cr", planId: "uncensored-day" },
+  "pack-2500": { badge: "Unlocks 30-Day Uncensored Pass + 500 cr", planId: "uncensored-30d" },
+  "pack-7500": { badge: "Unlocks 30-Day Uncensored Pass + 5,500 cr", planId: "uncensored-30d" },
+  "pack-20000": { badge: "Unlocks 30-Day Uncensored Pass + 18,000 cr", planId: "uncensored-30d" },
+};
 
 function packSavingsPercent(idx: number): string | null {
   if (idx === 0) return null;
@@ -268,14 +275,18 @@ export default function Pricing() {
     });
   };
 
-  const handleBuyCredits = (packId: string) => {
+  const handleBuyCredits = (packId: string, returnPath?: string) => {
     if (!isAuthenticated) {
-      window.location.href = getLoginUrl();
+      window.location.href = getLoginUrl(returnPath ?? "/pricing");
       return;
     }
     track("checkout_started", { kind: "credit_pack", pack: packId });
     setPendingCheckout(packId);
-    creditsMutation.mutate({ packId, origin: window.location.origin });
+    creditsMutation.mutate({
+      packId,
+      origin: window.location.origin,
+      ...(returnPath ? { returnPath } : {}),
+    });
   };
 
   return (
@@ -904,7 +915,14 @@ export default function Pricing() {
                   <div className="flex items-baseline gap-1 mb-1">
                     <span className="text-3xl font-bold">{formatPrice(pack.price)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-6">{pack.perCredit} per credit</p>
+                  <p className="text-xs text-muted-foreground mb-4">{pack.perCredit} per credit</p>
+
+                  {UNCENSORED_PACK_HINTS[pack.id] && (
+                    <div className="mb-4 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1.5 text-[11px] font-medium text-rose-200">
+                      <Flame className=" mr-1 inline h-3 w-3 text-rose-400" />
+                      {UNCENSORED_PACK_HINTS[pack.id].badge}
+                    </div>
+                  )}
 
                   <Button
                     variant="outline"
@@ -914,6 +932,21 @@ export default function Pricing() {
                   >
                     {pendingCheckout === pack.id ? "Opening checkout..." : "Buy Credits"}
                   </Button>
+                  {UNCENSORED_PACK_HINTS[pack.id] && (
+                    <button
+                      type="button"
+                      disabled={pendingCheckout === pack.id}
+                      onClick={() =>
+                        handleBuyCredits(
+                          pack.id,
+                          `/uncensored?auto_unlock=${encodeURIComponent(UNCENSORED_PACK_HINTS[pack.id].planId)}`,
+                        )
+                      }
+                      className="mt-2 w-full rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+                    >
+                      Buy &amp; Unlock Uncensored →
+                    </button>
+                  )}
                 </motion.div>
               );
             })}

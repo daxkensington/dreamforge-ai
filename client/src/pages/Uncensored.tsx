@@ -371,9 +371,9 @@ export default function Uncensored() {
     else if (plan || tabParam) setReturnIntent("buy");
   }, []);
 
-  // Automatically unlock the pass once Stripe webhook settles the credit pack.
+  // Automatically unlock or extend the pass once Stripe webhook settles the credit pack.
   useEffect(() => {
-    if (!autoUnlockPlanId || autoUnlockedRef.current || !isAuthed || !status || active) return;
+    if (!autoUnlockPlanId || autoUnlockedRef.current || !isAuthed || !status) return;
     if (!status.ageConfirmed) return;
     const targetPlan = plans.find((p) => p.id === autoUnlockPlanId);
     if (!targetPlan) return;
@@ -381,7 +381,7 @@ export default function Uncensored() {
       autoUnlockedRef.current = true;
       unlockWithCredits.mutate({ planId: autoUnlockPlanId });
     }
-  }, [autoUnlockPlanId, isAuthed, status, active, plans, unlockWithCredits]);
+  }, [autoUnlockPlanId, isAuthed, status, plans, unlockWithCredits]);
 
   // Once entitlement has loaded, put the visitor ON the free preview — that is
   // the leak: 21 age-confirmed accounts never generated because the hero sat
@@ -771,24 +771,32 @@ export default function Uncensored() {
                       )}
                       <div className="mt-4">
                         <p className="text-center text-xs font-medium text-rose-300">
-                          Continue with this creation in the Uncensored Studio:
+                          Continue with this creation in the Uncensored Pro Studio (select a tool to unlock):
                         </p>
-                        <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-2.5 grid gap-2 sm:grid-cols-3">
                           <button
                             type="button"
                             onClick={() => triggerStudioUpsell("video", "Animate this image into a 5s video")}
-                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "video"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
                           >
                             <span className="flex items-center gap-2">
                               <Film className="h-4 w-4 text-rose-400" />
-                              Animate into 5s Video
+                              Animate 5s Video
                             </span>
                             <Lock className="h-3.5 w-3.5 text-rose-300/80" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => triggerStudioUpsell("sheet", "Lock this character's face for new scenes")}
-                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                            onClick={() => triggerStudioUpsell("create", "Lock this character's face for new scenes")}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "create"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
                           >
                             <span className="flex items-center gap-2">
                               <UserCheck className="h-4 w-4 text-rose-400" />
@@ -798,23 +806,61 @@ export default function Uncensored() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => triggerStudioUpsell("outfit", "Change outfit or restyle this image")}
-                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                            onClick={() => triggerStudioUpsell("sheet", "Generate a 4-view turnaround sheet")}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "sheet"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
                           >
                             <span className="flex items-center gap-2">
-                              <Shirt className="h-4 w-4 text-rose-400" />
-                              Change Outfit / Edit
+                              <Grid2x2 className="h-4 w-4 text-rose-400" />
+                              4-View Character Sheet
                             </span>
                             <Lock className="h-3.5 w-3.5 text-rose-300/80" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => triggerStudioUpsell("refine", "Render unwatermarked full-HD & refine")}
-                            className="flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-left text-xs font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+                            onClick={() => triggerStudioUpsell("outfit", "Change outfit or restyle wardrobe")}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "outfit"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Shirt className="h-4 w-4 text-rose-400" />
+                              Virtual Outfit Swap
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("inpaint", "Brush inpaint & edit specific regions")}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "inpaint"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Paintbrush className="h-4 w-4 text-rose-400" />
+                              Brush Inpaint / Edit
+                            </span>
+                            <Lock className="h-3.5 w-3.5 text-rose-300/80" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerStudioUpsell("refine", "Render unwatermarked full-HD & 4K refine")}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                              studioIntent?.tab === "refine"
+                                ? "border-rose-400 bg-rose-500/25 text-white ring-1 ring-rose-400/50"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                            }`}
                           >
                             <span className="flex items-center gap-2">
                               <Sparkles className="h-4 w-4 text-rose-400" />
-                              Remove Watermark &amp; HD
+                              Remove Watermark &amp; 4K
                             </span>
                             <Lock className="h-3.5 w-3.5 text-rose-300/80" />
                           </button>
