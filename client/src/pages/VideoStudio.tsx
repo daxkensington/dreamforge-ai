@@ -20,7 +20,7 @@ import {
   ChevronRight, Video, Wand2, Layers, Save, FolderOpen,
   Download, Trash2, BookOpen, LayoutTemplate, Plus, Search,
   Rocket, GraduationCap, Mic, Smartphone, Clapperboard as Clap,
-  Waves, Users
+  Waves, Users, Flame
 } from "lucide-react";
 
 // ─── Storyboard Tab ───────────────────────────────────────────────
@@ -226,10 +226,92 @@ function StoryboardTab() {
           )}
 
           {!storyboard.data && !storyboard.isPending && (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground/50">
-              <Clapperboard className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-sm">Describe your video concept and generate a visual storyboard</p>
-              <p className="text-xs mt-1">Each scene gets an AI-generated preview image</p>
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-md">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    Quick-Start Storyboard Concepts
+                  </h3>
+                  <p className="text-xs text-white/60 mt-0.5">
+                    Click any starter concept below to pre-fill your script, camera style, and aspect ratio — or type your own idea on the left.
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-cyan-500/30 text-cyan-300 text-[11px]">
+                  1-Click Load
+                </Badge>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3.5">
+                {[
+                  {
+                    title: "Cyberpunk Neon Pursuit",
+                    styleId: "cinematic",
+                    ratio: "16:9",
+                    img: "/showcase/gallery-cyberpunk-city.jpg",
+                    prompt: "A rain-slicked Neo-Tokyo alley at midnight; a lone courier on a glowing cyber-bike races past holographic billboards while drones sweep searchlights overhead.",
+                  },
+                  {
+                    title: "Luxury Fragrance Commercial",
+                    styleId: "commercial",
+                    ratio: "9:16",
+                    img: "/showcase/uncensored-char-aria-nordic.jpg",
+                    prompt: "Golden-hour slow-motion macro shots of crystal perfume droplets suspended in mid-air, transitioning to an elegant model in silk walking through a candlelit marble hall.",
+                  },
+                  {
+                    title: "Dark Fantasy Dragon Trailer",
+                    styleId: "cinematic",
+                    ratio: "16:9",
+                    img: "/showcase/gallery-dragon-rider.jpg",
+                    prompt: "An armored valkyrie standing atop a volcanic cliff as a colossalobsidian dragon emerges through storm clouds, lightning illuminating ancient runes.",
+                  },
+                  {
+                    title: "Synthwave Music Video",
+                    styleId: "music-video",
+                    ratio: "16:9",
+                    img: "/showcase/gallery-cosmic-queen.jpg",
+                    prompt: "A cosmic vocalist performing on a floating glass stage orbiting a neon-ringed planet, with bass-reactive starlight ripples and dynamic crane camera sweeps.",
+                  },
+                ].map((preset) => (
+                  <button
+                    key={preset.title}
+                    type="button"
+                    onClick={() => {
+                      setConcept(preset.prompt);
+                      setStyle(preset.styleId);
+                      setAspectRatio(preset.ratio);
+                      toast.success(`Loaded "${preset.title}" concept`);
+                    }}
+                    className="group relative rounded-xl overflow-hidden border border-white/10 bg-black/60 text-left transition-all hover:border-cyan-400/50 hover:shadow-[0_0_25px_rgba(6,182,212,0.2)]"
+                  >
+                    <div className="relative h-28 overflow-hidden">
+                      <img
+                        src={preset.img}
+                        alt={preset.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover opacity-75 group-hover:scale-105 group-hover:opacity-95 transition-all duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+                      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                        <span className="rounded-full bg-black/70 border border-white/15 px-2 py-0.5 text-[10px] font-medium text-cyan-300 capitalize">
+                          {preset.styleId}
+                        </span>
+                        <span className="rounded-full bg-black/70 border border-white/15 px-2 py-0.5 text-[10px] font-medium text-white/80">
+                          {preset.ratio}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+                        <span className="text-sm font-bold text-white">{preset.title}</span>
+                        <span className="text-[11px] font-semibold text-cyan-300 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                          Use <ArrowRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs text-white/70 line-clamp-2 leading-relaxed">{preset.prompt}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1187,30 +1269,48 @@ export default function VideoStudio() {
   return (
     <PageLayout>
       {/* Hero */}
-      <div className="relative overflow-hidden border-b border-white/5 mb-8">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/15 via-transparent to-purple-900/10" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-[120px]" />
+      <div className="relative overflow-hidden border-b border-white/10 mb-8">
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster="/showcase/hero-forge.jpg"
+          className="absolute inset-0 w-full h-full object-cover opacity-35 pointer-events-none"
+        >
+          <source src="/video/hero-bg.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/65" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.20),transparent_60%)]" />
         <div className="container max-w-7xl relative py-10 md:py-14">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-3">
-                <Film className="h-3 w-3" />
-                AI Video Production
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-medium mb-3 backdrop-blur-md">
+                <Film className="h-3.5 w-3.5" />
+                AI Cinema &amp; Video Production Suite
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
+              <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-2">
                 Video{" "}
-                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
                   Studio
                 </span>
               </h1>
-              <p className="text-muted-foreground max-w-lg">
-                Storyboards, scripts, scene direction, soundtracks — everything you need to produce AI-powered video content.
+              <p className="text-white/75 max-w-xl text-sm md:text-base">
+                Storyboards, multi-angle scene direction, scripts, and AI soundtracks — powered by Google Veo 3, Runway Gen-4, Kling 2.0, and Wan 2.5.
               </p>
             </div>
-            <div className="flex gap-2">
-              {["/showcase/tool-t2v.jpg", "/showcase/tool-video.jpg", "/showcase/home-tool-video.jpg"].map((img, i) => (
-                <div key={i} className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70">
-                  <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
+            <div className="flex gap-2.5">
+              {[
+                { src: "/showcase/tool-t2v.jpg", label: "Text-to-Video" },
+                { src: "/showcase/tool-video.jpg", label: "Storyboard" },
+                { src: "/showcase/uncensored-char-kaelen-rogue.jpg", label: "Character Motion" },
+              ].map((item) => (
+                <div key={item.label} className="relative h-24 w-28 rounded-xl overflow-hidden border border-white/15 shadow-lg group">
+                  <img src={item.src} alt={item.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2">
+                    <span className="text-[10px] font-semibold text-white/90">{item.label}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1219,23 +1319,28 @@ export default function VideoStudio() {
           {/* Quick Links */}
           <div className="flex flex-wrap gap-2 mt-6">
             <Link href="/workspace">
-              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
-                <Wand2 className="w-3 h-3 mr-1" /> Image Studio
+              <Badge variant="outline" className="cursor-pointer bg-black/40 border-white/15 hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-colors">
+                <Wand2 className="w-3 h-3 mr-1 text-cyan-400" /> Image Studio
               </Badge>
             </Link>
-            <Link href="/tools">
-              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
-                <Layers className="w-3 h-3 mr-1" /> All AI Tools
+            <Link href="/uncensored?start=1&tab=video">
+              <Badge variant="outline" className="cursor-pointer bg-rose-500/15 border-rose-500/40 text-rose-200 hover:bg-rose-500/25 transition-colors">
+                <Flame className="w-3 h-3 mr-1 text-rose-400" /> Uncensored Video (18+ Wan 2.2)
               </Badge>
             </Link>
             <Link href="/video-studio/style-transfer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
-                <Palette className="w-3 h-3 mr-1" /> Video Style Transfer
+              <Badge variant="outline" className="cursor-pointer bg-black/40 border-white/15 hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-colors">
+                <Palette className="w-3 h-3 mr-1 text-purple-400" /> Video Style Transfer
               </Badge>
             </Link>
             <Link href="/video-studio/upscaler">
-              <Badge variant="outline" className="cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-colors">
-                <Maximize className="w-3 h-3 mr-1" /> Video Upscaler
+              <Badge variant="outline" className="cursor-pointer bg-black/40 border-white/15 hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-colors">
+                <Maximize className="w-3 h-3 mr-1 text-emerald-400" /> Video Upscaler
+              </Badge>
+            </Link>
+            <Link href="/tools">
+              <Badge variant="outline" className="cursor-pointer bg-black/40 border-white/15 hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-colors">
+                <Layers className="w-3 h-3 mr-1" /> All AI Tools
               </Badge>
             </Link>
           </div>

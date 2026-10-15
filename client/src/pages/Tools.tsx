@@ -168,7 +168,17 @@ const audioTools: GridTool[] = [
   { title: "Sound Effects", desc: "Custom AI sound design", icon: Waves, href: "/tools/sound-effects", img: "/showcase/tool-sfx.jpg" },
 ];
 
-const allToolCount = viralTools.length + imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
+// ─── Uncensored 18+ Studio Tools ─────────────────────────────────────────────
+const uncensoredTools: GridTool[] = [
+  { title: "Uncensored Text-to-Image", desc: "Zero-filter Flux Dev, Pony XL & SDXL renders", icon: Flame, href: "/uncensored?start=1&tab=create", img: "/showcase/uncensored-char-aria-nordic.jpg", badge: "18+ Pro" },
+  { title: "Character Face Lock", desc: "Keep the exact same face across unlimited scenes", icon: Users, href: "/uncensored?start=1&tab=create", img: "/showcase/uncensored-char-valentina-latina.jpg", badge: "18+ Pro" },
+  { title: "Virtual Outfit Swap", desc: "Change clothing, style, or material on any subject", icon: Shirt, href: "/uncensored?start=1&tab=outfit", img: "/showcase/uncensored-char-yuki-tokyo.jpg", badge: "18+ Pro" },
+  { title: "Brush Inpainting", desc: "Paint over any region to edit or replace details", icon: Paintbrush, href: "/uncensored?start=1&tab=inpaint", img: "/showcase/uncensored-char-zara-afro.jpg", badge: "18+ Pro" },
+  { title: "4-View Character Sheet", desc: "Front, side, back & close-up turnaround sheet", icon: RotateCw, href: "/uncensored?start=1&tab=sheet", img: "/showcase/uncensored-char-seraphina-elf.jpg", badge: "18+ Pro" },
+  { title: "Uncensored Video Motion", desc: "Animate any portrait into 5-second Wan 2.2 video", icon: Video, href: "/uncensored?start=1&tab=video", img: "/showcase/uncensored-char-kaelen-rogue.jpg", badge: "18+ Pro" },
+];
+
+const allToolCount = uncensoredTools.length + viralTools.length + imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
 
 function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
   return (
@@ -180,15 +190,19 @@ function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
           transition={{ duration: 0.4, delay: delay + i * 0.04 }}
         >
           <Link href={tool.href}>
-            <div className="group relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer hover:scale-[1.03] transition-transform duration-300">
+            <div className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 hover:border-cyan-400/50 cursor-pointer hover:scale-[1.03] transition-all duration-300 shadow-lg">
               <img
                 src={tool.img} alt={tool.title}
                 className="absolute inset-0 w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
               {tool.badge && (
                 <div className="absolute top-3 right-3">
-                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/90 text-white text-[10px] font-bold uppercase tracking-wider">
+                  <span className={`px-2.5 py-0.5 rounded-full text-white text-[10px] font-bold uppercase tracking-wider ${
+                    tool.badge.includes("18+")
+                      ? "bg-gradient-to-r from-rose-500 to-orange-500 shadow-md shadow-rose-500/30"
+                      : "bg-cyan-500/90"
+                  }`}>
                     {tool.badge}
                   </span>
                 </div>
@@ -198,7 +212,7 @@ function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
                   <tool.icon className="h-4 w-4 text-white" />
                 </div>
                 <h3 className="text-white font-semibold text-sm">{tool.title}</h3>
-                <p className="text-white/60 text-xs mt-0.5">{tool.desc}</p>
+                <p className="text-white/70 text-xs mt-0.5">{tool.desc}</p>
               </div>
             </div>
           </Link>
@@ -228,26 +242,34 @@ export default function Tools() {
     <PageLayout>
       <div className="min-h-screen">
         {/* Hero */}
-        <section className="relative h-[520px] flex items-center justify-center overflow-hidden">
-          <NextImage src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover" width={1408} height={768} />
-          <div className="absolute inset-0 bg-black/75 backdrop-blur-[2px]" />
+        <section className="relative h-[520px] flex items-center justify-center overflow-hidden border-b border-white/10">
+          <NextImage src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover opacity-75" width={1408} height={768} />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/40 to-black/90" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.20),transparent_60%)]" />
           <motion.div
             variants={fadeUp} initial="hidden" animate="visible"
             transition={{ duration: 0.7 }}
             className="relative text-center px-4 max-w-3xl"
           >
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 text-cyan-300 text-sm font-medium mb-6">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/15 text-cyan-300 text-sm font-medium mb-6 backdrop-blur-md">
               <Sparkles className="h-4 w-4" /> AI-Powered Creative Suite
             </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
-              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4">
+              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
                 {allToolCount}+ Professional Tools
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-white/70 mb-8">
-              Image editing, creative generation, audio production — everything you need in one studio
+            <p className="text-lg md:text-xl text-white/80 mb-8">
+              Photorealistic image generation, Uncensored 18+ Studio, cinema video, and audio production — all in one platform
             </p>
-            {cta("/workspace", "Start Creating")}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {cta("/workspace", "Start Creating")}
+              <Link href="/uncensored?start=1">
+                <Button size="lg" className="font-semibold gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/25">
+                  <Flame className="h-4 w-4" /> Uncensored Studio (3 Free)
+                </Button>
+              </Link>
+            </div>
           </motion.div>
         </section>
 
@@ -386,6 +408,23 @@ export default function Tools() {
               </div>
             </Link>
           </motion.div>
+        </section>
+
+        {/* Uncensored 18+ Studio Tools Grid */}
+        <section className="container max-w-6xl pb-16">
+          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-rose-400 mb-2 block">18+ · Zero Content Filter</span>
+              <h2 className="text-3xl md:text-4xl font-bold">Uncensored Pro Studio Suite</h2>
+              <p className="text-foreground/60 mt-2">Dedicated unfiltered models with Character Face Lock, Outfit Swap, Brush Inpaint &amp; Wan 2.2 Video</p>
+            </div>
+            <Link href="/uncensored?start=1">
+              <Button variant="outline" size="sm" className="gap-1.5 border-rose-500/40 text-rose-300 hover:bg-rose-500/15">
+                <Flame className="h-3.5 w-3.5 text-rose-400" /> Open Full Uncensored Studio <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </motion.div>
+          <ToolGrid tools={uncensoredTools} />
         </section>
 
         {/* Viral Trend Tools — placed first because they're the highest-intent traffic */}

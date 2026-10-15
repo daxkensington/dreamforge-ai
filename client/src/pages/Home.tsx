@@ -966,6 +966,114 @@ export default function Home() {
 
       <SectionDivider />
 
+      {/* ═══════ SECTION 6B: UNCENSORED 18+ PRO STUDIO SPOTLIGHT ═══════ */}
+      <section className="py-16 md:py-20 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="relative rounded-3xl overflow-hidden border border-rose-500/35 bg-gradient-to-br from-rose-950/50 via-black/80 to-orange-950/35 p-6 sm:p-10 lg:p-12 shadow-[0_0_70px_-15px_rgba(244,63,94,0.3)] backdrop-blur-xl">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(244,63,94,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(249,115,22,0.18),transparent_60%)] pointer-events-none" />
+            <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-7 space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-rose-200">
+                    <Flame className="h-3.5 w-3.5 text-rose-400" />
+                    18+ · Uncensored Pro Studio
+                  </span>
+                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                    3 Free Previews Included
+                  </span>
+                  <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
+                    Visa / Mastercard / Apple Pay + Bitcoin
+                  </span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+                  Zero Content Filters.{" "}
+                  <span className="bg-gradient-to-r from-rose-400 via-orange-300 to-amber-300 bg-clip-text text-transparent">
+                    Total Creative Freedom.
+                  </span>
+                </h2>
+                <p className="text-white/75 text-sm sm:text-base max-w-2xl leading-relaxed">
+                  Generate photorealistic characters, lock faces across unlimited scenes, swap outfits, brush-inpaint details, and animate 5-second Wan 2.2 motion clips on dedicated private GPUs. Unlock instantly from <strong className="text-white">$4.99 (24h Day Pass)</strong> with any Credit Pack or anonymous Bitcoin.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "Uncensored Text-to-Image",
+                    "Character Face Lock",
+                    "Virtual Outfit Swap",
+                    "Brush Inpaint",
+                    "4-View Character Sheet",
+                    "Uncensored Video (Wan 2.2)",
+                  ].map((pill) => (
+                    <span
+                      key={pill}
+                      className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-200"
+                    >
+                      {pill}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 font-semibold shadow-lg shadow-rose-500/30"
+                  >
+                    <Link href="/uncensored?start=1">
+                      <Flame className="h-4 w-4" />
+                      Try 3 Free Previews
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                  >
+                    <Link href="/pricing#uncensored-passes">
+                      View Day / Week / 30-Day Passes
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+                {[
+                  { src: "/showcase/uncensored-char-aria-nordic.jpg", name: "Aria · Nordic Muse", tag: "Face Lock" },
+                  { src: "/showcase/uncensored-char-valentina-latina.jpg", name: "Valentina · Golden Hour", tag: "Photoreal" },
+                  { src: "/showcase/uncensored-char-yuki-tokyo.jpg", name: "Yuki · Neo-Tokyo", tag: "Outfit Swap" },
+                  { src: "/showcase/uncensored-char-zara-afro.jpg", name: "Zara · Editorial", tag: "4K Studio" },
+                ].map((char) => (
+                  <Link
+                    key={char.name}
+                    href="/uncensored?start=1"
+                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-rose-400/25 bg-black/60 shadow-xl"
+                  >
+                    <img
+                      src={char.src}
+                      alt={char.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className="rounded-full bg-rose-500/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                        {char.tag}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2.5 left-3 right-3">
+                      <p className="text-xs font-bold text-white">{char.name}</p>
+                      <p className="text-[10px] text-rose-300 group-hover:underline">Click to load preset →</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <SectionDivider />
+
       {/* ═══════ SECTION 7: PRICING PREVIEW ═══════ */}
       <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
