@@ -156,6 +156,8 @@ export default function UncensoredStudio({
           <UncensoredRefineStudio
             focusGenerationId={focusId}
             onInpaint={(id) => go("inpaint", id)}
+            onOutfit={(id) => go("outfit", id)}
+            onSheet={(id) => go("sheet", id)}
             onAnimate={(id) => go("video", id)}
             onUseCharacter={(id) => go("create", id)}
           />
@@ -164,6 +166,8 @@ export default function UncensoredStudio({
           <UncensoredInpaintStudio
             focusGenerationId={focusId}
             onRefine={(id) => go("refine", id)}
+            onOutfit={(id) => go("outfit", id)}
+            onSheet={(id) => go("sheet", id)}
             onAnimate={(id) => go("video", id)}
             onUseCharacter={(id) => go("create", id)}
           />
@@ -173,6 +177,7 @@ export default function UncensoredStudio({
             focusGenerationId={focusId}
             onRefine={(id) => go("refine", id)}
             onInpaint={(id) => go("inpaint", id)}
+            onOutfit={(id) => go("outfit", id)}
             onAnimate={(id) => go("video", id)}
             onUseCharacter={(id) => go("create", id)}
           />
@@ -182,6 +187,7 @@ export default function UncensoredStudio({
             focusGenerationId={focusId}
             onRefine={(id) => go("refine", id)}
             onInpaint={(id) => go("inpaint", id)}
+            onSheet={(id) => go("sheet", id)}
             onAnimate={(id) => go("video", id)}
             onUseCharacter={(id) => go("create", id)}
           />

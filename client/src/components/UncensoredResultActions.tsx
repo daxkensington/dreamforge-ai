@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Film, Lock, Maximize, Paintbrush, Scissors, UserPlus, Wand2 } from "lucide-react";
+import { Download, Film, LayoutGrid, Lock, Maximize, Paintbrush, Scissors, Shirt, UserPlus, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ export default function UncensoredResultActions({
   onInpaint,
   onAnimate,
   onUseCharacter,
+  onOutfit,
+  onSheet,
   onContinue,
   onSave,
 }: {
@@ -25,6 +27,8 @@ export default function UncensoredResultActions({
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
   onUseCharacter?: (id: number) => void;
+  onOutfit?: (id: number) => void;
+  onSheet?: (id: number) => void;
   onContinue?: () => void;
   onSave?: () => void;
 }) {
@@ -33,6 +37,7 @@ export default function UncensoredResultActions({
     onSuccess: () => {
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Cutout ready — added to your library.");
     },
     onError: (e) => toast.error(e.message),
@@ -41,6 +46,7 @@ export default function UncensoredResultActions({
     onSuccess: () => {
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Upscaled — added to your library.");
     },
     onError: (e) => toast.error(e.message),
@@ -61,6 +67,16 @@ export default function UncensoredResultActions({
       {onInpaint && (
         <Button type="button" variant="outline" size="sm" onClick={() => onInpaint(generationId)}>
           <Paintbrush className="mr-1 h-3.5 w-3.5" /> Inpaint
+        </Button>
+      )}
+      {onOutfit && (
+        <Button type="button" variant="outline" size="sm" onClick={() => onOutfit(generationId)}>
+          <Shirt className="mr-1 h-3.5 w-3.5" /> Outfit
+        </Button>
+      )}
+      {onSheet && (
+        <Button type="button" variant="outline" size="sm" onClick={() => onSheet(generationId)}>
+          <LayoutGrid className="mr-1 h-3.5 w-3.5" /> Sheet
         </Button>
       )}
       {onAnimate && (

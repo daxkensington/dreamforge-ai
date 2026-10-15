@@ -363,19 +363,26 @@ function parseMaskDataUrl(dataUrl: string): Buffer {
   return buf;
 }
 
-async function blendMasked(source: Buffer, painted: Buffer, mask: Buffer): Promise<Buffer> {
+export async function blendMasked(source: Buffer, painted: Buffer, mask: Buffer): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
   const meta = await sharp(source).metadata();
   const width = meta.width ?? 1024;
   const height = meta.height ?? 1024;
-  const maskPng = await sharp(mask).resize(width, height, { fit: "fill" }).greyscale().png().toBuffer();
-  const overlay = await sharp(painted)
+  let maskPipe = sharp(mask).resize(width, height, { fit: "fill" }).greyscale();
+  if (width >= 32 && height >= 32) {
+    maskPipe = maskPipe.blur(4);
+  }
+  const alphaRaw = await maskPipe.raw().toBuffer();
+  const paintedRgb = await sharp(painted)
     .resize(width, height, { fit: "fill" })
-    .ensureAlpha()
-    .composite([{ input: maskPng, blend: "dest-in" }])
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  const overlay = await sharp(paintedRgb, { raw: { width, height, channels: 3 } })
+    .joinChannel(alphaRaw, { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
-  return sharp(source).composite([{ input: overlay, blend: "over" }]).png().toBuffer();
+  return sharp(source).removeAlpha().composite([{ input: overlay, blend: "over" }]).png().toBuffer();
 }
 
 export async function getUncensoredEntitlement(userId: number): Promise<{
@@ -1243,6 +1250,8 @@ export const uncensoredRouter = router({
         characterGenerationId: z.number().int().positive().optional(),
         savedCharacterId: z.number().int().positive().optional(),
         style: z.string().max(32).optional(),
+        wardrobe: z.string().max(32).optional(),
+        customPrompt: z.string().max(400).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1253,6 +1262,20 @@ export const uncensoredRouter = router({
       }
       if (!ent.active) {
         throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+
+      if (input.customPrompt && input.customPrompt.trim().length > 0) {
+        const verdict = checkPrompt(input.customPrompt, { strictMinors: true });
+        if (!verdict.allowed) {
+          await logModerationBlock({
+            category: verdict.category,
+            promptLen: input.customPrompt.length,
+            userId: ctx.user.id,
+            surface: "uncensored.characterSheet",
+            prompt: input.customPrompt,
+          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+        }
       }
 
       const lock = await resolveUncensoredLock(ctx.user.id, input);
@@ -1277,15 +1300,22 @@ export const uncensoredRouter = router({
       const results: { generationId: number; url: string; view: string }[] = [];
       let failed = 0;
       const imageB64 = await fetchAsBase64(lock.url);
+      const customNote = input.customPrompt?.trim() ?? "";
 
       const viewOutcomes = await Promise.all(
         UNCENSORED_SHEET_VIEWS.map(async (view) => {
           let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
+          if (input.wardrobe) {
+            prompt = applyUncensoredWardrobe(prompt, input.wardrobe);
+          }
+          if (customNote) {
+            prompt = `${prompt}, ${customNote}`;
+          }
           prompt = applyUncensoredStyle(prompt, style);
           prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
           const genId = await createGeneration({
             userId: ctx.user.id,
-            prompt: view.label,
+            prompt: customNote ? `${view.label} · ${customNote}` : view.label,
             negativePrompt: null,
             mediaType: "image",
             width: aspect.width,
@@ -1299,13 +1329,14 @@ export const uncensoredRouter = router({
               sheet: true,
               view: view.id,
               style: style ?? null,
+              wardrobe: input.wardrobe ?? null,
               cost: unitCost,
               savedCharacterId: lock.savedCharacterId,
               character: true,
             },
           });
           try {
-            const buffer = await refineUnfiltered(imageB64, prompt, { strength: 0.4, loraId });
+            const buffer = await refineUnfiltered(imageB64, prompt, { strength: customNote || input.wardrobe ? 0.46 : 0.4, loraId });
             const key = generateStorageKey("generations", "png");
             const { url } = await storagePut(key, buffer, "image/png");
             await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });

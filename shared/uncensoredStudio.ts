@@ -811,3 +811,128 @@ export function enhanceUncensoredPrompt(rawPrompt: string, styleId?: string | nu
   return `${base}, ${additions.slice(0, 4).join(", ")}`.slice(0, 980);
 }
 
+export interface UncensoredRefinePreset {
+  id: string;
+  label: string;
+  prompt: string;
+  /** Slider value 20..90 matching UncensoredRefineStudio. */
+  strength: number;
+}
+
+export const UNCENSORED_REFINE_PRESETS: UncensoredRefinePreset[] = [
+  {
+    id: "fix-hands",
+    label: "Fix hands & anatomy",
+    prompt:
+      "same character, face, pose, and outfit, anatomically accurate five-fingered hands, natural proportions, clean fingers and joints, crisp detail",
+    strength: 35,
+  },
+  {
+    id: "face-8k",
+    label: "8K face & eyes",
+    prompt:
+      "same character, pose, and outfit, hyper-detailed eyes with sharp catchlights, natural iris detail, lifelike skin micro-texture and pores, photorealistic facial features",
+    strength: 30,
+  },
+  {
+    id: "seductive-smile",
+    label: "Seductive smile",
+    prompt:
+      "same character, body, and outfit, warm confident seductive smile, direct eye contact with camera, natural expression",
+    strength: 45,
+  },
+  {
+    id: "sultry-gaze",
+    label: "Sultry gaze",
+    prompt:
+      "same character, body, and outfit, intense sultry bedroom eyes, softly parted lips, intimate editorial expression",
+    strength: 45,
+  },
+  {
+    id: "dewy-skin",
+    label: "Dewy skin glow",
+    prompt:
+      "same character, pose, and outfit, luminous dewy skin with warm specular highlights, soft subsurface scattering, studio beauty lighting",
+    strength: 40,
+  },
+  {
+    id: "penthouse-bg",
+    label: "Luxury penthouse BG",
+    prompt:
+      "same character, face, and pose, standing in a luxury high-rise penthouse suite at night, floor-to-ceiling glass with warm city bokeh lights",
+    strength: 65,
+  },
+  {
+    id: "beach-bg",
+    label: "Golden hour beach BG",
+    prompt:
+      "same character, face, and pose, on a secluded tropical beach at golden hour sunset, warm sunlight rim lighting, ocean horizon bokeh",
+    strength: 65,
+  },
+  {
+    id: "neon-alley-bg",
+    label: "Neon night BG",
+    prompt:
+      "same character, face, and pose, in a rain-slicked neon cyberpunk alley at night, cyan and magenta reflections, moody cinematic atmosphere",
+    strength: 65,
+  },
+];
+
+export interface UncensoredInpaintPreset {
+  id: string;
+  label: string;
+  prompt: string;
+  /** Slider value 30..85 matching UncensoredInpaintStudio. */
+  strength: number;
+}
+
+export const UNCENSORED_INPAINT_PRESETS: UncensoredInpaintPreset[] = [
+  {
+    id: "fix-hand",
+    label: "Fix hand / fingers",
+    prompt: "anatomically accurate five-fingered hand, natural finger posture and realistic skin texture",
+    strength: 50,
+  },
+  {
+    id: "silk-lace",
+    label: "Silk lace top",
+    prompt: "delicate black silk and sheer lace top with realistic fabric drape and stitch detail",
+    strength: 65,
+  },
+  {
+    id: "bikini-top",
+    label: "Designer bikini",
+    prompt: "minimalist luxury designer swimsuit top, natural fit and lighting",
+    strength: 65,
+  },
+  {
+    id: "sheer-lingerie",
+    label: "Sheer lingerie",
+    prompt: "intricate sheer embroidered boudoir lingerie, soft natural studio lighting",
+    strength: 65,
+  },
+  {
+    id: "neon-tattoo",
+    label: "Neon tattoo",
+    prompt: "intricate glowing cyberpunk tattoo with fine ink linework following the natural contour of the skin",
+    strength: 60,
+  },
+  {
+    id: "gold-jewelry",
+    label: "Gold necklace",
+    prompt: "luxury layered 18k gold chain necklace with warm specular highlights on skin",
+    strength: 55,
+  },
+  {
+    id: "enhance-eyes",
+    label: "Crisp eyes & lips",
+    prompt: "hyper-detailed expressive eyes with sharp catchlights and natural glossy lips",
+    strength: 45,
+  },
+  {
+    id: "clean-bg",
+    label: "Remove object",
+    prompt: "clean seamless background matching the surrounding lighting and environment",
+    strength: 75,
+  },
+];

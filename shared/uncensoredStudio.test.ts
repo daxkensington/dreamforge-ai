@@ -173,3 +173,39 @@ describe("uncensored I2V identity and HD size", () => {
     expect(out).toMatch(/energetic/i);
   });
 });
+
+describe("uncensored studio presets and prompt enhancer", async () => {
+  const {
+    UNCENSORED_REFINE_PRESETS,
+    UNCENSORED_INPAINT_PRESETS,
+    UNCENSORED_OUTFIT_PRESETS,
+    enhanceUncensoredPrompt,
+  } = await import("./uncensoredStudio");
+
+  it("provides valid refine, inpaint, and outfit presets within slider bounds", () => {
+    expect(UNCENSORED_REFINE_PRESETS.length).toBeGreaterThanOrEqual(6);
+    for (const p of UNCENSORED_REFINE_PRESETS) {
+      expect(p.strength).toBeGreaterThanOrEqual(20);
+      expect(p.strength).toBeLessThanOrEqual(90);
+      expect(p.prompt.length).toBeGreaterThan(10);
+    }
+
+    expect(UNCENSORED_INPAINT_PRESETS.length).toBeGreaterThanOrEqual(6);
+    for (const p of UNCENSORED_INPAINT_PRESETS) {
+      expect(p.strength).toBeGreaterThanOrEqual(30);
+      expect(p.strength).toBeLessThanOrEqual(85);
+      expect(p.prompt.length).toBeGreaterThan(10);
+    }
+
+    expect(UNCENSORED_OUTFIT_PRESETS.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("enhances short prompts with style-matched camera and lighting cues without duplicating existing terms", () => {
+    const enhanced = enhanceUncensoredPrompt("a woman in a red dress", "realistic");
+    expect(enhanced.startsWith("a woman in a red dress,")).toBe(true);
+    expect(enhanced).toMatch(/85mm/i);
+    const secondPass = enhanceUncensoredPrompt(enhanced, "realistic");
+    expect(secondPass.length).toBeGreaterThanOrEqual(enhanced.length);
+  });
+});
+

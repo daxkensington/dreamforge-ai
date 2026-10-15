@@ -25,12 +25,14 @@ export default function UncensoredOutfitStudio({
   onInpaint,
   onAnimate,
   onUseCharacter,
+  onSheet,
 }: {
   focusGenerationId?: number | null;
   onRefine?: (id: number) => void;
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
   onUseCharacter?: (id: number) => void;
+  onSheet?: (id: number) => void;
 }) {
   const [mode, setMode] = useState<OutfitMode>("quick");
   const [personId, setPersonId] = useState<number | null>(focusGenerationId ?? null);
@@ -299,8 +301,15 @@ export default function UncensoredOutfitStudio({
               <UncensoredResultActions
                 generationId={resultId}
                 url={resultUrl}
+                onContinue={() => {
+                  setPersonId(resultId);
+                  setResultUrl(null);
+                  setResultId(null);
+                  toast.info("Now restyling the new outfit image.");
+                }}
                 onRefine={onRefine}
                 onInpaint={onInpaint}
+                onSheet={onSheet}
                 onAnimate={onAnimate}
                 onUseCharacter={onUseCharacter}
               />
