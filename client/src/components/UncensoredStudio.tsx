@@ -67,6 +67,7 @@ export default function UncensoredStudio({
 
   const utils = trpc.useUtils();
   const { data: status } = trpc.uncensored.status.useQuery();
+  const { data: referralData } = trpc.referral.getMyReferral.useQuery();
   const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
     onSuccess: (res) => {
       if (res.url) window.location.href = res.url;
@@ -91,6 +92,19 @@ export default function UncensoredStudio({
   const go = (next: Tab, id?: number) => {
     if (typeof id === "number") setFocusId(id);
     setTab(next);
+  };
+
+  const handleCopyReferral = async () => {
+    const code = referralData?.code;
+    const url = code
+      ? `${window.location.origin}/uncensored?ref=${encodeURIComponent(code)}`
+      : `${window.location.origin}/uncensored`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Referral link copied! You get +100 credits & your friend gets +50 credits on signup.");
+    } catch {
+      toast.error("Couldn't copy link.");
+    }
   };
 
   return (
@@ -123,6 +137,14 @@ export default function UncensoredStudio({
             <Zap className="h-3.5 w-3.5 text-amber-400" />
             <span>{creditBalance.toLocaleString()} credits</span>
           </div>
+          <button
+            type="button"
+            onClick={handleCopyReferral}
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20"
+            title="Share your referral link: you earn +100 credits and your friend gets +50 credits"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Refer (+100 Cr)
+          </button>
           <button
             type="button"
             onClick={() => {

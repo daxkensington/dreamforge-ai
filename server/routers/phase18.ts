@@ -15,8 +15,8 @@ import crypto from "crypto";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const LOW_CREDIT_THRESHOLD = 10;
-const REFERRAL_BONUS_REFERRER = 25; // Credits awarded to the person who referred
-const REFERRAL_BONUS_REFERRED = 15; // Credits awarded to the new user who was referred
+const REFERRAL_BONUS_REFERRER = 100; // Credits awarded to the person who referred (4 referrals = free 24h Uncensored Pass!)
+const REFERRAL_BONUS_REFERRED = 50; // Credits awarded to the new user who was referred
 
 // ─── Helper: Generate unique referral code ──────────────────────────────────
 function generateCode(): string {

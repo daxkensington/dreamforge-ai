@@ -178,6 +178,10 @@ export default function Uncensored() {
     enabled: isAuthed && !!status?.ageConfirmed && !status?.active,
   });
 
+  const myReferral = trpc.referral.getMyReferral.useQuery(undefined, {
+    enabled: isAuthed,
+  });
+
   const confirmAge = trpc.uncensored.confirmAge.useMutation({
     onSuccess: () => {
       refetch();
@@ -340,7 +344,7 @@ export default function Uncensored() {
   useEffect(() => {
     track("paywall_viewed", { surface: "uncensored" });
     const params = new URLSearchParams(window.location.search);
-    const plan = params.get("plan");
+    const plan = params.get("plan") ?? params.get("pass");
     if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
     const tabParam = params.get("tab") as UncensoredStudioTab | null;
     const focusParam = params.get("focus");
@@ -1189,6 +1193,58 @@ export default function Uncensored() {
                 Credits unlock the Studio immediately. Bitcoin payments unlock as soon as seen on-chain or Lightning.
               </p>
                 </>
+              )}
+            </div>
+
+            {/* Share-to-Earn Free Uncensored Pass Referral Banner */}
+            <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-black/60 to-cyan-950/30 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                    <Sparkles className="h-3 w-3 text-emerald-400" />
+                    Share &amp; Earn Free Pass
+                  </span>
+                  <span className="text-xs font-semibold text-white/85">
+                    Give +50 Credits · Get +100 Credits per Friend
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Invite 4 friends with your personal link to earn <strong className="text-emerald-300">400 credits</strong> — enough to unlock a <strong className="text-white">24-Hour Uncensored Day Pass for free</strong>.
+                </p>
+              </div>
+              {isAuthed ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:opacity-90"
+                  onClick={async () => {
+                    const code = myReferral.data?.code;
+                    const link = code
+                      ? `${window.location.origin}/uncensored?ref=${encodeURIComponent(code)}`
+                      : `${window.location.origin}/uncensored`;
+                    try {
+                      await navigator.clipboard.writeText(link);
+                      toast.success("Referral link copied! You earn +100 credits for every friend who signs up.");
+                    } catch {
+                      toast.error("Couldn't copy referral link.");
+                    }
+                  }}
+                >
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  {myReferral.data?.code
+                    ? `Copy Link (?ref=${myReferral.data.code})`
+                    : "Copy Referral Link (+100 Cr)"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/15"
+                  onClick={() => (window.location.href = loginUrlKeepingIntent({ start: "1" }))}
+                >
+                  Sign In to Get Your Link →
+                </Button>
               )}
             </div>
 

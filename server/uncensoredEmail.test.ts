@@ -3,7 +3,13 @@
  * payment landed after they stopped watching the page.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildPassActivatedEmail, sendPassActivatedEmail, STUDIO_URL } from "./_core/uncensoredEmail";
+import {
+  buildPassActivatedEmail,
+  sendPassActivatedEmail,
+  buildPassExpiringEmail,
+  buildFreePreviewsRemainingEmail,
+  STUDIO_URL,
+} from "./_core/uncensoredEmail";
 import { UNCENSORED_PLANS, getUncensoredPlanById } from "../shared/uncensoredPlans";
 
 const until = new Date("2026-09-09T11:41:00.000Z");
@@ -32,6 +38,24 @@ describe("buildPassActivatedEmail", () => {
   it("tells a buyer who closed the tab mid-checkout that they must NOT pay again", () => {
     const m = buildPassActivatedEmail({ plan: getUncensoredPlanById("uncensored-day"), until });
     expect(m.text).toMatch(/no need to pay again/i);
+  });
+});
+
+describe("buildPassExpiringEmail & buildFreePreviewsRemainingEmail", () => {
+  it("builds a pass-expiring reminder with 1-click extend link and timestamp", () => {
+    const m = buildPassExpiringEmail({ until });
+    expect(m.subject).toBe("Your Uncensored Studio Pass expires soon");
+    expect(m.text).toContain("2026-09-09 11:41 UTC");
+    expect(m.html).toContain(`${STUDIO_URL}?plan=uncensored-30d`);
+  });
+
+  it("builds a free-previews recovery email with accurate singular/plural count", () => {
+    const one = buildFreePreviewsRemainingEmail({ remaining: 1 });
+    expect(one.subject).toContain("1 free uncensored preview");
+    expect(one.html).toContain(`${STUDIO_URL}?start=1`);
+
+    const three = buildFreePreviewsRemainingEmail({ remaining: 3 });
+    expect(three.subject).toContain("3 free uncensored previews");
   });
 });
 

@@ -67,6 +67,7 @@ import { upscaleBufferSharp, removeBackgroundBufferSharp } from "../_core/svgVec
 import { deductCredits, refundCredits, getOrCreateBalance } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
+import { sendPassActivatedEmail } from "../_core/uncensoredEmail";
 
 // Uncensored video is GPU-expensive (Wan 2.2, minutes/clip) → pass-gated, no
 // free tier. Two quality tiers: "fast" = 5B TI2V (~90s, 48GB); "hd" = 14B A14B
@@ -1905,6 +1906,9 @@ export const uncensoredRouter = router({
         .update(users)
         .set({ uncensoredUntil: newUntil })
         .where(eq(users.id, ctx.user.id));
+      if (ctx.user.email) {
+        void sendPassActivatedEmail({ to: ctx.user.email, plan, until: newUntil });
+      }
       return {
         ok: true,
         planId: plan.id,
