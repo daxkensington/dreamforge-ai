@@ -1,6 +1,7 @@
 import { Wand2, Heart, Twitter, Mail, ExternalLink, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
+import Image from "next/image";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -47,6 +48,19 @@ const footerLinks = {
     { label: "For real estate agents", href: "/for/real-estate-agents" },
     { label: "For authors", href: "/for/authors" },
     { label: "For indie devs", href: "/for/indie-devs" },
+  ],
+  // The /vs/* comparison pages are real indexable routes nothing else linked
+  // to — an orphaned silo. Surfaced in a dedicated footer column below.
+  comparisons: [
+    { label: "vs Midjourney", href: "/vs/midjourney" },
+    { label: "vs Adobe Firefly", href: "/vs/adobe-firefly" },
+    { label: "vs Ideogram", href: "/vs/ideogram" },
+    { label: "vs Leonardo", href: "/vs/leonardo" },
+    { label: "vs Krea", href: "/vs/krea" },
+    { label: "vs Canva AI", href: "/vs/canva-ai" },
+    { label: "vs Runway", href: "/vs/runway" },
+    { label: "vs NightCafe", href: "/vs/nightcafe" },
+    { label: "vs Playground", href: "/vs/playground" },
   ],
 };
 
@@ -100,7 +114,7 @@ export default function Footer() {
         <div className="flex gap-3 animate-footer-marquee">
           {[...galleryStrip, ...galleryStrip].map((img, i) => (
             <div key={i} className="flex-shrink-0 h-20 w-28 rounded-lg overflow-hidden opacity-60 hover:opacity-100 transition-opacity duration-300">
-              <img src={img} alt="AI generated showcase" className="w-full h-full object-cover" loading="lazy" />
+              <Image src={img} alt="AI generated showcase" width={112} height={80} sizes="112px" className="w-full h-full object-cover" />
             </div>
           ))}
         </div>
@@ -123,11 +137,11 @@ export default function Footer() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-8">
         {/* Main grid */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-8 mb-12">
           {/* Brand column */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <img src="/logo.png" alt="DreamForgeX" className="h-9 w-9 rounded-xl" />
+              <Image src="/logo.png" alt="DreamForgeX" width={36} height={36} className="h-9 w-9 rounded-xl" />
               <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                 DreamForgeX
               </span>
@@ -275,14 +289,40 @@ export default function Footer() {
               ))}
             </ul>
           </div>
+
+          {/* Comparisons — links out all 9 /vs/* pages (see footerLinks) */}
+          <div>
+            <h4 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-4">Comparisons</h4>
+            <ul className="space-y-2.5">
+              {footerLinks.comparisons.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-sm text-white/40 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* For Creators — wires the previously defined-but-never-rendered
+              audiences array; /for (all audiences) is linked under Resources */}
+          <div>
+            <h4 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-4">For Creators</h4>
+            <ul className="space-y-2.5">
+              {footerLinks.audiences.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-sm text-white/40 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        {/* Product Hunt Badge */}
-        <div className="border-t border-white/5 pt-6 flex justify-center">
-          <a href="https://www.producthunt.com/products/dreamforgex?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-dreamforgex" target="_blank" rel="noopener noreferrer">
-            <img alt="DreamForgeX on Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1116609&theme=dark&t=1775446426701" />
-          </a>
-        </div>
+        {/* Product Hunt badge hidden 2026-10-04: the widget reads "0" upvotes,
+            which undercuts trust instead of adding it (design audit #4).
+            Restore this block once the launch has a non-zero vote count. */}
 
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-6 mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">

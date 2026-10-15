@@ -2,14 +2,31 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import crypto from "crypto";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
-const dbState: { user: any; inserted: any[] } = { user: null, inserted: [] };
+const dbState: { user: any; inserted: any[]; updated: any[]; creditBalance: number } = {
+  user: null,
+  inserted: [],
+  updated: [],
+  creditBalance: 600,
+};
 
 vi.mock("./db", () => ({
   getDb: vi.fn(async () => ({
     select: () => ({ from: () => ({ where: () => ({ limit: async () => (dbState.user ? [dbState.user] : []) }) }) }),
-    update: () => ({ set: () => ({ where: async () => undefined }) }),
+    update: () => ({ set: (s: any) => ({ where: async () => { dbState.updated.push(s); } }) }),
     insert: () => ({ values: async (v: any) => { dbState.inserted.push(v); } }),
   })),
+}));
+
+vi.mock("./stripe", () => ({
+  getOrCreateBalance: vi.fn(async () => ({ balance: dbState.creditBalance })),
+  deductCredits: vi.fn(async (_userId: number, cost: number) => {
+    if (dbState.creditBalance < cost) {
+      return { success: false, balance: dbState.creditBalance, needed: cost };
+    }
+    dbState.creditBalance -= cost;
+    return { success: true, balance: dbState.creditBalance, needed: cost };
+  }),
+  refundCredits: vi.fn(async () => undefined),
 }));
 
 vi.mock("./_core/btcpay", async (orig) => {
@@ -28,7 +45,7 @@ import { isBtcpayConfigured } from "./_core/btcpay";
 const ctx = (overrides?: any) => ({ user: { id: 7, email: "u@x.com" }, session: null, ...overrides });
 
 describe("uncensored.status", () => {
-  beforeEach(() => { dbState.user = null; dbState.inserted = []; vi.clearAllMocks(); });
+  beforeEach(() => { dbState.user = null; dbState.inserted = []; dbState.updated = []; dbState.creditBalance = 600; vi.clearAllMocks(); });
 
   it("reports inactive when no entitlement", async () => {
     dbState.user = { uncensoredUntil: null, ageConfirmedAt: null };
@@ -36,6 +53,7 @@ describe("uncensored.status", () => {
     expect(res.active).toBe(false);
     expect(res.ageConfirmed).toBe(false);
     expect(res.plan.id).toBe(UNCENSORED_PLAN.id);
+    expect(res.creditBalance).toBe(600);
   });
 
   it("reports active when entitlement is in the future", async () => {
@@ -53,7 +71,7 @@ describe("uncensored.status", () => {
 });
 
 describe("uncensored.createCheckout", () => {
-  beforeEach(() => { dbState.user = null; dbState.inserted = []; vi.clearAllMocks(); });
+  beforeEach(() => { dbState.user = null; dbState.inserted = []; dbState.updated = []; dbState.creditBalance = 600; vi.clearAllMocks(); });
 
   it("blocks checkout until age is confirmed", async () => {
     dbState.user = { uncensoredUntil: null, ageConfirmedAt: null };
@@ -73,6 +91,43 @@ describe("uncensored.createCheckout", () => {
     dbState.user = { uncensoredUntil: null, ageConfirmedAt: new Date() };
     await expect(uncensoredRouter.createCaller(ctx()).createCheckout()).rejects.toThrow(/unavailable/i);
     (isBtcpayConfigured as any).mockReturnValue(true);
+  });
+});
+
+describe("uncensored.unlockWithCredits", () => {
+  beforeEach(() => { dbState.user = null; dbState.inserted = []; dbState.updated = []; dbState.creditBalance = 600; vi.clearAllMocks(); });
+
+  it("blocks credit unlock until age is confirmed", async () => {
+    dbState.user = { uncensoredUntil: null, ageConfirmedAt: null };
+    await expect(uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" })).rejects.toThrow(/age/i);
+    expect(dbState.updated).toHaveLength(0);
+  });
+
+  it("unlocks Day Pass for 400 credits and extends uncensoredUntil", async () => {
+    dbState.user = { uncensoredUntil: null, ageConfirmedAt: new Date() };
+    const res = await uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" });
+    expect(res.ok).toBe(true);
+    expect(res.creditsSpent).toBe(400);
+    expect(res.creditsRemaining).toBe(200);
+    expect(dbState.updated[0].uncensoredUntil).toBeInstanceOf(Date);
+  });
+
+  it("rejects when user has insufficient credits", async () => {
+    dbState.user = { uncensoredUntil: null, ageConfirmedAt: new Date() };
+    dbState.creditBalance = 40;
+    await expect(uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" })).rejects.toThrow(/Not enough credits/i);
+    expect(dbState.updated).toHaveLength(0);
+  });
+});
+
+describe("uncensored.enhancePrompt", () => {
+  it("enriches a short prompt with studio camera and lighting cues", async () => {
+    const res = await uncensoredRouter.createCaller(ctx()).enhancePrompt({
+      prompt: "woman in crimson silk dress on hotel balcony",
+      style: "realistic",
+    });
+    expect(res.prompt).toContain("woman in crimson silk dress on hotel balcony");
+    expect(res.prompt).toContain("85mm");
   });
 });
 

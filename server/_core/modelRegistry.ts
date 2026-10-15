@@ -9,6 +9,9 @@
 import { ENV } from "./env";
 import type { ModelTier } from "../../shared/creditCosts";
 import { resolveTierName, type TierName, TIERS } from "../../shared/tiers";
+import type { ImageExecutionKey } from "../../shared/imageModels";
+import { isRunPodAvailable } from "./runpod";
+import { DIRECT_IMAGE_MODELS } from "./directImageProviders";
 
 export interface AIModel {
   id: string;
@@ -28,6 +31,8 @@ export interface AIModel {
   description?: string;
   /** Cost info for display. */
   costInfo?: string;
+  /** Standard text-to-image execution through the existing image pipeline. */
+  imageExecution?: { key: ImageExecutionKey; aliases?: string[]; providerLabel?: string };
 }
 
 // ─── Flagship Model ──────────────────────────────────────────────────────────
@@ -35,17 +40,18 @@ export interface AIModel {
 function ultraMode(): AIModel {
   return {
     id: "ultra",
+    imageExecution: { key: "ultra", providerLabel: "Multiple providers" },
     name: "DreamForgeX Ultra",
     provider: "replicate",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 25, hd: 25 },
-    isAvailable: !!ENV.replicateApiToken || !!ENV.openaiApiKey,
+    creditCost: { base: 310, hd: 310 },
+    isAvailable: isRunPodAvailable() || !!ENV.falApiKey || !!ENV.replicateApiToken || !!ENV.openaiApiKey || !!ENV.grokApiKey || !!ENV.stabilityApiKey || (!!ENV.cfAiToken && !!ENV.cfAccountId) || (process.env.IMAGEN_ENABLED === "true" && !!ENV.geminiApiKey),
     modelTier: "ultra",
     tier: "studio",
-    description: "Flagship quality — enhanced prompt engineering + Flux Pro max settings. Midjourney-competitive output.",
-    costInfo: "25 credits (Studio+)",
+    description: "Enhanced-prompt image profile across configured providers. Each output records the provider and model used.",
+    costInfo: "310 credits (Studio+)",
   };
 }
 
@@ -54,51 +60,92 @@ function ultraMode(): AIModel {
 function grokImage(): AIModel {
   return {
     id: "grok-image",
+    imageExecution: { key: "grok", aliases: ["grok"] },
     name: "Grok Image Gen",
     provider: "grok",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 5 },
+    creditCost: { base: 105 },
     isAvailable: !!ENV.grokApiKey,
     modelTier: "standard",
     tier: "creator",
     description: "Fast image generation via xAI.",
-    costInfo: "5 credits (Creator+)",
+    costInfo: "105 credits (Creator+)",
   };
 }
 
 function dalleModel(): AIModel {
   return {
     id: "dall-e-3",
-    name: "DALL-E 3",
+    imageExecution: { key: "dall-e-3" },
+    name: "GPT Image 1",
     provider: "openai",
     type: "image",
     capabilities: ["text-to-image"],
-    maxResolution: { width: 1792, height: 1024 },
-    creditCost: { base: 15, hd: 25 },
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 325, hd: 325 },
     isAvailable: !!ENV.openaiApiKey,
     modelTier: "premium",
     tier: "pro",
-    description: "High quality image generation by OpenAI. Excellent prompt following.",
-    costInfo: "15 credits (Pro+), 25 HD",
+    description: "OpenAI GPT Image 1 for image creation with detailed prompt following.",
+    costInfo: "325 credits (Pro+)",
+  };
+}
+
+function grokImage20(): AIModel {
+  return {
+    id: "grok-imagine-image-2.0",
+    imageExecution: { key: "grok-imagine-image-2.0" },
+    name: "Grok Imagine Image 2.0",
+    provider: "grok",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 310 },
+    isAvailable: !!ENV.grokApiKey,
+    modelTier: "premium",
+    tier: "pro",
+    description: "xAI's Image 2.0 model for text-to-image creation.",
+    costInfo: "310 credits (Pro+) · Medium / 1K",
+  };
+}
+
+function gptImage25(modelId: "gpt-image-2.5-flare" | "gpt-image-2.5-sunburst"): AIModel {
+  const name = modelId === "gpt-image-2.5-flare" ? "GPT Image 2.5 Flare" : "GPT Image 2.5 Sunburst";
+  return {
+    id: modelId,
+    imageExecution: { key: modelId, aliases: [DIRECT_IMAGE_MODELS[modelId].model] },
+    name,
+    provider: "openai",
+    type: "image",
+    capabilities: ["text-to-image"],
+    maxResolution: { width: 1536, height: 1536 },
+    creditCost: { base: 900 },
+    // These new rows stay disabled until funded render verification enables them.
+    isAvailable: !!ENV.openaiImage25Enabled && !!ENV.openaiApiKey,
+    modelTier: "premium",
+    tier: "pro",
+    description: `OpenAI's ${name} model for text-to-image creation.`,
+    costInfo: "900 credits (Pro+) · Medium",
   };
 }
 
 function geminiImage(): AIModel {
   return {
     id: "gemini-image",
+    imageExecution: { key: "gemini", aliases: ["gemini"] },
     name: "Gemini Imagen",
     provider: "gemini",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 8 },
+    creditCost: { base: 200 },
     isAvailable: process.env.IMAGEN_ENABLED === "true" && !!ENV.geminiApiKey,
     modelTier: "premium",
     tier: "creator",
     description: "Google Gemini image generation. Premium model — billed at ~$0.039/image.",
-    costInfo: "8 credits (Creator+)",
+    costInfo: "200 credits (Creator+)",
   };
 }
 
@@ -177,34 +224,36 @@ function claudeSonnet(): AIModel {
 function fluxPro(): AIModel {
   return {
     id: "flux-pro",
+    imageExecution: { key: "flux-pro", providerLabel: "fal.ai / Replicate" },
     name: "Flux 1.1 Pro",
     provider: "replicate",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 15 },
-    isAvailable: !!ENV.replicateApiToken,
+    creditCost: { base: 210 },
+    isAvailable: !!ENV.falApiKey || !!ENV.replicateApiToken,
     modelTier: "premium",
     tier: "pro",
     description: "Black Forest Labs Flux Pro — high-quality, photorealistic images with excellent prompt adherence.",
-    costInfo: "15 credits (Pro+)",
+    costInfo: "210 credits (Pro+)",
   };
 }
 
 function fluxSchnell(): AIModel {
   return {
     id: "flux-schnell",
+    imageExecution: { key: "flux-schnell", providerLabel: "fal.ai / Replicate" },
     name: "Flux Schnell",
     provider: "replicate",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 10 },
-    isAvailable: !!ENV.replicateApiToken,
+    creditCost: { base: 16 },
+    isAvailable: !!ENV.falApiKey || !!ENV.replicateApiToken,
     modelTier: "quality",
     tier: "pro",
-    description: "Flux Schnell via Replicate — fast, high-quality image generation.",
-    costInfo: "10 credits (Pro+)",
+    description: "Flux Schnell via fal.ai, with Replicate failover for the same model.",
+    costInfo: "16 credits (Pro+)",
   };
 }
 
@@ -230,17 +279,18 @@ function minimaxVideo(): AIModel {
 function sd3Image(): AIModel {
   return {
     id: "sd3",
+    imageExecution: { key: "sd3" },
     name: "Stable Diffusion 3",
     provider: "stability",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1536, height: 1536 },
-    creditCost: { base: 10 },
+    creditCost: { base: 250 },
     isAvailable: !!ENV.stabilityApiKey,
     modelTier: "quality",
     tier: "pro",
     description: "Stability AI SD3 — excellent detail, composition, and text rendering.",
-    costInfo: "10 credits (Pro+)",
+    costInfo: "250 credits (Pro+)",
   };
 }
 
@@ -380,7 +430,7 @@ function musicGen(): AIModel {
     capabilities: ["text-to-music"],
     maxResolution: { width: 0, height: 0 },
     creditCost: { base: 6 },
-    isAvailable: !!ENV.replicateApiToken,
+    isAvailable: isRunPodAvailable() || !!ENV.falApiKey || !!ENV.replicateApiToken,
     modelTier: "standard",
     tier: "creator",
     description: "Meta MusicGen — generate original music from text descriptions.",
@@ -427,33 +477,35 @@ function groqLlm(): AIModel {
 function togetherFlux(): AIModel {
   return {
     id: "together-flux",
-    name: "Flux Schnell (Together AI)",
+    imageExecution: { key: "together", aliases: ["together"], providerLabel: "fal.ai / Together" },
+    name: "Flux Schnell (fal.ai / Together)",
     provider: "together",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 2 },
-    isAvailable: !!ENV.togetherApiKey,
+    creditCost: { base: 16 },
+    isAvailable: !!ENV.falApiKey || !!ENV.togetherApiKey,
     modelTier: "free",
     tier: "free",
-    description: "Together AI Flux Schnell — free high-quality image generation.",
-    costInfo: "2 credits (Free)",
+    description: "Flux Schnell using the configured fal.ai or Together route.",
+    costInfo: "16 credits",
   };
 }
 
 function cloudflareImage(): AIModel {
   return {
     id: "cf-flux-schnell",
+    imageExecution: { key: "cloudflare", aliases: ["cloudflare"] },
     name: "Flux Schnell (Cloudflare)",
     provider: "cloudflare",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
     creditCost: { base: 2 },
-    isAvailable: !!ENV.cfAiToken,
+    isAvailable: !!ENV.cfAiToken && !!ENV.cfAccountId,
     modelTier: "free",
     tier: "free",
-    description: "Cloudflare Workers AI — 100K free images per day.",
+    description: "Flux Schnell image creation through Cloudflare Workers AI.",
     costInfo: "2 credits (Free)",
   };
 }
@@ -480,34 +532,36 @@ function edgeTts(): AIModel {
 function runpodFluxDev(): AIModel {
   return {
     id: "runpod-flux-dev",
+    imageExecution: { key: "runpod-flux-dev" },
     name: "Flux Dev (Self-Hosted)",
     provider: "runpod",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 5 },
-    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    creditCost: { base: 50 },
+    isAvailable: isRunPodAvailable(),
     modelTier: "standard",
     tier: "creator",
-    description: "Flux Dev on DreamForge GPUs — high quality at 80% lower cost. 20-step generation.",
-    costInfo: "5 credits (Creator+)",
+    description: "Self-hosted Flux Dev with 20-step image generation.",
+    costInfo: "50 credits (Creator+)",
   };
 }
 
 function runpodFluxSchnell(): AIModel {
   return {
     id: "runpod-flux-schnell",
+    imageExecution: { key: "runpod-flux-schnell" },
     name: "Flux Schnell (Self-Hosted)",
     provider: "runpod",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 5 },
-    isAvailable: !!ENV.runpodApiKey && !!ENV.runpodFluxEndpointId,
+    creditCost: { base: 16 },
+    isAvailable: isRunPodAvailable(),
     modelTier: "standard",
     tier: "creator",
-    description: "Flux Schnell on DreamForge GPUs — fast 4-step generation at minimal cost.",
-    costInfo: "5 credits (Creator+)",
+    description: "Self-hosted Flux Schnell with four-step image generation.",
+    costInfo: "16 credits (Creator+)",
   };
 }
 
@@ -550,68 +604,72 @@ function runpodBgRemoval(): AIModel {
 function falFluxDev(): AIModel {
   return {
     id: "fal-flux-dev",
+    imageExecution: { key: "fal-flux-dev" },
     name: "Flux Dev (fal.ai)",
     provider: "fal",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 10 },
+    creditCost: { base: 210 },
     isAvailable: !!ENV.falApiKey,
     modelTier: "quality",
     tier: "pro",
     description: "Flux Dev via fal.ai — high-quality image generation with great prompt adherence.",
-    costInfo: "10 credits (Pro+)",
+    costInfo: "210 credits (Pro+)",
   };
 }
 
 function falFluxSchnell(): AIModel {
   return {
     id: "fal-flux-schnell",
+    imageExecution: { key: "fal-flux-schnell" },
     name: "Flux Schnell (fal.ai)",
     provider: "fal",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1024, height: 1024 },
-    creditCost: { base: 5 },
+    creditCost: { base: 16 },
     isAvailable: !!ENV.falApiKey,
     modelTier: "standard",
     tier: "creator",
     description: "Flux Schnell via fal.ai — fast, cheap image generation.",
-    costInfo: "5 credits (Creator+)",
+    costInfo: "16 credits (Creator+)",
   };
 }
 
 function falFluxProUltra(): AIModel {
   return {
     id: "fal-flux-pro-ultra",
+    imageExecution: { key: "fal-flux-pro-ultra" },
     name: "Flux Pro 1.1 Ultra (fal.ai)",
     provider: "fal",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 2048, height: 2048 },
-    creditCost: { base: 25 },
+    creditCost: { base: 310 },
     isAvailable: !!ENV.falApiKey,
     modelTier: "ultra",
     tier: "studio",
     description: "Flux Pro 1.1 Ultra via fal.ai — highest quality Flux model with ultra-high resolution.",
-    costInfo: "25 credits (Studio+)",
+    costInfo: "310 credits (Studio+)",
   };
 }
 
 function falSeedream(): AIModel {
   return {
     id: "fal-seedream",
-    name: "Seedream V4 (fal.ai)",
+    imageExecution: { key: "fal-seedream" },
+    name: "Seedream 3.0 (fal.ai)",
     provider: "fal",
     type: "image",
     capabilities: ["text-to-image"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 10 },
+    creditCost: { base: 155 },
     isAvailable: !!ENV.falApiKey,
     modelTier: "quality",
     tier: "pro",
-    description: "Seedream V4 via fal.ai — excellent at creative and artistic imagery.",
-    costInfo: "10 credits (Pro+)",
+    description: "Seedream 3.0 via fal.ai — creative and artistic imagery.",
+    costInfo: "155 credits (Pro+)",
   };
 }
 
@@ -623,12 +681,12 @@ function falFluxKontext(): AIModel {
     type: "image",
     capabilities: ["text-to-image", "image-editing"],
     maxResolution: { width: 1440, height: 1440 },
-    creditCost: { base: 15 },
+    creditCost: { base: 210 },
     isAvailable: !!ENV.falApiKey,
     modelTier: "premium",
     tier: "pro",
     description: "Flux Kontext Pro via fal.ai — context-aware image editing and generation.",
-    costInfo: "15 credits (Pro+)",
+    costInfo: "210 credits (Pro+)",
   };
 }
 
@@ -730,7 +788,10 @@ function buildModelList(): AIModel[] {
     ultraMode(),
     // Image models
     grokImage(),
+    grokImage20(),
     dalleModel(),
+    gptImage25("gpt-image-2.5-flare"),
+    gptImage25("gpt-image-2.5-sunburst"),
     geminiImage(),
     fluxPro(),
     fluxSchnell(),

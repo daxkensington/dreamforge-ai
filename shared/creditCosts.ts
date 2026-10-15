@@ -11,7 +11,7 @@ export type ModelTier = "free" | "standard" | "quality" | "premium" | "ultra";
 
 // ─── Model-Aware Credit Costs ─────────────────────────────────────────────
 export const MODEL_CREDIT_COSTS = {
-  image: { free: 2, standard: 5, quality: 10, premium: 15, ultra: 25 } as Record<ModelTier, number>,
+  image: { free: 2, standard: 5, quality: 155, premium: 210, ultra: 310 } as Record<ModelTier, number>,
   video: { free: 10, standard: 40, quality: 50, premium: 75, ultra: 200 } as Record<ModelTier, number>,
   audio: { tts_free: 1, tts_premium: 8, music: 6, sfx: 4 } as Record<string, number>,
 } as const;

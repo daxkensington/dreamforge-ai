@@ -186,3 +186,49 @@ describe("uncensored.refineImage — entitlement and safety", () => {
     expect(state.refunded).toBe(10);
   });
 });
+
+describe("blendMasked — inpaint mask compositing", () => {
+  it("preserves unpainted black-mask pixels from source and blends white-mask pixels from painted", async () => {
+    const sharp = (await import("sharp")).default;
+    const { blendMasked } = await import("./routers/uncensored");
+
+    const width = 20;
+    const height = 20;
+    const src = await sharp({
+      create: { width, height, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const painted = await sharp({
+      create: { width, height, channels: 3, background: { r: 0, g: 0, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+
+    // Opaque black RGBA canvas with a white painted square in the center (8..12, 8..12)
+    const maskRaw = Buffer.alloc(width * height * 4, 0);
+    for (let i = 0; i < width * height; i++) {
+      maskRaw[i * 4 + 3] = 255;
+    }
+    for (let y = 8; y <= 12; y++) {
+      for (let x = 8; x <= 12; x++) {
+        const idx = (y * width + x) * 4;
+        maskRaw[idx] = 255;
+        maskRaw[idx + 1] = 255;
+        maskRaw[idx + 2] = 255;
+      }
+    }
+    const mask = await sharp(maskRaw, { raw: { width, height, channels: 4 } }).png().toBuffer();
+
+    const resultPng = await blendMasked(src, painted, mask);
+    const { data, info } = await sharp(resultPng).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+
+    // Unpainted top-left corner (0,0) must stay pure red (255, 0, 0)
+    expect([data[0], data[1], data[2]]).toEqual([255, 0, 0]);
+
+    // Painted center (10,10) must be pure blue (0, 0, 255)
+    const centerIdx = (10 * info.width + 10) * info.channels;
+    expect([data[centerIdx], data[centerIdx + 1], data[centerIdx + 2]]).toEqual([0, 0, 255]);
+  });
+});
+

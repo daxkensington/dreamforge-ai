@@ -16,6 +16,8 @@ import {
   AlignCenter, Layers, Palette, Upload, Loader2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { useGenerationRequestIdentity } from "@/hooks/useGenerationRequestIdentity";
 
 interface CanvasElement {
   id: string;
@@ -48,6 +50,8 @@ const CANVAS_SIZES = [
 ];
 
 export default function DesignCanvas() {
+  const { user } = useAuth();
+  const requestIdentity = useGenerationRequestIdentity(user?.id, "design-canvas");
   const [canvasSize, setCanvasSize] = useState(CANVAS_SIZES[0]);
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -104,13 +108,21 @@ export default function DesignCanvas() {
   }, []);
 
   const generateMutation = trpc.generation.create.useMutation({
+    onSettled: requestIdentity.settled,
     onSuccess: (data) => {
+      requestIdentity.receive(data);
       if (data?.imageUrl) {
         addElement("ai-generated", data.imageUrl);
         toast.success("AI element added to canvas!");
+      } else if (data.status === "generating") {
+        toast.info(data.reconciliationRequired
+          ? "This request needs review. Checking again retrieves the same attempt; it does not start another render."
+          : "Your generation is still pending. Check again to retrieve the same attempt.");
+      } else if (data.status === "failed") {
+        toast.error(data.error ?? "Generation failed.");
       }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => { requestIdentity.uncertain(); toast.error(err.message); },
   });
 
   const addElement = (type: CanvasElement["type"], content: string = "") => {
@@ -215,9 +227,13 @@ export default function DesignCanvas() {
     reader.readAsDataURL(file);
   };
 
-  const generateAiElement = () => {
+  const generateAiElement = async () => {
     if (!aiPrompt.trim()) return;
-    generateMutation.mutate({ prompt: aiPrompt, style: "photorealistic", aspectRatio: "1:1" });
+    if (generateMutation.isPending) return;
+    try {
+      const payload = await requestIdentity.prepare({ prompt: aiPrompt, style: "photorealistic", aspectRatio: "1:1" });
+      if (payload) generateMutation.mutate(payload);
+    } catch (error) { requestIdentity.settled(); toast.error(error instanceof Error ? error.message : "Could not prepare your generation."); }
   };
 
   const selectedElement = elements.find((el) => el.id === selectedId);
@@ -296,9 +312,9 @@ export default function DesignCanvas() {
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2">AI Generate</p>
             <Input placeholder="Describe an element..." value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} className="text-xs bg-white/5 border-white/10 mb-2" />
-            <Button size="sm" className="w-full gap-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs" onClick={generateAiElement} disabled={generateMutation.isPending}>
+            <Button size="sm" className="w-full gap-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs" onClick={generateAiElement} disabled={generateMutation.isPending || requestIdentity.preparing}>
               {generateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              Generate
+              {requestIdentity.waiting ? "Retry generation" : "Generate"}
             </Button>
           </div>
 

@@ -120,6 +120,8 @@ vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) 
 
 import { uncensoredRouter } from "./routers/uncensored";
 import { submitUnfilteredImageJob, collectUnfilteredImageJob } from "./_core/imageGenerationUncensored";
+import { generateImage } from "./_core/imageGeneration";
+import { logToolFailure } from "./_core/toolStatus";
 import { deductCredits, refundCredits } from "./stripe";
 
 const OWNER = 7;
@@ -143,6 +145,7 @@ describe("uncensored.freeGenerate — async submit", () => {
     state.claims = [];
     vi.mocked(submitUnfilteredImageJob).mockClear();
     vi.mocked(collectUnfilteredImageJob).mockClear();
+    vi.mocked(logToolFailure).mockClear();
     vi.mocked(deductCredits).mockClear();
   });
 
@@ -189,6 +192,26 @@ describe("uncensored.freeGenerate — async submit", () => {
     const caller = uncensoredRouter.createCaller(ctx());
     await expect(caller.freeGenerate({ prompt: "a woman relaxing in a candlelit bath", requestId: REQ })).rejects.toThrow(/try again/i);
     expect(state.updated.at(-1)).toMatchObject({ id: 501, data: { status: "failed" } });
+  });
+
+  it("falls back to the synchronous unfiltered chain when RunPod is paused (409 ENDPOINT_PAUSED)", async () => {
+    freeVisitor();
+    vi.mocked(submitUnfilteredImageJob).mockRejectedValueOnce(
+      new Error('RunPod submit failed (409): {"status":409,"title":"Conflict","detail":"Endpoint is paused (max_workers=0).","code":"ENDPOINT_PAUSED"}'),
+    );
+    vi.mocked(generateImage).mockResolvedValueOnce({ url: "https://dreamforgex.ai/img/generations/fal-fallback.png" });
+    const caller = uncensoredRouter.createCaller(ctx());
+    const res = await caller.freeGenerate({ prompt: "a woman relaxing in a candlelit bath", requestId: REQ });
+    expect(res).toMatchObject({
+      generationId: 501,
+      status: "completed",
+      url: "https://dreamforgex.ai/img/generations/fal-fallback.png",
+    });
+    expect(state.updated.at(-1)).toMatchObject({
+      id: 501,
+      data: { status: "completed", imageUrl: "https://dreamforgex.ai/img/generations/fal-fallback.png" },
+    });
+    expect(logToolFailure).not.toHaveBeenCalled();
   });
 
   it("still refuses illegal content before any row or GPU call", async () => {

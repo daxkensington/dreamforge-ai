@@ -5,11 +5,11 @@ export default function Loading() {
         <span className="sr-only">Loading tools…</span>
       </div>
       <div className="container py-16 text-center" aria-hidden="true">
-        <div className="h-12 w-64 bg-white/5 rounded-lg animate-pulse mx-auto mb-4" />
-        <div className="h-6 w-96 bg-white/5 rounded-lg animate-pulse mx-auto mb-12" />
+        <div className="h-12 w-64 bg-white/5 rounded-lg motion-safe:animate-pulse mx-auto mb-4 max-w-full" />
+        <div className="h-6 w-96 bg-white/5 rounded-lg motion-safe:animate-pulse mx-auto mb-12 max-w-full" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] bg-white/5 rounded-2xl animate-pulse" />
+            <div key={i} className="aspect-[4/3] bg-white/5 rounded-2xl motion-safe:animate-pulse" />
           ))}
         </div>
       </div>

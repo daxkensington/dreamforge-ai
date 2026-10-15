@@ -515,7 +515,7 @@ export async function reviewModerationItem(
   reviewerId: number,
   status: "approved" | "rejected",
   note?: string
-): Promise<{ updated: boolean; galleryItemId?: number }> {
+): Promise<{ updated: boolean; galleryItemId?: number; submitterUserId?: number }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -566,7 +566,7 @@ export async function reviewModerationItem(
         })
         .returning({ id: galleryItems.id }),
     ]);
-    return { updated: updated.length > 0, galleryItemId: inserted[0]?.id };
+    return { updated: updated.length > 0, galleryItemId: inserted[0]?.id, submitterUserId: modItem.userId };
   } catch (err) {
     if (!isUniqueViolation(err)) throw err;
     // galleryItems(generationId) already satisfied: the generation is in the
@@ -582,7 +582,7 @@ export async function reviewModerationItem(
       .from(galleryItems)
       .where(eq(galleryItems.generationId, modItem.generationId))
       .limit(1);
-    return { updated: rows.length > 0, galleryItemId: existing[0]?.id };
+    return { updated: rows.length > 0, galleryItemId: existing[0]?.id, submitterUserId: modItem.userId };
   }
 }
 

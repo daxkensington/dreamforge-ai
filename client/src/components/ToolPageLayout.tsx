@@ -1,6 +1,6 @@
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lock, ArrowRight, Eye } from "lucide-react";
+import { ArrowLeft, Lock, ArrowRight, Eye, Flame } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -8,6 +8,7 @@ import { getLoginUrl } from "@/const";
 import { ToolSEOBlock } from "@/components/ToolSEOBlock";
 import { ToolPageSchemas } from "@/components/ToolPageSchemas";
 import { CreditCostBadge } from "@/components/CreditCostBadge";
+import ToolSamples from "@/components/ToolSamples";
 import type { LucideIcon } from "lucide-react";
 
 interface ToolPageLayoutProps {
@@ -129,6 +130,37 @@ export default function ToolPageLayout({
         <section className="container py-8">
           {children}
         </section>
+
+        {/* Uncensored Studio cross-sell strip across all 70+ /tools/* pages */}
+        <section className="container pb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-rose-500/25 bg-gradient-to-r from-rose-500/10 via-rose-500/5 to-orange-500/10 px-4 py-3.5">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-orange-500 text-white">
+                <Flame className="h-4 w-4" />
+              </div>
+              <div className="text-xs sm:text-sm">
+                <span className="font-semibold text-foreground">Need unfiltered 18+ generation?</span>{" "}
+                <span className="text-muted-foreground">
+                  Uncensored Studio includes Create, Face Lock, Brush Inpaint, Outfit Swap, 4-View Sheet & Uncensored Video — private by default.
+                </span>
+              </div>
+            </div>
+            <Button
+              asChild
+              size="sm"
+              className="shrink-0 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90"
+            >
+              <Link href="/uncensored?start=1">
+                <Flame className="mr-1.5 h-3.5 w-3.5" />
+                Try 3 Free Previews
+              </Link>
+            </Button>
+          </div>
+        </section>
+
+        {/* Sample outputs — derived from the URL slug via TOOL_SAMPLES so
+            visitors see real results before signing up (design audit #3). */}
+        <ToolSamples slug={location.split("/")[2] ?? ""} />
 
         {/* Below-fold SEO copy — renders if this slug has entries in shared/toolSeoCopy.ts */}
         <ToolSEOBlock />

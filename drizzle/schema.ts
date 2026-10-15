@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -11,6 +12,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -26,10 +28,10 @@ export const collabRoleEnum = pgEnum("collabRole", ["viewer", "editor"]);
 export const sharePermissionEnum = pgEnum("sharePermission", ["viewer", "editor"]);
 export const revisionSourceEnum = pgEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]);
 export const subStatusEnum = pgEnum("subStatus", ["active", "canceled", "past_due", "trialing", "incomplete"]);
-export const txTypeEnum = pgEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral"]);
+export const txTypeEnum = pgEnum("txType", ["purchase", "usage", "bonus", "refund", "subscription", "reward", "referral", "dispute"]);
 export const notifTypeEnum = pgEnum("notifType", ["collaboration", "generation", "comment", "system", "payment"]);
 export const prefTypeEnum = pgEnum("prefType", ["collaboration", "generation", "comment", "system", "payment"]);
-export const webhookStatusEnum = pgEnum("webhookStatus", ["processed", "failed", "ignored"]);
+export const webhookStatusEnum = pgEnum("webhookStatus", ["pending", "processed", "failed", "ignored"]);
 export const referralStatusEnum = pgEnum("referralStatus", ["pending", "completed", "expired"]);
 export const listingTypeEnum = pgEnum("listingType", ["prompt", "preset", "workflow", "asset_pack", "lora"]);
 export const listingStatusEnum = pgEnum("listingStatus", ["draft", "published", "suspended"]);
@@ -190,7 +192,7 @@ export type InsertTag = typeof tags.$inferInsert;
 // ─── Generations ─────────────────────────────────────────────────────────────
 export const generations = pgTable("generations", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   prompt: text("prompt").notNull(),
   negativePrompt: text("negativePrompt"),
   modelVersion: varchar("modelVersion", { length: 128 })
@@ -214,10 +216,45 @@ export const generations = pgTable("generations", {
   index("generations_userId_idx").on(table.userId),
   index("generations_status_idx").on(table.status),
   index("generations_createdAt_idx").on(table.createdAt),
+  // "My generations" feed: WHERE userId ORDER BY createdAt DESC — the two
+  // single-column indexes above can't drive the filter+sort together.
+  index("generations_user_createdAt_idx").on(table.userId, table.createdAt),
 ]);
 
 export type Generation = typeof generations.$inferSelect;
 export type InsertGeneration = typeof generations.$inferInsert;
+
+// Durable request identity for generation.create only. Existing generations remain unchanged.
+export const generationRequests = pgTable("generationRequests", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  requestId: uuid("requestId").notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  executionToken: uuid("executionToken").notNull(), // internal owner capability, never returned to clients
+  quotedCredits: integer("quotedCredits").notNull(),
+  state: varchar("state", { length: 24 }).notNull(),
+  generationId: integer("generationId").references(() => generations.id),
+  result: jsonb("result"),
+  errorCode: varchar("errorCode", { length: 128 }),
+  debitedAt: timestamp("debitedAt"),
+  refundedAt: timestamp("refundedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("generationRequests_user_request_unique").on(table.userId, table.requestId),
+  uniqueIndex("generationRequests_generation_unique").on(table.generationId),
+  index("generationRequests_state_updated_idx").on(table.state, table.updatedAt),
+  check("generationRequests_positive_quote", sql`${table.quotedCredits} > 0`),
+  check("generationRequests_payload_hash", sql`${table.payloadHash} ~ '^[0-9a-f]{64}$'`),
+  check("generationRequests_state_valid", sql`${table.state} IN ('reserved', 'rendering', 'completed', 'rejected', 'refunded', 'reconciliation')`),
+  check("generationRequests_debit_state", sql`(${table.state} = 'rejected' AND ${table.debitedAt} IS NULL) OR (${table.state} <> 'rejected' AND ${table.debitedAt} IS NOT NULL)`),
+  check("generationRequests_refund_state", sql`(${table.state} = 'refunded') = (${table.refundedAt} IS NOT NULL)`),
+  check("generationRequests_result_state", sql`(${table.state} IN ('completed', 'rejected', 'refunded')) = (${table.result} IS NOT NULL)`),
+  check("generationRequests_result_object", sql`${table.result} IS NULL OR jsonb_typeof(${table.result}) = 'object'`),
+  check("generationRequests_render_owner", sql`${table.state} NOT IN ('rendering', 'completed') OR ${table.generationId} IS NOT NULL`),
+]);
+
+export type GenerationRequest = typeof generationRequests.$inferSelect;
 
 // ─── Generation Tags (join table) ────────────────────────────────────────────
 export const generationTags = pgTable("generationTags", {
@@ -234,7 +271,7 @@ export type GenerationTag = typeof generationTags.$inferSelect;
 // ─── Gallery Items (approved generations) ────────────────────────────────────
 export const galleryItems = pgTable("galleryItems", {
   id: serial("id").primaryKey(),
-  generationId: integer("generationId").notNull(),
+  generationId: integer("generationId").notNull().references(() => generations.id),
   userId: integer("userId").notNull(),
   title: varchar("title", { length: 256 }),
   description: text("description"),
@@ -276,7 +313,7 @@ export type InsertModerationItem = typeof moderationQueue.$inferInsert;
 // ─── Video Projects ─────────────────────────────────────────────────────────
 export const videoProjects = pgTable("videoProjects", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   type: videoProjectTypeEnum("type").notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   description: text("description"),
@@ -457,7 +494,7 @@ export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
 // ─── User Subscriptions ─────────────────────────────────────────────────
 export const userSubscriptions = pgTable("userSubscriptions", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   planId: integer("planId").notNull(),
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
   status: subStatusEnum("subStatus").default("active").notNull(),
@@ -468,6 +505,9 @@ export const userSubscriptions = pgTable("userSubscriptions", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("userSubscriptions_stripeSubscriptionId_unique").on(table.stripeSubscriptionId),
+  // getUserTier inner-joins on userId for every generation; getUserSubscription
+  // queries per request. No query filters by status, so plain userId.
+  index("userSubscriptions_userId_idx").on(table.userId),
 ]);
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
@@ -493,7 +533,7 @@ export type InsertCreditBalance = typeof creditBalances.$inferInsert;
 // ─── Credit Transactions ─────────────────────────────────────────────────
 export const creditTransactions = pgTable("creditTransactions", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   amount: integer("amount").notNull(), // positive = purchase, negative = usage
   type: txTypeEnum("txType").notNull(),
   description: varchar("description", { length: 512 }),
@@ -502,6 +542,11 @@ export const creditTransactions = pgTable("creditTransactions", {
   metadata: jsonb("txMetadata"), // extra context (plan change, etc.)
   expiresAt: timestamp("expiresAt"), // null = never expires; set for bonus/signup credits
   expired: boolean("expired").default(false).notNull(), // true once credits have been deducted
+  // Cumulative credits clawed back from THIS purchase via refunds/disputes.
+  // Stripe sends one refund event per refund with CUMULATIVE amount_refunded,
+  // so handlers claw only (expectedTotal - this) per event — without the
+  // counter staged partial refunds would claw the full ratio every time.
+  clawedBackCredits: integer("clawedBackCredits").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("creditTransactions_userId_idx").on(table.userId),
@@ -509,6 +554,12 @@ export const creditTransactions = pgTable("creditTransactions", {
   // that list a user's transactions ordered by time. Much faster than the
   // userId-only index when users have many transactions.
   index("creditTransactions_user_time_idx").on(table.userId, table.createdAt),
+  // addCredits re-grant guard: look up a purchase by checkout session id
+  // before granting credits (webhook redelivery protection).
+  index("creditTransactions_stripeSessionId_idx").on(table.stripeSessionId),
+  // Refund/dispute clawback: findPurchaseByPaymentIntent looks up the original
+  // purchase by payment intent id.
+  index("creditTransactions_stripePaymentIntentId_idx").on(table.stripePaymentIntentId),
 ]);
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
@@ -594,7 +645,10 @@ export const referrals = pgTable("referrals", {
   creditsAwarded: integer("creditsAwarded").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
-});
+}, (table) => [
+  // Per-user referral stats (referralStats / leaderboard queries) filter by it.
+  index("referrals_referrerId_idx").on(table.referrerId),
+]);
 export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = typeof referrals.$inferInsert;
 
@@ -664,7 +718,12 @@ export const marketplacePurchases = pgTable("marketplacePurchases", {
   sellerPayout: integer("sellerPayout").notNull(), // 80% seller payout in cents
   stripePaymentId: varchar("stripePaymentId", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  // Purchase history filters by buyerId; hasPurchased filters by buyerId AND
+  // listingId before a download.
+  index("marketplacePurchases_buyerId_idx").on(table.buyerId),
+  index("marketplacePurchases_listingId_idx").on(table.listingId),
+]);
 
 export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
 export type InsertMarketplacePurchase = typeof marketplacePurchases.$inferInsert;
@@ -717,7 +776,7 @@ export type InsertSellerPayout = typeof sellerPayouts.$inferInsert;
 // ─── Audio Generations ──────────────────────────────────────────────────────
 export const audioGenerations = pgTable("audioGenerations", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("userId").notNull().references(() => users.id),
   type: audioTypeEnum("audioType").notNull(),
   prompt: text("prompt").notNull(),
   duration: integer("duration").notNull(), // seconds

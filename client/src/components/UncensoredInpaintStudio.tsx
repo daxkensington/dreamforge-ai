@@ -7,8 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
+import { UNCENSORED_IMAGE_COST, UNCENSORED_INPAINT_PRESETS } from "@shared/uncensoredStudio";
+import UncensoredResultActions, {
+  UncensoredBeforeAfterCompare,
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
 
 /**
  * Paint-region inpaint. Overlay canvas sits on the original so strokes never
@@ -19,17 +22,22 @@ export default function UncensoredInpaintStudio({
   onRefine,
   onAnimate,
   onUseCharacter,
+  onOutfit,
+  onSheet,
 }: {
   focusGenerationId?: number | null;
   onRefine?: (id: number) => void;
   onAnimate?: (id: number) => void;
   onUseCharacter?: (id: number) => void;
+  onOutfit?: (id: number) => void;
+  onSheet?: (id: number) => void;
 }) {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement | null>(null);
   const historyRef = useRef<{ overlay: ImageData; mask: ImageData }[]>([]);
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [prompt, setPrompt] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [brush, setBrush] = useState(32);
   const [strength, setStrength] = useState(55);
   const [erasing, setErasing] = useState(false);
@@ -150,6 +158,7 @@ export default function UncensoredInpaintStudio({
       setResultId(data.generationId);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Region updated — original is untouched.");
     },
     onError: (e) => toast.error(e.message),
@@ -183,14 +192,23 @@ export default function UncensoredInpaintStudio({
         <div>
           <h2 className="text-lg font-semibold">Inpaint a region</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Paint over what to change. Everything else stays identical.
+            Paint over what to change. Soft-feathered mask keeps everything outside your brush pixel-identical.
           </p>
         </div>
         <span className="text-xs text-muted-foreground">{UNCENSORED_IMAGE_COST.inpaint} credits</span>
       </div>
 
       <div className="mt-4">
-        <p className="text-sm text-muted-foreground">Pick one of your uncensored images:</p>
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={sourceId}
+          onSelectGeneration={(id) => {
+            setSourceId(id);
+            setResultUrl(null);
+            setResultId(null);
+          }}
+          disabled={inpaint.isPending}
+        />
+        <p className="text-sm text-muted-foreground">1. Pick one of your uncensored images:</p>
         {images.data && images.data.length > 0 ? (
           <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {images.data.map((img) => (
@@ -218,6 +236,7 @@ export default function UncensoredInpaintStudio({
 
       {selected && (
         <div className="mt-4">
+          <p className="mb-2 text-xs text-muted-foreground">2. Paint over the region you want to change:</p>
           <div className="relative overflow-hidden rounded-xl border border-border/60">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selected.imageUrl ?? ""} alt="" className="block w-full" />
@@ -265,16 +284,46 @@ export default function UncensoredInpaintStudio({
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear
             </Button>
             <div className="flex min-w-[160px] flex-1 items-center gap-2">
-              <span className="text-xs text-muted-foreground">Brush</span>
+              <span className="text-xs text-muted-foreground">Brush ({brush}px)</span>
               <Slider value={[brush]} onValueChange={(v) => setBrush(v[0] ?? 32)} min={8} max={96} step={4} />
             </div>
           </div>
         </div>
       )}
 
+      <div className="mt-5">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">
+          3. Pick a 1-click region preset or describe what should appear in the painted area:
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {UNCENSORED_INPAINT_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              disabled={inpaint.isPending}
+              onClick={() => {
+                setSelectedPreset(preset.id);
+                setPrompt(preset.prompt);
+                setStrength(preset.strength);
+              }}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                selectedPreset === preset.id
+                  ? "border-rose-500 bg-rose-500/15 font-medium text-rose-200"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Textarea
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          setSelectedPreset(null);
+        }}
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
@@ -285,14 +334,14 @@ export default function UncensoredInpaintStudio({
         rows={3}
         maxLength={1000}
         disabled={inpaint.isPending}
-        className="mt-4 resize-none"
+        className="mt-3 resize-none"
       />
 
       <div className="mt-4">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">How much to change the painted region</span>
           <span className="font-medium">
-            {strength <= 40 ? "Subtle" : strength <= 65 ? "Balanced" : "Heavy"}
+            {strength <= 40 ? "Subtle" : strength <= 65 ? "Balanced" : "Heavy"} ({strength}%)
           </span>
         </div>
         <Slider
@@ -328,9 +377,12 @@ export default function UncensoredInpaintStudio({
       <p className="mt-2 text-center text-[11px] text-muted-foreground">Ctrl+Enter to run</p>
 
       {resultUrl && (
-        <div className="mt-5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={resultUrl} alt="Inpainted" className="w-full rounded-xl border border-rose-500/40" />
+        <UncensoredBeforeAfterCompare
+          beforeUrl={selected?.imageUrl ?? null}
+          afterUrl={resultUrl}
+          beforeLabel="Original"
+          afterLabel="Inpainted Result"
+        >
           {resultId && (
             <UncensoredResultActions
               generationId={resultId}
@@ -342,11 +394,13 @@ export default function UncensoredInpaintStudio({
                 toast.info("Now painting on the new image.");
               }}
               onRefine={onRefine}
+              onOutfit={onOutfit}
+              onSheet={onSheet}
               onAnimate={onAnimate}
               onUseCharacter={onUseCharacter}
             />
           )}
-        </div>
+        </UncensoredBeforeAfterCompare>
       )}
     </div>
   );

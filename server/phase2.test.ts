@@ -6,17 +6,75 @@ import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import {
   createGeneration,
+  getDb,
   getGenerationById,
   getGalleryItems,
   getGalleryStats,
   getGenerationsForExport,
   getUserGenerations,
   publishGalleryItem,
+  setGenerationTags,
   updateGeneration,
   updateUserProfile,
 } from "./db";
 import { deductCredits, refundCredits } from "./stripe";
 import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
+import { createNotification } from "./routersPhase15";
+import { autoCheckAchievements } from "./routers/phase22";
+import type { SubscriptionEntitlementInput } from "../shared/subscriptionEntitlement";
+
+const imageTestConfig = vi.hoisted(() => ({
+  falApiKey: "test-fal-not-a-real-key",
+  openaiApiKey: "",
+  grokApiKey: "",
+  stabilityApiKey: "",
+  replicateApiToken: "",
+  togetherApiKey: "",
+  geminiApiKey: "",
+  cfAiToken: "",
+  cfAccountId: "",
+  runpodApiKey: "",
+  runpodFluxEndpointId: "",
+}));
+
+const generationBillingMocks = vi.hoisted(() => ({
+  read: vi.fn(), claim: vi.fn(), begin: vi.fn(), complete: vi.fn(), fail: vi.fn(), reconcile: vi.fn(),
+  records: new Map<string, any>(),
+}));
+vi.mock("./_core/generationBilling", () => ({
+  readGenerationRequest: (...args: any[]) => generationBillingMocks.read(...args),
+  claimGenerationRequest: (...args: any[]) => generationBillingMocks.claim(...args),
+  beginGenerationRequest: (...args: any[]) => generationBillingMocks.begin(...args),
+  completeGenerationRequest: (...args: any[]) => generationBillingMocks.complete(...args),
+  failGenerationRequestAndRefund: (...args: any[]) => generationBillingMocks.fail(...args),
+  markGenerationReconciliation: (...args: any[]) => generationBillingMocks.reconcile(...args),
+}));
+
+// Provider configuration is synthetic. Render calls below are always mocked.
+vi.mock("./_core/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./_core/env")>();
+  return {
+    ...actual,
+    ENV: new Proxy(actual.ENV, {
+      get(target, property) {
+        if (Object.hasOwn(imageTestConfig, property)) {
+          return imageTestConfig[property as keyof typeof imageTestConfig];
+        }
+        return Reflect.get(target, property);
+      },
+    }),
+  };
+});
+
+vi.mock("./routersPhase15", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./routersPhase15")>();
+  return { ...actual, createNotification: vi.fn(async () => undefined) };
+});
+
+vi.mock("./routers/phase22", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./routers/phase22")>();
+  return { ...actual, autoCheckAchievements: vi.fn(async () => []) };
+});
 
 // Stub the LLM module — generation.enhancePrompt must never make live
 // network calls in tests. Per-test behavior is set with mockInvokeLLM below.
@@ -73,6 +131,7 @@ const mockInvokeLLM = vi.mocked(invokeLLM);
 const mockGenerateImage = vi.mocked(generateImage);
 const mockCreateGeneration = vi.mocked(createGeneration);
 const mockUpdateGeneration = vi.mocked(updateGeneration);
+const mockSetGenerationTags = vi.mocked(setGenerationTags);
 const mockGetUserGenerations = vi.mocked(getUserGenerations);
 const mockGetGenerationById = vi.mocked(getGenerationById);
 const mockGetGalleryItems = vi.mocked(getGalleryItems);
@@ -82,11 +141,43 @@ const mockPublishGalleryItem = vi.mocked(publishGalleryItem);
 const mockUpdateUserProfile = vi.mocked(updateUserProfile);
 const mockDeductCredits = vi.mocked(deductCredits);
 const mockRefundCredits = vi.mocked(refundCredits);
+const mockCreateNotification = vi.mocked(createNotification);
+const mockAutoCheckAchievements = vi.mocked(autoCheckAchievements);
 
 // Fresh call history per test; factory implementations survive clearing, and
 // tests that need specific rows set them explicitly.
 beforeEach(() => {
   vi.clearAllMocks();
+  generationBillingMocks.records.clear();
+  generationBillingMocks.read.mockReset().mockResolvedValue(null);
+  generationBillingMocks.claim.mockReset().mockImplementation(async input => {
+    const request = { ...input, id: 1, quotedCredits: input.credits, state: "reserved", generationId: null, result: null };
+    generationBillingMocks.records.set(input.requestId, request);
+    return { kind: "owned", request, owner: { ...input, id: 1, executionToken: "11111111-1111-4111-8111-111111111111" } };
+  });
+  generationBillingMocks.begin.mockReset().mockImplementation(async (owner, generationId) => {
+    const request = { ...generationBillingMocks.records.get(owner.requestId), state: "rendering", generationId };
+    generationBillingMocks.records.set(owner.requestId, request);
+    return { kind: "begun", request };
+  });
+  generationBillingMocks.complete.mockReset().mockImplementation(async (owner, input) => ({
+    kind: "completed", request: { ...generationBillingMocks.records.get(owner.requestId), state: "completed", result: input.result },
+  }));
+  generationBillingMocks.fail.mockReset().mockImplementation(async (owner, input) => ({
+    kind: "refunded", request: { ...generationBillingMocks.records.get(owner.requestId), state: "refunded", generationId: input.generationId ?? null },
+  }));
+  generationBillingMocks.reconcile.mockReset().mockResolvedValue({ kind: "uncertain" });
+  vi.mocked(getDb).mockResolvedValue(null);
+  imageTestConfig.falApiKey = "test-fal-not-a-real-key";
+  imageTestConfig.grokApiKey = "";
+  mockGenerateImage.mockReset().mockResolvedValue({ url: "https://cdn.example.com/phase2-generated.png" });
+  mockCreateGeneration.mockReset().mockResolvedValue(101);
+  mockUpdateGeneration.mockReset().mockResolvedValue(undefined);
+  mockSetGenerationTags.mockReset().mockResolvedValue(undefined);
+  mockDeductCredits.mockReset().mockResolvedValue({ success: true, balance: 95, needed: 5 });
+  mockRefundCredits.mockReset().mockResolvedValue(undefined as any);
+  mockCreateNotification.mockReset().mockResolvedValue(undefined as any);
+  mockAutoCheckAchievements.mockReset().mockResolvedValue([]);
 });
 
 function llmResult(content: string) {
@@ -157,6 +248,42 @@ function createPublicContext(): { ctx: TrpcContext } {
     } as TrpcContext["res"],
   };
   return { ctx };
+}
+
+function subscriptionRow(planName: string, overrides: Partial<SubscriptionEntitlementInput> = {}) {
+  return {
+    planName,
+    status: "active",
+    currentPeriodStart: new Date(Date.now() - 86_400_000),
+    currentPeriodEnd: new Date(Date.now() + 86_400_000),
+    cancelAtPeriodEnd: false,
+    ...overrides,
+  };
+}
+
+function useSubscriptionPlan(planName: "creator" | "pro", overrides: Partial<SubscriptionEntitlementInput> = {}) {
+  vi.mocked(getDb).mockResolvedValue({
+    execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([subscriptionRow(planName, overrides)]),
+  } as any);
+}
+
+function expectGenerationQuote(userId: number, credits: number) {
+  expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+  expect(generationBillingMocks.claim).toHaveBeenCalledWith(expect.objectContaining({ userId, credits }));
+}
+
+function expectGenerationRefund(userId: number, credits: number) {
+  expectGenerationQuote(userId, credits);
+  expect(generationBillingMocks.fail).toHaveBeenCalledTimes(1);
+  expect(generationBillingMocks.fail).toHaveBeenCalledWith(
+    expect.objectContaining({ userId }), expect.objectContaining({ confirmedFailure: true, errorCode: "generation-failed" }),
+  );
 }
 
 /* Minimal generations row matching drizzle/schema.ts. Tests pass it (via
@@ -303,11 +430,7 @@ describe("generation.create", () => {
     });
 
     // Credits are charged up front for the requested tool...
-    expect(mockDeductCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
-      expect.stringContaining("Generated image"),
-    );
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-image"] ?? 1);
     // ...a "generating" row is inserted...
     expect(mockCreateGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -322,17 +445,20 @@ describe("generation.create", () => {
     );
     expect(mockGenerateImage).toHaveBeenCalledOnce();
     // ...and the row is flipped to completed with the provider URL.
-    expect(mockUpdateGeneration).toHaveBeenCalledWith(101, {
-      status: "completed",
+    expect(generationBillingMocks.complete).toHaveBeenCalledWith(expect.objectContaining({ userId: ctx.user.id }), expect.objectContaining({
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       thumbnailUrl: "https://cdn.example.com/phase2-generated.png",
-    });
+    }));
     expect(result).toEqual({
       id: 101,
       status: "completed",
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       mediaType: "image",
+      requestId: expect.any(String),
       newAchievements: [],
+      modelId: "built-in-v1",
+      creditCost: 5,
+      provenance: undefined,
     });
   });
 
@@ -349,11 +475,7 @@ describe("generation.create", () => {
       modelVersion: "animatediff-v2",
     });
 
-    expect(mockDeductCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-video"] ?? 1,
-      expect.stringContaining("Generated video"),
-    );
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-video"] ?? 1);
     expect(mockCreateGeneration).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: ctx.user.id,
@@ -369,13 +491,14 @@ describe("generation.create", () => {
       status: "completed",
       imageUrl: "https://cdn.example.com/phase2-generated.png",
       mediaType: "video",
+      requestId: expect.any(String),
       newAchievements: [],
     });
     expect(result.mediaType).toBe("video");
   });
 
-  it("marks the generation failed and refunds credits when the provider errors", async () => {
-    mockGenerateImage.mockRejectedValueOnce(new Error("provider exploded"));
+  it.each(["provider exploded", "provider poll timed out", "image download unavailable", "storage write unavailable"])("holds an unconfirmed renderer error for reconciliation (%s)", async message => {
+    mockGenerateImage.mockRejectedValueOnce(new Error(message));
 
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
@@ -388,18 +511,314 @@ describe("generation.create", () => {
       modelVersion: "built-in-v1",
     });
 
-    // The router maps provider errors to a failed row, not a thrown error...
-    expect(result).toEqual({ id: 101, status: "failed", error: "provider exploded" });
-    expect(mockUpdateGeneration).toHaveBeenCalledWith(101, {
-      status: "failed",
-      errorMessage: "provider exploded",
-    });
-    // ...and refunds the credit charge.
-    expect(mockRefundCredits).toHaveBeenCalledWith(
-      ctx.user.id,
-      TOOL_CREDIT_COSTS["text-to-image"] ?? 1,
-      expect.stringContaining("Refund"),
-    );
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
+    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-image"] ?? 1);
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unknown explicit model before charging or creating a row", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.generation.create({
+      prompt: "A crystal dragon over a volcano",
+      mediaType: "image",
+      width: 768,
+      height: 768,
+      modelVersion: "some-future-model",
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it("charges the model's registry price for known premium models", async () => {
+    // Pro-plan user so the premium model gate (canAccessModel) passes.
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
+    } as any);
+    try {
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      const result = await caller.generation.create({
+        prompt: "A crystal dragon over a volcano",
+        mediaType: "image",
+        width: 768,
+        height: 768,
+        modelVersion: "flux-pro", // registry premium image model, creditCost.base = 210
+      });
+
+      expect(result.status).toBe("completed");
+      expectGenerationQuote(ctx.user.id, 210);
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
+  });
+
+  it("rejects an image model for video before charging or executing", async () => {
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
+    } as any);
+    try {
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(caller.generation.create({
+        prompt: "A phoenix rising from flames",
+        mediaType: "video",
+        width: 768,
+        height: 768,
+        duration: 4,
+        modelVersion: "flux-pro",
+      })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+      expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+      expect(mockCreateGeneration).not.toHaveBeenCalled();
+      expect(mockGenerateImage).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
+  });
+
+  it("holds the exact premium quote when the renderer outcome is uncertain", async () => {
+    vi.mocked(getDb).mockResolvedValue({
+      execute: vi.fn().mockResolvedValue({ rows: [{ current_hits: 0, allowed: true }] }),
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([subscriptionRow("pro")]),
+    } as any);
+    try {
+      mockGenerateImage.mockRejectedValueOnce(new Error("provider exploded"));
+
+      const { ctx } = createAuthContext();
+      const caller = appRouter.createCaller(ctx);
+
+      const result = await caller.generation.create({
+        prompt: "A crystal dragon over a volcano",
+        mediaType: "image",
+        width: 768,
+        height: 768,
+        modelVersion: "flux-pro",
+      });
+
+      expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+      expect(result).not.toHaveProperty("refundedCredits");
+      expectGenerationQuote(ctx.user.id, 210);
+      expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+      expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.mocked(getDb).mockResolvedValue(null);
+    }
+  });
+
+  it("exposes the executable image catalog without authentication or generation", async () => {
+    const caller = appRouter.createCaller(createPublicContext().ctx);
+    const catalog = await caller.generation.imageModels();
+    expect(catalog).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "built-in-v1", creditCost: 5, requiredTier: "free", isConfigured: true }),
+      expect.objectContaining({ id: "flux-pro", creditCost: 210, requiredTier: "pro" }),
+    ]));
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each(["built-in-v1", "auto"])("charges %s once at the fixed automatic price", async modelVersion => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion });
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expectGenerationQuote(1, 5);
+    expect(mockGenerateImage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ model: "auto" }));
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it("executes a selected model alias and stores its canonical identity and real provider receipt", async () => {
+    useSubscriptionPlan("creator");
+    imageTestConfig.grokApiKey = "test-grok-not-a-real-key";
+    const provenance = { provider: "grok", model: "grok-imagine-image", requestedModel: "grok", fallbackUsed: false };
+    mockGenerateImage.mockResolvedValueOnce({ url: "https://cdn.example.com/grok.png", provenance });
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion: "grok" });
+    expect(mockGenerateImage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ model: "grok", userTier: "creator" }));
+    expectGenerationQuote(1, 105);
+    expect(mockCreateGeneration).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({ requestedModelId: "grok", modelId: "grok-image", quotedCredits: 105 }),
+    }));
+    expect(generationBillingMocks.complete).toHaveBeenCalledWith(expect.objectContaining({ userId: 1 }), expect.objectContaining({
+      metadata: expect.objectContaining({ imageGeneration: provenance }),
+    }));
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["gpt-4o-mini", "BAD_REQUEST"],
+    ["fal-flux-kontext", "BAD_REQUEST"],
+    ["flux-pro", "FORBIDDEN"],
+  ])("rejects invalid standard image selection %s before debit", async (modelVersion, code) => {
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion }))
+      .rejects.toMatchObject({ code });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unconfigured selection before debit without switching to configured Automatic", async () => {
+    useSubscriptionPlan("creator");
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake", width: 768, height: 768, modelVersion: "grok-image" }))
+      .rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each(["canceled", "past_due", "incomplete", "unpaid", "paused"])("denies saved paid model access for %s before any debit", async status => {
+    useSubscriptionPlan("pro", { status });
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each([null, new Date("2020-01-01T00:00:00Z")])("denies active paid model access without an unexpired end (%s)", async currentPeriodEnd => {
+    useSubscriptionPlan("pro", { currentPeriodEnd });
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: "active", cancelAtPeriodEnd: true },
+    { status: "trialing", cancelAtPeriodEnd: false },
+  ])("retains valid saved paid access for %j", async overrides => {
+    useSubscriptionPlan("pro", overrides);
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake", modelVersion: "flux-pro" });
+    expect(result.status).toBe("completed");
+    expectGenerationQuote(1, 210);
+    expect(mockGenerateImage).toHaveBeenCalledWith(expect.objectContaining({ model: "flux-pro", userTier: "pro" }));
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it("does not create, render or refund when the wallet declines the debit", async () => {
+    generationBillingMocks.claim.mockImplementationOnce(async input => ({
+      kind: "replay", request: { ...input, id: 1, quotedCredits: input.credits, state: "rejected", generationId: null, result: null },
+    }));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake" }))
+      .resolves.toMatchObject({ status: "failed", creditCost: 0, quotedCredits: 5, refundedCredits: 0 });
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expect(mockCreateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it("refunds a successful debit once if the generation record cannot be created", async () => {
+    mockCreateGeneration.mockRejectedValueOnce(new Error("record insert unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake" })).resolves.toMatchObject({ id: undefined, status: "failed", refundedCredits: 5, creditCost: 0 });
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expectGenerationRefund(1, 5);
+    expect(mockUpdateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it("refunds and stops before rendering when record creation returns an invalid ID", async () => {
+    mockCreateGeneration.mockResolvedValueOnce(0);
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    await expect(caller.generation.create({ prompt: "A mountain lake" })).resolves.toMatchObject({ id: undefined, status: "failed", refundedCredits: 5, creditCost: 0 });
+    expectGenerationRefund(1, 5);
+    expect(mockUpdateGeneration).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it("refunds tag persistence failure once before making a provider request", async () => {
+    mockSetGenerationTags.mockRejectedValueOnce(new Error("tags unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake", tagIds: [1] });
+    expect(result.status).toBe("failed");
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expectGenerationRefund(1, 5);
+  });
+
+  it("retains pending reconciliation when the atomic failure settlement cannot be confirmed", async () => {
+    mockSetGenerationTags.mockRejectedValueOnce(new Error("tags unavailable"));
+    generationBillingMocks.fail.mockRejectedValueOnce(new Error("atomic settlement unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake", tagIds: [1] });
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
+    expect(generationBillingMocks.claim).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "   "])("holds a provider response with no downloadable URL for reconciliation (%s)", async url => {
+    mockGenerateImage.mockResolvedValueOnce({ url });
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake" });
+    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
+    expect(result).not.toHaveProperty("refundedCredits");
+    expect(mockUpdateGeneration).not.toHaveBeenCalledWith(101, expect.objectContaining({ status: "completed" }));
+    expectGenerationQuote(1, 5);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.complete).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps uncertain completion pending and never enters the confirmed-failure refund path", async () => {
+    generationBillingMocks.complete.mockRejectedValueOnce(new Error("completion acknowledgment unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake" });
+    expect(result.status).toBe("generating");
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+    expect(mockCreateNotification).not.toHaveBeenCalled();
+  });
+
+  it("does not refund a delivered result when its completion notification fails", async () => {
+    mockCreateNotification.mockRejectedValueOnce(new Error("notification unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake" });
+    expect(result.status).toBe("completed");
+    expect(generationBillingMocks.complete).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
+  });
+
+  it("preserves delivered output when achievement checks fail", async () => {
+    mockAutoCheckAchievements.mockRejectedValueOnce(new Error("achievements unavailable"));
+    const caller = appRouter.createCaller(createAuthContext().ctx);
+    const result = await caller.generation.create({ prompt: "A mountain lake" });
+    expect(result).toMatchObject({ status: "completed", newAchievements: [] });
+    expect(generationBillingMocks.complete).toHaveBeenCalledTimes(1);
+    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
   });
 });
 

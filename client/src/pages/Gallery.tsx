@@ -159,35 +159,51 @@ export default function Gallery() {
   return (
     <PageLayout>
       <div className="container py-8 md:py-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-primary" />
-              Community Gallery
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Discover stunning AI-generated art from our creator community
-              {galleryData && <span className="ml-1">({total} items)</span>}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {selectedItems.length > 0 && (
-              <Button
-                size="sm"
-                onClick={handleBulkExport}
-                disabled={isExporting}
-                className="gap-1.5"
-              >
-                {isExporting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Download className="h-3.5 w-3.5" />
-                )}
-                Export {selectedItems.length} items
-              </Button>
-            )}
-            <DisclaimerBanner compact />
+        {/* Hero Banner */}
+        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 p-6 md:p-9 mb-8 shadow-2xl">
+          <img
+            src="/showcase/gallery-1.jpg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover opacity-35"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/55" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_left,rgba(168,85,247,0.18),transparent_60%)]" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-medium mb-3 backdrop-blur-md">
+                <Sparkles className="h-3.5 w-3.5" />
+                Curated AI Art Showcase
+              </div>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
+                Community{" "}
+                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  Gallery
+                </span>
+              </h1>
+              <p className="text-sm md:text-base text-white/75 mt-1.5 max-w-xl">
+                Discover stunning AI-generated art, remix prompts in one click, and explore creations from the DreamForgeX community
+                {galleryData && <span className="ml-1 text-cyan-300 font-medium">({total} items)</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedItems.length > 0 && (
+                <Button
+                  size="sm"
+                  onClick={handleBulkExport}
+                  disabled={isExporting}
+                  className="gap-1.5"
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  Export {selectedItems.length} items
+                </Button>
+              )}
+              <DisclaimerBanner compact />
+            </div>
           </div>
         </div>
 
