@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import UncensoredLanding from "@/pages/UncensoredLanding";
 import { UNCENSORED_LANDINGS, UNCENSORED_LANDING_SLUGS } from "@shared/uncensoredLanding";
+import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 
 const SITE = "https://dreamforgex.ai";
 
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: page.metaDescription,
       url,
       siteName: "DreamForgeX",
-      images: [`${SITE}/showcase/gallery-1.jpg`],
+      images: [`${SITE}/showcase/uncensored-char-aria-nordic.jpg`],
     },
     robots: { index: true, follow: true },
   };
@@ -51,11 +52,19 @@ export default async function Page({ params }: PageProps) {
         brand: { "@type": "Brand", name: "DreamForgeX" },
         url,
         offers: {
-          "@type": "Offer",
-          price: "19.00",
+          "@type": "AggregateOffer",
+          lowPrice: "4.99",
+          highPrice: "19.00",
           priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-          url: `${SITE}/uncensored`,
+          offerCount: UNCENSORED_PLANS.length,
+          offers: UNCENSORED_PLANS.map((p) => ({
+            "@type": "Offer",
+            name: `Uncensored ${p.label}`,
+            price: p.priceUsd.toFixed(2),
+            priceCurrency: "USD",
+            availability: "https://schema.org/InStock",
+            url: `${SITE}/uncensored`,
+          })),
         },
       },
       {

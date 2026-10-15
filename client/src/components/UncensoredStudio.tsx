@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Flame, Wand2, Paintbrush, LayoutGrid, Shirt, Film, FolderHeart, Zap, Plus, Loader2 } from "lucide-react";
+import { Flame, Wand2, Paintbrush, LayoutGrid, Shirt, Film, FolderHeart, Zap, Plus, Loader2, Clock, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredImageStudio from "./UncensoredImageStudio";
 import UncensoredRefineStudio from "./UncensoredRefineStudio";
 import UncensoredInpaintStudio from "./UncensoredInpaintStudio";
@@ -31,6 +32,20 @@ const QUICK_TOPUP_PACKS = [
   { id: "pack-7500", label: "+7,500 cr", price: "$49.99" },
 ] as const;
 
+function formatPassRemaining(untilDate: Date | null): { text: string; urgent: boolean } | null {
+  if (!untilDate) return null;
+  const diffMs = untilDate.getTime() - Date.now();
+  if (diffMs <= 0) return { text: "Expired", urgent: true };
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days >= 2) return { text: `${days}d ${hours}h left`, urgent: false };
+  if (days === 1) return { text: `1d ${hours}h left`, urgent: false };
+  if (totalHours >= 1) return { text: `${totalHours}h left`, urgent: true };
+  const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  return { text: `${mins}m left`, urgent: true };
+}
+
 /**
  * Paid uncensored workspace. Tabs share a focused generation id so Create →
  * Refine / Inpaint / Animate is one click instead of re-picking the image.
@@ -48,7 +63,9 @@ export default function UncensoredStudio({
   const [focusId, setFocusId] = useState<number | null>(initialFocusId ?? null);
   const [recreateId, setRecreateId] = useState<number | null>(null);
   const [showTopUp, setShowTopUp] = useState(false);
+  const [showExtendPass, setShowExtendPass] = useState(false);
 
+  const utils = trpc.useUtils();
   const { data: status } = trpc.uncensored.status.useQuery();
   const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
     onSuccess: (res) => {
@@ -57,6 +74,19 @@ export default function UncensoredStudio({
     },
     onError: (e) => toast.error(e.message),
   });
+  const extendWithCredits = trpc.uncensored.unlockWithCredits.useMutation({
+    onSuccess: (res) => {
+      const newDate = res.until ? new Date(res.until).toLocaleDateString() : "extended";
+      toast.success(`Pass extended until ${newDate}! (${res.creditsRemaining.toLocaleString()} credits remaining)`);
+      setShowExtendPass(false);
+      utils.uncensored.status.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const effectiveUntil = status?.until ? new Date(status.until) : until ? new Date(until) : null;
+  const remaining = formatPassRemaining(effectiveUntil);
+  const creditBalance = status?.creditBalance ?? 0;
 
   const go = (next: Tab, id?: number) => {
     if (typeof id === "number") setFocusId(id);
@@ -67,29 +97,102 @@ export default function UncensoredStudio({
     <div className="mt-10 rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-500/5 via-card/30 to-card/20 p-4 sm:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
             <h2 className="text-xl font-bold sm:text-2xl">Uncensored Pro Studio</h2>
+            {remaining && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                  remaining.urgent
+                    ? "border border-amber-500/40 bg-amber-500/15 text-amber-300"
+                    : "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                }`}
+              >
+                <Clock className="h-3 w-3" />
+                {remaining.text}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Pass active until {until ? new Date(until).toLocaleDateString() : "—"} · Private · Unfiltered · Zero Watermark
+            Pass active until {effectiveUntil ? effectiveUntil.toLocaleDateString() : "—"} · Private · Unfiltered · Zero Watermark
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-black/30 px-3.5 py-1.5 text-xs font-semibold text-rose-100">
             <Zap className="h-3.5 w-3.5 text-amber-400" />
-            <span>{(status?.creditBalance ?? 0).toLocaleString()} credits</span>
+            <span>{creditBalance.toLocaleString()} credits</span>
           </div>
           <button
             type="button"
-            onClick={() => setShowTopUp((v) => !v)}
+            onClick={() => {
+              setShowExtendPass((v) => !v);
+              setShowTopUp(false);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-500/25"
+          >
+            <Clock className="h-3.5 w-3.5 text-rose-300" /> Extend Pass
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowTopUp((v) => !v);
+              setShowExtendPass(false);
+            }}
             className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-3.5 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" /> Top Up Credits
           </button>
         </div>
       </div>
+
+      {showExtendPass && (
+        <div className="mt-4 rounded-xl border border-rose-500/30 bg-black/35 p-3.5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-rose-100">
+                Stack extra pass time onto your active Uncensored Pass (no time lost):
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Use existing credits in 1 click, or pay with Card / Apple Pay to top up and auto-extend.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {UNCENSORED_PLANS.map((plan) => {
+                const hasEnough = creditBalance >= plan.creditPrice;
+                const busy = extendWithCredits.isPending || purchaseCredits.isPending;
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (hasEnough) {
+                        extendWithCredits.mutate({ planId: plan.id });
+                      } else {
+                        purchaseCredits.mutate({
+                          packId: plan.creditPackId,
+                          origin: window.location.origin,
+                          returnPath: `/uncensored?autounlock=${encodeURIComponent(plan.id)}`,
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-500/25 disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3 text-amber-400" />
+                    )}
+                    +{plan.durationDays === 1 ? "24h" : `${plan.durationDays}d`} ({plan.label}) ·{" "}
+                    {hasEnough ? `${plan.creditPrice.toLocaleString()} cr` : `$${plan.priceUsd} Card/Pay`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTopUp && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-black/30 p-3">

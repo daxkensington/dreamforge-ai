@@ -19,7 +19,7 @@ import {
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import type { UncensoredLanding as Landing } from "@shared/uncensoredLanding";
+import { UNCENSORED_SILO_LINKS, type UncensoredLanding as Landing } from "@shared/uncensoredLanding";
 import {
   FREE_UNCENSORED_PREVIEWS,
   UNCENSORED_ENTRY_PLAN,
@@ -261,6 +261,22 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
             </div>
           </div>
         )}
+
+        {/* Silo cross-linking cloud so all /uncensored/* landers pass crawl equity */}
+        <div className="mt-14">
+          <h2 className="text-center text-lg font-semibold">Explore more uncensored studio tools</h2>
+          <div className="mx-auto mt-4 flex max-w-3xl flex-wrap justify-center gap-2">
+            {UNCENSORED_SILO_LINKS.filter((l) => l.slug !== page.slug).map((l) => (
+              <a
+                key={l.slug}
+                href={`/uncensored/${l.slug}`}
+                className="rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-rose-300"
+              >
+                {l.label}
+              </a>
+            ))}
+          </div>
+        </div>
 
         {/* Compliance footer + funnel link */}
         <p className="mt-12 text-center text-xs text-muted-foreground">

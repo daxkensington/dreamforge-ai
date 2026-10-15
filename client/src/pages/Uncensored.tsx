@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
+import { UNCENSORED_SILO_LINKS } from "@shared/uncensoredLanding";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredStudio, { type UncensoredStudioTab } from "@/components/UncensoredStudio";
 import {
@@ -1171,24 +1172,8 @@ export default function Uncensored() {
                 equity from this indexed page (descriptive anchor text). */}
             <div className="mt-14">
               <h2 className="text-center text-xl font-semibold">Explore uncensored generators</h2>
-              <div className="mx-auto mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
-                {[
-                  { slug: "no-filter", label: "AI image generator — no filter" },
-                  { slug: "unfiltered", label: "Unfiltered AI image generator" },
-                  { slug: "no-restrictions", label: "No restrictions" },
-                  { slug: "private-crypto", label: "Private — pay with crypto" },
-                  { slug: "flux-uncensored", label: "Flux uncensored online" },
-                  { slug: "realistic", label: "Realistic" },
-                  { slug: "anime", label: "Anime" },
-                  { slug: "fantasy", label: "Fantasy" },
-                  { slug: "cyberpunk", label: "Cyberpunk" },
-                  { slug: "midjourney-nsfw-alternative", label: "Midjourney NSFW alternative" },
-                  { slug: "civitai-alternative-online", label: "Civitai alternative (online)" },
-                  { slug: "stable-diffusion-no-filter-online", label: "Stable Diffusion no filter online" },
-                  { slug: "ai-video-generator-uncensored", label: "Uncensored AI video generator" },
-                  { slug: "nsfw-ai-video-generator", label: "NSFW AI video generator" },
-                  { slug: "image-to-video-nsfw", label: "Image to video (NSFW)" },
-                ].map((l) => (
+              <div className="mx-auto mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
+                {UNCENSORED_SILO_LINKS.map((l) => (
                   <a
                     key={l.slug}
                     href={`/uncensored/${l.slug}`}
