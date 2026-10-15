@@ -936,3 +936,145 @@ export const UNCENSORED_INPAINT_PRESETS: UncensoredInpaintPreset[] = [
     strength: 75,
   },
 ];
+
+export interface UncensoredSceneRecipe {
+  id: string;
+  label: string;
+  prompt: string;
+  style: string;
+  aspect: string;
+  framing: string | null;
+  pose: string | null;
+  camera: string | null;
+  lighting: string | null;
+  wardrobe: string | null;
+  setting: string | null;
+}
+
+/**
+ * 1-click complete scene recipes for both Free Preview and Paid Create Studio.
+ * Each recipe configures the prompt plus matching style, aspect, framing, pose,
+ * camera, lighting, wardrobe, and setting chips in a single click.
+ */
+export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
+  {
+    id: "penthouse-boudoir",
+    label: "Penthouse Boudoir",
+    prompt:
+      "gorgeous fictional woman in a high-rise penthouse suite at night, warm city skyline bokeh through floor-to-ceiling glass, intimate editorial glamour",
+    style: "realistic",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "reclining",
+    camera: "eyelevel",
+    lighting: "candle",
+    wardrobe: "lingerie",
+    setting: "hotel",
+  },
+  {
+    id: "neon-rain-cyberpunk",
+    label: "Neon Rain Cyberpunk",
+    prompt:
+      "fictional cyberpunk femme fatale on a rain-slicked rooftop at midnight, glowing holographic billboards, wet skin specular highlights",
+    style: "cinematic",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "frombehind",
+    camera: "low",
+    lighting: "neon",
+    wardrobe: "leather",
+    setting: "balcony",
+  },
+  {
+    id: "candlelight-silk",
+    label: "Candlelight Silk",
+    prompt:
+      "intimate boudoir portrait of a fictional woman draped in flowing black silk, warm flickering candlelight, soft chiaroscuro shadows",
+    style: "realistic",
+    aspect: "portrait",
+    framing: "bust",
+    pose: "sitting",
+    camera: "eyelevel",
+    lighting: "candle",
+    wardrobe: "silk",
+    setting: "bedroom",
+  },
+  {
+    id: "golden-hour-beach",
+    label: "Golden Hour Beach",
+    prompt:
+      "sun-kissed fictional model on a secluded tropical cove at sunset, glowing wet skin, warm golden rim light and turquoise waves",
+    style: "realistic",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "standing",
+    camera: "eyelevel",
+    lighting: "golden",
+    wardrobe: "swimsuit",
+    setting: "beach",
+  },
+  {
+    id: "leather-editorial",
+    label: "Leather Editorial",
+    prompt:
+      "high-fashion nocturnal editorial of a confident fictional woman in tailored black leather, dramatic studio beauty dish lighting",
+    style: "cinematic",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "leaning",
+    camera: "low",
+    lighting: "studio",
+    wardrobe: "leather",
+    setting: "loft",
+  },
+  {
+    id: "dark-fantasy-sorceress",
+    label: "Dark Fantasy Sorceress",
+    prompt:
+      "ethereal dark-fantasy sorceress wreathed in arcane embers and moonlight, intricate obsidian and sheer silk attire, dramatic atmosphere",
+    style: "fantasy",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "arching",
+    camera: "low",
+    lighting: "candle",
+    wardrobe: "evening",
+    setting: "forest",
+  },
+  {
+    id: "anime-after-hours",
+    label: "90s Anime After-Hours",
+    prompt:
+      "expressive anime heroine in a neon-lit Tokyo apartment at night, rain on window glass, crisp cel shading and vibrant rim light",
+    style: "anime",
+    aspect: "portrait",
+    framing: "bust",
+    pose: "sitting",
+    camera: "eyelevel",
+    lighting: "neon",
+    wardrobe: "casual",
+    setting: "bedroom",
+  },
+  {
+    id: "chiaroscuro-oil",
+    label: "Chiaroscuro Figure Study",
+    prompt:
+      "classical baroque oil-painting figure study in dramatic Caravaggio lighting, rich canvas brushstroke texture, warm amber shadows",
+    style: "artistic",
+    aspect: "portrait",
+    framing: "threequarter",
+    pose: "reclining",
+    camera: "eyelevel",
+    lighting: "candle",
+    wardrobe: "silk",
+    setting: "bedroom",
+  },
+];
+
+export function pickRandomUncensoredSceneRecipe(
+  excludeId?: string | null,
+): UncensoredSceneRecipe {
+  const pool = UNCENSORED_SCENE_RECIPES.filter((r) => r.id !== excludeId);
+  const list = pool.length > 0 ? pool : UNCENSORED_SCENE_RECIPES;
+  return list[Math.floor(Math.random() * list.length)]!;
+}

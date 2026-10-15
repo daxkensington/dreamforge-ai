@@ -2,7 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Flame, Lock, Shield, Bitcoin, Loader2, ArrowRight, Wallet, QrCode, Zap, ExternalLink, X, Film, Sparkles, Shirt, UserCheck, Wand2 } from "lucide-react";
+import {
+  Flame,
+  Lock,
+  Shield,
+  Bitcoin,
+  Loader2,
+  ArrowRight,
+  Wallet,
+  QrCode,
+  Zap,
+  ExternalLink,
+  X,
+  Film,
+  Sparkles,
+  Shirt,
+  UserCheck,
+  Wand2,
+  Shuffle,
+  Paintbrush,
+  Grid2x2,
+  Images,
+} from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,15 +35,89 @@ import { track } from "@/lib/analytics";
 import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredStudio, { type UncensoredStudioTab } from "@/components/UncensoredStudio";
-import { UNCENSORED_ASPECTS, DEFAULT_UNCENSORED_ASPECT, enhanceUncensoredPrompt } from "@shared/uncensoredStudio";
+import {
+  UNCENSORED_ASPECTS,
+  UNCENSORED_SCENE_RECIPES,
+  DEFAULT_UNCENSORED_ASPECT,
+  enhanceUncensoredPrompt,
+  pickRandomUncensoredSceneRecipe,
+} from "@shared/uncensoredStudio";
 import RenderWaitHint, { newRequestId } from "@/components/RenderWaitHint";
 
-/** One-tap starters so age-confirmed visitors don't stall on an empty box. */
-const FREE_STARTERS = [
-  "A film-noir detective lit only by neon through venetian blinds, cigarette smoke curling",
-  "A baroque oil-painting portrait of a fallen angel with cracked marble wings",
-  "A tattooed biker gang at a desert gas station at golden hour, grimy and cinematic",
-  "A moody boudoir-style figure study in dramatic chiaroscuro lighting",
+const VALID_STUDIO_TABS: UncensoredStudioTab[] = [
+  "create",
+  "refine",
+  "inpaint",
+  "sheet",
+  "outfit",
+  "video",
+  "library",
+];
+
+const STUDIO_SHOWCASE_TOOLS: {
+  tab: UncensoredStudioTab;
+  icon: typeof Sparkles;
+  title: string;
+  badge: string;
+  desc: string;
+  upsellLabel: string;
+}[] = [
+  {
+    tab: "create",
+    icon: Sparkles,
+    title: "Create & Face Lock",
+    badge: "IP-Adapter Identity",
+    desc: "Save any generated character and lock her face across brand-new scenes, poses, cameras & lighting.",
+    upsellLabel: "Create with IP-Adapter Face Lock & 60+ director chips",
+  },
+  {
+    tab: "refine",
+    icon: Wand2,
+    title: "Refine & Relight",
+    badge: "8 Presets + 4K",
+    desc: "1-click Fix Hands, 8K Face & Eyes, Dewy Skin, Penthouse/Beach backgrounds, Relight, Cutout & 4× Upscale.",
+    upsellLabel: "Refine, relight & 4K upscale in the Uncensored Studio",
+  },
+  {
+    tab: "inpaint",
+    icon: Paintbrush,
+    title: "Brush Inpaint",
+    badge: "Feathered Mask",
+    desc: "Paint over any region to swap wardrobe, add tattoos/jewelry, or fix details with side-by-side comparison.",
+    upsellLabel: "Brush inpaint & edit regions in the Uncensored Studio",
+  },
+  {
+    tab: "outfit",
+    icon: Shirt,
+    title: "Virtual Outfit Swap",
+    badge: "10 Presets + Try-On",
+    desc: "Swap into Silk Lace, Latex Catsuit, Velvet Gown, Cyberpunk Armor, or copy any reference garment photo.",
+    upsellLabel: "Swap outfits & restyle wardrobe in 1 click",
+  },
+  {
+    tab: "sheet",
+    icon: Grid2x2,
+    title: "4-View Character Sheet",
+    badge: "Parallel 2×2 PNG",
+    desc: "Render front, 3/4, profile & full-body turnaround views in parallel + download a stitched 2×2 master PNG.",
+    upsellLabel: "Generate 4-view character turnaround sheets",
+  },
+  {
+    tab: "video",
+    icon: Film,
+    title: "Uncensored Video (Wan 2.1)",
+    badge: "5s Motion Clips",
+    desc: "Animate any uncensored character or text prompt into smooth 5-second video clips with camera & motion presets.",
+    upsellLabel: "Animate characters into 5s uncensored video clips",
+  },
+  {
+    tab: "library",
+    icon: Images,
+    title: "100% Private Library",
+    badge: "Zero Public Feed",
+    desc: "Every image & video stays private. Star favorites, copy full recipes, or 1-click Recreate exact seeds.",
+    upsellLabel: "Unlock your private Uncensored Studio library",
+  },
 ];
 
 /**
@@ -237,6 +332,17 @@ export default function Uncensored() {
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     if (plan && UNCENSORED_PLANS.some((p) => p.id === plan)) setSelectedPlanId(plan);
+    const tabParam = params.get("tab") as UncensoredStudioTab | null;
+    const focusParam = params.get("focus");
+    if (tabParam && VALID_STUDIO_TABS.includes(tabParam)) {
+      const toolLabel = STUDIO_SHOWCASE_TOOLS.find((t) => t.tab === tabParam)?.title ?? "Uncensored Studio";
+      const parsedFocus = focusParam ? Number(focusParam) : null;
+      setStudioIntent({
+        tab: tabParam,
+        focusId: parsedFocus && Number.isFinite(parsedFocus) ? parsedFocus : null,
+        label: `Open ${toolLabel} in Uncensored Studio`,
+      });
+    }
     const autoUnlock = params.get("auto_unlock");
     if (autoUnlock && UNCENSORED_PLANS.some((p) => p.id === autoUnlock)) {
       setSelectedPlanId(autoUnlock);
@@ -252,7 +358,7 @@ export default function Uncensored() {
     const carried = params.get("prompt");
     if (carried) setFreePrompt(carried.slice(0, 1000));
     if (params.get("start") === "1") setReturnIntent("free");
-    else if (plan) setReturnIntent("buy");
+    else if (plan || tabParam) setReturnIntent("buy");
   }, []);
 
   // Automatically unlock the pass once Stripe webhook settles the credit pack.
@@ -306,23 +412,29 @@ export default function Uncensored() {
     await confirmAge.mutateAsync({ confirmed: true });
   };
 
-  const handleFreeGenerate = (promptOverride?: string) => {
+  const handleFreeGenerate = (promptOverride?: string, styleOverride?: string, aspectOverride?: string) => {
     const p = (promptOverride ?? freePrompt).trim();
     if (p.length < 3) {
       toast.error("Describe what you want to create.");
       return;
     }
+    const chosenStyle = styleOverride ?? freeStyle;
+    const chosenAspect = aspectOverride ?? freeAspect;
     if (promptOverride) setFreePrompt(promptOverride);
+    if (styleOverride) setFreeStyle(styleOverride);
+    if (aspectOverride) setFreeAspect(aspectOverride);
     setFreeResultUrl(null);
     setFreeStartedAt(Date.now());
     track("generation_started", { kind: "uncensored_free" });
-    freeGen.mutate({ prompt: p, style: freeStyle, aspect: freeAspect, requestId: newRequestId() });
+    freeGen.mutate({ prompt: p, style: chosenStyle, aspect: chosenAspect, requestId: newRequestId() });
   };
 
   const handleStart = async () => {
     if (!isAuthed) {
-      // Carry the chosen plan through auth so they return to the same offer.
-      window.location.href = loginUrlKeepingIntent({ plan: selectedPlanId });
+      const extra: Record<string, string> = { plan: selectedPlanId };
+      if (studioIntent?.tab) extra.tab = studioIntent.tab;
+      if (studioIntent?.focusId) extra.focus = String(studioIntent.focusId);
+      window.location.href = loginUrlKeepingIntent(extra);
       return;
     }
     if (!ageConfirmed) {
@@ -341,7 +453,10 @@ export default function Uncensored() {
 
   const handleUnlockWithCredits = async () => {
     if (!isAuthed) {
-      window.location.href = loginUrlKeepingIntent({ plan: selectedPlanId });
+      const extra: Record<string, string> = { plan: selectedPlanId };
+      if (studioIntent?.tab) extra.tab = studioIntent.tab;
+      if (studioIntent?.focusId) extra.focus = String(studioIntent.focusId);
+      window.location.href = loginUrlKeepingIntent(extra);
       return;
     }
     if (!ageConfirmed) {
@@ -354,10 +469,13 @@ export default function Uncensored() {
     if (!hasEnoughCredits) {
       const packId = selectedPlan?.creditPackId ?? "pack-2500";
       track("checkout_started", { kind: "credit_pack", pack: packId, surface: "uncensored", plan: selectedPlanId });
+      const returnParams = new URLSearchParams({ auto_unlock: selectedPlanId });
+      if (studioIntent?.tab) returnParams.set("tab", studioIntent.tab);
+      if (studioIntent?.focusId) returnParams.set("focus", String(studioIntent.focusId));
       purchaseCredits.mutate({
         packId,
         origin: window.location.origin,
-        returnPath: `/uncensored?auto_unlock=${selectedPlanId}`,
+        returnPath: `/uncensored?${returnParams.toString()}`,
       });
       return;
     }
@@ -376,12 +494,12 @@ export default function Uncensored() {
             <Flame className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Uncensored AI Image Generator
+            Uncensored AI Image &amp; Video Studio
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-            No content filter. Unfiltered open-source models running on our own GPUs.
-            Pay anonymously with crypto, and your generations stay private — never
-            shown in the public gallery or shared anywhere.
+            No content filter. 7 unfiltered open-source tools — Image Studio, 5s Video,
+            Character Sheet, Outfit Swap, Brush Inpaint, Refine &amp; 4K Upscale — private by
+            default. Unlock instantly with Card / Apple Pay (via Credits) or Bitcoin.
           </p>
         </motion.div>
 
@@ -425,9 +543,23 @@ export default function Uncensored() {
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6">
                   {freeRemaining > 0 ? (
                     <>
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="text-lg font-semibold">Free uncensored preview</h2>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={freeBusy}
+                            onClick={() => {
+                              const recipe = pickRandomUncensoredSceneRecipe();
+                              setFreePrompt(recipe.prompt);
+                              setFreeStyle(recipe.style);
+                              setFreeAspect(recipe.aspect);
+                              toast.success(`Loaded "${recipe.label}" scene recipe`);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-40"
+                          >
+                            <Shuffle className="h-3 w-3 text-rose-400" /> Surprise me
+                          </button>
                           <button
                             type="button"
                             disabled={freeBusy || freePrompt.trim().length < 3}
@@ -452,18 +584,25 @@ export default function Uncensored() {
                         disabled={freeBusy}
                         className="mt-3 resize-none"
                       />
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {FREE_STARTERS.map((starter) => (
-                          <button
-                            key={starter}
-                            type="button"
-                            disabled={freeBusy}
-                            onClick={() => handleFreeGenerate(starter)}
-                            className="rounded-full border border-border/60 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-50"
-                          >
-                            {starter.length > 72 ? `${starter.slice(0, 72)}…` : starter}
-                          </button>
-                        ))}
+                      <div className="mt-3">
+                        <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                          1-Click Scene Recipes (sets prompt, style &amp; aspect + renders free):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {UNCENSORED_SCENE_RECIPES.map((recipe) => (
+                            <button
+                              key={recipe.id}
+                              type="button"
+                              disabled={freeBusy}
+                              onClick={() => handleFreeGenerate(recipe.prompt, recipe.style, recipe.aspect)}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/40 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-200 disabled:opacity-50"
+                            >
+                              <Flame className="h-3 w-3 shrink-0 text-rose-400" />
+                              <span className="font-medium text-foreground/90">{recipe.label}</span>
+                              <span className="hidden text-[10px] opacity-70 sm:inline">· {recipe.style}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className="text-xs text-muted-foreground">Aspect:</span>
@@ -609,12 +748,65 @@ export default function Uncensored() {
               )}
             </div>
 
+            {/* Interactive 7-Tool Studio Showcase */}
+            <div className="mt-12 rounded-2xl border border-rose-500/25 bg-card/30 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-rose-300">
+                    <Sparkles className="h-3 w-3 text-rose-400" /> 7-Tool Uncensored Pro Suite
+                  </span>
+                  <h2 className="mt-2 text-lg font-bold">
+                    Everything unlocked with any Uncensored Pass
+                  </h2>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Click any tool to unlock &amp; open directly →
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {STUDIO_SHOWCASE_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  const isSelected = studioIntent?.tab === tool.tab;
+                  return (
+                    <button
+                      key={tool.tab}
+                      type="button"
+                      onClick={() => triggerStudioUpsell(tool.tab, `Open ${tool.title} in Uncensored Studio`)}
+                      className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
+                        isSelected
+                          ? "border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/40"
+                          : "border-border/60 bg-background/40 hover:border-rose-500/50 hover:bg-rose-500/10"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-rose-200">
+                            <Icon className="h-4 w-4 text-rose-400" />
+                            {tool.title}
+                          </span>
+                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-300">
+                            {tool.badge}
+                          </span>
+                        </div>
+                        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                          {tool.desc}
+                        </p>
+                      </div>
+                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300">
+                        Unlock &amp; launch {tool.title} →
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Feature row */}
-            <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
-                { icon: Flame, title: "No filter", body: "Prompts the standard models reject just work." },
-                { icon: Shield, title: "Private by default", body: "Uncensored creations can't enter the gallery or share links." },
-                { icon: Bitcoin, title: "Pay with crypto", body: "Bitcoin via self-hosted BTCPay. No card, no name on a statement, discreet billing." },
+                { icon: Flame, title: "Zero content filter", body: "Unfiltered open-source Flux, Wan 2.1 video & PuLID models — prompts standard tools reject just work." },
+                { icon: Shield, title: "Private by default", body: "Uncensored creations never enter the public gallery, feeds, or share links." },
+                { icon: Bitcoin, title: "Card, Credits or Bitcoin", body: "Unlock instantly with Card / Apple Pay (via Credits) from $4.99, or pay anonymously with Bitcoin." },
               ].map((f) => (
                 <div key={f.title} className="rounded-xl border border-border/60 bg-card/40 p-5">
                   <f.icon className="h-6 w-6 text-rose-500" />

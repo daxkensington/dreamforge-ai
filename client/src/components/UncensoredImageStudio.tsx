@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors, Shirt } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors, Shirt, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,15 @@ import {
   UNCENSORED_WARDROBE,
   UNCENSORED_SETTINGS,
   UNCENSORED_IMAGE_COST,
+  UNCENSORED_SCENE_RECIPES,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
   DEFAULT_CHARACTER_STRENGTH,
   getUncensoredAspectFromSize,
   formatUncensoredRecipe,
   enhanceUncensoredPrompt,
+  pickRandomUncensoredSceneRecipe,
+  type UncensoredSceneRecipe,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 import RenderWaitHint, { newRequestId } from "./RenderWaitHint";
@@ -71,7 +74,21 @@ export default function UncensoredImageStudio({
   const [savedCharacterId, setSavedCharacterId] = useState<number | null>(null);
   const [savingFor, setSavingFor] = useState<number | null>(null);
   const [charName, setCharName] = useState("");
+  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
   const [results, setResults] = useState<{ url: string; seed: number | null; generationId: number }[]>([]);
+
+  const applySceneRecipe = (r: UncensoredSceneRecipe) => {
+    setActiveRecipeId(r.id);
+    setPrompt(r.prompt);
+    setStyle(r.style);
+    setAspect(r.aspect);
+    setFraming(r.framing);
+    setPose(r.pose);
+    setCamera(r.camera);
+    setLighting(r.lighting);
+    setWardrobe(r.wardrobe);
+    setSetting(r.setting);
+  };
   // Renders run as background GPU jobs: `generate` returns generation ids in
   // ~1s and we poll generateStatus until every one lands. Holding one request
   // open for the render died at Vercel's 300s ceiling on a cold worker — the
@@ -414,23 +431,66 @@ export default function UncensoredImageStudio({
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4">
+        <p className="text-xs text-muted-foreground mb-2">
+          1-Click Scene Recipes (sets prompt, style, lighting, pose &amp; wardrobe)
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {UNCENSORED_SCENE_RECIPES.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                applySceneRecipe(r);
+                toast.success(`${r.label} scene loaded.`);
+              }}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                activeRecipeId === r.id
+                  ? "border-rose-500 bg-rose-500/15 text-rose-200"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Prompt</p>
-        <button
-          type="button"
-          disabled={busy || prompt.trim().length < 3}
-          onClick={() => {
-            setPrompt(enhanceUncensoredPrompt(prompt, style));
-            toast.success("Prompt enhanced with studio lighting & lens direction.");
-          }}
-          className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
-        >
-          <Wand2 className="h-3 w-3 text-rose-400" /> Enhance prompt
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const r = pickRandomUncensoredSceneRecipe(activeRecipeId);
+              applySceneRecipe(r);
+              toast.success(`Surprise scene: ${r.label}`);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-rose-200 disabled:opacity-40"
+          >
+            <Shuffle className="h-3 w-3 text-rose-400" /> Surprise me
+          </button>
+          <button
+            type="button"
+            disabled={busy || prompt.trim().length < 3}
+            onClick={() => {
+              setPrompt(enhanceUncensoredPrompt(prompt, style));
+              toast.success("Prompt enhanced with studio lighting & lens direction.");
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
+          >
+            <Wand2 className="h-3 w-3 text-rose-400" /> Enhance prompt
+          </button>
+        </div>
       </div>
       <Textarea
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          setActiveRecipeId(null);
+        }}
         placeholder="Describe the scene, character, lighting, mood…"
         rows={4}
         maxLength={1000}

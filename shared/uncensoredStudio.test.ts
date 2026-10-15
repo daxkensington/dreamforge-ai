@@ -179,6 +179,12 @@ describe("uncensored studio presets and prompt enhancer", async () => {
     UNCENSORED_REFINE_PRESETS,
     UNCENSORED_INPAINT_PRESETS,
     UNCENSORED_OUTFIT_PRESETS,
+    UNCENSORED_SCENE_RECIPES,
+    UNCENSORED_ASPECTS,
+    UNCENSORED_FRAMINGS,
+    UNCENSORED_WARDROBE,
+    UNCENSORED_SETTINGS,
+    pickRandomUncensoredSceneRecipe,
     enhanceUncensoredPrompt,
   } = await import("./uncensoredStudio");
 
@@ -200,6 +206,24 @@ describe("uncensored studio presets and prompt enhancer", async () => {
     expect(UNCENSORED_OUTFIT_PRESETS.length).toBeGreaterThanOrEqual(8);
   });
 
+  it("provides 1-click scene recipes whose style, aspect, and director chips all match known studio IDs", () => {
+    const validStyles = ["realistic", "cinematic", "fantasy", "anime", "artistic"];
+    expect(UNCENSORED_SCENE_RECIPES.length).toBeGreaterThanOrEqual(6);
+    for (const r of UNCENSORED_SCENE_RECIPES) {
+      expect(r.prompt.length).toBeGreaterThan(30);
+      expect(validStyles.includes(r.style)).toBe(true);
+      expect(UNCENSORED_ASPECTS.some((a) => a.id === r.aspect)).toBe(true);
+      expect(UNCENSORED_FRAMINGS.some((f) => f.id === r.framing)).toBe(true);
+      expect(UNCENSORED_POSES.some((p) => p.id === r.pose)).toBe(true);
+      expect(UNCENSORED_CAMERAS.some((c) => c.id === r.camera)).toBe(true);
+      expect(UNCENSORED_LIGHTING.some((l) => l.id === r.lighting)).toBe(true);
+      expect(UNCENSORED_WARDROBE.some((w) => w.id === r.wardrobe)).toBe(true);
+      expect(UNCENSORED_SETTINGS.some((s) => s.id === r.setting)).toBe(true);
+    }
+    const picked = pickRandomUncensoredSceneRecipe("penthouse-boudoir");
+    expect(picked.id).not.toBe("penthouse-boudoir");
+  });
+
   it("enhances short prompts with style-matched camera and lighting cues without duplicating existing terms", () => {
     const enhanced = enhanceUncensoredPrompt("a woman in a red dress", "realistic");
     expect(enhanced.startsWith("a woman in a red dress,")).toBe(true);
@@ -208,4 +232,5 @@ describe("uncensored studio presets and prompt enhancer", async () => {
     expect(secondPass.length).toBeGreaterThanOrEqual(enhanced.length);
   });
 });
+
 
