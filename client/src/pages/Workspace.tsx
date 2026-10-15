@@ -21,7 +21,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -51,32 +53,53 @@ import {
   Link2,
   Flame,
 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { track } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
 import { ShareButton } from "@/components/ShareButton";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { getTierConfig } from "@shared/tiers";
+import { getSubscriptionEntitlement } from "@shared/subscriptionEntitlement";
+import {
+  getWorkspaceImageSelectionError,
+  hasWorkspaceModelAccess,
+  WORKSPACE_AUTO_IMAGE_MODEL,
+  WORKSPACE_AUTO_VIDEO_MODEL,
+  fingerprintGenerationInput,
+  isGenerationRequestRetry,
+  isTerminalGenerationResult,
+  resolveGenerationRequestIdentity,
+  readGenerationRequestIdentity,
+  persistGenerationRequestIdentity,
+  clearGenerationRequestIdentity,
+  type GenerationRequestIdentity,
+} from "@shared/workspaceModelSelection";
 
-const MODEL_OPTIONS = [
-  // Image models
-  { value: "ultra", label: "DreamForgeX Ultra", desc: "Flagship quality — Midjourney-competitive output", types: ["image"], tier: "pro", badge: "Ultra" },
-  { value: "auto", label: "Auto (Best Available)", desc: "Automatically picks the best model", types: ["image"], tier: "free", badge: "Recommended" },
-  // DreamForge Exclusive Styles (self-hosted LoRAs)
+type WorkspaceGenerationPayload = {
+  prompt: string;
+  negativePrompt?: string;
+  mediaType: "image" | "video";
+  width: number;
+  height: number;
+  duration?: number;
+  modelVersion: string;
+  tagIds?: number[];
+  uncensored: boolean;
+};
+
+// Existing style presets retain their separate execution path.
+const DF_IMAGE_PRESETS = [
   { value: "df-cinematic", label: "DreamForge Cinematic", desc: "Dramatic lighting, film grain, cinematic color grading", types: ["image"], tier: "creator", badge: "Exclusive" },
   { value: "df-anime", label: "DreamForge Anime", desc: "High-quality anime with cel shading & vibrant colors", types: ["image"], tier: "creator", badge: "Exclusive" },
   { value: "df-fantasy", label: "DreamForge Fantasy", desc: "Epic fantasy art, magical effects, D&D inspired", types: ["image"], tier: "creator", badge: "Exclusive" },
   { value: "df-product", label: "DreamForge Product", desc: "Clean studio photography, commercial quality", types: ["image"], tier: "creator", badge: "Exclusive" },
   { value: "df-abstract", label: "DreamForge Abstract", desc: "Artistic, painterly, surreal compositions", types: ["image"], tier: "creator", badge: "Exclusive" },
-  // Standard models
-  { value: "grok", label: "Grok Image Gen", desc: "Fast generation via xAI", types: ["image"], tier: "free" },
-  { value: "flux-pro", label: "Flux 1.1 Pro", desc: "Highest quality, photorealistic", types: ["image"], tier: "creator", badge: "Premium" },
-  { value: "flux-schnell", label: "Flux Schnell", desc: "Fast, high-quality iteration", types: ["image"], tier: "free" },
-  { value: "dall-e-3", label: "DALL-E 3", desc: "Excellent prompt following by OpenAI", types: ["image"], tier: "creator" },
-  { value: "sd3", label: "Stable Diffusion 3", desc: "Great detail and text rendering", types: ["image"], tier: "creator" },
-  { value: "gemini", label: "Gemini Imagen", desc: "Google's image generation", types: ["image"], tier: "creator" },
-  // Video models
+];
+
+const VIDEO_MODEL_OPTIONS = [
+  { value: WORKSPACE_AUTO_VIDEO_MODEL, label: "Auto (Best Available)", desc: "Automatically picks an available model", types: ["video"], tier: "free", badge: "Recommended" },
   { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "premium", badge: "Premium" },
   { value: "cogvideo", label: "CogVideoX (Self-Hosted)", desc: "Text-to-video on DreamForge GPUs — 75% cheaper", types: ["video"], tier: "creator" },
   { value: "minimax", label: "Minimax Video", desc: "High-quality short video clips", types: ["video"], tier: "creator" },
@@ -124,7 +147,7 @@ export default function Workspace() {
   const [height, setHeight] = useState(768);
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [duration, setDuration] = useState(4);
-  const [modelVersion, setModelVersion] = useState("built-in-v1");
+  const [modelVersion, setModelVersion] = useState(WORKSPACE_AUTO_IMAGE_MODEL);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submitGenId, setSubmitGenId] = useState<number | null>(null);
@@ -141,6 +164,18 @@ export default function Workspace() {
   const [animateDuration, setAnimateDuration] = useState(4);
   const [animateStyle, setAnimateStyle] = useState<string>("smooth-pan");
   const [uncensored, setUncensored] = useState(false);
+  const generationInFlight = useRef(false);
+  const generationUser = useRef(user?.id);
+  generationUser.current = user?.id;
+  const pendingRequestRef = useRef<GenerationRequestIdentity | null>(null);
+  const pendingPayloadRef = useRef<WorkspaceGenerationPayload | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<GenerationRequestIdentity | null>(null);
+  const [preparingSubmission, setPreparingSubmission] = useState(false);
+  const [draftMatchesPending, setDraftMatchesPending] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<"processing" | "review" | "uncertain" | "retry">("uncertain");
+  const [retryAvailable, setRetryAvailable] = useState(true);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [entitlementNow, setEntitlementNow] = useState(() => Date.now());
 
   // Uncensored entitlement (crypto-paid tier). Drives the toggle's enabled
   // state + the "activate" CTA.
@@ -148,6 +183,100 @@ export default function Workspace() {
     enabled: isAuthenticated,
   });
   const uncensoredActive = !!uncensoredStatus?.active;
+
+  const imageModelsQuery = trpc.generation.imageModels.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: 1,
+  });
+  const subscriptionQuery = trpc.pricing.getCurrentSubscription.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: 1,
+  });
+  const subscriptionInput = useMemo(() => ({
+    planName: subscriptionQuery.data?.plan?.name,
+    status: subscriptionQuery.data?.subscription?.status,
+    currentPeriodStart: subscriptionQuery.data?.subscription?.currentPeriodStart,
+    currentPeriodEnd: subscriptionQuery.data?.subscription?.currentPeriodEnd,
+    cancelAtPeriodEnd: subscriptionQuery.data?.subscription?.cancelAtPeriodEnd,
+  }), [subscriptionQuery.data]);
+  const subscriptionEntitlement = getSubscriptionEntitlement(subscriptionInput, entitlementNow);
+  const userTier = subscriptionEntitlement.tier;
+  useEffect(() => { setEntitlementNow(Date.now()); }, [subscriptionInput]);
+  useEffect(() => {
+    if (subscriptionEntitlement.expiresAt === null) return;
+    const wait = Math.min(2_147_483_647, Math.max(1, subscriptionEntitlement.expiresAt - Date.now() + 1));
+    const timer = setTimeout(() => setEntitlementNow(Date.now()), wait);
+    return () => clearTimeout(timer);
+  }, [subscriptionEntitlement.expiresAt, entitlementNow]);
+  useEffect(() => {
+    const updateTime = () => setEntitlementNow(Date.now());
+    window.addEventListener("focus", updateTime);
+    document.addEventListener("visibilitychange", updateTime);
+    return () => { window.removeEventListener("focus", updateTime); document.removeEventListener("visibilitychange", updateTime); };
+  }, []);
+  const planReady = subscriptionQuery.isSuccess && !subscriptionQuery.isError && !subscriptionQuery.isFetching;
+  const imageCatalogReady = imageModelsQuery.isSuccess && !imageModelsQuery.isError && !imageModelsQuery.isFetching;
+  const uncensoredEnabled = uncensored && uncensoredActive && mediaType === "image";
+  const selectedDFPreset = DF_IMAGE_PRESETS.some((preset) => preset.value === modelVersion);
+  const selectedImageModel = imageModelsQuery.data?.find((model) => model.id === modelVersion);
+  const getCurrentImageSelectionError = (tier = userTier) => mediaType !== "image" || uncensoredEnabled
+    ? null
+    : selectedDFPreset
+      ? !planReady
+        ? "Your subscription is still being checked. Try again or choose Auto."
+        : !hasWorkspaceModelAccess(tier, "creator")
+          ? "DreamForge style presets require Creator or higher."
+          : null
+      : getWorkspaceImageSelectionError({
+          modelId: modelVersion,
+          catalog: imageModelsQuery.data,
+          catalogReady: imageCatalogReady,
+          userTier: tier,
+          planReady,
+          width,
+          height,
+        });
+  const imageSelectionError = getCurrentImageSelectionError();
+  const draftPayload = useMemo<WorkspaceGenerationPayload>(() => ({
+    prompt: prompt.trim(),
+    negativePrompt: negativePrompt.trim() || undefined,
+    mediaType, width, height,
+    duration: mediaType === "video" ? duration : undefined,
+    modelVersion,
+    tagIds: selectedTags.length > 0 ? [...selectedTags].sort((left, right) => left - right) : undefined,
+    uncensored: uncensoredEnabled,
+  }), [prompt, negativePrompt, mediaType, width, height, duration, modelVersion, selectedTags, uncensoredEnabled]);
+
+  useEffect(() => {
+    const identity = user ? readGenerationRequestIdentity(user.id) : null;
+    pendingRequestRef.current = identity;
+    pendingPayloadRef.current = null;
+    setPendingRequest(identity);
+    setPendingStatus("uncertain");
+  }, [user?.id]);
+  useEffect(() => {
+    let current = true;
+    setDraftMatchesPending(false);
+    if (pendingRequest) {
+      fingerprintGenerationInput(draftPayload).then((fingerprint) => {
+        if (current) setDraftMatchesPending(isGenerationRequestRetry(pendingRequest, user?.id ?? 0, fingerprint));
+      }).catch(() => { if (current) setDraftMatchesPending(false); });
+    }
+    return () => { current = false; };
+  }, [pendingRequest, draftPayload, user?.id]);
+  useEffect(() => () => { if (retryTimer.current) clearTimeout(retryTimer.current); }, []);
+
+  const clearConfirmedRequest = (requestId: string | undefined) => {
+    const identity = pendingRequestRef.current;
+    if (!identity || identity.requestId !== requestId) return;
+    clearGenerationRequestIdentity(identity);
+    pendingRequestRef.current = null;
+    pendingPayloadRef.current = null;
+    setPendingRequest(null);
+    setDraftMatchesPending(false);
+    setRetryAvailable(true);
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+  };
 
   const { data: tags } = trpc.tags.list.useQuery(undefined, { enabled: isAuthenticated });
   const { data: generations, refetch: refetchGens } = trpc.generation.list.useQuery(
@@ -157,13 +286,14 @@ export default function Workspace() {
 
   const utils = trpc.useUtils();
 
-  const filteredModels = useMemo(
-    () => MODEL_OPTIONS.filter((m) => m.types.includes(mediaType)),
-    [mediaType]
-  );
-
   const generateMutation = trpc.generation.create.useMutation({
-    onSuccess: (data: any) => {
+    onSettled: () => {
+      generationInFlight.current = false;
+    },
+    onSuccess: (data: any, variables) => {
+      if (isTerminalGenerationResult(data)) {
+        clearConfirmedRequest(data.requestId ?? variables?.requestId);
+      }
       if (data.status === "completed") {
         track("generation_completed", { source: "workspace", mediaType: data.mediaType });
         toast.success(`${data.mediaType === "video" ? "Video" : "Image"} generation completed!`);
@@ -180,10 +310,19 @@ export default function Workspace() {
         }
       } else if (data.status === "failed") {
         toast.error(`Generation failed: ${data.error || "Unknown error"}`);
+      } else if (data.status === "generating") {
+        setPendingStatus(data.reconciliationRequired ? "review" : "processing");
+        setRetryAvailable(false);
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        const wait = Number.isFinite(data.retryAfterMs) ? Math.max(250, Math.min(data.retryAfterMs, 60_000)) : 1500;
+        retryTimer.current = setTimeout(() => setRetryAvailable(true), wait);
+        toast.info(data.reconciliationRequired ? "This generation needs review before a final result can be confirmed." : "Your earlier generation is still processing. Check it again shortly.");
       }
       refetchGens();
     },
     onError: (err) => {
+      setPendingStatus((current) => current === "review" ? "review" : !err.data?.code || err.data.code === "INTERNAL_SERVER_ERROR" ? "uncertain" : "retry");
+      setRetryAvailable(true);
       // Adult prompt on the standard chain — send them to the metered funnel
       // with the prompt intact rather than making them retype it.
       if (isAdultRedirect(err.message)) {
@@ -242,39 +381,82 @@ export default function Workspace() {
     setMediaType(type);
     // Auto-select appropriate model
     if (type === "video") {
-      setModelVersion("animatediff-v2");
+      setModelVersion(WORKSPACE_AUTO_VIDEO_MODEL);
     } else {
-      setModelVersion("built-in-v1");
+      setModelVersion(WORKSPACE_AUTO_IMAGE_MODEL);
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (generateMutation.isPending || generationInFlight.current) return;
+    if (!user || !isAuthenticated) {
+      toast.error("Sign in to generate");
+      return;
+    }
     if (!prompt.trim()) {
       toast.error("Please enter a prompt");
       return;
     }
-    track("generation_started", { source: "workspace" });
-    generateMutation.mutate({
-      prompt: prompt.trim(),
-      negativePrompt: negativePrompt.trim() || undefined,
-      mediaType,
-      width,
-      height,
-      duration: mediaType === "video" ? duration : undefined,
-      modelVersion,
-      tagIds: selectedTags.length > 0 ? selectedTags : undefined,
-      uncensored: uncensored && uncensoredActive && mediaType === "image",
-    });
+    const actorId = user.id;
+    // Guard synchronously: digesting the draft must not open a second click window.
+    generationInFlight.current = true;
+    setPreparingSubmission(true);
+    try {
+      const fingerprint = await fingerprintGenerationInput(draftPayload);
+      if (generationUser.current !== actorId) {
+        generationInFlight.current = false;
+        toast.error("Your account changed. Start this generation again.");
+        return;
+      }
+      const previous = pendingRequestRef.current ?? readGenerationRequestIdentity(actorId);
+      const isRetry = isGenerationRequestRetry(previous, actorId, fingerprint);
+      if (isRetry && !retryAvailable) {
+        generationInFlight.current = false;
+        toast.info("Your generation is still processing. Check it again shortly.");
+        return;
+      }
+      // Replays may retrieve a confirmed result after eligibility changes.
+      // Only a new logical generation needs current model/plan eligibility.
+      if (!isRetry) {
+        const currentTier = getSubscriptionEntitlement(subscriptionInput, Date.now()).tier;
+        const selectionError = getCurrentImageSelectionError(currentTier);
+        if (selectionError) {
+          generationInFlight.current = false;
+          toast.error(selectionError);
+          return;
+        }
+      }
+      const identity = resolveGenerationRequestIdentity(previous, actorId, fingerprint);
+      const payload = isRetry && pendingPayloadRef.current ? pendingPayloadRef.current : draftPayload;
+      if (previous && !isRetry) toast.info("The changed settings start a new generation. The earlier attempt remains unconfirmed.");
+      pendingRequestRef.current = identity;
+      pendingPayloadRef.current = payload;
+      persistGenerationRequestIdentity(identity);
+      setPendingRequest(identity);
+      if (!isRetry) setPendingStatus("uncertain");
+      setDraftMatchesPending(true);
+      setRetryAvailable(true);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      if (!isRetry) track("generation_started", { source: "workspace" });
+      generateMutation.mutate({ ...payload, requestId: identity.requestId });
+    } catch {
+      generationInFlight.current = false;
+      toast.error("Could not prepare this generation. Try again.");
+    } finally {
+      setPreparingSubmission(false);
+    }
   };
 
   useEffect(() => {
     if (!workspaceAutogenArmed || authLoading || !isAuthenticated) return;
+    if (generateMutation.isPending || generationInFlight.current) return;
+    if (mediaType === "image" && !draftMatchesPending && (!imageCatalogReady || imageSelectionError)) return;
     const p = prompt.trim();
     if (p.length < 3) return;
     workspaceAutogenArmed = false;
     handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, prompt]);
+  }, [authLoading, isAuthenticated, prompt, mediaType, imageCatalogReady, imageSelectionError, generateMutation.isPending, draftMatchesPending]);
 
   useKeyboardShortcuts([
     { key: "Enter", ctrl: true, handler: handleGenerate, description: "Generate image or video" },
@@ -461,12 +643,46 @@ export default function Workspace() {
                   <Cpu className="h-3 w-3" />
                   Model
                 </Label>
-                <Select value={modelVersion} onValueChange={setModelVersion}>
+                <Select value={modelVersion} onValueChange={setModelVersion} disabled={uncensoredEnabled}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Choose an available model" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredModels.map((m: any) => (
+                    {mediaType === "image" ? (
+                      <>
+                        <SelectGroup>
+                          <SelectLabel>Image models</SelectLabel>
+                          {!imageModelsQuery.data?.some((model) => model.id === WORKSPACE_AUTO_IMAGE_MODEL) && (
+                            <SelectItem value={WORKSPACE_AUTO_IMAGE_MODEL}>Auto (Best Available)</SelectItem>
+                          )}
+                          {modelVersion !== WORKSPACE_AUTO_IMAGE_MODEL && !selectedDFPreset && !selectedImageModel && (
+                            <SelectItem value={modelVersion} disabled>Selected image model — no longer available</SelectItem>
+                          )}
+                          {imageModelsQuery.data?.map((model) => (
+                            <SelectItem
+                              key={model.id}
+                              value={model.id}
+                              disabled={!model.isConfigured || (model.id !== WORKSPACE_AUTO_IMAGE_MODEL && (!imageCatalogReady || (model.requiredTier !== "free" && !planReady) || !hasWorkspaceModelAccess(userTier, model.requiredTier)))}
+                            >
+                              <div className="flex flex-col gap-0.5 py-0.5">
+                                <span>{model.name}{!model.isConfigured ? " — unavailable" : ""}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {model.creditCost} credits · {getTierConfig(model.requiredTier).displayName}{model.requiredTier !== "free" ? "+" : ""}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>DreamForge style presets · Creator+</SelectLabel>
+                          {DF_IMAGE_PRESETS.map((preset) => (
+                            <SelectItem key={preset.value} value={preset.value} disabled={!planReady || !hasWorkspaceModelAccess(userTier, "creator")}>
+                              <span>{preset.label}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </>
+                    ) : VIDEO_MODEL_OPTIONS.map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         <div className="flex items-center gap-2">
                           <span>{m.label}</span>
@@ -486,6 +702,32 @@ export default function Workspace() {
                     ))}
                   </SelectContent>
                 </Select>
+                {mediaType === "image" && (
+                  <div className="mt-2 space-y-2">
+                    {uncensoredEnabled ? (
+                      <p className="text-xs text-muted-foreground">Uncensored mode uses its own image models.</p>
+                    ) : selectedDFPreset ? (
+                      <p className="text-xs text-muted-foreground">{DF_IMAGE_PRESETS.find((preset) => preset.value === modelVersion)?.desc}</p>
+                    ) : selectedImageModel ? (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedImageModel.description}
+                        {" "}{"outputInfo" in selectedImageModel && selectedImageModel.outputInfo
+                          ? selectedImageModel.outputInfo
+                          : `Max ${selectedImageModel.maxResolution.width} × ${selectedImageModel.maxResolution.height}.`}
+                      </p>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+                        {imageModelsQuery.isError ? "Could not refresh image models. Auto is available; retry to choose a model." : imageModelsQuery.isFetching ? "Refreshing image models…" : "Models and quoted costs refresh automatically."}
+                      </p>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => void imageModelsQuery.refetch()} disabled={imageModelsQuery.isFetching} className="h-7 shrink-0 text-xs">
+                        <RotateCcw className={`mr-1 h-3 w-3 ${imageModelsQuery.isFetching ? "animate-spin" : ""}`} />
+                        {imageModelsQuery.isError ? "Retry" : "Refresh"}
+                      </Button>
+                    </div>
+                    {imageSelectionError && <p className="text-xs text-amber-400" role="status">{imageSelectionError}</p>}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -813,8 +1055,8 @@ export default function Workspace() {
                           </span>
                           <p className="text-[11px] text-muted-foreground">
                             {mediaType === "video"
-                              ? "No content filter · self-hosted GPU · 18+"
-                              : "No content filter · pay with crypto · 18+"}
+                              ? "No content filter · self-hosted GPU · 3 free previews · 18+"
+                              : "No content filter · 3 free previews · Credits or Bitcoin · 18+"}
                           </p>
                         </div>
                       </div>
@@ -824,16 +1066,22 @@ export default function Workspace() {
                 )}
 
                 {/* Generate Button */}
+                {pendingRequest && !generateMutation.isPending && !preparingSubmission && (
+                  <p className="mb-3 text-xs text-muted-foreground" role="status" aria-live="polite">
+                    {pendingStatus === "review" ? "This generation needs review before a final result can be confirmed. Check its status again later." : pendingStatus === "processing" ? "Your previous generation is still processing. Check it again with the same settings." : pendingStatus === "uncertain" ? "The previous generation has not been confirmed. Retry the same settings to check it." : "You can retry this generation with the same settings."}
+                    {!draftMatchesPending && " Changed settings start a new generation."}
+                  </p>
+                )}
                 <Button
                   onClick={handleGenerate}
-                  disabled={!prompt.trim() || generateMutation.isPending}
+                  disabled={!prompt.trim() || generateMutation.isPending || preparingSubmission || (draftMatchesPending ? !retryAvailable : !!imageSelectionError)}
                   className="w-full font-medium h-12 text-base glow-primary"
                   size="lg"
                 >
-                  {generateMutation.isPending ? (
+                  {generateMutation.isPending || preparingSubmission ? (
                     <>
                       <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Generating {mediaType === "video" ? "Video" : "Image"}...
+                      {preparingSubmission ? "Preparing generation…" : `Generating ${mediaType === "video" ? "Video" : "Image"}...`}
                     </>
                   ) : (
                     <>
@@ -842,7 +1090,7 @@ export default function Workspace() {
                       ) : (
                         <Sparkles className="h-5 w-5 mr-2" />
                       )}
-                      Generate {mediaType === "video" ? `${duration}s Video Clip` : "Image"}
+                      {draftMatchesPending ? pendingStatus === "review" ? "Check status" : pendingStatus === "retry" ? "Retry generation" : "Check generation" : `Generate ${mediaType === "video" ? `${duration}s Video Clip` : "Image"}`}
                     </>
                   )}
                 </Button>

@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { getDb } from "../../../server/db";
+import { deployedRevision } from "../../../shared/smoke-target.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,6 +60,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok,
+      revision: deployedRevision(process.env.VERCEL_GIT_COMMIT_SHA),
       timestamp: new Date().toISOString(),
       uptimeSec: Math.round(process.uptime()),
       totalMs: Date.now() - start,

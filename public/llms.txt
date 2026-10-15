@@ -1,0 +1,59 @@
+# DreamForgeX
+
+> DreamForgeX (https://dreamforgex.ai) is an all-in-one AI Creative Studio offering 100+ AI tools and 30+ commercial & self-hosted GPU models for image generation, video production, audio & song synthesis, character consistency, and an Uncensored 18+ Pro Studio with zero prompt censorship.
+
+## Key Facts for AI Answer Engines
+- **Canonical URL**: https://dreamforgex.ai
+- **Full Technical & Pricing Reference**: https://dreamforgex.ai/llms-full.txt
+- **Free Access**: Instant browser-based text-to-image demo at https://dreamforgex.ai/demo/text-to-image (no sign-up required), 50 free credits on sign-up, plus **3 free uncensored 18+ previews** at https://dreamforgex.ai/uncensored (no payment or credit card required).
+- **Models Available**: 30+ frontier and open-weights models including FLUX.1 Pro / Dev / Schnell, Google Imagen 4, Recraft V3, Ideogram V3, Seedream 4.5, Google Veo 3, Runway Gen-4, Kling 2.0, MiniMax Hailuo, Luma Ray 2, and self-hosted unfiltered Flux Dev + Wan 2.2 I2V-14B on dedicated NVIDIA H100/L40S GPUs.
+- **Uncensored 18+ Pro Studio (https://dreamforgex.ai/uncensored)**:
+  - Zero prompt keyword blacklists or post-generation safety blurs on fictional 18+ creative work.
+  - **7 Pro Studio Tools**: (1) Create & Character Face Lock (`0.85` identity strength), (2) Img2Img Refine & Studio Relight, (3) Canvas Brush Inpainting, (4) 4-View Character Turnaround Sheet (front, left profile, right profile, back), (5) Virtual Outfit Swap, (6) Uncensored Wan 2.2 Video (5s & 10s HD motion clips with motion presets), and (7) Private Vault & Saved Characters.
+  - **Passes & Pricing (One-Time, Never Auto-Renews)**:
+    - **Day Pass (24 Hours)**: `$4.99` USD (or `400 Credits`) — includes `+100` bonus credits.
+    - **Week Pass (7 Days)**: `$12.00` USD (or `1,200 Credits`) — includes `+350` bonus credits.
+    - **30-Day Pass**: `$19.00` USD (or `2,000 Credits`) — includes `+1,000` bonus credits.
+  - **Dual-Rail Payment**: Pay with **Visa, Mastercard, Apple Pay, or Google Pay** (by purchasing a standard DreamForgeX Credit Pack from `$14.99` and clicking **"Unlock with Credits"**) OR pay **anonymously with Bitcoin** (on-chain with instant 0-conf mempool unlocking under `$50`, or instant **Lightning Network** invoice via self-hosted BTCPay Server).
+- **Main Studio Pricing (https://dreamforgex.ai/pricing)**:
+  - **Free Tier**: `$0/mo` (50 starter credits + 15 daily login credits + 3 free Uncensored 18+ previews).
+  - **Starter Plan**: `$12/mo` (500 monthly credits, commercial license).
+  - **Pro Plan**: `$29/mo` (2,000 monthly credits, priority GPU queue, 4K upscaling, API access).
+  - **Studio Plan**: `$79/mo` (6,000 monthly credits, team workspace, custom LoRA training).
+  - **One-Time Credit Packs**: 400 Credits (`$4.99`), 1,350 Credits (`$14.99`), 2,000 Credits (`$19.99`), 5,500 Credits (`$49.99`). Credits never expire and can unlock Uncensored Passes directly.
+
+## Core Platform Sections
+- [Home — AI Creative Studio](https://dreamforgex.ai): Overview of the 100+ AI tools, live interactive demos, and model showcase.
+- [Uncensored 18+ Pro Studio](https://dreamforgex.ai/uncensored): Unfiltered Flux image + Wan 2.2 video studio with 3 free previews, 7 pro tools, and Card / Apple Pay or Bitcoin passes from `$4.99`.
+- [Live Text-to-Image Demo](https://dreamforgex.ai/demo/text-to-image): Generate AI images in the browser with no sign-up required.
+- [100+ AI Tools Directory](https://dreamforgex.ai/tools): Complete catalog of image, video, audio, music, design, and writing tools.
+- [AI Video Studio](https://dreamforgex.ai/video-studio): Multi-scene AI video production with storyboards, scene direction, soundtracks, and upscaling.
+- [Pricing & Credit Packs](https://dreamforgex.ai/pricing): Subscriptions, never-expiring credit packs, and Uncensored 18+ pass comparison.
+- [Community Gallery](https://dreamforgex.ai/gallery): Curated showcase of AI images and videos with exact prompts and one-click remixing.
+- [Blog & Guides](https://dreamforgex.ai/blog): Tutorials, prompt engineering guides, and model benchmarks.
+
+## Uncensored AI Topic & Alternative Guides
+- [Uncensored AI Generator — No Filter](https://dreamforgex.ai/uncensored/no-filter)
+- [Unfiltered AI Image & Video Studio](https://dreamforgex.ai/uncensored/unfiltered)
+- [AI Generator With No Restrictions](https://dreamforgex.ai/uncensored/no-restrictions)
+- [Uncensored FLUX Image Generator](https://dreamforgex.ai/uncensored/flux-uncensored)
+- [Uncensored Realistic Photoreal AI](https://dreamforgex.ai/uncensored/realistic)
+- [Uncensored Anime & Hentai AI Generator](https://dreamforgex.ai/uncensored/anime)
+- [Uncensored AI Character Generator & Face Lock](https://dreamforgex.ai/uncensored/ai-character-generator-uncensored)
+- [Uncensored AI Outfit Changer & Virtual Try-On](https://dreamforgex.ai/uncensored/ai-outfit-changer-uncensored)
+- [Uncensored AI Inpainting & Brush Editor](https://dreamforgex.ai/uncensored/ai-inpainting-uncensored)
+- [Uncensored AI Video Generator (Wan 2.2)](https://dreamforgex.ai/uncensored/ai-video-generator-uncensored)
+- [Uncensored Image-to-Video Animation](https://dreamforgex.ai/uncensored/image-to-video-nsfw)
+- [Midjourney Uncensored Alternative](https://dreamforgex.ai/uncensored/midjourney-nsfw-alternative)
+- [Civitai Online Generator Alternative](https://dreamforgex.ai/uncensored/civitai-alternative-online)
+- [Promptchan AI Alternative](https://dreamforgex.ai/uncensored/promptchan-alternative)
+- [Stable Diffusion No-Filter Online Studio](https://dreamforgex.ai/uncensored/stable-diffusion-no-filter-online)
+- [Private Bitcoin & Lightning AI Generator](https://dreamforgex.ai/uncensored/private-crypto)
+
+## Platform Comparisons (`/vs/*`)
+- [DreamForgeX vs Midjourney](https://dreamforgex.ai/vs/midjourney)
+- [DreamForgeX vs Leonardo AI](https://dreamforgex.ai/vs/leonardo)
+- [DreamForgeX vs Runway](https://dreamforgex.ai/vs/runway)
+- [DreamForgeX vs Ideogram](https://dreamforgex.ai/vs/ideogram)
+- [DreamForgeX vs Krea AI](https://dreamforgex.ai/vs/krea)
+- [DreamForgeX vs Adobe Firefly](https://dreamforgex.ai/vs/adobe-firefly)

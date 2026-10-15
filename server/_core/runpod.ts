@@ -29,7 +29,9 @@ export type RunPodTask =
   | "wan-t2v"
   | "wan-i2v"
   | "musicgen"
-  | "audiogen";
+  | "audiogen"
+  | "depth"
+  | "vtracer";
 
 export interface RunPodInput {
   task: RunPodTask;
@@ -75,6 +77,18 @@ export interface RunPodInput {
    * so its Schnell realism LoRA lands on the base it was trained for.
    */
   model?: "dev" | "schnell";
+  /** Depth output variant (Depth Anything V2 task) */
+  variant?: "grayscale" | "colored" | "normal";
+  /** Colormap for the colored depth variant: jet | rainbow | hot */
+  colormap?: "jet" | "rainbow" | "hot";
+  /** vtracer color precision 1-8 (maps from the tool's 2-32 color count) */
+  color_precision?: number;
+  /** vtracer mode */
+  mode?: "color" | "binary";
+  /** vtracer speckle filter (px²) */
+  filter_speckle?: number;
+  /** vtracer corner threshold (degrees) */
+  corner_threshold?: number;
 }
 
 interface RunPodRunResponse {
@@ -99,6 +113,8 @@ interface RunPodOutput {
   seed?: number;
   /** Audio duration generated */
   duration?: number;
+  /** Vectorized SVG text (vtracer task) */
+  svg?: string;
 }
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
@@ -147,6 +163,14 @@ export function isRunPodAvailable(): boolean {
  * Polling adds ≤2s on a warm worker and survives cold starts up to 5 min.
  */
 export async function runpodRun(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<Buffer> {
+  return extractOutput(await runpodRunAsync(input, opts));
+}
+
+/**
+ * Same as runpodRun but returns the raw output object — for tasks that don't
+ * return image_b64 (e.g. vtracer's `svg` text field).
+ */
+export async function runpodRunRaw(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<RunPodOutput> {
   return runpodRunAsync(input, opts);
 }
 
@@ -154,7 +178,7 @@ export async function runpodRun(input: RunPodInput, opts: RunPodRunOpts = {}): P
  * Async run with polling — for longer jobs like Flux Dev (20 steps, ~15-20s)
  * and Wan video (minutes, incl. cold start — pass a larger maxAttempts).
  */
-async function runpodRunAsync(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<Buffer> {
+async function runpodRunAsync(input: RunPodInput, opts: RunPodRunOpts = {}): Promise<RunPodOutput> {
   const endpointId = opts.endpointId;
   // Submit job
   const submitController = new AbortController();
@@ -200,7 +224,7 @@ async function runpodRunAsync(input: RunPodInput, opts: RunPodRunOpts = {}): Pro
     const status = (await statusResponse.json()) as RunPodRunResponse;
 
     if (status.status === "COMPLETED") {
-      return extractOutput(status);
+      return getOutput(status);
     }
 
     if (status.status === "FAILED" || status.status === "CANCELLED") {
@@ -212,9 +236,9 @@ async function runpodRunAsync(input: RunPodInput, opts: RunPodRunOpts = {}): Pro
 }
 
 /**
- * Extract image buffer from a completed RunPod response.
+ * Extract the validated output object from a completed RunPod response.
  */
-function extractOutput(result: RunPodRunResponse): Buffer {
+function getOutput(result: RunPodRunResponse): RunPodOutput {
   if (result.status === "FAILED") {
     throw new Error(`RunPod job failed: ${result.error ?? "Unknown error"}`);
   }
@@ -223,23 +247,30 @@ function extractOutput(result: RunPodRunResponse): Buffer {
     throw new Error(`RunPod job not completed (status: ${result.status})`);
   }
 
+  return result.output;
+}
+
+/**
+ * Extract image buffer from a completed RunPod response.
+ */
+function extractOutput(result: RunPodOutput): Buffer {
   // Prefer base64 output (image or audio)
-  if (result.output.image_b64) {
-    return Buffer.from(result.output.image_b64, "base64");
+  if (result.image_b64) {
+    return Buffer.from(result.image_b64, "base64");
   }
 
-  if (result.output.audio_b64) {
-    return Buffer.from(result.output.audio_b64, "base64");
+  if (result.audio_b64) {
+    return Buffer.from(result.audio_b64, "base64");
   }
 
-  if (result.output.video_b64) {
-    return Buffer.from(result.output.video_b64, "base64");
+  if (result.video_b64) {
+    return Buffer.from(result.video_b64, "base64");
   }
 
   // URL output requires a follow-up download
-  if (result.output.image_url) {
+  if (result.image_url) {
     // Return a marker — caller should download
-    throw new Error(`DOWNLOAD:${result.output.image_url}`);
+    throw new Error(`DOWNLOAD:${result.image_url}`);
   }
 
   throw new Error("RunPod returned no image data");
@@ -302,13 +333,17 @@ export async function runpodFluxSchnell(
 export async function runpodUpscale(
   imageB64: string,
   scale: number = 4,
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "esrgan",
-      image_b64: imageB64,
-      scale,
-    }),
+    runpodRun(
+      {
+        task: "esrgan",
+        image_b64: imageB64,
+        scale,
+      },
+      opts,
+    ),
   );
 }
 
@@ -317,13 +352,56 @@ export async function runpodUpscale(
  */
 export async function runpodRemoveBackground(
   imageB64: string,
+  opts?: RunPodRunOpts,
+): Promise<Buffer> {
+  return handleRunpodResult(
+    runpodRun(
+      {
+        task: "rmbg",
+        image_b64: imageB64,
+      },
+      opts,
+    ),
+  );
+}
+
+/**
+ * True monocular depth estimation with Depth Anything V2 (self-hosted).
+ * variant: grayscale (white=near) | colored (cv2 colormap) | normal (true
+ * surface normals derived from the depth field — usable in real 3D workflows).
+ */
+export async function runpodDepth(
+  imageB64: string,
+  variant: "grayscale" | "colored" | "normal" = "grayscale",
+  colormap: "jet" | "rainbow" | "hot" = "jet",
 ): Promise<Buffer> {
   return handleRunpodResult(
     runpodRun({
-      task: "rmbg",
+      task: "depth",
       image_b64: imageB64,
+      variant,
+      colormap,
     }),
   );
+}
+
+/**
+ * True raster→SVG vectorization with vtracer (self-hosted). Returns SVG text.
+ * colorCount is the tool-level 2-32 slider; the WORKER maps it to vtracer's
+ * 1-8 color_precision (job_input.color_precision carries the raw 2-32 value).
+ */
+export async function runpodVectorize(
+  imageB64: string,
+  colorCount: number = 8,
+): Promise<string> {
+  const out = await runpodRunRaw({
+    task: "vtracer",
+    image_b64: imageB64,
+    color_precision: colorCount,
+    mode: "color",
+  });
+  if (!out.svg) throw new Error("RunPod returned no SVG data");
+  return out.svg;
 }
 
 /**
@@ -355,22 +433,26 @@ export async function runpodFluxImg2Img(
   loraId?: string,
   seed?: number,
   model?: "dev" | "schnell",
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "flux-img2img",
-      image_b64: imageB64,
-      prompt,
-      strength,
-      num_inference_steps: steps,
-      guidance_scale: guidanceScale,
-      ...(model ? { model } : {}),
-      // handle_flux_img2img already loads a LoRA per request; the app just
-      // never passed one, so uncensored refines lost the realism LoRA that
-      // text-to-image gets.
-      ...(loraId ? { lora_id: loraId } : {}),
-      ...(typeof seed === "number" ? { seed } : {}),
-    }),
+    runpodRun(
+      {
+        task: "flux-img2img",
+        image_b64: imageB64,
+        prompt,
+        strength,
+        num_inference_steps: steps,
+        guidance_scale: guidanceScale,
+        ...(model ? { model } : {}),
+        // handle_flux_img2img already loads a LoRA per request; the app just
+        // never passed one, so uncensored refines lost the realism LoRA that
+        // text-to-image gets.
+        ...(loraId ? { lora_id: loraId } : {}),
+        ...(typeof seed === "number" ? { seed } : {}),
+      },
+      opts,
+    ),
   );
 }
 
@@ -453,6 +535,9 @@ export async function runpodJobStatus(jobId: string, endpointId?: string): Promi
     return { status: "IN_PROGRESS" };
   } finally {
     clearTimeout(timeout);
+  }
+  if (res.status === 404) {
+    return { status: "FAILED", error: "RunPod job expired or not found (404)" };
   }
   if (!res.ok) return { status: "IN_PROGRESS" };
   const s = (await res.json()) as RunPodRunResponse;
@@ -583,14 +668,18 @@ export async function runpodTryOn(
   personImageUrl: string,
   garmentImageUrl: string,
   clothType: string = "upper",
+  opts?: RunPodRunOpts,
 ): Promise<Buffer> {
   return handleRunpodResult(
-    runpodRun({
-      task: "tryon",
-      person_image_url: personImageUrl,
-      garment_image_url: garmentImageUrl,
-      cloth_type: clothType,
-    }),
+    runpodRun(
+      {
+        task: "tryon",
+        person_image_url: personImageUrl,
+        garment_image_url: garmentImageUrl,
+        cloth_type: clothType,
+      },
+      opts,
+    ),
   );
 }
 

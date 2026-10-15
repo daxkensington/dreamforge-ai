@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Paintbrush, Loader2, Download, Sparkles, RotateCcw, Trash2, Undo2 } from "lucide-react";
+import { Paintbrush, Loader2, Download, Sparkles, RotateCcw, Trash2, Undo2, Zap } from "lucide-react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -20,8 +20,10 @@ export default function ToolCanvas() {
   const [prompt, setPrompt] = useState("");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [style, setStyle] = useState("photorealistic");
+  const [liveMode, setLiveMode] = useState(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const historyRef = useRef<ImageData[]>([]);
+  const liveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const styles = [
     { value: "photorealistic", label: "Photo" }, { value: "anime", label: "Anime" },
@@ -122,7 +124,11 @@ export default function ToolCanvas() {
     lastPos.current = pos;
   };
 
-  const stopDrawing = () => { setIsDrawing(false); lastPos.current = null; };
+  const styleMap: Record<string, string> = {
+    "photorealistic": "realistic", "anime": "anime", "oil-painting": "oil-painting",
+    "watercolor": "watercolor", "cyberpunk": "digital-art", "fantasy": "digital-art",
+    "pixel-art": "digital-art", "comic": "digital-art",
+  };
 
   // Use sketch-to-image via the existing tools endpoint
   const mutation = trpc.tools.sketchToImage?.useMutation?.({
@@ -132,6 +138,43 @@ export default function ToolCanvas() {
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  // Fast Krea-style live canvas streaming endpoint
+  const liveMutation = trpc.tools.liveCanvasRender?.useMutation?.({
+    onSuccess: (data: any) => {
+      if (data.status === "completed" && data.url) {
+        setResultUrl(data.url);
+      } else if (!liveMode) {
+        toast.error(data.error || "Generation failed");
+      }
+    },
+    onError: (err: any) => {
+      if (!liveMode) toast.error(err.message);
+    },
+  });
+
+  const scheduleLiveRender = useCallback(() => {
+    if (!liveMode) return;
+    if (liveDebounceRef.current) clearTimeout(liveDebounceRef.current);
+    liveDebounceRef.current = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || liveMutation?.isPending) return;
+      const sketchDataUrl = canvas.toDataURL("image/png");
+      liveMutation?.mutate({
+        sketchDataUrl,
+        prompt: prompt || "Transform this sketch into a detailed artwork",
+        outputStyle: (styleMap[style] || "digital-art") as any,
+      });
+    }, 700);
+  }, [liveMode, prompt, style, liveMutation]);
+
+  const stopDrawing = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      lastPos.current = null;
+      scheduleLiveRender();
+    }
+  };
 
   const generateFromCanvas = async () => {
     const canvas = canvasRef.current;
@@ -150,22 +193,25 @@ export default function ToolCanvas() {
 
       if (res.ok) {
         const { url } = await res.json();
-        const styleMap: Record<string, string> = {
-          "photorealistic": "realistic", "anime": "anime", "oil-painting": "oil-painting",
-          "watercolor": "watercolor", "cyberpunk": "digital-art", "fantasy": "digital-art",
-          "pixel-art": "digital-art", "comic": "digital-art",
-        };
         mutation?.mutate({ imageUrl: url, description: prompt || "Transform this sketch into a detailed image", outputStyle: (styleMap[style] || "digital-art") as any });
       } else {
-        // Fallback: use the inpaint endpoint with dataUrl
-        toast.error("Upload required for canvas generation");
+        // Fallback: direct base64 sketch render via liveCanvasRender
+        liveMutation?.mutate({
+          sketchDataUrl: dataUrl,
+          prompt: prompt || "Transform this sketch into a detailed image",
+          outputStyle: (styleMap[style] || "digital-art") as any,
+        });
       }
     } catch {
-      toast.error("Failed to upload canvas");
+      liveMutation?.mutate({
+        sketchDataUrl: dataUrl,
+        prompt: prompt || "Transform this sketch into a detailed image",
+        outputStyle: (styleMap[style] || "digital-art") as any,
+      });
     }
   };
 
-  const isProcessing = mutation?.isPending || false;
+  const isProcessing = mutation?.isPending || liveMutation?.isPending || false;
 
   return (
     <ToolPageLayout title="AI Canvas" description="Draw and let AI transform your sketches in real-time" icon={Paintbrush} gradient="from-violet-500 to-indigo-400">
@@ -180,7 +226,22 @@ export default function ToolCanvas() {
             <Card className="border-border/50 overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <Badge variant="secondary">512 × 512 Canvas</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">512 × 512 Canvas</Badge>
+                    <Button
+                      variant={liveMode ? "default" : "outline"}
+                      size="sm"
+                      className={liveMode ? "h-7 text-xs bg-violet-600 hover:bg-violet-500 text-white" : "h-7 text-xs"}
+                      onClick={() => {
+                        const next = !liveMode;
+                        setLiveMode(next);
+                        toast.info(next ? "Live Mode enabled — preview updates automatically after each stroke" : "Live Mode paused");
+                      }}
+                    >
+                      <Zap className="h-3.5 w-3.5 mr-1" />
+                      {liveMode ? "Live Render: ON" : "Live Render"}
+                    </Button>
+                  </div>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={undo}><Undo2 className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="sm" onClick={clearCanvas}><Trash2 className="h-4 w-4" /></Button>

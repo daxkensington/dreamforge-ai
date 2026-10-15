@@ -8,7 +8,6 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { exportScriptPdf } from "@/lib/pdfExport";
 import { Loader2, FileText, Clapperboard, Sparkles, Clock, MapPin, Camera as CameraIcon, Volume2, StickyNote, Save, Download } from "lucide-react";
 
 const FORMATS = [
@@ -66,8 +65,9 @@ export default function ToolTextToVideoScript() {
     });
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!script.data || script.data.status !== "completed") return;
+    const { exportScriptPdf } = await import("@/lib/pdfExport");
     exportScriptPdf({
       title: script.data.title,
       logline: script.data.logline,

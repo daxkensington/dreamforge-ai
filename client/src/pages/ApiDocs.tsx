@@ -15,13 +15,13 @@ const endpoints = [
   "prompt": "A serene mountain landscape at sunset",
   "width": 1024,
   "height": 1024,
-  "model": "default"
+  "model": "auto"
 }`,
     response: `{
   "id": 123,
   "url": "https://cdn.example.com/generated/abc.png",
-  "prompt": "A serene mountain landscape at sunset",
-  "status": "completed"
+  "status": "completed",
+  "requestId": "114bdd89-cd2b-4b77-8ad3-857220ed45ed"
 }`,
   },
   {
@@ -152,9 +152,11 @@ export default function ApiDocs() {
           <div className="bg-background rounded-lg p-4 font-mono text-sm overflow-x-auto">
             <pre className="text-xs">{`curl -X POST https://dreamforgex.ai/api/v1/generate \\
   -H "Authorization: Bearer df_your_api_key" \\
+  -H "Idempotency-Key: 114bdd89-cd2b-4b77-8ad3-857220ed45ed" \\
   -H "Content-Type: application/json" \\
   -d '{"prompt": "A beautiful sunset over mountains"}'`}</pre>
           </div>
+          <p className="text-sm text-muted-foreground">Use a new UUID in Idempotency-Key for each new generation. Retry the same prompt, model and dimensions with the same UUID to retrieve the original attempt. A pending request returns HTTP 202 with Retry-After; a UUID reused for different inputs returns HTTP 409. Requests without this header receive a new UUID in the response and cannot recover it after a lost response.</p>
         </CardContent>
       </Card>
 

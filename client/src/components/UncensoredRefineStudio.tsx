@@ -7,8 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import UncensoredResultActions from "@/components/UncensoredResultActions";
-import { UNCENSORED_LIGHTING, UNCENSORED_IMAGE_COST } from "@shared/uncensoredStudio";
+import UncensoredResultActions, {
+  UncensoredBeforeAfterCompare,
+  UncensoredSourcePickerExtras,
+} from "@/components/UncensoredResultActions";
+import {
+  UNCENSORED_LIGHTING,
+  UNCENSORED_IMAGE_COST,
+  UNCENSORED_REFINE_PRESETS,
+} from "@shared/uncensoredStudio";
 
 /**
  * Refine — uncensored img2img over the user's OWN generations.
@@ -25,14 +32,19 @@ export default function UncensoredRefineStudio({
   onInpaint,
   onAnimate,
   onUseCharacter,
+  onOutfit,
+  onSheet,
 }: {
   focusGenerationId?: number | null;
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
   onUseCharacter?: (id: number) => void;
+  onOutfit?: (id: number) => void;
+  onSheet?: (id: number) => void;
 } = {}) {
   const [sourceId, setSourceId] = useState<number | null>(focusGenerationId ?? null);
   const [prompt, setPrompt] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [strength, setStrength] = useState(60); // 0-100 slider → 0.2–0.9
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultId, setResultId] = useState<number | null>(null);
@@ -68,6 +80,15 @@ export default function UncensoredRefineStudio({
       toast.success("Relit — original is untouched.");
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const enhancePrompt = trpc.uncensored.enhancePrompt.useMutation({
+    onSuccess: (res) => {
+      setPrompt(res.prompt);
+      toast.success("Prompt enhanced with studio lighting & detail.");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -96,9 +117,9 @@ export default function UncensoredRefineStudio({
     <div className="mt-8 rounded-2xl border border-rose-500/30 bg-card/40 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Refine an image</h2>
+          <h2 className="text-lg font-semibold">Refine &amp; Relight an image</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Change one thing and keep the rest — same character, new detail.
+            Change one thing and keep the rest — same character, new detail, expression, or setting.
           </p>
         </div>
         <span className="shrink-0 text-xs text-muted-foreground">{refineCost} credits</span>
@@ -106,7 +127,16 @@ export default function UncensoredRefineStudio({
 
       {/* Source picker — your own generations only. No upload by design. */}
       <div className="mt-5">
-        <p className="text-sm text-muted-foreground">Pick one of your uncensored images:</p>
+        <UncensoredSourcePickerExtras
+          selectedGenerationId={sourceId}
+          onSelectGeneration={(id) => {
+            setSourceId(id);
+            setResultUrl(null);
+            setResultId(null);
+          }}
+          disabled={isBusy}
+        />
+        <p className="text-sm text-muted-foreground">1. Pick one of your uncensored images:</p>
         {images.isLoading ? (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading your generations…
@@ -145,14 +175,61 @@ export default function UncensoredRefineStudio({
         )}
       </div>
 
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground">
+            2. One-click studio presets (auto-tunes strength) or describe any change:
+          </p>
+          {prompt.trim().length >= 3 && (
+            <button
+              type="button"
+              disabled={isBusy || enhancePrompt.isPending}
+              onClick={() => enhancePrompt.mutate({ prompt })}
+              className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              {enhancePrompt.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Wand2 className="h-3 w-3" />
+              )}
+              Enhance prompt
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {UNCENSORED_REFINE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              disabled={isBusy}
+              onClick={() => {
+                setSelectedPreset(preset.id);
+                setPrompt(preset.prompt);
+                setStrength(preset.strength);
+              }}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                selectedPreset === preset.id
+                  ? "border-rose-500 bg-rose-500/15 font-medium text-rose-200"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Textarea
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          setSelectedPreset(null);
+        }}
         placeholder="Describe the change… (e.g. same pose and face, change the dress to red silk)"
         rows={3}
         maxLength={1000}
         disabled={isBusy}
-        className="mt-4 resize-none"
+        className="mt-3 resize-none"
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
@@ -208,7 +285,7 @@ export default function UncensoredRefineStudio({
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">How much to change</span>
           <span className="font-medium">
-            {strength <= 40 ? "Subtle" : strength <= 70 ? "Balanced" : "Heavy"}
+            {strength <= 40 ? "Subtle" : strength <= 70 ? "Balanced" : "Heavy"} ({strength}%)
           </span>
         </div>
         <Slider
@@ -242,43 +319,30 @@ export default function UncensoredRefineStudio({
         )}
       </Button>
 
-      {(selected || resultUrl) && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {selected && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Original</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selected.imageUrl ?? ""}
-                alt="source"
-                className="w-full rounded-xl border border-border/60"
-              />
-            </div>
-          )}
-          {resultUrl && (
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Refined</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={resultUrl} alt="refined" className="w-full rounded-xl border border-rose-500/40" />
-              {resultId && (
-                <UncensoredResultActions
-                  generationId={resultId}
-                  url={resultUrl}
-                  onContinue={() => {
-                    setSourceId(resultId);
-                    setResultUrl(null);
-                    setResultId(null);
-                    toast.info("Now refining the new image.");
-                  }}
-                  onInpaint={onInpaint}
-                  onAnimate={onAnimate}
-                  onUseCharacter={onUseCharacter}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <UncensoredBeforeAfterCompare
+        beforeUrl={selected?.imageUrl ?? null}
+        afterUrl={resultUrl}
+        beforeLabel="Original"
+        afterLabel="Refined"
+      >
+        {resultId && resultUrl && (
+          <UncensoredResultActions
+            generationId={resultId}
+            url={resultUrl}
+            onContinue={() => {
+              setSourceId(resultId);
+              setResultUrl(null);
+              setResultId(null);
+              toast.info("Now refining the new image.");
+            }}
+            onInpaint={onInpaint}
+            onOutfit={onOutfit}
+            onSheet={onSheet}
+            onAnimate={onAnimate}
+            onUseCharacter={onUseCharacter}
+          />
+        )}
+      </UncensoredBeforeAfterCompare>
     </div>
   );
 }

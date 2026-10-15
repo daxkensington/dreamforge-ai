@@ -24,6 +24,7 @@ import {
   Rocket,
   Flame,
   Bitcoin,
+  CreditCard,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -175,7 +176,7 @@ const faqs = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "We accept all major credit cards, debit cards, and PayPal. Business and Agency customers can also pay via invoice with net-30 terms.",
+    a: "We accept all major credit and debit cards (Visa, Mastercard, Amex), Apple Pay, and Google Pay via Stripe for all subscriptions and Credit Packs. For the Uncensored Pro Studio (18+), you can unlock passes in 1 click using Credit Packs or pay anonymously with Bitcoin (On-Chain and Lightning).",
   },
   {
     q: "Is there a free trial for paid plans?",
@@ -197,8 +198,15 @@ const faqs = [
 
 /* -- Credit pack helpers -- */
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
+  return cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
 }
+
+const UNCENSORED_PACK_HINTS: Record<string, { badge: string; planId: string }> = {
+  "pack-500": { badge: "Unlocks 24h Uncensored Pass + 100 cr", planId: "uncensored-day" },
+  "pack-2500": { badge: "Unlocks 30-Day Uncensored Pass + 500 cr", planId: "uncensored-30d" },
+  "pack-7500": { badge: "Unlocks 30-Day Uncensored Pass + 5,500 cr", planId: "uncensored-30d" },
+  "pack-20000": { badge: "Unlocks 30-Day Uncensored Pass + 18,000 cr", planId: "uncensored-30d" },
+};
 
 function packSavingsPercent(idx: number): string | null {
   if (idx === 0) return null;
@@ -268,14 +276,18 @@ export default function Pricing() {
     });
   };
 
-  const handleBuyCredits = (packId: string) => {
+  const handleBuyCredits = (packId: string, returnPath?: string) => {
     if (!isAuthenticated) {
-      window.location.href = getLoginUrl();
+      window.location.href = getLoginUrl(returnPath ?? "/pricing");
       return;
     }
     track("checkout_started", { kind: "credit_pack", pack: packId });
     setPendingCheckout(packId);
-    creditsMutation.mutate({ packId, origin: window.location.origin });
+    creditsMutation.mutate({
+      packId,
+      origin: window.location.origin,
+      ...(returnPath ? { returnPath } : {}),
+    });
   };
 
   return (
@@ -354,6 +366,31 @@ export default function Pricing() {
               </span>
             </button>
           </motion.div>
+
+          {/* Quick-Jump Section Pills */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+            <a
+              href="#plans"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/80 hover:border-cyan-400/50 hover:text-cyan-300 transition-colors"
+            >
+              <Crown className="h-3.5 w-3.5 text-cyan-400" />
+              Subscription Plans
+            </a>
+            <a
+              href="#uncensored-passes"
+              className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/25 transition-colors shadow-[0_0_20px_rgba(244,63,94,0.2)]"
+            >
+              <Flame className="h-3.5 w-3.5 text-rose-400" />
+              Uncensored 18+ Passes ($4.99–$19)
+            </a>
+            <a
+              href="#credit-packs"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/80 hover:border-purple-400/50 hover:text-purple-300 transition-colors"
+            >
+              <Package className="h-3.5 w-3.5 text-purple-400" />
+              One-Time Credit Packs
+            </a>
+          </div>
         </div>
       </section>
 
@@ -611,44 +648,174 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* ======= UNCENSORED TIER (18+, crypto-only — never touches Stripe) ======= */}
-      <section className="pb-2">
+      {/* ======= UNCENSORED TIER (18+, Credits or Bitcoin) ======= */}
+      <section id="uncensored-passes" className="py-16 border-t border-rose-500/20 relative scroll-mt-20">
         <div className="container">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="max-w-4xl mx-auto rounded-2xl border border-rose-500/25 bg-gradient-to-r from-rose-500/[0.07] to-orange-500/[0.04] p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 shadow-lg shadow-rose-500/20">
-              <Flame className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold">Uncensored Pass</h3>
-                <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-300">
-                  18+
-                </span>
+          <div className="max-w-6xl mx-auto rounded-3xl border border-rose-500/30 bg-gradient-to-br from-rose-950/40 via-black/70 to-orange-950/30 p-6 sm:p-10 shadow-[0_0_60px_-15px_rgba(244,63,94,0.25)] backdrop-blur-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-rose-200">
+                    <Flame className="h-3.5 w-3.5 text-rose-400" />
+                    Uncensored Pro Studio (18+)
+                  </span>
+                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                    3 Free Previews Included
+                  </span>
+                  <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
+                    Card / Apple Pay or Bitcoin
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                  Instant Uncensored Passes —{" "}
+                  <span className="bg-gradient-to-r from-rose-400 via-orange-300 to-amber-300 bg-clip-text text-transparent">
+                    No Subscription Required
+                  </span>
+                </h2>
+                <p className="text-sm text-white/75 mt-1.5 max-w-2xl">
+                  Unlock all 7 unfiltered studio tools (Create &amp; Face Lock, Refine &amp; Relight, Brush Inpaint, 4-View Character Sheet, Virtual Outfit Swap, and Uncensored Wan 2.2 Video) with a 1-click Credit Pack or anonymous Bitcoin.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                No content filter. Unfiltered open-source models, private by default.{" "}
-                <span className="text-foreground/80">$19 / 30 days · pay with crypto</span> — separate
-                from the plans above.
-              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                {[
+                  "/showcase/uncensored-char-aria-nordic.jpg",
+                  "/showcase/uncensored-char-valentina-glam.jpg",
+                  "/showcase/uncensored-char-sora-cyber.jpg",
+                  "/showcase/uncensored-char-chloe-california.jpg",
+                ].map((src, idx) => (
+                  <img
+                    key={idx}
+                    src={src}
+                    alt="Uncensored Character Preset"
+                    loading="lazy"
+                    className="h-14 w-14 rounded-xl object-cover border border-rose-400/30 shadow-md"
+                  />
+                ))}
+              </div>
             </div>
-            <Button
-              asChild
-              variant="outline"
-              className="shrink-0 border-rose-500/30 hover:bg-rose-500/10"
-            >
-              <Link href="/uncensored">
-                <Bitcoin className="h-4 w-4 mr-2" />
-                View Uncensored
-              </Link>
-            </Button>
-          </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  id: "uncensored-day",
+                  name: "24-Hour Day Pass",
+                  badge: "Impulse Try-Out",
+                  cardPrice: "$4.99",
+                  btcPrice: "$5 BTC",
+                  creditsCost: "400 credits",
+                  packId: "pack-500",
+                  bonusText: "Includes 500-cr pack (+100 bonus studio credits)",
+                  perks: [
+                    "Unlimited unfiltered Flux & Pony XL renders",
+                    "Character Face Lock & 8 quick-pick personas",
+                    "Brush Inpaint & Virtual Outfit Swap",
+                    "100% private encrypted vault",
+                  ],
+                  popular: false,
+                },
+                {
+                  id: "uncensored-7d",
+                  name: "7-Day Week Pass",
+                  badge: "Creator Sprint",
+                  cardPrice: "$12.00",
+                  btcPrice: "$12 BTC",
+                  creditsCost: "1,000 credits",
+                  packId: "pack-2500",
+                  bonusText: "Card unlocks via $19.99 pack (+1,500 bonus credits)",
+                  perks: [
+                    "Full 7 days of unfiltered studio access",
+                    "Uncensored Image-to-Video (Wan 2.2 Motion)",
+                    "4-View Character Turnaround Sheets",
+                    "Zero watermarks & commercial rights",
+                  ],
+                  popular: false,
+                },
+                {
+                  id: "uncensored-30d",
+                  name: "30-Day Pro Access",
+                  badge: "Best Value · Most Popular",
+                  cardPrice: "$19.99",
+                  btcPrice: "$19 BTC",
+                  creditsCost: "2,000 credits",
+                  packId: "pack-2500",
+                  bonusText: "Includes 2,500-cr pack (+500 bonus studio credits)",
+                  perks: [
+                    "30 full days of unlimited Uncensored Studio",
+                    "Priority dedicated GPU queue (fastest renders)",
+                    "All 7 unfiltered image, edit & video tools",
+                    "Stackable pass timer + private vault",
+                  ],
+                  popular: true,
+                },
+              ].map((pass) => (
+                <div
+                  key={pass.id}
+                  className={`relative rounded-2xl p-5 flex flex-col justify-between border transition-all ${
+                    pass.popular
+                      ? "border-rose-500/60 bg-gradient-to-b from-rose-500/15 to-black/70 ring-1 ring-rose-500/40 shadow-[0_0_30px_rgba(244,63,94,0.2)]"
+                      : "border-white/10 bg-black/50 hover:border-rose-500/35"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-sm font-bold text-white">{pass.name}</span>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          pass.popular
+                            ? "bg-gradient-to-r from-rose-500 to-orange-500 text-white"
+                            : "bg-white/10 text-white/75"
+                        }`}
+                      >
+                        {pass.badge}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-3xl font-extrabold text-white">{pass.cardPrice}</span>
+                      <span className="text-xs text-rose-300 font-medium">
+                        ({pass.creditsCost} or {pass.btcPrice})
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-300/90 mb-4">{pass.bonusText}</p>
+                    <ul className="space-y-2 mb-5">
+                      {pass.perks.map((perk) => (
+                        <li key={perk} className="flex items-start gap-2 text-xs text-white/80">
+                          <Check className="h-3.5 w-3.5 text-rose-400 shrink-0 mt-0.5" />
+                          <span>{perk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full gap-1.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 text-xs h-9 font-semibold"
+                      disabled={pendingCheckout === pass.packId}
+                      onClick={() =>
+                        handleBuyCredits(
+                          pass.packId,
+                          `/uncensored?auto_unlock=${encodeURIComponent(pass.id)}`,
+                        )
+                      }
+                    >
+                      <CreditCard className="h-3.5 w-3.5" />
+                      {pendingCheckout === pass.packId
+                        ? "Opening Stripe..."
+                        : "Unlock with Card / Apple Pay →"}
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full gap-1.5 border-white/15 bg-white/5 hover:bg-white/10 text-xs h-8 text-white/80"
+                    >
+                      <Link href={`/uncensored?pass=${encodeURIComponent(pass.id)}`}>
+                        <Bitcoin className="h-3.5 w-3.5 text-amber-400" />
+                        Pay with Bitcoin or Try Free Preview
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -818,7 +985,7 @@ export default function Pricing() {
       </section>
 
       {/* ======= CREDIT PACKS ======= */}
-      <section className="py-24 border-t border-border/50">
+      <section id="credit-packs" className="py-24 border-t border-border/50 scroll-mt-20">
         <div className="container">
           <div className="text-center mb-16">
             <motion.h2
@@ -886,7 +1053,14 @@ export default function Pricing() {
                   <div className="flex items-baseline gap-1 mb-1">
                     <span className="text-3xl font-bold">{formatPrice(pack.price)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-6">{pack.perCredit} per credit</p>
+                  <p className="text-xs text-muted-foreground mb-4">{pack.perCredit} per credit</p>
+
+                  {UNCENSORED_PACK_HINTS[pack.id] && (
+                    <div className="mb-4 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1.5 text-[11px] font-medium text-rose-200">
+                      <Flame className=" mr-1 inline h-3 w-3 text-rose-400" />
+                      {UNCENSORED_PACK_HINTS[pack.id].badge}
+                    </div>
+                  )}
 
                   <Button
                     variant="outline"
@@ -896,6 +1070,21 @@ export default function Pricing() {
                   >
                     {pendingCheckout === pack.id ? "Opening checkout..." : "Buy Credits"}
                   </Button>
+                  {UNCENSORED_PACK_HINTS[pack.id] && (
+                    <button
+                      type="button"
+                      disabled={pendingCheckout === pack.id}
+                      onClick={() =>
+                        handleBuyCredits(
+                          pack.id,
+                          `/uncensored?auto_unlock=${encodeURIComponent(UNCENSORED_PACK_HINTS[pack.id].planId)}`,
+                        )
+                      }
+                      className="mt-2 w-full rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+                    >
+                      Buy &amp; Unlock Uncensored →
+                    </button>
+                  )}
                 </motion.div>
               );
             })}

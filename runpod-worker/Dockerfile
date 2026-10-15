@@ -24,6 +24,25 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir --no-deps audiocraft && \
     pip install --no-cache-dir lameenc num2words flashy torchaudio imageio-ffmpeg imageio \
     av julius spacy librosa torchmetrics
+# realesrgan/basicsr are also installed --no-deps: their declared dependencies
+# (notably tb-nightly) conflict with the protobuf pin and send pip's resolver
+# into backtracking that dies with resolution-too-deep. Inference needs none
+# of the training-only deps; the four real runtime gaps are backfilled by hand
+# (addict/future/lmdb/yapf — everything else they import is already pinned in
+# requirements.txt: numpy/opencv/Pillow/scipy/scikit-image/torch/torchvision).
+RUN pip install --no-cache-dir --no-deps realesrgan==0.3.0 basicsr==1.4.2 && \
+    pip install --no-cache-dir addict future lmdb yapf
+# runpod SDK --no-deps for the same resolver reason: its declared fastapi[all]
+# tree backtracks pip to death against the base image's preinstalled packages.
+# serverless.start() at runtime needs only the HTTP/pydantic stack below; if a
+# future SDK version imports something else, the worker log will name it
+# (same find-missing-deps.sh workflow as the audiocraft backfill).
+RUN pip install --no-cache-dir --no-deps runpod==1.6.0 && \
+    pip install --no-cache-dir "numpy==1.26.4" "scipy==1.11.4" "scikit-image==0.22.0" "opencv-python-headless==4.8.0.76" \
+    aiohttp aiohttp-retry backoff boto3 botocore \
+    click colorama fastapi uvicorn py-cpuinfo paramiko prettytable \
+    inquirerpy requests tqdm tqdm-loggable pydantic tomli tomlkit urllib3 watchdog && \
+    python -c "import sys, torchvision.transforms, torchvision.transforms.functional as _F; torchvision.transforms.functional_tensor = _F; sys.modules['torchvision.transforms.functional_tensor'] = _F; import runpod, cv2, scipy, skimage, diffusers, transformers, realesrgan, vtracer, soundfile, librosa, av; print('Worker imports verified OK')"
 
 # Enable fast parallel HF downloads at runtime (first worker startup)
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
@@ -50,8 +69,9 @@ RUN git clone --depth 1 https://github.com/Zheng-Chong/CatVTON.git /app/catvton 
     git checkout 7818397f25613beedb3d861a34769f607cfcf3b1 && \
     rm -rf .git
 
-# Flux + RMBG-2.0 + CatVTON (HF repo zhengchong/CatVTON) weights are downloaded
-# lazily on first request via huggingface_hub. Those downloads ARE integrity
+# Flux + RMBG-2.0 + CatVTON (HF repo zhengchong/CatVTON) + Depth Anything V2
+# Small (depth-anything/Depth-Anything-V2-Small-hf, the `depth` task) weights
+# are downloaded lazily on first request via huggingface_hub. Those downloads ARE integrity
 # checked (the client verifies LFS sha256 at download time) but NOT pinned to a
 # repo revision — an upstream repo change will change the weights.
 # HF_TOKEN must be set at runtime via RunPod endpoint env vars.

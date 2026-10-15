@@ -28,6 +28,7 @@ import {
   UNCENSORED_SETTINGS,
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_VIDEO_CAMERAS,
   UNCENSORED_VIDEO_INTENSITIES,
   UNCENSORED_SHEET_VIEWS,
   UNCENSORED_CHARACTER_LIMIT,
@@ -39,6 +40,7 @@ import {
   applyUncensoredWardrobe,
   applyUncensoredSetting,
   applyUncensoredVideoMotion,
+  applyUncensoredVideoCamera,
   applyUncensoredVideoIntensity,
   applyUncensoredI2vIdentity,
   clampCharacterStrength,
@@ -52,16 +54,20 @@ import {
   uncensoredCharacterRef,
   isUncensoredCharacter,
   parseUncensoredCharacterRef,
+  enhanceUncensoredPrompt,
 } from "../../shared/uncensoredStudio";
+import { ENV } from "../_core/env";
 import { resolveUncensoredLora } from "../_core/uncensoredStyleLora";
 import { submitUncensoredVideoJob, collectUncensoredVideoJob, fetchAsBase64 } from "../_core/videoGenerationUncensored";
 import { canSubmitUnfilteredImageJob, submitUnfilteredImageJob, collectUnfilteredImageJob, warmUnfilteredImageWorker } from "../_core/imageGenerationUncensored";
 import { checkPrompt, logModerationBlock } from "../_core/promptModeration";
 import { requireToolActive, logToolFailure, getToolStatus } from "../_core/toolStatus";
 import { isRunPodAvailable, runpodUpscale, runpodRemoveBackground, runpodTryOn } from "../_core/runpod";
+import { upscaleBufferSharp, removeBackgroundBufferSharp } from "../_core/svgVectorize";
 import { deductCredits, refundCredits, getOrCreateBalance } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
+import { sendPassActivatedEmail } from "../_core/uncensoredEmail";
 
 // Uncensored video is GPU-expensive (Wan 2.2, minutes/clip) → pass-gated, no
 // free tier. Two quality tiers: "fast" = 5B TI2V (~90s, 48GB); "hd" = 14B A14B
@@ -86,6 +92,11 @@ const UNCENSORED_REFINE_COST = 10;
 // Single source of truth — the landing pages advertise this same number.
 const FREE_UNCENSORED_LIMIT = FREE_UNCENSORED_PREVIEWS;
 const FREE_UNCENSORED_GLOBAL_DAILY_CAP = 500;
+
+function isRunPodEndpointPausedError(err: unknown): boolean {
+  const msg = (err as any)?.message ?? String(err ?? "");
+  return /\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(msg);
+}
 
 async function countFreeUncensored(userId: number): Promise<number> {
   const db = await requireDb();
@@ -164,7 +175,20 @@ async function finalizePaidImageRow(gen: GenerationRow, userId: number): Promise
     return { generationId: gen.id, status: "processing", url: null, seed };
   }
 
-  const result = await collectUnfilteredImageJob(jobId, { watermark: false });
+  const fallback =
+    typeof gen.prompt === "string" && gen.prompt.length > 0 && !meta.character
+      ? {
+          prompt: applyUncensoredStyle(gen.prompt, meta.style),
+          width: gen.width ?? 832,
+          height: gen.height ?? 1216,
+          seed,
+          createdAt: gen.createdAt ?? null,
+        }
+      : undefined;
+  const result = await collectUnfilteredImageJob(
+    jobId,
+    fallback ? { watermark: false, fallback } : { watermark: false },
+  );
   if (result.status === "completed") {
     await db
       .update(generations)
@@ -197,7 +221,19 @@ async function finalizeFreeRow(
     }
     return { status: "processing", url: null };
   }
-  const result = await collectUnfilteredImageJob(jobId, { watermark: true });
+  const fallback =
+    typeof gen.prompt === "string" && gen.prompt.length > 0
+      ? {
+          prompt: applyUncensoredStyle(gen.prompt, meta.style),
+          width: gen.width ?? 832,
+          height: gen.height ?? 1216,
+          createdAt: gen.createdAt ?? null,
+        }
+      : undefined;
+  const result = await collectUnfilteredImageJob(
+    jobId,
+    fallback ? { watermark: true, fallback } : { watermark: true },
+  );
   if (result.status === "completed") {
     await db
       .update(generations)
@@ -330,19 +366,26 @@ function parseMaskDataUrl(dataUrl: string): Buffer {
   return buf;
 }
 
-async function blendMasked(source: Buffer, painted: Buffer, mask: Buffer): Promise<Buffer> {
+export async function blendMasked(source: Buffer, painted: Buffer, mask: Buffer): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
   const meta = await sharp(source).metadata();
   const width = meta.width ?? 1024;
   const height = meta.height ?? 1024;
-  const maskPng = await sharp(mask).resize(width, height, { fit: "fill" }).greyscale().png().toBuffer();
-  const overlay = await sharp(painted)
+  let maskPipe = sharp(mask).resize(width, height, { fit: "fill" }).greyscale();
+  if (width >= 32 && height >= 32) {
+    maskPipe = maskPipe.blur(4);
+  }
+  const alphaRaw = await maskPipe.raw().toBuffer();
+  const paintedRgb = await sharp(painted)
     .resize(width, height, { fit: "fill" })
-    .ensureAlpha()
-    .composite([{ input: maskPng, blend: "dest-in" }])
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  const overlay = await sharp(paintedRgb, { raw: { width, height, channels: 3 } })
+    .joinChannel(alphaRaw, { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
-  return sharp(source).composite([{ input: overlay, blend: "over" }]).png().toBuffer();
+  return sharp(source).removeAlpha().composite([{ input: overlay, blend: "over" }]).png().toBuffer();
 }
 
 export async function getUncensoredEntitlement(userId: number): Promise<{
@@ -381,15 +424,23 @@ export const uncensoredRouter = router({
     let videoAvailable = false;
     try {
       const vs = await getToolStatus("uncensored-video");
-      videoAvailable = vs.status !== "offline" && isRunPodAvailable();
+      videoAvailable = vs.status !== "offline" && (isRunPodAvailable() || !!ENV.falApiKey);
     } catch {
       /* default to unavailable */
+    }
+    let creditBalance = 0;
+    try {
+      const bal = await getOrCreateBalance(ctx.user.id);
+      creditBalance = Number(bal?.balance ?? 0);
+    } catch {
+      /* balance lookup failure must not break status */
     }
     return {
       ...ent,
       plan: UNCENSORED_PLAN,
       plans: UNCENSORED_PLANS,
       available: isBtcpayConfigured(),
+      creditBalance,
       freeUsed,
       freeLimit: FREE_UNCENSORED_LIMIT,
       freeRemaining: Math.max(0, FREE_UNCENSORED_LIMIT - freeUsed),
@@ -411,6 +462,32 @@ export const uncensoredRouter = router({
       videoIntensities: UNCENSORED_VIDEO_INTENSITIES,
     };
   }),
+
+  /**
+   * 1-click Uncensored Studio Director — upgrades a short user prompt with
+   * style-matched lens, lighting, and anatomy direction (free, 0 credits).
+   */
+  enhancePrompt: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(3).max(900),
+        style: z.string().max(32).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const verdict = checkPrompt(input.prompt, { strictMinors: true });
+      if (!verdict.allowed) {
+        await logModerationBlock({
+          category: verdict.category,
+          promptLen: input.prompt.length,
+          userId: ctx.user.id,
+          surface: "uncensored.enhancePrompt",
+          prompt: input.prompt,
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+      }
+      return { prompt: enhanceUncensoredPrompt(input.prompt, input.style) };
+    }),
 
   /**
    * Paid uncensored image studio — the product pass-holders actually came for.
@@ -625,6 +702,27 @@ export const uncensoredRouter = router({
             await updateGeneration(genId, { metadata: { ...row.metadata, runpodJobId: jobId } });
             generationIds.push(genId);
           } catch (err: any) {
+            if (!characterUrl && isRunPodEndpointPausedError(err)) {
+              try {
+                const gen = await generateImage({
+                  prompt,
+                  model: "auto",
+                  size: `${aspect.width}x${aspect.height}`,
+                  userTier: "pro",
+                  unfiltered: true,
+                  unfilteredQuality: input.quality,
+                  loraId,
+                  seed,
+                });
+                const url = gen.url!;
+                await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url });
+                results.push({ generationId: genId, url, seed });
+                generationIds.push(genId);
+                continue;
+              } catch (syncErr: any) {
+                err = syncErr;
+              }
+            }
             failed += 1;
             await updateGeneration(genId, { status: "failed" });
             await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
@@ -640,8 +738,9 @@ export const uncensoredRouter = router({
         if (failed > 0) {
           await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate submit partial fail ×${failed}`);
         }
+        const allCompletedInline = results.length === generationIds.length;
         return {
-          status: "processing" as const,
+          status: allCompletedInline ? ("completed" as const) : ("processing" as const),
           generationIds,
           images: results,
           cost: unitCost * generationIds.length,
@@ -798,6 +897,7 @@ export const uncensoredRouter = router({
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
         duration: z.enum(["5s", "8s", "10s"]).default("5s" as const),
         motion: z.string().max(32).optional(),
+        camera: z.string().max(32).optional(),
         intensity: z.enum(["subtle", "natural", "energetic"]).default("natural"),
         negativePrompt: z.string().max(500).optional(),
         seed: z.number().int().min(0).max(2_147_483_647).optional(),
@@ -841,6 +941,7 @@ export const uncensoredRouter = router({
       const cost = uncensoredVideoCredits(UNCENSORED_VIDEO_COST[input.quality][input.mode], duration.id);
       let gpuPrompt = applyUncensoredI2vIdentity(input.prompt, input.mode === "i2v");
       gpuPrompt = applyUncensoredVideoMotion(gpuPrompt, input.motion);
+      gpuPrompt = applyUncensoredVideoCamera(gpuPrompt, input.camera);
       gpuPrompt = applyUncensoredVideoIntensity(gpuPrompt, input.intensity);
       const negative = [DEFAULT_UNCENSORED_VIDEO_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"} ${duration.label}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id });
@@ -862,7 +963,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -882,7 +983,7 @@ export const uncensoredRouter = router({
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -1097,9 +1198,6 @@ export const uncensoredRouter = router({
       }
 
       const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The upscaler GPU is unavailable right now." });
-      }
 
       const cost = input.scale === "4x" ? UNCENSORED_IMAGE_COST.upscale4x : UNCENSORED_IMAGE_COST.upscale2x;
       await enforceRateLimit(`uncensored.upscale:user:${ctx.user.id}`, 6, 60_000, "Slow down a moment between upscales.");
@@ -1125,7 +1223,16 @@ export const uncensoredRouter = router({
 
       try {
         const buf = await fetchImageBuffer(src.imageUrl!);
-        const result = await runpodUpscale(buf.toString("base64"), scale);
+        let result: Buffer;
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodUpscale(buf.toString("base64"), scale, { maxAttempts: 8 });
+          } catch {
+            result = await upscaleBufferSharp(buf, scale as 2 | 4);
+          }
+        } else {
+          result = await upscaleBufferSharp(buf, scale as 2 | 4);
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
@@ -1148,6 +1255,8 @@ export const uncensoredRouter = router({
         characterGenerationId: z.number().int().positive().optional(),
         savedCharacterId: z.number().int().positive().optional(),
         style: z.string().max(32).optional(),
+        wardrobe: z.string().max(32).optional(),
+        customPrompt: z.string().max(400).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1158,6 +1267,20 @@ export const uncensoredRouter = router({
       }
       if (!ent.active) {
         throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+
+      if (input.customPrompt && input.customPrompt.trim().length > 0) {
+        const verdict = checkPrompt(input.customPrompt, { strictMinors: true });
+        if (!verdict.allowed) {
+          await logModerationBlock({
+            category: verdict.category,
+            promptLen: input.customPrompt.length,
+            userId: ctx.user.id,
+            surface: "uncensored.characterSheet",
+            prompt: input.customPrompt,
+          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: verdict.userMessage });
+        }
       }
 
       const lock = await resolveUncensoredLock(ctx.user.id, input);
@@ -1182,43 +1305,58 @@ export const uncensoredRouter = router({
       const results: { generationId: number; url: string; view: string }[] = [];
       let failed = 0;
       const imageB64 = await fetchAsBase64(lock.url);
+      const customNote = input.customPrompt?.trim() ?? "";
 
-      for (const view of UNCENSORED_SHEET_VIEWS) {
-        let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
-        prompt = applyUncensoredStyle(prompt, style);
-        prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: view.label,
-          negativePrompt: null,
-          mediaType: "image",
-          width: aspect.width,
-          height: aspect.height,
-          duration: null,
-          status: "generating",
-          modelVersion: "uncensored-sheet",
-          parentGenerationId: lock.generationId,
-          metadata: {
-            uncensored: true,
-            sheet: true,
-            view: view.id,
-            style: style ?? null,
-            cost: unitCost,
-            savedCharacterId: lock.savedCharacterId,
-            character: true,
-          },
-        });
-        try {
-          const buffer = await refineUnfiltered(imageB64, prompt, { strength: 0.4, loraId });
-          const key = generateStorageKey("generations", "png");
-          const { url } = await storagePut(key, buffer, "image/png");
-          await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
-          results.push({ generationId: genId, url, view: view.id });
-        } catch (err: any) {
-          failed += 1;
-          await updateGeneration(genId, { status: "failed" });
-          await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        }
+      const viewOutcomes = await Promise.all(
+        UNCENSORED_SHEET_VIEWS.map(async (view) => {
+          let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
+          if (input.wardrobe) {
+            prompt = applyUncensoredWardrobe(prompt, input.wardrobe);
+          }
+          if (customNote) {
+            prompt = `${prompt}, ${customNote}`;
+          }
+          prompt = applyUncensoredStyle(prompt, style);
+          prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
+          const genId = await createGeneration({
+            userId: ctx.user.id,
+            prompt: customNote ? `${view.label} · ${customNote}` : view.label,
+            negativePrompt: null,
+            mediaType: "image",
+            width: aspect.width,
+            height: aspect.height,
+            duration: null,
+            status: "generating",
+            modelVersion: "uncensored-sheet",
+            parentGenerationId: lock.generationId,
+            metadata: {
+              uncensored: true,
+              sheet: true,
+              view: view.id,
+              style: style ?? null,
+              wardrobe: input.wardrobe ?? null,
+              cost: unitCost,
+              savedCharacterId: lock.savedCharacterId,
+              character: true,
+            },
+          });
+          try {
+            const buffer = await refineUnfiltered(imageB64, prompt, { strength: customNote || input.wardrobe ? 0.46 : 0.4, loraId });
+            const key = generateStorageKey("generations", "png");
+            const { url } = await storagePut(key, buffer, "image/png");
+            await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+            return { ok: true as const, item: { generationId: genId, url, view: view.id } };
+          } catch (err: any) {
+            await updateGeneration(genId, { status: "failed" });
+            await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+            return { ok: false as const };
+          }
+        }),
+      );
+
+      for (const outcome of viewOutcomes) {
+        if (outcome.ok) results.push(outcome.item);
+        else failed += 1;
       }
 
       if (results.length === 0) {
@@ -1249,9 +1387,6 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
       }
       const src = await requireOwnUncensoredImage(ctx.user.id, input.sourceGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
-      }
       const cost = UNCENSORED_IMAGE_COST.cutout;
       await enforceRateLimit(`uncensored.cutout:user:${ctx.user.id}`, 8, 60_000, "Slow down a moment between cutouts.");
       const debit = await deductCredits(ctx.user.id, cost, "Uncensored cutout", "usage", { uncensored: true, cutout: true });
@@ -1273,7 +1408,16 @@ export const uncensoredRouter = router({
       });
       try {
         const buf = await fetchImageBuffer(src.imageUrl!);
-        const result = await runpodRemoveBackground(buf.toString("base64"));
+        let result: Buffer;
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodRemoveBackground(buf.toString("base64"), { maxAttempts: 8 });
+          } catch {
+            result = await removeBackgroundBufferSharp(buf);
+          }
+        } else {
+          result = await removeBackgroundBufferSharp(buf);
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
@@ -1312,9 +1456,6 @@ export const uncensoredRouter = router({
       }
       const person = await requireOwnUncensoredImage(ctx.user.id, input.personGenerationId);
       const garment = await requireOwnUncensoredImage(ctx.user.id, input.garmentGenerationId);
-      if (!isRunPodAvailable()) {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The GPU is unavailable right now." });
-      }
       const cost = UNCENSORED_IMAGE_COST.outfit;
       await enforceRateLimit(`uncensored.outfit:user:${ctx.user.id}`, 4, 60_000, "Slow down a moment between outfits.");
       const debit = await deductCredits(ctx.user.id, cost, "Uncensored outfit transfer", "usage", { uncensored: true, outfit: true });
@@ -1341,7 +1482,28 @@ export const uncensoredRouter = router({
         },
       });
       try {
-        const result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType);
+        let result: Buffer;
+        const style = (person.metadata as any)?.style ?? undefined;
+        const fallbackOutfitRefine = async () => {
+          const personB64 = await fetchAsBase64(person.imageUrl!);
+          const outfitPrompt = applyUncensoredStyle(
+            `same person identity, same face, same pose, wearing the ${input.clothType} outfit from reference (${garment.prompt || "stylish outfit"})`,
+            style,
+          );
+          return refineUnfiltered(personB64, outfitPrompt, {
+            strength: 0.55,
+            loraId: resolveUncensoredLora(style),
+          });
+        };
+        if (isRunPodAvailable()) {
+          try {
+            result = await runpodTryOn(person.imageUrl!, garment.imageUrl!, input.clothType, { maxAttempts: 8 });
+          } catch {
+            result = await fallbackOutfitRefine();
+          }
+        } else {
+          result = await fallbackOutfitRefine();
+        }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
         await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
@@ -1613,15 +1775,18 @@ export const uncensoredRouter = router({
           await updateGeneration(genId, { metadata: { ...metadata, runpodJobId: jobId } });
           return { generationId: genId, status: "processing" as FreePreviewStatus, url: null, remaining };
         } catch (err: any) {
-          await updateGeneration(genId, { status: "failed" });
-          await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-          const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the preview — please try again.";
-          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          if (!isRunPodEndpointPausedError(err)) {
+            await updateGeneration(genId, { status: "failed" });
+            await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+            const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the preview — please try again.";
+            throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          }
+          console.warn("[Uncensored] RunPod endpoint paused on freeGenerate, falling back to synchronous unfiltered chain");
         }
       }
 
-      // No self-hosted GPU configured: the synchronous fallback chain (fal
-      // Schnell, safety checker off) is fast enough to answer inline.
+      // No self-hosted GPU configured (or RunPod endpoint is paused): the synchronous
+      // fallback chain (fal Schnell, safety checker off) is fast enough to answer inline.
       try {
         const { url } = await generateImage({
           prompt: enhancedPrompt,
@@ -1635,6 +1800,9 @@ export const uncensoredRouter = router({
         return { generationId: genId, status: "completed" as FreePreviewStatus, url: url ?? null, remaining };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
+        if (typeof err?.userMessage !== "string") {
+          await logToolFailure({ toolId: "uncensored-free", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
+        }
         // PromptBlockedError from the backstop carries a userMessage.
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Generation failed — please try again.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
@@ -1701,6 +1869,53 @@ export const uncensoredRouter = router({
       // invoiceId lets the client listen for BTCPay's postMessage status
       // events from the embedded checkout iframe (faster than polling).
       return { checkoutLink, invoiceId };
+    }),
+
+  /**
+   * Unlock or extend an Uncensored Pass using DreamForgeX platform credits
+   * ("Civitai Buzz" model). Lets card / Apple Pay / Google Pay buyers purchase
+   * standard platform credit packs on /pricing and unlock the Uncensored Studio
+   * in 1 click without touching Stripe on the adult tier.
+   */
+  unlockWithCredits: protectedProcedure
+    .input(z.object({ planId: z.string().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Age confirmation required first." });
+      }
+      const plan = getUncensoredPlanById(input?.planId);
+      const cost = plan.creditPrice;
+      const debit = await deductCredits(
+        ctx.user.id,
+        cost,
+        `Uncensored ${plan.label} (${plan.durationDays}d pass)`,
+        "usage",
+        { uncensoredPass: true, planId: plan.id, durationDays: plan.durationDays },
+      );
+      if (!debit.success) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not enough credits — the ${plan.label} requires ${cost} credits and you have ${debit.balance}. Top up a credit pack to unlock instantly.`,
+        });
+      }
+      const db = await requireDb();
+      const baseMs = ent.until && ent.until.getTime() > Date.now() ? ent.until.getTime() : Date.now();
+      const newUntil = new Date(baseMs + plan.durationDays * 24 * 60 * 60 * 1000);
+      await db
+        .update(users)
+        .set({ uncensoredUntil: newUntil })
+        .where(eq(users.id, ctx.user.id));
+      if (ctx.user.email) {
+        void sendPassActivatedEmail({ to: ctx.user.email, plan, until: newUntil });
+      }
+      return {
+        ok: true,
+        planId: plan.id,
+        until: newUntil,
+        creditsSpent: cost,
+        creditsRemaining: debit.balance,
+      };
     }),
 
   /** The caller's recent completed uncensored images — the I2V "animate" picker. */
@@ -1858,6 +2073,95 @@ export const uncensoredRouter = router({
       const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}), deleted: true };
       await updateGeneration(src.id, { metadata: meta });
       return { ok: true };
+    }),
+
+  /** Bulk-hide multiple uncensored generations owned by the caller. */
+  bulkDeleteGenerations: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1).max(48) }))
+    .mutation(async ({ ctx, input }) => {
+      let deletedCount = 0;
+      for (const id of input.ids) {
+        try {
+          const src = await requireOwnUncensoredMedia(ctx.user.id, id);
+          const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}), deleted: true };
+          await updateGeneration(src.id, { metadata: meta });
+          deletedCount += 1;
+        } catch {
+          // Skip rows not owned or already deleted
+        }
+      }
+      return { ok: true, deletedCount };
+    }),
+
+  /**
+   * List the caller's own AI-generated images from the standard /workspace
+   * so they can import their existing fictional AI characters into the
+   * Uncensored Studio without external file uploads.
+   */
+  myWorkspaceImages: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    return db
+      .select({
+        id: generations.id,
+        imageUrl: generations.imageUrl,
+        prompt: generations.prompt,
+        createdAt: generations.createdAt,
+        width: generations.width,
+        height: generations.height,
+      })
+      .from(generations)
+      .where(
+        and(
+          eq(generations.userId, ctx.user.id),
+          eq(generations.mediaType, "image"),
+          eq(generations.status, "completed"),
+          sql`coalesce(${generations.metadata}->>'uncensored', '') <> 'true'`,
+        ),
+      )
+      .orderBy(desc(generations.createdAt))
+      .limit(24);
+  }),
+
+  /**
+   * Import one of the caller's own AI-generated /workspace images into their
+   * private Uncensored Studio library so it can be used for Face Lock,
+   * 4-View Sheet, Outfit Swap, Refine, Inpaint, and Video Animation.
+   */
+  importWorkspaceImage: protectedProcedure
+    .input(z.object({ sourceGenerationId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+      const src = await getGenerationById(input.sourceGenerationId);
+      if (!src || src.userId !== ctx.user.id || src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Workspace image not found." });
+      }
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: src.prompt || "Imported workspace character",
+        negativePrompt: src.negativePrompt ?? null,
+        mediaType: "image",
+        width: src.width ?? 832,
+        height: src.height ?? 1216,
+        duration: null,
+        status: "completed",
+        imageUrl: src.imageUrl,
+        thumbnailUrl: src.thumbnailUrl ?? src.imageUrl,
+        modelVersion: "uncensored-workspace-import",
+        parentGenerationId: src.id,
+        metadata: {
+          uncensored: true,
+          importedFromWorkspace: true,
+          sourceWorkspaceId: src.id,
+          style: "realistic",
+        },
+      });
+      return { generationId: genId, url: src.imageUrl };
     }),
 
   /** Images + video clips for the Library tab. */

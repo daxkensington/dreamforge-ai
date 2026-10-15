@@ -49,6 +49,51 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           Resend({
             apiKey: resendKey,
             from: resendFrom,
+            // The middleware in-memory limiter on /api/auth is only a
+            // best-effort pre-filter (per-isolate on serverless). This is the
+            // real chokepoint: it runs on the Node runtime immediately before
+            // an email goes out, so magic-link bombing is capped in Postgres
+            // per email address and per IP. Enforcement here, sending below.
+            async sendVerificationRequest({ identifier: email, url, provider, request }) {
+              const { enforceIpRateLimit } = await import("../../../server/rate-limit");
+              const { getClientIp } = await import("../../../server/_core/context");
+              const ip = request ? getClientIp(request.headers) : null;
+              await enforceIpRateLimit(
+                "auth.magiclink:email",
+                email.toLowerCase(),
+                5,
+                60 * 60 * 1000,
+                "Too many sign-in emails — please wait about an hour and try again.",
+              );
+              if (ip) {
+                await enforceIpRateLimit(
+                  "auth.magiclink:ip",
+                  ip,
+                  20,
+                  60 * 60 * 1000,
+                  "Too many sign-in emails from this connection — please try again later.",
+                );
+              }
+
+              const host = new URL(url).host;
+              const res = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${provider.apiKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  from: provider.from,
+                  to: email,
+                  subject: `Sign in to ${host}`,
+                  html: `<p>Click the link below to sign in to ${host}:</p><p><a href="${url}">Sign in to ${host}</a></p><p>If you did not request this email, you can ignore it.</p>`,
+                  text: `Sign in to ${host}:\n${url}\n\nIf you did not request this email, you can ignore it.`,
+                }),
+              });
+              if (!res.ok) {
+                throw new Error("Resend error: " + (await res.text()));
+              }
+            },
           }),
         ]
       : []),

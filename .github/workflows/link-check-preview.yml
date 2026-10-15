@@ -7,6 +7,10 @@ name: Link Check (PR Preview)
 on:
   deployment_status:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   check-preview:
     # Only run for successful Vercel preview deploys (skip prod, skip failures).
@@ -16,9 +20,21 @@ jobs:
       github.event.deployment_status.target_url != ''
     runs-on: ubuntu-latest
     steps:
+      - name: Verify trusted repository source before credential use
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.deployment?.sha || context.sha;
+            if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid exact source SHA');
+            const repo = `${context.repo.owner}/${context.repo.repo}`;
+            const branches = await github.rest.repos.listBranchesForHeadCommit({ ...context.repo, commit_sha: sha });
+            if (!branches.data.length) throw new Error('Source is not the head of an owned repository branch');
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: sha });
+            if (prs.data.some(pr => pr.head?.repo?.full_name !== repo)) throw new Error('Fork source cannot use deployment credentials');
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.deployment.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -27,33 +43,14 @@ jobs:
       - name: Check links + assets against preview
         env:
           BASE_URL: ${{ github.event.deployment_status.target_url }}
+          EXPECTED_DEPLOYMENT_SHA: ${{ github.event.deployment.sha }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           echo "🔍 Preview URL: $BASE_URL"
           node scripts/check-links.mjs
 
-      - name: Comment results on PR
+      - name: Record preview link failure
         if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const sha = context.payload.deployment.sha;
-            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: sha,
-            });
-            for (const pr of prs.data) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                body: [
-                  `❌ **Link check failed on preview deploy**`,
-                  ``,
-                  `Preview: ${context.payload.deployment_status.target_url}`,
-                  `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-                  ``,
-                  `One or more internal links or asset references are broken. Check the workflow log for details.`,
-                ].join("\n"),
-              });
-            }
+        run: |
+          echo '### DreamForge preview link check failed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Read the app/source preflight or broken route/asset assertions in this run.' >> "$GITHUB_STEP_SUMMARY"

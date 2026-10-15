@@ -33,6 +33,8 @@ import {
   Moon,
   Clapperboard,
   Gamepad2,
+  Flame,
+  Shield,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -58,8 +60,6 @@ const scaleIn = {
 };
 
 /* ── Data ── */
-const heroImages = ["/showcase/hero-forge.jpg", "/showcase/hero-2.jpg", "/showcase/hero-3.jpg"];
-
 const galleryImages = [
   { src: "/showcase/gallery-1.jpg", prompt: "Bioluminescent underwater cathedral with jellyfish stained glass" },
   { src: "/showcase/gallery-2.jpg", prompt: "Cyberpunk samurai in neon rain, holographic katana" },
@@ -271,7 +271,6 @@ export default function Home() {
   const { data: stats } = trpc.gallery.stats.useQuery();
   const { completed: onboardingDone, markCompleted } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [heroIdx, setHeroIdx] = useState(0);
   const [promptText, setPromptText] = useState("");
   /* Kling availability from /api/status/providers. undefined while loading or
      if the probe is unreachable — in that case we default to showing it. */
@@ -288,26 +287,27 @@ export default function Home() {
   }, []);
 
   const showKling = klingConfigured !== false;
-  const visibleTools = showKling
+  const visibleTools = (showKling
     ? tools
     : tools.map((t) =>
         t.title === "AI Video"
           ? { ...t, desc: "Runway, Veo 3, Wan 2.5 — text or image to video" }
           : t
-      );
+      )
+  ).map((t) =>
+    // Signed-out visitors clicking "Text-to-Image" used to land in the
+    // sign-in-walled /workspace despite the hero's no-signup promise — send
+    // them to the free demo instead. The video tile keeps /video-studio:
+    // it's the honest destination and there is no video demo to offer.
+    !isAuthenticated && t.title === "Text-to-Image"
+      ? { ...t, href: "/demo/text-to-image" as const }
+      : t
+  );
   const visibleProviders = showKling ? marqueeProviders : marqueeProviders.filter((p) => p !== "Kling");
 
   useEffect(() => {
     if (isAuthenticated && !onboardingDone) setShowOnboarding(true);
   }, [isAuthenticated, onboardingDone]);
-
-  /* Hero rotation */
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setHeroIdx((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
 
   const handleGenerate = useCallback(() => {
     // Don't wall cold visitors at signup — hand the typed prompt to the
@@ -335,41 +335,40 @@ export default function Home() {
 
       {/* ═══════ SECTION 1: HERO WITH VIDEO BACKGROUND ═══════ */}
       <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        {/* Video background */}
+        {/* Live Hero Video background with instant poster + img fallback */}
         <video
           autoPlay
           muted
           loop
           playsInline
+          preload="auto"
           poster="/showcase/hero-forge.jpg"
           className="absolute inset-0 w-full h-full object-cover"
         >
-          <source src="/video/hero-bg.mp4" type="video/mp4" />
-        </video>
-        {/* Fallback rotating images (behind video, shows on poster/load) */}
-        {heroImages.map((src, i) => (
+          <source src="/video/hero-bg.mp4?v=1080p" type="video/mp4" />
           <img
-            key={src}
-            src={src}
-            alt="Hero background"
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out -z-10"
-            style={{ opacity: i === heroIdx ? 1 : 0 }}
+            src="/showcase/hero-forge.jpg"
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover"
           />
-        ))}
-        {/* Dark overlay — FIX 1: much darker */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/95" />
+        </video>
+        {/* Balanced cinematic vignette + radial neon spotlights so the video shines through */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/35 to-black/90" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.20),transparent_60%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.18),transparent_60%)] pointer-events-none" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-32 lg:py-40">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-28 lg:py-32">
           <div className="max-w-5xl mx-auto text-center">
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeUp}
               custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 backdrop-blur-sm border border-cyan-500/20 mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/15 backdrop-blur-md border border-cyan-400/30 shadow-[0_0_24px_rgba(6,182,212,0.2)] mb-8"
             >
-              <Sparkles className="h-4 w-4 text-cyan-400" />
-              <span className="text-sm font-medium text-white/90">100+ AI Tools — One Platform</span>
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              <span className="text-sm font-semibold text-white">100+ AI Tools · 30+ Models · Self-Hosted GPU Fleet</span>
             </motion.div>
 
             <motion.h1
@@ -378,7 +377,7 @@ export default function Home() {
               variants={fadeUp}
               custom={1}
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tighter mb-6 leading-[1.05] text-white"
-              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.8)' }}
+              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.85)' }}
             >
               Create Stunning <CyclingWord />
             </motion.h1>
@@ -388,9 +387,9 @@ export default function Home() {
               animate="visible"
               variants={fadeUp}
               custom={2}
-              className="text-lg md:text-xl text-white/60 mb-12 max-w-2xl mx-auto"
+              className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl mx-auto drop-shadow"
             >
-              The all-in-one AI creative studio. Images, video, songs, music videos — powered by 30+ AI models.
+              The all-in-one AI creative studio. Photoreal images, cinema video, songs, music videos &amp; unfiltered pro tools — powered by 30+ AI models.
             </motion.p>
 
             <motion.div
@@ -409,20 +408,125 @@ export default function Home() {
                 </Button>
               ) : (
                 <Button
+                  asChild
                   size="lg"
                   className="font-medium gap-2 px-8 h-13 text-base glow-primary"
-                  onClick={() => (window.location.href = "/demo/text-to-image")}
                 >
-                  <Zap className="h-5 w-5" />
-                  Try It Free — No Signup
+                  <Link href="/demo/text-to-image">
+                    <Zap className="h-5 w-5" />
+                    Try It Free — No Signup
+                  </Link>
                 </Button>
               )}
-              <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-transparent border-white/20 hover:bg-white/10">
+              <Button
+                asChild
+                size="lg"
+                className="font-semibold gap-2 px-8 h-13 text-base bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/30"
+              >
+                <Link href="/uncensored?start=1">
+                  <Flame className="h-5 w-5" />
+                  Uncensored Studio (3 Free)
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-black/35 backdrop-blur-md border-white/25 hover:bg-white/15">
                 <Link href="/gallery">
                   <Eye className="h-5 w-5" />
                   Explore Gallery
                 </Link>
               </Button>
+            </motion.div>
+
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              custom={4}
+              className="mt-7 mx-auto max-w-2xl"
+            >
+              <Link
+                href="/uncensored?start=1"
+                className="group flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-rose-500/45 bg-gradient-to-r from-black/70 via-rose-950/60 to-black/70 px-5 py-3.5 text-left backdrop-blur-xl shadow-[0_8px_32px_rgba(244,63,94,0.2)] transition-all hover:border-rose-400 hover:shadow-[0_8px_36px_rgba(244,63,94,0.35)]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-md shadow-rose-500/30">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <span>Private Uncensored AI Studio</span>
+                      <span className="rounded-full bg-rose-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-200">
+                        18+ · No Filter
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/75">
+                      Unfiltered Flux + Wan 2.2 Video · Character Face Lock · Outfit Swap · 4-View Sheets · Card/Apple Pay or Bitcoin
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-rose-300 group-hover:translate-x-0.5 transition-transform">
+                  Try 3 Free Previews <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </Link>
+            </motion.div>
+
+            {/* 4-Card Live Studio Visual Showcase Dock */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              custom={5}
+              className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto text-left"
+            >
+              {[
+                {
+                  title: "Photoreal Studio",
+                  sub: "Flux Pro · DALL-E 3 · Grok",
+                  img: "/showcase/gallery-9.jpg",
+                  href: isAuthenticated ? "/workspace" : "/demo/text-to-image",
+                  badge: "Image",
+                },
+                {
+                  title: "AI Video & Cinema",
+                  sub: "Veo 3 · Runway · Wan 2.5",
+                  img: "/showcase/tool-t2v.jpg",
+                  href: "/video-studio",
+                  badge: "Video",
+                },
+                {
+                  title: "Uncensored Pro",
+                  sub: "Face Lock · Outfit · 4-View",
+                  img: "/showcase/uncensored-char-aria-nordic.jpg",
+                  href: "/uncensored?start=1",
+                  badge: "18+ No Filter",
+                },
+                {
+                  title: "100+ Creative Tools",
+                  sub: "Try-On · Upscale · Audio",
+                  img: "/showcase/gallery-2.jpg",
+                  href: "/tools",
+                  badge: "Suite",
+                },
+              ].map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  className="group relative h-28 sm:h-32 overflow-hidden rounded-2xl border border-white/15 bg-black/50 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-cyan-400/60 hover:shadow-[0_0_25px_rgba(6,182,212,0.25)]"
+                >
+                  <img
+                    src={card.img}
+                    alt={card.title}
+                    className="absolute inset-0 h-full w-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105 group-hover:opacity-85"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
+                  <span className="absolute top-2 right-2 rounded-full border border-white/20 bg-black/65 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
+                    {card.badge}
+                  </span>
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="text-xs sm:text-sm font-bold text-white leading-tight">{card.title}</div>
+                    <div className="text-[10px] text-white/70 truncate mt-0.5">{card.sub}</div>
+                  </div>
+                </Link>
+              ))}
             </motion.div>
           </div>
         </div>
@@ -432,9 +536,9 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5, duration: 1 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/40"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-white/50"
         >
-          <span className="text-xs uppercase tracking-widest">Scroll</span>
+          <span className="text-[10px] uppercase tracking-widest">Scroll</span>
           <ChevronDown className="h-4 w-4 animate-bounce" />
         </motion.div>
       </section>
@@ -547,7 +651,7 @@ export default function Home() {
                   viewport={{ once: true }}
                   variants={scaleIn}
                   custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 hover:border-cyan-500/40 transition-all duration-500 cursor-pointer min-h-[200px]"
+                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[210px]"
                 >
                   <div className="absolute inset-0">
                     <img
@@ -557,22 +661,22 @@ export default function Home() {
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "/showcase/hero-forge.jpg";
                       }}
-                      className="w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700"
+                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/15" />
                   </div>
-                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
+                  <div className="relative p-6 flex flex-col h-full min-h-[210px]">
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <item.icon className="h-6 w-6 text-cyan-400" />
+                      <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
+                        <item.icon className="h-6 w-6 text-cyan-300" />
                       </div>
-                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
+                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-black/70 backdrop-blur-md text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
                         {item.tag}
                       </span>
                     </div>
-                    <h3 className="text-lg font-semibold mb-1 text-white">{item.title}</h3>
-                    <p className="text-sm text-white/60 mb-4">{item.desc}</p>
-                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{item.title}</h3>
+                    <p className="text-sm text-white/75 mb-4">{item.desc}</p>
+                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
                       Try it now <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
@@ -832,27 +936,137 @@ export default function Home() {
                   viewport={{ once: true }}
                   variants={scaleIn}
                   custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-500 cursor-pointer min-h-[180px]"
+                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[200px]"
                 >
                   <div className="absolute inset-0">
                     <img
                       src={tool.bg}
-                      alt="Hero background"
+                      alt={tool.title}
                       loading="lazy"
-                      className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity duration-500"
+                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-black/50" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/15" />
                   </div>
-                  <div className="relative p-6">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-4">
-                      <tool.icon className="h-6 w-6 text-cyan-400" />
+                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
+                    <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                      <tool.icon className="h-6 w-6 text-cyan-300" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-1 text-white">{tool.title}</h3>
-                    <p className="text-sm text-white/60">{tool.desc}</p>
+                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{tool.title}</h3>
+                    <p className="text-sm text-white/75 mb-4">{tool.desc}</p>
+                    <div className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
+                      Open studio <ArrowRight className="h-3.5 w-3.5" />
+                    </div>
                   </div>
                 </motion.div>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <SectionDivider />
+
+      {/* ═══════ SECTION 6B: UNCENSORED 18+ PRO STUDIO SPOTLIGHT ═══════ */}
+      <section className="py-16 md:py-20 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="relative rounded-3xl overflow-hidden border border-rose-500/35 bg-gradient-to-br from-rose-950/50 via-black/80 to-orange-950/35 p-6 sm:p-10 lg:p-12 shadow-[0_0_70px_-15px_rgba(244,63,94,0.3)] backdrop-blur-xl">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(244,63,94,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(249,115,22,0.18),transparent_60%)] pointer-events-none" />
+            <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-7 space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-rose-200">
+                    <Flame className="h-3.5 w-3.5 text-rose-400" />
+                    18+ · Uncensored Pro Studio
+                  </span>
+                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                    3 Free Previews Included
+                  </span>
+                  <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
+                    Visa / Mastercard / Apple Pay + Bitcoin
+                  </span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+                  Zero Content Filters.{" "}
+                  <span className="bg-gradient-to-r from-rose-400 via-orange-300 to-amber-300 bg-clip-text text-transparent">
+                    Total Creative Freedom.
+                  </span>
+                </h2>
+                <p className="text-white/75 text-sm sm:text-base max-w-2xl leading-relaxed">
+                  Generate photorealistic characters, lock faces across unlimited scenes, swap outfits, brush-inpaint details, and animate 5-second Wan 2.2 motion clips on dedicated private GPUs. Unlock instantly from <strong className="text-white">$4.99 (24h Day Pass)</strong> with any Credit Pack or anonymous Bitcoin.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "Uncensored Text-to-Image",
+                    "Character Face Lock",
+                    "Virtual Outfit Swap",
+                    "Brush Inpaint",
+                    "4-View Character Sheet",
+                    "Uncensored Video (Wan 2.2)",
+                  ].map((pill) => (
+                    <span
+                      key={pill}
+                      className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-200"
+                    >
+                      {pill}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 font-semibold shadow-lg shadow-rose-500/30"
+                  >
+                    <Link href="/uncensored?start=1">
+                      <Flame className="h-4 w-4" />
+                      Try 3 Free Previews
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                  >
+                    <Link href="/pricing#uncensored-passes">
+                      View Day / Week / 30-Day Passes
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+                {[
+                  { src: "/showcase/uncensored-char-aria-nordic.jpg", name: "Aria · Nordic Muse", tag: "Face Lock" },
+                  { src: "/showcase/uncensored-char-valentina-glam.jpg", name: "Valentina · Golden Hour", tag: "Photoreal" },
+                  { src: "/showcase/uncensored-char-sora-cyber.jpg", name: "Sora · Neo-Tokyo", tag: "Outfit Swap" },
+                  { src: "/showcase/uncensored-char-chloe-california.jpg", name: "Chloe · Sunset Editorial", tag: "4K Studio" },
+                ].map((char) => (
+                  <Link
+                    key={char.name}
+                    href="/uncensored?start=1"
+                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-rose-400/25 bg-black/60 shadow-xl"
+                  >
+                    <img
+                      src={char.src}
+                      alt={char.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className="rounded-full bg-rose-500/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                        {char.tag}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2.5 left-3 right-3">
+                      <p className="text-xs font-bold text-white">{char.name}</p>
+                      <p className="text-[10px] text-rose-300 group-hover:underline">Click to load preset →</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
