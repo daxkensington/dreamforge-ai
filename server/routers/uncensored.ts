@@ -28,6 +28,7 @@ import {
   UNCENSORED_SETTINGS,
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_VIDEO_CAMERAS,
   UNCENSORED_VIDEO_INTENSITIES,
   UNCENSORED_SHEET_VIEWS,
   UNCENSORED_CHARACTER_LIMIT,
@@ -39,6 +40,7 @@ import {
   applyUncensoredWardrobe,
   applyUncensoredSetting,
   applyUncensoredVideoMotion,
+  applyUncensoredVideoCamera,
   applyUncensoredVideoIntensity,
   applyUncensoredI2vIdentity,
   clampCharacterStrength,
@@ -894,6 +896,7 @@ export const uncensoredRouter = router({
         aspect: z.enum(["portrait", "landscape", "square"]).default("portrait"),
         duration: z.enum(["5s", "8s", "10s"]).default("5s" as const),
         motion: z.string().max(32).optional(),
+        camera: z.string().max(32).optional(),
         intensity: z.enum(["subtle", "natural", "energetic"]).default("natural"),
         negativePrompt: z.string().max(500).optional(),
         seed: z.number().int().min(0).max(2_147_483_647).optional(),
@@ -937,6 +940,7 @@ export const uncensoredRouter = router({
       const cost = uncensoredVideoCredits(UNCENSORED_VIDEO_COST[input.quality][input.mode], duration.id);
       let gpuPrompt = applyUncensoredI2vIdentity(input.prompt, input.mode === "i2v");
       gpuPrompt = applyUncensoredVideoMotion(gpuPrompt, input.motion);
+      gpuPrompt = applyUncensoredVideoCamera(gpuPrompt, input.camera);
       gpuPrompt = applyUncensoredVideoIntensity(gpuPrompt, input.intensity);
       const negative = [DEFAULT_UNCENSORED_VIDEO_NEGATIVE, input.negativePrompt?.trim()].filter(Boolean).join(", ");
       const debit = await deductCredits(ctx.user.id, cost, `Uncensored ${input.quality} ${input.mode === "i2v" ? "image-to-video" : "video"} ${duration.label}`, "usage", { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id });
@@ -958,7 +962,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
+        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -978,7 +982,7 @@ export const uncensoredRouter = router({
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
+          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
@@ -2065,6 +2069,95 @@ export const uncensoredRouter = router({
       const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}), deleted: true };
       await updateGeneration(src.id, { metadata: meta });
       return { ok: true };
+    }),
+
+  /** Bulk-hide multiple uncensored generations owned by the caller. */
+  bulkDeleteGenerations: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1).max(48) }))
+    .mutation(async ({ ctx, input }) => {
+      let deletedCount = 0;
+      for (const id of input.ids) {
+        try {
+          const src = await requireOwnUncensoredMedia(ctx.user.id, id);
+          const meta = { ...((src.metadata as Record<string, unknown> | null) ?? {}), deleted: true };
+          await updateGeneration(src.id, { metadata: meta });
+          deletedCount += 1;
+        } catch {
+          // Skip rows not owned or already deleted
+        }
+      }
+      return { ok: true, deletedCount };
+    }),
+
+  /**
+   * List the caller's own AI-generated images from the standard /workspace
+   * so they can import their existing fictional AI characters into the
+   * Uncensored Studio without external file uploads.
+   */
+  myWorkspaceImages: protectedProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    return db
+      .select({
+        id: generations.id,
+        imageUrl: generations.imageUrl,
+        prompt: generations.prompt,
+        createdAt: generations.createdAt,
+        width: generations.width,
+        height: generations.height,
+      })
+      .from(generations)
+      .where(
+        and(
+          eq(generations.userId, ctx.user.id),
+          eq(generations.mediaType, "image"),
+          eq(generations.status, "completed"),
+          sql`coalesce(${generations.metadata}->>'uncensored', '') <> 'true'`,
+        ),
+      )
+      .orderBy(desc(generations.createdAt))
+      .limit(24);
+  }),
+
+  /**
+   * Import one of the caller's own AI-generated /workspace images into their
+   * private Uncensored Studio library so it can be used for Face Lock,
+   * 4-View Sheet, Outfit Swap, Refine, Inpaint, and Video Animation.
+   */
+  importWorkspaceImage: protectedProcedure
+    .input(z.object({ sourceGenerationId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const ent = await getUncensoredEntitlement(ctx.user.id);
+      if (!ent.ageConfirmed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirm you are 18 or older first." });
+      }
+      if (!ent.active) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Uncensored Pass is required." });
+      }
+      const src = await getGenerationById(input.sourceGenerationId);
+      if (!src || src.userId !== ctx.user.id || src.mediaType !== "image" || src.status !== "completed" || !src.imageUrl) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Workspace image not found." });
+      }
+      const genId = await createGeneration({
+        userId: ctx.user.id,
+        prompt: src.prompt || "Imported workspace character",
+        negativePrompt: src.negativePrompt ?? null,
+        mediaType: "image",
+        width: src.width ?? 832,
+        height: src.height ?? 1216,
+        duration: null,
+        status: "completed",
+        imageUrl: src.imageUrl,
+        thumbnailUrl: src.thumbnailUrl ?? src.imageUrl,
+        modelVersion: "uncensored-workspace-import",
+        parentGenerationId: src.id,
+        metadata: {
+          uncensored: true,
+          importedFromWorkspace: true,
+          sourceWorkspaceId: src.id,
+          style: "realistic",
+        },
+      });
+      return { generationId: genId, url: src.imageUrl };
     }),
 
   /** Images + video clips for the Library tab. */

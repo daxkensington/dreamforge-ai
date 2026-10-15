@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon, Download } from "lucide-react";
+import { Film, Loader2, Sparkles, Wand2, Image as ImageIcon, Download, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,15 @@ import { toast } from "sonner";
 import {
   UNCENSORED_VIDEO_DURATIONS,
   UNCENSORED_VIDEO_MOTIONS,
+  UNCENSORED_VIDEO_CAMERAS,
+  UNCENSORED_VIDEO_RECIPES,
   UNCENSORED_VIDEO_INTENSITIES,
   DEFAULT_UNCENSORED_VIDEO_DURATION,
   DEFAULT_UNCENSORED_VIDEO_INTENSITY,
   uncensoredVideoCredits,
   getUncensoredVideoAspectFromSize,
+  pickRandomUncensoredVideoRecipe,
+  type UncensoredVideoRecipe,
 } from "@shared/uncensoredStudio";
 
 /**
@@ -52,6 +56,8 @@ export default function UncensoredVideoStudio({
     DEFAULT_UNCENSORED_VIDEO_DURATION,
   );
   const [motion, setMotion] = useState<string | null>(null);
+  const [camera, setCamera] = useState<string | null>(null);
+  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
   const [intensity, setIntensity] = useState<"subtle" | "natural" | "energetic">(
     DEFAULT_UNCENSORED_VIDEO_INTENSITY,
   );
@@ -61,6 +67,15 @@ export default function UncensoredVideoStudio({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [resultSeed, setResultSeed] = useState<number | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
+
+  const applyVideoRecipe = (r: UncensoredVideoRecipe) => {
+    setActiveRecipeId(r.id);
+    setPrompt(r.prompt);
+    setMotion(r.motion);
+    setCamera(r.camera);
+    setIntensity(r.intensity);
+    if (mode === "t2v") setAspect(r.aspect);
+  };
 
   const utils = trpc.useUtils();
   const { data: status } = trpc.uncensored.status.useQuery();
@@ -132,15 +147,15 @@ export default function UncensoredVideoStudio({
 
   const isBusy = gen.isPending || pendingId != null;
   const canGenerate =
-    (prompt.trim().length >= 3 || !!motion) && !isBusy && (mode === "t2v" || !!sourceId);
+    (prompt.trim().length >= 3 || !!motion || !!camera) && !isBusy && (mode === "t2v" || !!sourceId);
 
   const handleGenerate = (opts?: { seedOverride?: string }) => {
     if (mode === "i2v" && !sourceId) {
       toast.error("Pick an image to animate.");
       return;
     }
-    if (prompt.trim().length < 3 && !motion) {
-      toast.error("Describe the motion, or pick a motion chip.");
+    if (prompt.trim().length < 3 && !motion && !camera) {
+      toast.error("Describe the motion, or pick a motion / camera chip.");
       return;
     }
     const seedInput = opts?.seedOverride !== undefined ? opts.seedOverride : seed;
@@ -153,6 +168,7 @@ export default function UncensoredVideoStudio({
       aspect,
       duration,
       motion: motion ?? undefined,
+      camera: camera ?? undefined,
       intensity,
       negativePrompt: negative.trim() || undefined,
       seed: parseSeedInput(seedInput),
@@ -268,31 +284,74 @@ export default function UncensoredVideoStudio({
         </div>
       )}
 
+      <div className="mt-4">
+        <p className="mb-1.5 text-xs text-muted-foreground">
+          1-Click Video Scene &amp; Motion Recipes (sets prompt, motion, camera &amp; intensity)
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {UNCENSORED_VIDEO_RECIPES.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              disabled={isBusy}
+              onClick={() => {
+                applyVideoRecipe(r);
+                toast.success(`Loaded "${r.label}" video recipe`);
+              }}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                activeRecipeId === r.id
+                  ? "border-rose-500 bg-rose-500/15 text-rose-200"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Prompt */}
       <div className="mt-4">
-        <div className="mb-1.5 flex items-center justify-between">
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
             {mode === "i2v" ? "Motion direction (or pick a motion chip below)" : "Video prompt"}
           </span>
-          {prompt.trim().length >= 3 && (
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              disabled={isBusy || enhancePrompt.isPending}
-              onClick={() => enhancePrompt.mutate({ prompt })}
-              className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+              disabled={isBusy}
+              onClick={() => {
+                const r = pickRandomUncensoredVideoRecipe(activeRecipeId);
+                applyVideoRecipe(r);
+                toast.success(`Surprise video recipe: ${r.label}`);
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-foreground disabled:opacity-50"
             >
-              {enhancePrompt.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Wand2 className="h-3 w-3" />
-              )}
-              Enhance prompt
+              <Shuffle className="h-3 w-3 text-rose-400" /> Surprise me
             </button>
-          )}
+            {prompt.trim().length >= 3 && (
+              <button
+                type="button"
+                disabled={isBusy || enhancePrompt.isPending}
+                onClick={() => enhancePrompt.mutate({ prompt })}
+                className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+              >
+                {enhancePrompt.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3 w-3" />
+                )}
+                Enhance prompt
+              </button>
+            )}
+          </div>
         </div>
         <Textarea
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            setActiveRecipeId(null);
+          }}
           placeholder={mode === "i2v" ? "Describe the motion… (e.g. slow turn toward camera, hair blowing)" : "Describe the video you want…"}
           rows={3}
           maxLength={1000}
@@ -323,6 +382,27 @@ export default function UncensoredVideoStudio({
               }`}
             >
               {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <p className="text-xs text-muted-foreground mb-2">Camera Work</p>
+        <div className="flex flex-wrap gap-2">
+          {UNCENSORED_VIDEO_CAMERAS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setCamera(camera === c.id ? null : c.id)}
+              disabled={isBusy}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                camera === c.id
+                  ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40"
+              }`}
+            >
+              {c.label}
             </button>
           ))}
         </div>

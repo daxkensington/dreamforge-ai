@@ -180,11 +180,16 @@ describe("uncensored studio presets and prompt enhancer", async () => {
     UNCENSORED_INPAINT_PRESETS,
     UNCENSORED_OUTFIT_PRESETS,
     UNCENSORED_SCENE_RECIPES,
+    UNCENSORED_CHARACTER_ARCHETYPES,
+    UNCENSORED_VIDEO_CAMERAS,
+    UNCENSORED_VIDEO_RECIPES,
     UNCENSORED_ASPECTS,
     UNCENSORED_FRAMINGS,
     UNCENSORED_WARDROBE,
     UNCENSORED_SETTINGS,
+    applyUncensoredVideoCamera,
     pickRandomUncensoredSceneRecipe,
+    pickRandomUncensoredVideoRecipe,
     enhanceUncensoredPrompt,
   } = await import("./uncensoredStudio");
 
@@ -222,6 +227,33 @@ describe("uncensored studio presets and prompt enhancer", async () => {
     }
     const picked = pickRandomUncensoredSceneRecipe("penthouse-boudoir");
     expect(picked.id).not.toBe("penthouse-boudoir");
+  });
+
+  it("provides 8 signature character archetypes and 6 video scene recipes with valid studio chips", () => {
+    const validStyles = ["realistic", "cinematic", "fantasy", "anime", "artistic"];
+    expect(UNCENSORED_POSES).toHaveLength(12);
+    expect(UNCENSORED_CHARACTER_ARCHETYPES).toHaveLength(8);
+    for (const a of UNCENSORED_CHARACTER_ARCHETYPES) {
+      expect(a.prompt.length).toBeGreaterThan(40);
+      expect(validStyles.includes(a.style)).toBe(true);
+      expect(UNCENSORED_FRAMINGS.some((f) => f.id === a.framing)).toBe(true);
+      expect(UNCENSORED_CAMERAS.some((c) => c.id === a.camera)).toBe(true);
+      expect(UNCENSORED_LIGHTING.some((l) => l.id === a.lighting)).toBe(true);
+      expect(UNCENSORED_WARDROBE.some((w) => w.id === a.wardrobe)).toBe(true);
+      expect(UNCENSORED_SETTINGS.some((s) => s.id === a.setting)).toBe(true);
+    }
+
+    expect(UNCENSORED_VIDEO_CAMERAS).toHaveLength(6);
+    expect(applyUncensoredVideoCamera("slow turn", "slow-push")).toMatch(/push-in/i);
+    expect(applyUncensoredVideoCamera("slow turn", "unknown")).toBe("slow turn");
+
+    expect(UNCENSORED_VIDEO_RECIPES).toHaveLength(6);
+    for (const vr of UNCENSORED_VIDEO_RECIPES) {
+      expect(UNCENSORED_VIDEO_MOTIONS.some((m) => m.id === vr.motion)).toBe(true);
+      expect(UNCENSORED_VIDEO_CAMERAS.some((c) => c.id === vr.camera)).toBe(true);
+    }
+    const pickedVid = pickRandomUncensoredVideoRecipe("boudoir-glance");
+    expect(pickedVid.id).not.toBe("boudoir-glance");
   });
 
   it("enhances short prompts with style-matched camera and lighting cues without duplicating existing terms", () => {

@@ -117,6 +117,31 @@ export const UNCENSORED_POSES: UncensoredPose[] = [
     label: "Leaning",
     promptSuffix: "leaning against a wall, casual confident pose",
   },
+  {
+    id: "mirror",
+    label: "Mirror reflection",
+    promptSuffix: "posing in front of a warm vanity mirror, dual reflection, intimate eye contact",
+  },
+  {
+    id: "crossedlegs",
+    label: "Crossed legs",
+    promptSuffix: "seated with legs crossed elegantly, poised high-fashion posture, direct gaze",
+  },
+  {
+    id: "walking",
+    label: "Walking toward",
+    promptSuffix: "walking confidently toward the camera, natural mid-stride movement, flowing hair",
+  },
+  {
+    id: "armsup",
+    label: "Hands in hair",
+    promptSuffix: "arms raised with hands running through hair, elongated torso, effortless glamour",
+  },
+  {
+    id: "bedside",
+    label: "Lounging on bed",
+    promptSuffix: "lounging propped up on one elbow on soft sheets, relaxed intimate posture",
+  },
 ];
 
 export function getUncensoredPose(id: string | null | undefined): UncensoredPose | null {
@@ -1078,3 +1103,266 @@ export function pickRandomUncensoredSceneRecipe(
   const list = pool.length > 0 ? pool : UNCENSORED_SCENE_RECIPES;
   return list[Math.floor(Math.random() * list.length)]!;
 }
+
+export interface UncensoredCharacterArchetype {
+  id: string;
+  name: string;
+  tagline: string;
+  style: string;
+  prompt: string;
+  framing: string;
+  camera: string;
+  lighting: string;
+  wardrobe: string;
+  setting: string;
+}
+
+/**
+ * 8 signature fictional character archetypes users can spawn in 1 click,
+ * then save to their Named Characters roster for IP-Adapter Face Lock,
+ * 4-View Turnaround Sheets, Outfit Swap, and 5–10s Video Animation.
+ */
+export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
+  {
+    id: "aria-nordic",
+    name: "Aria",
+    tagline: "Nordic Editorial Muse",
+    style: "realistic",
+    prompt:
+      "striking fictional 25-year-old Nordic editorial model with platinum blonde waves, ice-blue eyes, sculpted cheekbones, natural skin pores, subtle freckles across the nose",
+    framing: "bust",
+    camera: "eyelevel",
+    lighting: "studio",
+    wardrobe: "silk",
+    setting: "hotel",
+  },
+  {
+    id: "sora-cyber",
+    name: "Sora",
+    tagline: "Neo-Tokyo Cyber Siren",
+    style: "cinematic",
+    prompt:
+      "fictional 24-year-old Neo-Tokyo cyberpunk muse with jet-black bob haircut, subtle violet hair highlights, sharp dark eyes, dewy luminous skin, fine cybernetic collar detail",
+    framing: "bust",
+    camera: "eyelevel",
+    lighting: "neon",
+    wardrobe: "leather",
+    setting: "club",
+  },
+  {
+    id: "valentina-glam",
+    name: "Valentina",
+    tagline: "Mediterranean Glamour",
+    style: "realistic",
+    prompt:
+      "fictional 26-year-old Mediterranean glamour model with long espresso-brown curls, warm hazel eyes, sun-kissed olive skin, full glossy lips, confident editorial expression",
+    framing: "threequarter",
+    camera: "eyelevel",
+    lighting: "golden",
+    wardrobe: "evening",
+    setting: "balcony",
+  },
+  {
+    id: "nyx-fantasy",
+    name: "Nyx",
+    tagline: "Dark Fantasy Sorceress",
+    style: "fantasy",
+    prompt:
+      "fictional silver-haired dark-fantasy elven sorceress with glowing violet eyes, porcelain skin, intricate obsidian filigree tiara, ethereal regal expression",
+    framing: "bust",
+    camera: "low",
+    lighting: "film",
+    wardrobe: "evening",
+    setting: "forest",
+  },
+  {
+    id: "chloe-california",
+    name: "Chloe",
+    tagline: "Golden Hour Swim Muse",
+    style: "realistic",
+    prompt:
+      "fictional 24-year-old sun-kissed California beach model with honey-blonde beach waves, emerald green eyes, glowing bronzed skin with water droplets",
+    framing: "threequarter",
+    camera: "eyelevel",
+    lighting: "golden",
+    wardrobe: "swimsuit",
+    setting: "beach",
+  },
+  {
+    id: "mei-noir",
+    name: "Mei",
+    tagline: "Velvet Noir Femme Fatale",
+    style: "cinematic",
+    prompt:
+      "fictional 26-year-old East Asian noir femme fatale with sleek pinned-up dark hair, smoky eyeliner, crimson lips, dramatic chiaroscuro film lighting",
+    framing: "bust",
+    camera: "eyelevel",
+    lighting: "candle",
+    wardrobe: "lingerie",
+    setting: "hotel",
+  },
+  {
+    id: "freya-athletic",
+    name: "Freya",
+    tagline: "Sculpted Studio Muse",
+    style: "realistic",
+    prompt:
+      "fictional 25-year-old athletic redhead model with copper waves, amber eyes, toned shoulders, dewy studio skin highlights, confident gaze",
+    framing: "threequarter",
+    camera: "eyelevel",
+    lighting: "studio",
+    wardrobe: "casual",
+    setting: "loft",
+  },
+  {
+    id: "kaia-anime",
+    name: "Kaia",
+    tagline: "After-Hours Anime Heroine",
+    style: "anime",
+    prompt:
+      "fictional adult anime heroine with long twin-tone silver and rose hair, expressive amber eyes, detailed cel-shaded highlights, warm apartment bokeh",
+    framing: "bust",
+    camera: "eyelevel",
+    lighting: "neon",
+    wardrobe: "knit",
+    setting: "bedroom",
+  },
+];
+
+export interface UncensoredVideoCamera {
+  id: string;
+  label: string;
+  promptSuffix: string;
+}
+
+/** Cinematic camera movement controls for Uncensored Video (Wan 2.1 T2V & I2V). */
+export const UNCENSORED_VIDEO_CAMERAS: UncensoredVideoCamera[] = [
+  {
+    id: "slow-push",
+    label: "Slow push-in",
+    promptSuffix: "slow cinematic camera push-in toward the subject, shallow depth of field",
+  },
+  {
+    id: "orbit",
+    label: "Parallax orbit",
+    promptSuffix: "smooth parallax camera arc around the subject, 3D depth",
+  },
+  {
+    id: "tilt-up",
+    label: "Low-to-high tilt",
+    promptSuffix: "slow vertical camera tilt up from waist to eyes, editorial framing",
+  },
+  {
+    id: "handheld",
+    label: "Intimate handheld",
+    promptSuffix: "subtle organic handheld camera movement, intimate close-up perspective",
+  },
+  {
+    id: "rack-focus",
+    label: "Rack focus",
+    promptSuffix: "cinematic rack focus pulling sharply onto the subject's eyes, creamy bokeh",
+  },
+  {
+    id: "locked",
+    label: "Locked tripod",
+    promptSuffix: "locked-off tripod camera, zero camera shake, subject movement only",
+  },
+];
+
+export function getUncensoredVideoCamera(
+  id: string | null | undefined,
+): UncensoredVideoCamera | null {
+  if (!id) return null;
+  return UNCENSORED_VIDEO_CAMERAS.find((c) => c.id === id) ?? null;
+}
+
+export function applyUncensoredVideoCamera(
+  prompt: string,
+  cameraId: string | null | undefined,
+): string {
+  const cam = getUncensoredVideoCamera(cameraId);
+  return cam ? `${prompt}. ${cam.promptSuffix}` : prompt;
+}
+
+export interface UncensoredVideoRecipe {
+  id: string;
+  label: string;
+  prompt: string;
+  motion: string;
+  camera: string;
+  intensity: "subtle" | "natural" | "energetic";
+  aspect: UncensoredVideoAspect;
+}
+
+/** 1-click video scene & motion recipes for both I2V and T2V in UncensoredVideoStudio. */
+export const UNCENSORED_VIDEO_RECIPES: UncensoredVideoRecipe[] = [
+  {
+    id: "boudoir-glance",
+    label: "Boudoir Slow Turn",
+    prompt:
+      "gorgeous fictional woman in warm candlelit penthouse boudoir, turning her head slowly toward the camera with a sultry half-smile, silk fabric catching golden light",
+    motion: "turn",
+    camera: "slow-push",
+    intensity: "subtle",
+    aspect: "portrait",
+  },
+  {
+    id: "neon-rain-balcony",
+    label: "Neon Balcony Breeze",
+    prompt:
+      "fictional cyberpunk woman standing on a rain-slicked neon balcony at night, warm wind blowing through her hair, neon reflections shimmering on wet skin",
+    motion: "hair",
+    camera: "orbit",
+    intensity: "natural",
+    aspect: "portrait",
+  },
+  {
+    id: "beach-walk-golden",
+    label: "Golden Hour Beach Walk",
+    prompt:
+      "fictional sun-kissed model walking slowly along wet shoreline at sunset, ocean breeze lifting her hair, warm golden-hour rim light",
+    motion: "walk",
+    camera: "handheld",
+    intensity: "natural",
+    aspect: "portrait",
+  },
+  {
+    id: "candlelight-breath",
+    label: "Intimate Eye Contact",
+    prompt:
+      "close-up portrait in flickering candlelight, soft natural breathing, subtle blink and parted lips, holding deep eye contact with the lens",
+    motion: "breathe",
+    camera: "rack-focus",
+    intensity: "subtle",
+    aspect: "portrait",
+  },
+  {
+    id: "over-shoulder-look",
+    label: "Over-Shoulder Reveal",
+    prompt:
+      "fictional model in an evening gown standing by floor-to-ceiling city windows, looking back over her bare shoulder toward the camera with a confident smile",
+    motion: "turn",
+    camera: "tilt-up",
+    intensity: "natural",
+    aspect: "portrait",
+  },
+  {
+    id: "club-neon-sway",
+    label: "VIP Lounge Sway",
+    prompt:
+      "fictional glamour model in a dimly lit VIP lounge with magenta and cyan neon rim lighting, fluid rhythmic hip and shoulder sway, confident gaze",
+    motion: "sway",
+    camera: "slow-push",
+    intensity: "energetic",
+    aspect: "portrait",
+  },
+];
+
+export function pickRandomUncensoredVideoRecipe(
+  excludeId?: string | null,
+): UncensoredVideoRecipe {
+  const pool = UNCENSORED_VIDEO_RECIPES.filter((r) => r.id !== excludeId);
+  const list = pool.length > 0 ? pool : UNCENSORED_VIDEO_RECIPES;
+  return list[Math.floor(Math.random() * list.length)]!;
+}
+
