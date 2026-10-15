@@ -515,7 +515,7 @@ export default function UncensoredImageStudio({
           <p className="mb-1.5 text-[11px] text-muted-foreground">
             1-Click Signature Character Archetypes (loads identity, lens, lighting &amp; style):
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {UNCENSORED_CHARACTER_ARCHETYPES.map((arch) => (
               <button
                 key={arch.id}
@@ -525,15 +525,24 @@ export default function UncensoredImageStudio({
                   applyCharacterArchetype(arch);
                   toast.success(`Loaded ${arch.name} (${arch.tagline}) — click Generate, then Save Character to lock her face!`);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                className={`group flex items-center gap-2.5 rounded-xl border p-1.5 text-left transition-all ${
                   activeArchetypeId === arch.id
-                    ? "border-rose-500 bg-rose-500/15 text-rose-200"
-                    : "border-border/60 bg-background/40 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+                    ? "border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/40"
+                    : "border-border/60 bg-background/40 hover:border-rose-500/40 hover:bg-rose-500/5"
                 }`}
               >
-                <Sparkles className="h-3 w-3 text-rose-400" />
-                <span className="font-semibold text-foreground/90">{arch.name}</span>
-                <span className="hidden text-[10px] opacity-70 sm:inline">· {arch.tagline}</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={arch.imageUrl}
+                  alt={arch.name}
+                  className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-rose-500/30 transition-transform group-hover:scale-105"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-foreground/95">
+                    <span className="truncate">{arch.name}</span>
+                  </div>
+                  <div className="truncate text-[10px] text-muted-foreground">{arch.tagline}</div>
+                </div>
               </button>
             ))}
           </div>
@@ -567,13 +576,19 @@ export default function UncensoredImageStudio({
                     : `${r.label} scene loaded.`,
                 );
               }}
-              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 text-xs transition-colors ${
                 activeRecipeId === r.id
                   ? "border-rose-500 bg-rose-500/15 text-rose-200"
                   : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
               }`}
             >
-              {r.label}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={r.imageUrl}
+                alt={r.label}
+                className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-rose-500/30"
+              />
+              <span>{r.label}</span>
             </button>
           ))}
         </div>

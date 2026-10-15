@@ -25,15 +25,16 @@ import {
   UNCENSORED_ENTRY_PLAN,
   UNCENSORED_PLANS,
 } from "@shared/uncensoredPlans";
+import { UNCENSORED_CHARACTER_ARCHETYPES } from "@shared/uncensoredStudio";
 
 const STUDIO_TOOLS = [
-  { icon: Sparkles, name: "Create & Face Lock", desc: "Photoreal, anime, dark fantasy & 60+ director chips with IP-Adapter identity lock." },
-  { icon: Wand2, name: "Refine & Relight", desc: "Img2img polish + 8 instant lighting presets, 4K upscale & background removal." },
-  { icon: Paintbrush, name: "Brush Inpaint", desc: "Paint over any region to swap wardrobe, fix hands, or restyle details with feathered blending." },
-  { icon: Grid2x2, name: "4-View Character Sheet", desc: "Parallel front, 3/4, side & back turnaround views + 1-click 2×2 master PNG export." },
-  { icon: Shirt, name: "Virtual Outfit Swap", desc: "10 one-click wardrobe presets or upload any garment reference photo onto your character." },
-  { icon: Film, name: "Uncensored Video (Wan 2.1)", desc: "Turn any still or prompt into smooth 5-second unfiltered motion clips on dedicated GPUs." },
-  { icon: Images, name: "100% Private Library", desc: "Never indexed or shared publicly. Recreate any image's exact seed & settings in 1 click." },
+  { icon: Sparkles, name: "Create & Face Lock", previewImg: "/showcase/uncensored-char-valentina-glam.jpg", desc: "Photoreal, anime, dark fantasy & 60+ director chips with IP-Adapter identity lock." },
+  { icon: Wand2, name: "Refine & Relight", previewImg: "/showcase/tool-relight.jpg", desc: "Img2img polish + 8 instant lighting presets, 4K upscale & background removal." },
+  { icon: Paintbrush, name: "Brush Inpaint", previewImg: "/showcase/tool-inpaint.jpg", desc: "Paint over any region to swap wardrobe, fix hands, or restyle details with feathered blending." },
+  { icon: Grid2x2, name: "4-View Character Sheet", previewImg: "/showcase/tool-character-sheet.jpg", desc: "Parallel front, 3/4, side & back turnaround views + 1-click 2×2 master PNG export." },
+  { icon: Shirt, name: "Virtual Outfit Swap", previewImg: "/showcase/tool-virtual-tryon.jpg", desc: "10 one-click wardrobe presets or copy any garment reference photo onto your character." },
+  { icon: Film, name: "Uncensored Video (Wan 2.1)", previewImg: "/showcase/tool-i2v.jpg", desc: "Turn any still or prompt into smooth 5–10s unfiltered motion clips on dedicated GPUs." },
+  { icon: Images, name: "100% Private Vault", previewImg: "/showcase/demo-upscale-after.jpg", desc: "Never indexed or shared publicly. Recreate any image's exact seed & settings in 1 click." },
 ];
 
 /**
@@ -45,7 +46,7 @@ const STUDIO_TOOLS = [
 export default function UncensoredLanding({ page }: { page: Landing }) {
   return (
     <PageLayout>
-      <div className="mx-auto max-w-3xl px-4 py-16">
+      <div className="mx-auto max-w-4xl px-4 py-16">
         {/* 18+ / compliance band */}
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2 text-center text-xs text-muted-foreground">
           <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold uppercase tracking-wide text-rose-300">
@@ -62,8 +63,37 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{page.h1}</h1>
         </motion.div>
 
+        {/* 4-Card Hero Visual Showcase */}
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {UNCENSORED_CHARACTER_ARCHETYPES.slice(0, 4).map((arch) => (
+            <Link
+              key={arch.id}
+              href={`/uncensored?start=1&prompt=${encodeURIComponent(arch.prompt)}`}
+              className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-rose-500/30 bg-black text-left shadow-lg transition-all hover:-translate-y-0.5 hover:border-rose-500"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={arch.imageUrl}
+                alt={arch.name}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+              <span className="absolute top-2.5 left-2.5 rounded-full border border-rose-500/40 bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-200">
+                {arch.style}
+              </span>
+              <div className="absolute inset-x-0 bottom-0 p-3">
+                <div className="text-sm font-bold text-white">{arch.name}</div>
+                <div className="text-[11px] text-zinc-300">{arch.tagline}</div>
+                <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-rose-300">
+                  <Sparkles className="h-3 w-3" /> Try free →
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
         {/* Intro */}
-        <div className="mt-6 space-y-4 text-lg text-muted-foreground">
+        <div className="mt-8 space-y-4 text-lg text-muted-foreground">
           {page.intro.split("\n").map((p) => p.trim()).filter(Boolean).map((para, i) => (
             <p key={i}>{para}</p>
           ))}
@@ -174,14 +204,22 @@ export default function UncensoredLanding({ page }: { page: Landing }) {
               <Link
                 key={t.name}
                 href="/uncensored"
-                className="group flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-4 transition-colors hover:border-rose-500/40 hover:bg-rose-500/5"
+                className="group flex items-start gap-3 rounded-xl border border-border/60 bg-card/40 p-3.5 transition-colors hover:border-rose-500/40 hover:bg-rose-500/5"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400">
-                  <t.icon className="h-4 w-4" />
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-rose-500/30 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={t.previewImg}
+                    alt={t.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold group-hover:text-rose-300">{t.name}</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold group-hover:text-rose-300">
+                      <t.icon className="h-3.5 w-3.5 text-rose-400" />
+                      {t.name}
+                    </h3>
                     <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t.desc}</p>

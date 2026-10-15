@@ -38,6 +38,7 @@ import UncensoredStudio, { type UncensoredStudioTab } from "@/components/Uncenso
 import {
   UNCENSORED_ASPECTS,
   UNCENSORED_SCENE_RECIPES,
+  UNCENSORED_CHARACTER_ARCHETYPES,
   DEFAULT_UNCENSORED_ASPECT,
   enhanceUncensoredPrompt,
   pickRandomUncensoredSceneRecipe,
@@ -59,6 +60,7 @@ const STUDIO_SHOWCASE_TOOLS: {
   icon: typeof Sparkles;
   title: string;
   badge: string;
+  previewImg: string;
   desc: string;
   upsellLabel: string;
 }[] = [
@@ -67,6 +69,7 @@ const STUDIO_SHOWCASE_TOOLS: {
     icon: Sparkles,
     title: "Create & Face Lock",
     badge: "IP-Adapter Identity",
+    previewImg: "/showcase/uncensored-char-valentina-glam.jpg",
     desc: "Save any generated character and lock her face across brand-new scenes, poses, cameras & lighting.",
     upsellLabel: "Create with IP-Adapter Face Lock & 60+ director chips",
   },
@@ -75,6 +78,7 @@ const STUDIO_SHOWCASE_TOOLS: {
     icon: Wand2,
     title: "Refine & Relight",
     badge: "8 Presets + 4K",
+    previewImg: "/showcase/tool-relight.jpg",
     desc: "1-click Fix Hands, 8K Face & Eyes, Dewy Skin, Penthouse/Beach backgrounds, Relight, Cutout & 4× Upscale.",
     upsellLabel: "Refine, relight & 4K upscale in the Uncensored Studio",
   },
@@ -83,7 +87,8 @@ const STUDIO_SHOWCASE_TOOLS: {
     icon: Paintbrush,
     title: "Brush Inpaint",
     badge: "Feathered Mask",
-    desc: "Paint over any region to swap wardrobe, add tattoos/jewelry, or fix details with side-by-side comparison.",
+    previewImg: "/showcase/tool-inpaint.jpg",
+    desc: "Paint over any region to swap wardrobe, add tattoos/jewelry, or fix details with interactive split comparison.",
     upsellLabel: "Brush inpaint & edit regions in the Uncensored Studio",
   },
   {
@@ -91,6 +96,7 @@ const STUDIO_SHOWCASE_TOOLS: {
     icon: Shirt,
     title: "Virtual Outfit Swap",
     badge: "10 Presets + Try-On",
+    previewImg: "/showcase/tool-virtual-tryon.jpg",
     desc: "Swap into Silk Lace, Latex Catsuit, Velvet Gown, Cyberpunk Armor, or copy any reference garment photo.",
     upsellLabel: "Swap outfits & restyle wardrobe in 1 click",
   },
@@ -99,6 +105,7 @@ const STUDIO_SHOWCASE_TOOLS: {
     icon: Grid2x2,
     title: "4-View Character Sheet",
     badge: "Parallel 2×2 PNG",
+    previewImg: "/showcase/tool-character-sheet.jpg",
     desc: "Render front, 3/4, profile & full-body turnaround views in parallel + download a stitched 2×2 master PNG.",
     upsellLabel: "Generate 4-view character turnaround sheets",
   },
@@ -106,17 +113,19 @@ const STUDIO_SHOWCASE_TOOLS: {
     tab: "video",
     icon: Film,
     title: "Uncensored Video (Wan 2.1)",
-    badge: "5s Motion Clips",
-    desc: "Animate any uncensored character or text prompt into smooth 5-second video clips with camera & motion presets.",
-    upsellLabel: "Animate characters into 5s uncensored video clips",
+    badge: "5–10s Motion Clips",
+    previewImg: "/showcase/tool-i2v.jpg",
+    desc: "Animate any uncensored character or text prompt into smooth 5–10s video clips with 6 camera & 12 motion presets.",
+    upsellLabel: "Animate characters into 5–10s uncensored video clips",
   },
   {
     tab: "library",
     icon: Images,
-    title: "100% Private Library",
+    title: "100% Private Vault & Darkroom",
     badge: "Zero Public Feed",
-    desc: "Every image & video stays private. Star favorites, copy full recipes, or 1-click Recreate exact seeds.",
-    upsellLabel: "Unlock your private Uncensored Studio library",
+    previewImg: "/showcase/demo-upscale-after.jpg",
+    desc: "Full-screen Darkroom Lightbox, multi-select bulk download, character filter & 1-click seed recreate.",
+    upsellLabel: "Unlock your private Uncensored Studio vault",
   },
 ];
 
@@ -484,7 +493,7 @@ export default function Uncensored() {
 
   return (
     <PageLayout>
-      <div className={`mx-auto px-4 py-16 ${active ? "max-w-6xl" : "max-w-3xl"}`}>
+      <div className={`mx-auto px-4 py-16 ${active ? "max-w-6xl" : "max-w-5xl"}`}>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -496,8 +505,8 @@ export default function Uncensored() {
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
             Uncensored AI Image &amp; Video Studio
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-            No content filter. 7 unfiltered open-source tools — Image Studio, 5s Video,
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+            No content filter. 7 unfiltered open-source tools — Image Studio, 5–10s Video,
             Character Sheet, Outfit Swap, Brush Inpaint, Refine &amp; 4K Upscale — private by
             default. Unlock instantly with Card / Apple Pay (via Credits) or Bitcoin.
           </p>
@@ -513,8 +522,75 @@ export default function Uncensored() {
           </motion.div>
         ) : (
           <>
+            {/* ── Hero 4-Style Interactive Visual Showcase Strip ── */}
+            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                {
+                  title: "Photoreal Boudoir",
+                  badge: "85mm f/1.4 · Realistic",
+                  img: "/showcase/uncensored-char-aria-nordic.jpg",
+                  style: "realistic",
+                  prompt: UNCENSORED_SCENE_RECIPES[0]!.prompt,
+                },
+                {
+                  title: "Neon Cyber Siren",
+                  badge: "Anamorphic · Cinematic",
+                  img: "/showcase/uncensored-char-sora-cyber.jpg",
+                  style: "cinematic",
+                  prompt: UNCENSORED_SCENE_RECIPES[1]!.prompt,
+                },
+                {
+                  title: "Dark Fantasy Empress",
+                  badge: "Arcane Light · Fantasy",
+                  img: "/showcase/uncensored-char-nyx-fantasy.jpg",
+                  style: "fantasy",
+                  prompt: UNCENSORED_SCENE_RECIPES[5]!.prompt,
+                },
+                {
+                  title: "Uncensored Anime",
+                  badge: "Cel-Shaded · Anime",
+                  img: "/showcase/uncensored-char-kaia-anime.jpg",
+                  style: "anime",
+                  prompt: UNCENSORED_SCENE_RECIPES[6]!.prompt,
+                },
+              ].map((card) => (
+                <button
+                  key={card.title}
+                  type="button"
+                  onClick={() => {
+                    setFreePrompt(card.prompt);
+                    setFreeStyle(card.style);
+                    if (ageConfirmed && freeRemaining > 0 && !freeBusy) {
+                      handleFreeGenerate(card.prompt, card.style, "portrait");
+                    } else {
+                      conversionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      toast.info(`Loaded "${card.title}" style — unlock free previews below to render.`);
+                    }
+                  }}
+                  className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-rose-500/30 bg-black text-left shadow-lg transition-all hover:-translate-y-0.5 hover:border-rose-500 hover:shadow-rose-500/20"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={card.img}
+                    alt={card.title}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                  <span className="absolute top-2.5 left-2.5 rounded-full border border-rose-500/40 bg-black/70 px-2.5 py-0.5 text-[10px] font-semibold text-rose-200 backdrop-blur-sm">
+                    {card.badge}
+                  </span>
+                  <div className="absolute inset-x-0 bottom-0 p-3.5">
+                    <div className="text-sm font-bold text-white">{card.title}</div>
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-rose-300">
+                      <Sparkles className="h-3 w-3" /> Try this look free →
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
             {/* ── Free taste — the conversion hook ──────────────────────────── */}
-            <div className="mt-10" ref={conversionCardRef}>
+            <div className="mt-8" ref={conversionCardRef}>
               {!ageConfirmed ? (
                 <div className="rounded-2xl border border-rose-500/30 bg-card/40 p-6 text-center">
                   <h2 className="text-lg font-semibold">Try it free — {freeLimit} uncensored previews</h2>
@@ -595,9 +671,14 @@ export default function Uncensored() {
                               type="button"
                               disabled={freeBusy}
                               onClick={() => handleFreeGenerate(recipe.prompt, recipe.style, recipe.aspect)}
-                              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/40 px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-200 disabled:opacity-50"
+                              className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/40 py-1 pr-3 pl-1 text-left text-xs text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-200 disabled:opacity-50"
                             >
-                              <Flame className="h-3 w-3 shrink-0 text-rose-400" />
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={recipe.imageUrl}
+                                alt={recipe.label}
+                                className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-rose-500/40"
+                              />
                               <span className="font-medium text-foreground/90">{recipe.label}</span>
                               <span className="hidden text-[10px] opacity-70 sm:inline">· {recipe.style}</span>
                             </button>
@@ -748,6 +829,60 @@ export default function Uncensored() {
               )}
             </div>
 
+            {/* 8 Signature Character Archetypes Visual Roster */}
+            <div className="mt-12 rounded-2xl border border-rose-500/25 bg-card/30 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-rose-300">
+                    <UserCheck className="h-3 w-3 text-rose-400" /> 8 Signature Studio Characters
+                  </span>
+                  <h2 className="mt-2 text-lg font-bold">
+                    Spawn any character in 1 click — then lock her face across new scenes &amp; videos
+                  </h2>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Click any portrait to try free or unlock Face Lock →
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {UNCENSORED_CHARACTER_ARCHETYPES.map((arch) => (
+                  <button
+                    key={arch.id}
+                    type="button"
+                    onClick={() => {
+                      setFreePrompt(arch.prompt);
+                      setFreeStyle(arch.style);
+                      if (ageConfirmed && freeRemaining > 0 && !freeBusy) {
+                        handleFreeGenerate(arch.prompt, arch.style, "portrait");
+                      } else {
+                        triggerStudioUpsell("create", `Spawn ${arch.name} (${arch.tagline}) with Face Lock`);
+                      }
+                    }}
+                    className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-border/60 bg-black text-left transition-all hover:-translate-y-0.5 hover:border-rose-500 hover:shadow-lg hover:shadow-rose-500/15"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={arch.imageUrl}
+                      alt={arch.name}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                    <span className="absolute top-2 left-2 rounded-full border border-rose-500/40 bg-black/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-rose-200">
+                      {arch.style}
+                    </span>
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <div className="text-sm font-bold text-white">{arch.name}</div>
+                      <div className="text-[11px] text-zinc-300">{arch.tagline}</div>
+                      <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-rose-300">
+                        <Sparkles className="h-3 w-3" />
+                        {ageConfirmed && freeRemaining > 0 ? "Render free →" : "Unlock Face Lock →"}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Interactive 7-Tool Studio Showcase */}
             <div className="mt-12 rounded-2xl border border-rose-500/25 bg-card/30 p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -763,7 +898,7 @@ export default function Uncensored() {
                   Click any tool to unlock &amp; open directly →
                 </span>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {STUDIO_SHOWCASE_TOOLS.map((tool) => {
                   const Icon = tool.icon;
                   const isSelected = studioIntent?.tab === tool.tab;
@@ -772,29 +907,36 @@ export default function Uncensored() {
                       key={tool.tab}
                       type="button"
                       onClick={() => triggerStudioUpsell(tool.tab, `Open ${tool.title} in Uncensored Studio`)}
-                      className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
+                      className={`group flex flex-col justify-between overflow-hidden rounded-xl border text-left transition-all ${
                         isSelected
                           ? "border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/40"
                           : "border-border/60 bg-background/40 hover:border-rose-500/50 hover:bg-rose-500/10"
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-rose-200">
-                            <Icon className="h-4 w-4 text-rose-400" />
-                            {tool.title}
-                          </span>
-                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-300">
-                            {tool.badge}
-                          </span>
+                      <div className="relative h-36 w-full overflow-hidden bg-black">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={tool.previewImg}
+                          alt={tool.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+                        <span className="absolute top-2.5 right-2.5 rounded-full border border-rose-500/40 bg-black/75 px-2.5 py-0.5 text-[10px] font-semibold text-rose-200 backdrop-blur-sm">
+                          {tool.badge}
+                        </span>
+                        <div className="absolute bottom-2.5 left-3 flex items-center gap-2 text-sm font-bold text-white">
+                          <Icon className="h-4 w-4 text-rose-400" />
+                          {tool.title}
                         </div>
-                        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                      </div>
+                      <div className="flex flex-1 flex-col justify-between p-4">
+                        <p className="text-xs leading-relaxed text-muted-foreground">
                           {tool.desc}
                         </p>
+                        <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300">
+                          Unlock &amp; launch {tool.title} →
+                        </span>
                       </div>
-                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300">
-                        Unlock &amp; launch {tool.title} →
-                      </span>
                     </button>
                   );
                 })}

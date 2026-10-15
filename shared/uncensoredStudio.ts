@@ -965,6 +965,7 @@ export const UNCENSORED_INPAINT_PRESETS: UncensoredInpaintPreset[] = [
 export interface UncensoredSceneRecipe {
   id: string;
   label: string;
+  imageUrl: string;
   prompt: string;
   style: string;
   aspect: string;
@@ -985,6 +986,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "penthouse-boudoir",
     label: "Penthouse Boudoir",
+    imageUrl: "/showcase/uncensored-char-aria-nordic.jpg",
     prompt:
       "gorgeous fictional woman in a high-rise penthouse suite at night, warm city skyline bokeh through floor-to-ceiling glass, intimate editorial glamour",
     style: "realistic",
@@ -999,6 +1001,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "neon-rain-cyberpunk",
     label: "Neon Rain Cyberpunk",
+    imageUrl: "/showcase/uncensored-char-sora-cyber.jpg",
     prompt:
       "fictional cyberpunk femme fatale on a rain-slicked rooftop at midnight, glowing holographic billboards, wet skin specular highlights",
     style: "cinematic",
@@ -1013,6 +1016,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "candlelight-silk",
     label: "Candlelight Silk",
+    imageUrl: "/showcase/uncensored-char-mei-noir.jpg",
     prompt:
       "intimate boudoir portrait of a fictional woman draped in flowing black silk, warm flickering candlelight, soft chiaroscuro shadows",
     style: "realistic",
@@ -1027,6 +1031,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "golden-hour-beach",
     label: "Golden Hour Beach",
+    imageUrl: "/showcase/uncensored-char-chloe-california.jpg",
     prompt:
       "sun-kissed fictional model on a secluded tropical cove at sunset, glowing wet skin, warm golden rim light and turquoise waves",
     style: "realistic",
@@ -1041,6 +1046,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "leather-editorial",
     label: "Leather Editorial",
+    imageUrl: "/showcase/uncensored-char-freya-athletic.jpg",
     prompt:
       "high-fashion nocturnal editorial of a confident fictional woman in tailored black leather, dramatic studio beauty dish lighting",
     style: "cinematic",
@@ -1055,6 +1061,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "dark-fantasy-sorceress",
     label: "Dark Fantasy Sorceress",
+    imageUrl: "/showcase/uncensored-char-nyx-fantasy.jpg",
     prompt:
       "ethereal dark-fantasy sorceress wreathed in arcane embers and moonlight, intricate obsidian and sheer silk attire, dramatic atmosphere",
     style: "fantasy",
@@ -1069,6 +1076,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "anime-after-hours",
     label: "90s Anime After-Hours",
+    imageUrl: "/showcase/uncensored-char-kaia-anime.jpg",
     prompt:
       "expressive anime heroine in a neon-lit Tokyo apartment at night, rain on window glass, crisp cel shading and vibrant rim light",
     style: "anime",
@@ -1083,6 +1091,7 @@ export const UNCENSORED_SCENE_RECIPES: UncensoredSceneRecipe[] = [
   {
     id: "chiaroscuro-oil",
     label: "Chiaroscuro Figure Study",
+    imageUrl: "/showcase/uncensored-char-valentina-glam.jpg",
     prompt:
       "classical baroque oil-painting figure study in dramatic Caravaggio lighting, rich canvas brushstroke texture, warm amber shadows",
     style: "artistic",
@@ -1108,6 +1117,7 @@ export interface UncensoredCharacterArchetype {
   id: string;
   name: string;
   tagline: string;
+  imageUrl: string;
   style: string;
   prompt: string;
   framing: string;
@@ -1127,6 +1137,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "aria-nordic",
     name: "Aria",
     tagline: "Nordic Editorial Muse",
+    imageUrl: "/showcase/uncensored-char-aria-nordic.jpg",
     style: "realistic",
     prompt:
       "striking fictional 25-year-old Nordic editorial model with platinum blonde waves, ice-blue eyes, sculpted cheekbones, natural skin pores, subtle freckles across the nose",
@@ -1140,6 +1151,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "sora-cyber",
     name: "Sora",
     tagline: "Neo-Tokyo Cyber Siren",
+    imageUrl: "/showcase/uncensored-char-sora-cyber.jpg",
     style: "cinematic",
     prompt:
       "fictional 24-year-old Neo-Tokyo cyberpunk muse with jet-black bob haircut, subtle violet hair highlights, sharp dark eyes, dewy luminous skin, fine cybernetic collar detail",
@@ -1153,6 +1165,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "valentina-glam",
     name: "Valentina",
     tagline: "Mediterranean Glamour",
+    imageUrl: "/showcase/uncensored-char-valentina-glam.jpg",
     style: "realistic",
     prompt:
       "fictional 26-year-old Mediterranean glamour model with long espresso-brown curls, warm hazel eyes, sun-kissed olive skin, full glossy lips, confident editorial expression",
@@ -1166,6 +1179,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "nyx-fantasy",
     name: "Nyx",
     tagline: "Dark Fantasy Sorceress",
+    imageUrl: "/showcase/uncensored-char-nyx-fantasy.jpg",
     style: "fantasy",
     prompt:
       "fictional silver-haired dark-fantasy elven sorceress with glowing violet eyes, porcelain skin, intricate obsidian filigree tiara, ethereal regal expression",
@@ -1179,6 +1193,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "chloe-california",
     name: "Chloe",
     tagline: "Golden Hour Swim Muse",
+    imageUrl: "/showcase/uncensored-char-chloe-california.jpg",
     style: "realistic",
     prompt:
       "fictional 24-year-old sun-kissed California beach model with honey-blonde beach waves, emerald green eyes, glowing bronzed skin with water droplets",
@@ -1192,6 +1207,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "mei-noir",
     name: "Mei",
     tagline: "Velvet Noir Femme Fatale",
+    imageUrl: "/showcase/uncensored-char-mei-noir.jpg",
     style: "cinematic",
     prompt:
       "fictional 26-year-old East Asian noir femme fatale with sleek pinned-up dark hair, smoky eyeliner, crimson lips, dramatic chiaroscuro film lighting",
@@ -1205,6 +1221,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "freya-athletic",
     name: "Freya",
     tagline: "Sculpted Studio Muse",
+    imageUrl: "/showcase/uncensored-char-freya-athletic.jpg",
     style: "realistic",
     prompt:
       "fictional 25-year-old athletic redhead model with copper waves, amber eyes, toned shoulders, dewy studio skin highlights, confident gaze",
@@ -1218,6 +1235,7 @@ export const UNCENSORED_CHARACTER_ARCHETYPES: UncensoredCharacterArchetype[] = [
     id: "kaia-anime",
     name: "Kaia",
     tagline: "After-Hours Anime Heroine",
+    imageUrl: "/showcase/uncensored-char-kaia-anime.jpg",
     style: "anime",
     prompt:
       "fictional adult anime heroine with long twin-tone silver and rose hair, expressive amber eyes, detailed cel-shaded highlights, warm apartment bokeh",
