@@ -1,12 +1,13 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { track } from "@/lib/analytics";
 
 declare global {
   interface Window {
     fbq?: (event: string, name: string, params?: Record<string, unknown>) => void;
+    __dfFbqReady?: boolean;
   }
 }
 
@@ -33,11 +34,37 @@ function markSeen(key: string): void {
 
 export function MetaPixelConversions() {
   const { data: session, status } = useSession();
+  const [pixelReady, setPixelReady] = useState(false);
+
+  // The afterInteractive pixel script can run after these effects, so wait for it.
+  useEffect(() => {
+    if (typeof window.fbq === "function") {
+      setPixelReady(true);
+      return;
+    }
+    const markReady = () => setPixelReady(true);
+    window.addEventListener("df:fbq-ready", markReady);
+    const interval = window.setInterval(() => {
+      if (typeof window.fbq === "function") {
+        markReady();
+        window.clearInterval(interval);
+        window.clearTimeout(timeout);
+      }
+    }, 250);
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(interval);
+    }, 10000);
+    return () => {
+      window.removeEventListener("df:fbq-ready", markReady);
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, []);
 
   // Lead + CompleteRegistration on first sight of an authenticated user
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id) return;
-    if (typeof window === "undefined" || !window.fbq) return;
+    if (typeof window === "undefined" || !pixelReady || !window.fbq) return;
     const flagKey = `df_meta_signup_${session.user.id}`;
     if (flagSeen(flagKey)) return;
     window.fbq("track", "Lead");
@@ -47,11 +74,11 @@ export function MetaPixelConversions() {
     // to exactly once per user id.
     track("signup_completed", { userId: session.user.id });
     markSeen(flagKey);
-  }, [status, session?.user?.id]);
+  }, [status, session?.user?.id, pixelReady]);
 
   // Purchase on Stripe success redirect
   useEffect(() => {
-    if (typeof window === "undefined" || !window.fbq) return;
+    if (typeof window === "undefined" || !pixelReady || !window.fbq) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") !== "true") return;
     const sessionId = params.get("session_id");
@@ -75,7 +102,7 @@ export function MetaPixelConversions() {
       content_ids: credits ? [credits] : [],
     });
     markSeen(flagKey);
-  }, []);
+  }, [pixelReady]);
 
   return null;
 }

@@ -24,6 +24,7 @@ s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
 fbq('init', '${PIXEL_ID}');
 fbq('track', 'PageView');
+window.__dfFbqReady=true;window.dispatchEvent(new CustomEvent('df:fbq-ready'));
           `,
         }}
       />
