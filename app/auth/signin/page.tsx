@@ -9,6 +9,14 @@ import { toast } from "sonner";
 import { RETURN_TO_PARAM, resolvePostLogin } from "@shared/returnTo";
 import { track } from "@/lib/analytics";
 
+function trackSignupStarted(method: "email" | "google" | "github") {
+  try {
+    track("signup_started", { method });
+  } catch {
+    // Analytics is best-effort and must never interrupt sign-in.
+  }
+}
+
 export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -31,11 +39,12 @@ export default function SignInPage() {
       return;
     }
     setSubmitting(true);
-    track("signup_started", { method: "email" });
     try {
+      trackSignupStarted("email");
       await signIn("resend", { email: email.trim(), callbackUrl: postLoginUrl() });
     } catch (err: any) {
       toast.error(err?.message || "Sign-in failed");
+    } finally {
       setSubmitting(false);
     }
   };
@@ -57,7 +66,7 @@ export default function SignInPage() {
             variant="outline"
             className="w-full justify-center gap-3 border-zinc-700 bg-zinc-800/50 py-6 text-sm font-medium text-zinc-200 hover:border-purple-500/50 hover:bg-zinc-800 hover:text-white"
             onClick={() => {
-              track("signup_started", { method: "google" });
+              trackSignupStarted("google");
               signIn("google", { callbackUrl: postLoginUrl() });
             }}
           >
@@ -74,7 +83,7 @@ export default function SignInPage() {
             variant="outline"
             className="w-full justify-center gap-3 border-zinc-700 bg-zinc-800/50 py-6 text-sm font-medium text-zinc-200 hover:border-purple-500/50 hover:bg-zinc-800 hover:text-white"
             onClick={() => {
-              track("signup_started", { method: "github" });
+              trackSignupStarted("github");
               signIn("github", { callbackUrl: postLoginUrl() });
             }}
           >
