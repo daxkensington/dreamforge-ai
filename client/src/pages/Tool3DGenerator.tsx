@@ -183,7 +183,7 @@ export default function Tool3DGenerator() {
             <Card className="border-border/50 overflow-hidden sticky top-24">
               <CardContent className="p-0">
                 <AnimatePresence mode="wait">
-                  {!resultPreviewUrl && !isProcessing ? (
+                  {!resultModelUrl && !isProcessing ? (
                     <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
                       <div className="h-16 w-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
                         <Box className="h-8 w-8 text-violet-400" />
@@ -199,15 +199,17 @@ export default function Tool3DGenerator() {
                       <p className="text-sm text-muted-foreground">Generating 3D model...</p>
                       <p className="text-xs text-muted-foreground/60">This may take a moment</p>
                     </div>
-                  ) : resultPreviewUrl ? (
+                  ) : resultModelUrl ? (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="p-4 space-y-4"
                     >
-                      <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
-                        <img loading="lazy" src={resultPreviewUrl} alt="3D Preview" className="w-full h-auto max-h-[400px] object-contain" />
-                      </div>
+                      {resultPreviewUrl && (
+                        <div className="rounded-lg overflow-hidden bg-muted/30 border border-border/30">
+                          <img loading="lazy" src={resultPreviewUrl} alt="3D Preview" className="w-full h-auto max-h-[400px] object-contain" />
+                        </div>
+                      )}
                       <div className="flex justify-end gap-3">
                         {resultModelUrl && (
                           <Button asChild size="sm">
