@@ -14,6 +14,7 @@ vi.mock("./_core/llm", () => ({
 // Mock credit deduction (always succeeds in tests)
 vi.mock('./stripe', () => ({
   deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99 }),
+  refundCredits: vi.fn().mockResolvedValue(undefined),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
     'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,
@@ -28,9 +29,21 @@ vi.mock('./stripe', () => ({
   CREDIT_PACKAGES: [],
 }));
 
+// Mock the tool kill-switch + failure logging (never touch the real db)
+vi.mock("./_core/toolStatus", () => ({
+  requireToolActive: vi.fn().mockResolvedValue(undefined),
+  getAllToolStatus: vi.fn().mockResolvedValue([]),
+  getFailureStats: vi.fn().mockResolvedValue([]),
+  logToolFailure: vi.fn().mockResolvedValue(undefined),
+  setToolStatus: vi.fn().mockResolvedValue(undefined),
+  clearToolStatus: vi.fn().mockResolvedValue(undefined),
+  runAutoDegradeScan: vi.fn().mockResolvedValue({ flipped: [] }),
+}));
+
 
 import { generateImage } from "./_core/imageGeneration";
 import { invokeLLM } from "./_core/llm";
+import { deductCredits, refundCredits } from "./stripe";
 import { appRouter } from "./routers";
 
 const mockCtx = {
@@ -572,6 +585,108 @@ describe("Video Studio Endpoints", () => {
       expect(result.status).toBe("failed");
       expect(result.title).toBe("");
       expect(result.scenes).toHaveLength(0);
+    });
+  });
+
+  // ─── Text-to-Video (provider-backed) ────────────────────────────
+  describe("video.textToVideo", () => {
+    const PROVIDER_ENV_KEYS = [
+      "RUNWAY_API_KEY",
+      "KLING_ACCESS_KEY",
+      "REPLICATE_API_TOKEN",
+      "FAL_KEY",
+      "FAL_API_KEY",
+      "RUNPOD_API_KEY",
+      "RUNPOD_FLUX_ENDPOINT_ID",
+      "RUNPOD_COGVIDEO_ENDPOINT_ID",
+      "VEO3_ENABLED",
+      "GEMINI_API_KEY",
+    ];
+
+    beforeEach(() => {
+      for (const key of PROVIDER_ENV_KEYS) delete process.env[key];
+    });
+
+    it("refunds the 50-credit charge when all providers fail", async () => {
+      const result = await caller.video.textToVideo({
+        prompt: "A cinematic mountain flyover at dawn",
+      });
+
+      expect(result.status).toBe("failed");
+      expect(result.videoUrl).toBeNull();
+      expect(deductCredits).toHaveBeenCalledWith(
+        1,
+        50,
+        expect.stringContaining("Text-to-video"),
+      );
+      expect(refundCredits).toHaveBeenCalledTimes(1);
+      expect(refundCredits).toHaveBeenCalledWith(
+        1,
+        50,
+        expect.stringContaining("Refund"),
+      );
+    });
+
+    it("refunds when an explicitly selected model is unavailable", async () => {
+      const result = await caller.video.textToVideo({
+        prompt: "Ocean waves crashing on black sand",
+        model: "veo-3",
+      });
+
+      expect(result.status).toBe("failed");
+      expect(refundCredits).toHaveBeenCalledTimes(1);
+      expect(refundCredits).toHaveBeenCalledWith(1, 50, expect.stringContaining("Refund"));
+    });
+
+    it("does not deduct or refund on input validation failures", async () => {
+      await expect(
+        caller.video.textToVideo({ prompt: "" }),
+      ).rejects.toThrow();
+      expect(deductCredits).not.toHaveBeenCalled();
+      expect(refundCredits).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Image-to-Video (provider-backed) ───────────────────────────
+  describe("video.imageToVideo", () => {
+    const PROVIDER_ENV_KEYS = [
+      "RUNWAY_API_KEY",
+      "KLING_ACCESS_KEY",
+      "REPLICATE_API_TOKEN",
+      "VEO3_ENABLED",
+      "GEMINI_API_KEY",
+    ];
+
+    beforeEach(() => {
+      for (const key of PROVIDER_ENV_KEYS) delete process.env[key];
+    });
+
+    it("refunds the 40-credit charge when all providers fail", async () => {
+      const result = await caller.video.imageToVideo({
+        imageUrl: "https://example.com/photo.png",
+        prompt: "Slow cinematic zoom toward the subject",
+      });
+
+      expect(result.status).toBe("failed");
+      expect(result.videoUrl).toBeNull();
+      expect(deductCredits).toHaveBeenCalledWith(
+        1,
+        40,
+        expect.stringContaining("Image-to-video"),
+      );
+      expect(refundCredits).toHaveBeenCalledTimes(1);
+      expect(refundCredits).toHaveBeenCalledWith(1, 40, expect.stringContaining("Refund"));
+    });
+
+    it("does not deduct or refund when the imageUrl fails the SSRF guard", async () => {
+      await expect(
+        caller.video.imageToVideo({
+          imageUrl: "http://127.0.0.1/internal.png",
+          prompt: "animate",
+        }),
+      ).rejects.toThrow();
+      expect(deductCredits).not.toHaveBeenCalled();
+      expect(refundCredits).not.toHaveBeenCalled();
     });
   });
 });

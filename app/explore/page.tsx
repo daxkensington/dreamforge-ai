@@ -67,7 +67,15 @@ export default async function ExplorePage({ searchParams }: PageProps) {
 
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: "2.5rem 1rem" }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* JSON.stringify does NOT escape "</script>", and gallery titles/prompts
+          are user-controlled — a title containing "</script><script>…" would be
+          a persistent XSS on this public page (CSP allows 'unsafe-inline').
+          Escaping "<" as "\u003c" keeps the JSON valid — parsers decode it
+          back to "<" — but a raw "</script>" can never appear in the markup. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
 
       <header style={{ textAlign: "center", marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "2.25rem", fontWeight: 800, letterSpacing: "-0.02em" }}>

@@ -9,9 +9,11 @@ import {
   creditTransactions,
 } from "../../drizzle/schema";
 import { eq, sql, desc, and } from "drizzle-orm";
-import { getOrCreateBalance } from "../stripe";
+import { getOrCreateBalance, sanitizeRedirectOrigin, requestOriginFromCtx } from "../stripe";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
 import Stripe from "stripe";
+import { currentSubscriptionOrder } from "../_core/subscriptionSelection";
+import { getEffectiveSubscriptionTier } from "../../shared/subscriptionEntitlement";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripe: Stripe | null = null;
@@ -137,6 +139,7 @@ async function getUserSubscription(userId: number) {
     .select()
     .from(userSubscriptions)
     .where(eq(userSubscriptions.userId, userId))
+    .orderBy(...currentSubscriptionOrder())
     .limit(1);
   return rows[0] ?? null;
 }
@@ -231,6 +234,19 @@ export const pricingRouter = router({
         });
       }
 
+      // Client-supplied origin is allowlisted server-side (open redirect +
+      // session-id leak); a bad origin falls back to APP_URL, never rejects.
+      const safeOrigin = sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx));
+
+      // Meta Pixel Purchase attribution: success_url carries the price/credits
+      // actually being purchased so the client can fire a valued conversion.
+      const sharedPlan = SUBSCRIPTION_PLANS.find((p) => p.name === plan.name);
+      const amountCents =
+        input.billingInterval === "year"
+          ? sharedPlan?.yearlyPrice ?? plan.price * 12
+          : plan.price;
+      const purchaseValue = (amountCents / 100).toFixed(2);
+
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
@@ -251,8 +267,8 @@ export const pricingRouter = router({
             billing_interval: input.billingInterval,
           },
         },
-        success_url: `${input.origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${input.origin}/pricing?canceled=true`,
+        success_url: `${safeOrigin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}&value=${purchaseValue}&currency=usd&credits=${plan.monthlyCredits}`,
+        cancel_url: `${safeOrigin}/pricing?canceled=true`,
       });
 
       return { url: session.url };
@@ -328,11 +344,14 @@ export const pricingRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not find subscription item" });
       }
 
-      // Update with proration
+      // Update with proration. Merge metadata instead of replacing it:
+      // customer.subscription.deleted reads user_id from it, and replacing
+      // the map with only plan keys would orphan cancellations.
       await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
         items: [{ id: itemId, price: newPlan.stripePriceId! }],
         proration_behavior: "create_prorations",
         metadata: {
+          ...(stripeSub.metadata ?? {}),
           plan_id: newPlan.id.toString(),
           plan_name: newPlan.name,
         },
@@ -411,6 +430,7 @@ export const pricingRouter = router({
       z.object({
         packId: z.string(),
         origin: z.string().url(),
+        returnPath: z.string().max(200).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -422,6 +442,15 @@ export const pricingRouter = router({
         ctx.user.email || "",
         ctx.user.name || "User"
       );
+
+      const safeOrigin = sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx));
+      const packValue = (pack.price / 100).toFixed(2);
+      const rawReturn =
+        input.returnPath && /^\/[A-Za-z0-9/_?&=-]*$/.test(input.returnPath) && !input.returnPath.startsWith("//")
+          ? input.returnPath
+          : "/pricing";
+      const [returnPathname, returnSearch = ""] = rawReturn.split("?");
+      const extraQuery = returnSearch ? `&${returnSearch}` : "";
 
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
@@ -447,8 +476,8 @@ export const pricingRouter = router({
           credits: pack.credits.toString(),
           type: "credit_pack",
         },
-        success_url: `${input.origin}/pricing?credit_success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${input.origin}/pricing?canceled=true`,
+        success_url: `${safeOrigin}${returnPathname}?credit_success=true&session_id={CHECKOUT_SESSION_ID}&value=${packValue}&currency=usd&credits=${pack.credits}${extraQuery}`,
+        cancel_url: `${safeOrigin}${returnPathname}?canceled=true${extraQuery}`,
       });
 
       return { url: session.url };
@@ -462,13 +491,15 @@ export const pricingRouter = router({
 
 // ─── Exported Helpers for Webhook Use ──────────────────────────────────────
 
-/** Activate a subscription after Stripe confirms it */
+/** Persist provider state. Verified paid invoices alone allocate subscription credits. */
 export async function activateSubscription(
   userId: number,
   planId: number,
   stripeSubscriptionId: string,
-  periodStart: Date,
-  periodEnd: Date
+  periodStart: Date | null,
+  periodEnd: Date | null,
+  providerStatus: string = "active",
+  cancelAtPeriodEnd: boolean = false,
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -476,18 +507,24 @@ export async function activateSubscription(
   const plan = await getPlanById(planId);
   if (!plan) throw new Error(`Plan ${planId} not found`);
 
-  // Upsert user subscription
-  const existing = await getUserSubscription(userId);
+  const statusMap: Record<string, "active" | "canceled" | "past_due" | "trialing" | "incomplete"> = {
+    active: "active", canceled: "canceled", past_due: "past_due", trialing: "trialing", incomplete: "incomplete",
+  };
+  const status = statusMap[providerStatus] ?? "canceled";
+  const existingRows = await db.select().from(userSubscriptions)
+    .where(eq(userSubscriptions.stripeSubscriptionId, stripeSubscriptionId)).limit(1);
+  const existing = existingRows[0];
+  if (existing && existing.userId !== userId) throw new Error("Subscription user mapping does not match the saved account.");
   if (existing) {
     await db
       .update(userSubscriptions)
       .set({
         planId,
         stripeSubscriptionId,
-        status: "active",
+        status,
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
-        cancelAtPeriodEnd: false,
+        cancelAtPeriodEnd,
       })
       .where(eq(userSubscriptions.id, existing.id));
   } else {
@@ -495,30 +532,13 @@ export async function activateSubscription(
       userId,
       planId,
       stripeSubscriptionId,
-      status: "active",
+      status,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd,
     });
   }
 
-  // Allocate monthly credits
-  await db
-    .update(creditBalances)
-    .set({
-      balance: sql`${creditBalances.balance} + ${plan.monthlyCredits}`,
-      monthlyAllocation: plan.monthlyCredits,
-      lastResetAt: new Date(),
-    })
-    .where(eq(creditBalances.userId, userId));
-
-  // Record the transaction
-  await db.insert(creditTransactions).values({
-    userId,
-    amount: plan.monthlyCredits,
-    type: "subscription",
-    description: `${plan.displayName} plan — monthly credit allocation`,
-    metadata: { planId, planName: plan.name, stripeSubscriptionId },
-  });
 }
 
 /** Handle subscription update (plan change) */
@@ -526,8 +546,9 @@ export async function handleSubscriptionUpdated(
   stripeSubscriptionId: string,
   planName: string,
   status: string,
-  periodStart: Date,
-  periodEnd: Date
+  periodStart: Date | null,
+  periodEnd: Date | null,
+  cancelAtPeriodEnd?: boolean,
 ) {
   const db = await getDb();
   if (!db) return;
@@ -552,10 +573,14 @@ export async function handleSubscriptionUpdated(
   };
 
   const updateData: Record<string, any> = {
-    status: statusMap[status] || "active",
+    // Unknown Stripe statuses (unpaid, paused, incomplete_expired, anything
+    // future) must not map to "active" — default to "canceled" so a broken
+    // or lapsed subscription never keeps granting entitlements.
+    status: statusMap[status] || "canceled",
     currentPeriodStart: periodStart,
     currentPeriodEnd: periodEnd,
   };
+  if (cancelAtPeriodEnd !== undefined) updateData.cancelAtPeriodEnd = cancelAtPeriodEnd;
   if (plan) updateData.planId = plan.id;
 
   await db
@@ -563,13 +588,6 @@ export async function handleSubscriptionUpdated(
     .set(updateData)
     .where(eq(userSubscriptions.id, sub.id));
 
-  // Update monthly allocation if plan changed
-  if (plan) {
-    await db
-      .update(creditBalances)
-      .set({ monthlyAllocation: plan.monthlyCredits })
-      .where(eq(creditBalances.userId, sub.userId));
-  }
 }
 
 /** Handle subscription cancellation */
@@ -590,6 +608,13 @@ export async function handleSubscriptionDeleted(stripeSubscriptionId: string) {
     .update(userSubscriptions)
     .set({ status: "canceled" })
     .where(eq(userSubscriptions.id, sub.id));
+
+  // Deleting an old subscription must not downgrade another current paid plan.
+  const current = await getUserSubscription(sub.userId);
+  if (current && current.id !== sub.id) {
+    const currentPlan = await getPlanById(current.planId);
+    if (getEffectiveSubscriptionTier({ ...current, planName: currentPlan?.name }) !== "free") return;
+  }
 
   // Reset monthly allocation to free tier
   const freePlan = await getPlanByName("free");
@@ -618,13 +643,16 @@ export async function handleMonthlyReset(stripeSubscriptionId: string) {
   const plan = await getPlanById(sub.planId);
   if (!plan) return;
 
-  // Reset balance to monthly allocation (keep bonus credits separate)
+  // Reset balance to monthly allocation plus purchased credits, then zero the
+  // bonusCredits counter — it has been folded into balance. Without the
+  // zeroing, the same purchased credits would be re-added on every reset.
   const balance = await getOrCreateBalance(sub.userId);
 
   await db
     .update(creditBalances)
     .set({
       balance: sql`${plan.monthlyCredits} + ${creditBalances.bonusCredits}`,
+      bonusCredits: 0,
       monthlyAllocation: plan.monthlyCredits,
       lastResetAt: new Date(),
     })

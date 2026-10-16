@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { generationRequests, generations } from "../drizzle/schema";
 
-const state: { user: any; updates: any[]; deletes: string[] } = {
+const state: { user: any; updates: any[]; updateCalls: { table: any; values: any; where: any }[]; deletes: string[] } = {
   user: { id: 7, email: "u@x.com", loginMethod: "google", name: "Ian" },
   updates: [],
+  updateCalls: [],
   deletes: [],
 };
 
@@ -33,16 +36,17 @@ vi.mock("./db", () => ({
         }),
       }),
     }),
-    update: () => ({
+    update: (table: any) => ({
       set: (v: any) => ({
-        where: async () => {
+        where: async (where: any) => {
           state.updates.push(v);
+          state.updateCalls.push({ table, values: v, where });
         },
       }),
     }),
     delete: (table: any) => ({
       where: async () => {
-        state.deletes.push(String(table));
+        state.deletes.push(String(table?.[Symbol.for("drizzle:Name")] ?? table));
       },
     }),
   })),
@@ -58,6 +62,7 @@ describe("deleteUserAccount", () => {
   beforeEach(() => {
     state.user = { id: 7, email: "u@x.com", loginMethod: "google", name: "Ian" };
     state.updates = [];
+    state.updateCalls = [];
     state.deletes = [];
   });
 
@@ -73,6 +78,26 @@ describe("deleteUserAccount", () => {
   it("scrubs generation prompts", async () => {
     await deleteUserAccount(7);
     expect(state.updates.some((u) => u.prompt === "[deleted]")).toBe(true);
+  });
+
+  it("fences pending requests and scrubs replay assets before generation links while retaining the ledger", async () => {
+    await deleteUserAccount(7);
+    const requestUpdate = state.updateCalls.find((call) => call.table === generationRequests);
+    const generationUpdate = state.updateCalls.find((call) => call.table === generations);
+    expect(requestUpdate).toBeTruthy();
+    expect(state.updateCalls.indexOf(requestUpdate!)).toBeLessThan(state.updateCalls.indexOf(generationUpdate!));
+
+    const dialect = new PgDialect();
+    const stateQuery = dialect.sqlToQuery(requestUpdate!.values.state);
+    expect(stateQuery.sql).toBe('CASE WHEN "generationRequests"."state" IN (\'reserved\', \'rendering\') THEN \'reconciliation\' ELSE "generationRequests"."state" END');
+    const errorQuery = dialect.sqlToQuery(requestUpdate!.values.errorCode);
+    expect(errorQuery.sql).toBe('CASE WHEN "generationRequests"."state" IN (\'reserved\', \'rendering\', \'reconciliation\') THEN \'account-deleted\' ELSE "generationRequests"."errorCode" END');
+    const resultQuery = dialect.sqlToQuery(requestUpdate!.values.result);
+    expect(resultQuery.sql).toBe('CASE WHEN "generationRequests"."result" IS NULL THEN NULL ELSE $1::text::jsonb END');
+    expect(resultQuery.params).toEqual([JSON.stringify({ deleted: true })]);
+    expect(dialect.sqlToQuery(requestUpdate!.where).params).toEqual([7]);
+    expect(requestUpdate!.values.updatedAt).toBeInstanceOf(Date);
+    expect(state.deletes.some((table) => /generationRequests|creditTransactions/.test(table))).toBe(false);
   });
 
   it("refuses a second delete", async () => {

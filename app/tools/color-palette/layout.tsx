@@ -7,6 +7,18 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AI Color Palette Extractor — DreamForgeX",
     description: "Extract and generate color palettes from any image",
+    url: "https://dreamforgex.ai/tools/color-palette",
+    siteName: "DreamForgeX",
+    images: [
+      {
+        url: "https://dreamforgex.ai/og-image.jpg",
+        width: 1408,
+        height: 768,
+        alt: "DreamForgeX — AI Creative Studio with 100+ tools",
+      },
+    ],
+    type: "website",
+    locale: "en_US",
   },
 };
 

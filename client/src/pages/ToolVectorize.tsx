@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { PenTool, Upload, Loader2, Download, ArrowRight, Sparkles, RotateCcw } from "lucide-react";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const vectorStyles = [
   { value: "flat", label: "Flat", desc: "Solid fills, clean edges" },
@@ -26,13 +27,17 @@ export default function ToolVectorize() {
   const [style, setStyle] = useState("flat");
   const [colorCount, setColorCount] = useState(8);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [svgUrl, setSvgUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = trpc.tools.vectorize.useMutation({
     onSuccess: (data) => {
-      if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Image vectorized!"); }
-      else toast.error(data.error || "Vectorization failed");
+      if (data.status === "completed" && data.url) {
+        setResultUrl(data.url);
+        setSvgUrl(data.svgUrl ?? null);
+        toast.success(data.svgUrl ? "Vectorized — true SVG ready!" : "Image vectorized!");
+      } else toast.error(data.error || "Vectorization failed");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -62,7 +67,7 @@ export default function ToolVectorize() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-vector.jpg" alt="Image vectorization" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-vector.jpg" alt="Image vectorization" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -100,7 +105,7 @@ export default function ToolVectorize() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); mutation.mutate({ imageUrl, style: style as any, colorCount }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={() => { setResultUrl(null); setSvgUrl(null); mutation.mutate({ imageUrl, style: style as any, colorCount }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Vectorizing...</> : <><Sparkles className="h-4 w-4 mr-2" />Vectorize</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
@@ -149,7 +154,16 @@ export default function ToolVectorize() {
                       </div>
                     </div>
                     {resultUrl && (
-                      <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
+                      <div className="p-4 border-t border-border/50 flex justify-end gap-2">
+                        {svgUrl && (
+                          <Button size="sm" className="bg-rose-600 hover:bg-rose-500 text-white" onClick={() => window.open(svgUrl, "_blank")}>
+                            <Download className="h-4 w-4 mr-2" />Download SVG
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}>
+                          <Download className="h-4 w-4 mr-2" />{svgUrl ? "Download Raster" : "Download"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

@@ -463,7 +463,7 @@ describe("Phase 18 — Usage Analytics, Low Credit Warning, Referral Credits", (
       const result = await caller.referral.applyCode({ code: "FRIEND" });
       expect(result).toBeDefined();
       expect(result.success).toBe(true);
-      expect(result.creditsEarned).toBe(15);
+      expect(result.creditsEarned).toBe(50);
       expect(addCredits).toHaveBeenCalledTimes(2); // referrer + referred
     });
 
@@ -483,8 +483,8 @@ describe("Phase 18 — Usage Analytics, Low Credit Warning, Referral Credits", (
       const caller = createCaller();
       const result = await caller.referral.getConstants();
       expect(result).toBeDefined();
-      expect(result.referrerBonus).toBe(25);
-      expect(result.referredBonus).toBe(15);
+      expect(result.referrerBonus).toBe(100);
+      expect(result.referredBonus).toBe(50);
       expect(result.lowCreditThreshold).toBe(10);
     });
 

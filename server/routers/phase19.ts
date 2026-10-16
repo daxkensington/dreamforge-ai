@@ -22,8 +22,8 @@ export const REFERRAL_TIERS = [
   { threshold: 50, bonus: 500, name: "Diamond", color: "#B9F2FF" },
 ] as const;
 
-const BASE_REFERRAL_BONUS_REFERRER = 25;
-const BASE_REFERRAL_BONUS_REFERRED = 15;
+const BASE_REFERRAL_BONUS_REFERRER = 100;
+const BASE_REFERRAL_BONUS_REFERRED = 50;
 
 function generateCode(): string {
   return crypto.randomBytes(6).toString("hex").toUpperCase().slice(0, 8);

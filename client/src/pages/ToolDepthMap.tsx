@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Layers, Upload, Loader2, Download, ArrowRight, Sparkles, RotateCcw } from "lucide-react";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const depthStyles = [
   { value: "grayscale", label: "Grayscale", desc: "Classic black-to-white depth", icon: "⬛" },
@@ -21,13 +22,17 @@ export default function ToolDepthMap() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [style, setStyle] = useState("grayscale");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [engine, setEngine] = useState<"depth-anything" | "vision-model" | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = trpc.tools.depthMap.useMutation({
     onSuccess: (data) => {
-      if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Depth map generated!"); }
-      else toast.error(data.error || "Generation failed");
+      if (data.status === "completed" && data.url) {
+        setResultUrl(data.url);
+        setEngine(data.engine ?? null);
+        toast.success(data.engine === "depth-anything" ? "Depth map generated (Depth Anything V2)!" : "Depth map generated!");
+      } else toast.error(data.error || "Generation failed");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -58,7 +63,7 @@ export default function ToolDepthMap() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-depthmap.jpg" alt="3D depth map" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-depthmap.jpg" alt="3D depth map" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -91,7 +96,7 @@ export default function ToolDepthMap() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); mutation.mutate({ imageUrl, style: style as any }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={() => { setResultUrl(null); setEngine(null); mutation.mutate({ imageUrl, style: style as any }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Depth Map</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
@@ -140,7 +145,19 @@ export default function ToolDepthMap() {
                       </div>
                     </div>
                     {resultUrl && (
-                      <div className="p-4 border-t border-border/50 flex justify-end"><Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button></div>
+                      <div className="p-4 border-t border-border/50 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          {engine && (
+                            <Badge variant="secondary" className={engine === "depth-anything" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : "bg-amber-500/15 text-amber-400 border-amber-500/30"}>
+                              {engine === "depth-anything" ? "Depth Anything V2 — true depth" : "Vision model — estimated depth"}
+                            </Badge>
+                          )}
+                          {engine === "vision-model" && style === "normal-map" && (
+                            <span className="text-xs text-amber-400/90">Preview only — not a true normal map for 3D use.</span>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => window.open(resultUrl, "_blank")}><Download className="h-4 w-4 mr-2" />Download</Button>
+                      </div>
                     )}
                   </div>
                 )}

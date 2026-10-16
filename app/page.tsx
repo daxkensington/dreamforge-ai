@@ -1,5 +1,10 @@
-"use client";
-import Home from "@/pages/Home";
-export default function HomePage() {
-  return <Home />;
+import type { Metadata } from "next";
+import ClientPage from "./ClientPage";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai" },
+};
+
+export default function Page() {
+  return <ClientPage />;
 }

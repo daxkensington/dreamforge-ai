@@ -29,6 +29,8 @@ import {
   addCredits,
   getCreditHistory,
   createCheckoutSession,
+  sanitizeRedirectOrigin,
+  requestOriginFromCtx,
   CREDIT_PACKAGES,
   CREDIT_COSTS,
 } from "./stripe";
@@ -105,7 +107,9 @@ export const creditsRouter = router({
         ctx.user.email || "",
         ctx.user.name || "User",
         input.packageId,
-        input.origin
+        // Allowlist the client origin (open redirect / session-id leak);
+        // mismatches fall back to APP_URL inside createCheckoutSession.
+        sanitizeRedirectOrigin(input.origin, requestOriginFromCtx(ctx))
       );
       return result;
     }),
@@ -140,40 +144,56 @@ export const notificationsRouter = router({
     .input(
       z
         .object({
-          limit: z.number().min(1).max(100).optional(),
+          limit: z.number().min(1).max(500).optional(),
+          page: z.number().min(1).optional(),
           unreadOnly: z.boolean().optional(),
         })
         .optional()
     )
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { notifications: [], unreadCount: 0 };
+      if (!db) return { notifications: [], unreadCount: 0, total: 0 };
 
       const conditions = [eq(notifications.userId, ctx.user.id)];
       if (input?.unreadOnly) {
         conditions.push(eq(notifications.read, false));
       }
 
+      const limit = input?.limit || 30;
+      const page = input?.page ?? 1;
+
       const items = await db
         .select()
         .from(notifications)
         .where(and(...conditions))
         .orderBy(desc(notifications.createdAt))
-        .limit(input?.limit || 30);
+        .limit(limit)
+        .offset((page - 1) * limit);
 
-      const unreadResult = await db
-        .select({ count: count() })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.userId, ctx.user.id),
-            eq(notifications.read, false)
-          )
-        );
+      const [unreadResult, totalResult] = await Promise.all([
+        db
+          .select({ count: count() })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.userId, ctx.user.id),
+              eq(notifications.read, false)
+            )
+          ),
+        // unreadOnly callers (navbar badge) don't need the total — skip the
+        // extra count query for them.
+        input?.unreadOnly
+          ? Promise.resolve([{ count: 0 }] as { count: number }[])
+          : db
+              .select({ count: count() })
+              .from(notifications)
+              .where(eq(notifications.userId, ctx.user.id)),
+      ]);
 
       return {
         notifications: items,
         unreadCount: unreadResult[0]?.count || 0,
+        total: input?.unreadOnly ? 0 : totalResult[0]?.count || 0,
       };
     }),
 

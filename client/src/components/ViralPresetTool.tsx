@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -120,13 +121,14 @@ export function ViralPresetTool({
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {showcase.map((src) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   key={src}
                   src={src}
                   alt={title + " example"}
+                  width={400}
+                  height={400}
+                  sizes="(min-width: 640px) 280px, calc(50vw - 24px)"
                   className="aspect-square w-full rounded-xl object-cover bg-card/40"
-                  loading="lazy"
                 />
               ))}
             </div>

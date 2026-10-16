@@ -17,7 +17,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { invokeLLM } from "../_core/llm";
 import { requireToolActive } from "../_core/toolStatus";
-import { deductCredits } from "../stripe";
+import { deductCredits, refundCredits } from "../stripe";
 import { getDb } from "../db";
 import { getCharacter } from "../dbExtended";
 import { audioGenerations } from "../../drizzle/schema";
@@ -25,11 +25,24 @@ import { eq, and } from "drizzle-orm";
 
 // Cost: storyboard LLM call + N image gens + optional music.
 // Charged as one bundled cost so the "one-click" feels honest.
+const STORYBOARD_COST = 5;
+const STORY_IMAGE_COST = 5;
+const STORY_MUSIC_COST = 6;
+
 function totalCost(sceneCount: number, withMusic: boolean): number {
-  const storyboard = 5;
-  const perImage = 5;
-  const music = withMusic ? 6 : 0;
+  const storyboard = STORYBOARD_COST;
+  const perImage = STORY_IMAGE_COST;
+  const music = withMusic ? STORY_MUSIC_COST : 0;
   return storyboard + sceneCount * perImage + music;
+}
+
+// Refunds must never throw — a failed refund must not mask the original error.
+async function safeRefund(userId: number, amount: number, reason: string) {
+  try {
+    await refundCredits(userId, amount, reason);
+  } catch (err) {
+    console.error("[story] Credit refund failed:", err);
+  }
 }
 
 export const storyRouter = router({
@@ -74,58 +87,76 @@ export const storyRouter = router({
       }
 
       // ─── Step 1: generate storyboard JSON via LLM ───────────────────
-      const storyboardResp = await invokeLLM({
-        messages: [
-          {
-            role: "system",
-            content:
-              `You are a video story director. Create a ${input.sceneCount}-scene short story from the user's idea, in ${input.style} style. ` +
-              `For each scene, write a vivid 2-3 sentence visual description suitable for AI image generation. ` +
-              `Maintain narrative continuity — set up, escalate, resolve. ` +
-              `Output JSON: { title, synopsis, mood, musicMood, scenes: [{ sceneNumber, narration, visual, mood }] }`,
-          },
-          {
-            role: "user",
-            content: `Idea: ${input.idea}${characterClause ? `\n\n${characterClause}` : ""}`,
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "story_storyboard",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                synopsis: { type: "string" },
-                mood: { type: "string" },
-                musicMood: { type: "string", description: "1-3 words: e.g. 'epic cinematic', 'gentle whimsical'" },
-                scenes: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      sceneNumber: { type: "number" },
-                      narration: { type: "string" },
-                      visual: { type: "string" },
-                      mood: { type: "string" },
+      let storyboard: any;
+      try {
+        const storyboardResp = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content:
+                `You are a video story director. Create a ${input.sceneCount}-scene short story from the user's idea, in ${input.style} style. ` +
+                `For each scene, write a vivid 2-3 sentence visual description suitable for AI image generation. ` +
+                `Maintain narrative continuity — set up, escalate, resolve. ` +
+                `Output JSON: { title, synopsis, mood, musicMood, scenes: [{ sceneNumber, narration, visual, mood }] }`,
+            },
+            {
+              role: "user",
+              content: `Idea: ${input.idea}${characterClause ? `\n\n${characterClause}` : ""}`,
+            },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "story_storyboard",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  synopsis: { type: "string" },
+                  mood: { type: "string" },
+                  musicMood: { type: "string", description: "1-3 words: e.g. 'epic cinematic', 'gentle whimsical'" },
+                  scenes: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        sceneNumber: { type: "number" },
+                        narration: { type: "string" },
+                        visual: { type: "string" },
+                        mood: { type: "string" },
+                      },
+                      required: ["sceneNumber", "narration", "visual", "mood"],
+                      additionalProperties: false,
                     },
-                    required: ["sceneNumber", "narration", "visual", "mood"],
-                    additionalProperties: false,
                   },
                 },
+                required: ["title", "synopsis", "mood", "musicMood", "scenes"],
+                additionalProperties: false,
               },
-              required: ["title", "synopsis", "mood", "musicMood", "scenes"],
-              additionalProperties: false,
             },
           },
-        },
-      });
+        });
 
-      const content = storyboardResp.choices[0]?.message?.content;
-      const storyboard = typeof content === "string" ? JSON.parse(content) : null;
+        const content = storyboardResp.choices[0]?.message?.content;
+        storyboard = typeof content === "string" ? JSON.parse(content) : null;
+      } catch (err) {
+        // LLM step failed before anything was produced — refund the whole bundle.
+        await safeRefund(
+          ctx.user.id,
+          cost,
+          `Refund: story creation failed — ${(err as Error)?.message ?? "storyboard generation failed"}`,
+        );
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storyboard generation failed" });
+      }
       if (!storyboard?.scenes?.length) {
+        // LLM returned unusable output — the user received nothing for the
+        // storyboard portion, so refund the entire bundle.
+        await safeRefund(
+          ctx.user.id,
+          cost,
+          "Refund: story creation failed — storyboard generation returned no scenes",
+        );
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storyboard generation failed" });
       }
 
@@ -133,6 +164,7 @@ export const storyRouter = router({
       // Sequential rather than parallel — most providers throttle and we
       // want determinism in the order returned to the user.
       const scenesWithImages: any[] = [];
+      let failedImages = 0;
       for (const scene of storyboard.scenes) {
         const prompt =
           `${scene.visual}. ${characterClause}. ` +
@@ -142,8 +174,19 @@ export const storyRouter = router({
           const { url } = await generateImage({ prompt });
           scenesWithImages.push({ ...scene, imageUrl: url ?? null });
         } catch {
+          failedImages++;
           scenesWithImages.push({ ...scene, imageUrl: null });
         }
+      }
+
+      // Refund the per-scene image cost for every scene that produced no
+      // image — the user paid for N scenes and got N - failedImages.
+      if (failedImages > 0) {
+        await safeRefund(
+          ctx.user.id,
+          failedImages * STORY_IMAGE_COST,
+          `Refund: ${failedImages} story scene image(s) failed to generate`,
+        );
       }
 
       // ─── Step 3: kick off music generation async ─────────────────────

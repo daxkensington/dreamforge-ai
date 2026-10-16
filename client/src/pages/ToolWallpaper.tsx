@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Monitor, Loader2, Download, Sparkles, RotateCcw, Smartphone, Tablet } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import NextImage from "next/image";
 
 const resolutions = [
   { value: "phone" as const, label: "Phone", icon: Smartphone, desc: "9:16 portrait" },
@@ -51,7 +52,7 @@ export default function ToolWallpaper() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-xs text-muted-foreground mb-3">Example output:</p>
-          <img loading="lazy" src="/showcase/example-wallpaper-1.jpg" alt="AI generated wallpapers" className="w-full rounded-lg" />
+          <NextImage src="/showcase/example-wallpaper-1.jpg" alt="AI generated wallpapers" className="w-full rounded-lg" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-6">
