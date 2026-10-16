@@ -160,7 +160,10 @@ export default function Navbar() {
         duration: 8000,
       });
       // Clean URL
-      window.history.replaceState({}, "", "/");
+      params.delete("welcome");
+      const query = params.toString();
+      const newUrl = window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
+      window.history.replaceState(window.history.state, "", newUrl);
 
       // Auto-apply referral code if stored
       const storedRef = sessionStorage.getItem("dreamforge_referral");
