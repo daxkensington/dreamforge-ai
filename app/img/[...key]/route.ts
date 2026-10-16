@@ -18,7 +18,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ key
   const key = (parts ?? []).join("/");
   if (!key) return new NextResponse("Not found", { status: 404 });
 
-  const obj = await storageGetObject(key);
+  let obj: Awaited<ReturnType<typeof storageGetObject>>;
+  try {
+    obj = await storageGetObject(key);
+  } catch (err) {
+    console.error("[/img] storage fetch failed:", key, err);
+    return new NextResponse("Upstream storage error", {
+      status: 502,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex",
+      },
+    });
+  }
   if (!obj) return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(Buffer.from(obj.bytes), {
