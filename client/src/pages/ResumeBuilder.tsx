@@ -61,10 +61,14 @@ Use action verbs, quantify achievements, and tailor for ATS compatibility.`,
     });
   };
 
-  const copyResume = () => {
+  const copyResume = async () => {
     if (!result) return;
-    navigator.clipboard.writeText(result);
-    toast.success("Resume copied to clipboard!");
+    try {
+      await navigator.clipboard.writeText(result);
+      toast.success("Resume copied to clipboard!");
+    } catch {
+      toast.error("Could not copy resume. Please try again or download it as Markdown.");
+    }
   };
 
   const downloadResume = () => {
@@ -103,11 +107,11 @@ Use action verbs, quantify achievements, and tailor for ATS compatibility.`,
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-2 block">Full Name</label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="John Smith" className="bg-white/5 border-white/10" />
+                    <Input value={name} onChange={(e) => setName(e.target.value)} disabled={generateMutation.isPending} placeholder="John Smith" className="bg-white/5 border-white/10" />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-2 block">Job Title</label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Senior Software Engineer" className="bg-white/5 border-white/10" />
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={generateMutation.isPending} placeholder="Senior Software Engineer" className="bg-white/5 border-white/10" />
                   </div>
                 </div>
                 <div>
