@@ -14,7 +14,7 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { requireToolActive } from "../_core/toolStatus";
-import { deductCredits, CREDIT_COSTS } from "../stripe";
+import { deductCredits, refundCredits, CREDIT_COSTS } from "../stripe";
 
 // Preset name → { creditTool, prompt-augmentation }.
 // `creditTool` lookups go through TOOL_CREDIT_COSTS so the user-facing
@@ -122,6 +122,16 @@ export const viralRouter = router({
         });
         return { url, status: "completed" as const, preset: input.preset };
       } catch (error: any) {
+        // Refund the exact charge — the user received no image.
+        try {
+          await refundCredits(
+            ctx.user.id,
+            cost,
+            `Refund: ${preset.label} generation failed — ${(error?.message || "unknown error").slice(0, 100)}`,
+          );
+        } catch (refundErr) {
+          console.error("[viral.transform] Credit refund failed:", refundErr);
+        }
         return {
           url: null,
           status: "failed" as const,

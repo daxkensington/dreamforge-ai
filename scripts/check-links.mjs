@@ -19,6 +19,7 @@
 
 import { readdir, readFile, stat, access } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { smokeTarget, bypassHeaders, assertDeployedHealth } from "../shared/smoke-target.mjs";
 
 const BASE_URL = process.env.BASE_URL || "https://dreamforgex.ai";
 const ROOT = process.cwd();
@@ -139,7 +140,7 @@ async function checkRoute(href) {
     const res = await fetch(url, {
       method: "HEAD",
       redirect: "manual",
-      headers: { "User-Agent": "dreamforgex-link-checker/1.0" },
+      headers: { "User-Agent": "dreamforgex-link-checker/1.0", ...bypassHeaders(smokeTarget(BASE_URL), process.env.VERCEL_AUTOMATION_BYPASS_SECRET) },
     });
     return { href, status: res.status };
   } catch (err) {
@@ -188,6 +189,15 @@ async function main() {
 
   // ── ROUTES ─────────────────────────────────────────────
   if (!SKIP_ROUTES) {
+    // A Vercel sign-in redirect is not proof that our app's routes resolve.
+    const target = smokeTarget(BASE_URL);
+    const health = await fetch(target.origin + '/api/health', {
+      headers: bypassHeaders(target, process.env.VERCEL_AUTOMATION_BYPASS_SECRET),
+      redirect: 'manual', signal: AbortSignal.timeout(30_000),
+    });
+    let body;
+    try { body = await health.json(); } catch { body = null; }
+    assertDeployedHealth(health.status, health.headers.get('content-type'), body, process.env.EXPECTED_DEPLOYMENT_SHA || body?.revision);
     console.log(`\n🌐 Checking ${routeList.length} routes against ${BASE_URL}…\n`);
     const results = await runWithConcurrency(routeList, checkRoute, CONCURRENCY);
     for (const r of results) {

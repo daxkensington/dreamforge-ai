@@ -520,6 +520,74 @@ export async function getSellerDashboard(userId: number) {
 
 // ─── Payout Helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Atomically reserve payout funds: conditional UPDATE that decrements only
+ * when the balance covers the amount, returning the post-decrement balance.
+ * Two concurrent requestPayout calls can't both pass — exactly one wins the
+ * row, the other gets zero rows back and we throw BEFORE any Stripe transfer.
+ *
+ * Always pair with exactly one of: setPayoutStatus(paid) or releasePayout.
+ */
+export async function reservePayout(sellerProfileId: number, amount: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .update(sellerProfiles)
+    .set({
+      payoutBalance: sql`${sellerProfiles.payoutBalance} - ${amount}`,
+    })
+    .where(
+      and(
+        eq(sellerProfiles.id, sellerProfileId),
+        sql`${sellerProfiles.payoutBalance} >= ${amount}`
+      )
+    )
+    .returning({ payoutBalance: sellerProfiles.payoutBalance });
+
+  if (result.length === 0) {
+    throw new Error(`Insufficient balance for payout of ${amount}`);
+  }
+  return result[0].payoutBalance;
+}
+
+/** Compensating increment for when the Stripe transfer fails after reservation. */
+export async function releasePayout(sellerProfileId: number, amount: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(sellerProfiles)
+    .set({
+      payoutBalance: sql`${sellerProfiles.payoutBalance} + ${amount}`,
+    })
+    .where(eq(sellerProfiles.id, sellerProfileId));
+}
+
+/** Transition a payout row to its terminal state once the transfer settles. */
+export async function setPayoutStatus(
+  payoutId: number,
+  status: "pending" | "paid" | "failed",
+  stripeTransferId?: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(sellerPayouts)
+    .set({
+      status,
+      ...(stripeTransferId ? { stripeTransferId } : {}),
+    })
+    .where(eq(sellerPayouts.id, payoutId));
+}
+
+/**
+ * Insert the payout ledger row. Balance movement is NOT done here — funds are
+ * reserved up front via reservePayout() so no Stripe transfer can ever happen
+ * before the money is secured. Status is "paid" when a transfer id is already
+ * known, otherwise "pending" until setPayoutStatus settles it.
+ */
 export async function createPayout(sellerId: number, amount: number, stripeTransferId?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -530,14 +598,6 @@ export async function createPayout(sellerId: number, amount: number, stripeTrans
     stripeTransferId: stripeTransferId || null,
     status: stripeTransferId ? "paid" : "pending",
   }).returning({ id: sellerPayouts.id });
-
-  // Deduct from payout balance
-  await db
-    .update(sellerProfiles)
-    .set({
-      payoutBalance: sql`${sellerProfiles.payoutBalance} - ${amount}`,
-    })
-    .where(eq(sellerProfiles.id, sellerId));
 
   return { id: result[0].id };
 }

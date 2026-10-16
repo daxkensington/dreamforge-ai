@@ -21,6 +21,9 @@ import {
   submitReview,
   hasReviewed,
   createPayout,
+  reservePayout,
+  releasePayout,
+  setPayoutStatus,
   getListingById,
   PLATFORM_FEE_PERCENT,
 } from "../dbMarketplace";
@@ -395,11 +398,37 @@ const requestPayoutRoute = protectedProcedure
     if (!profile.stripeConnectId) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe Connect account not set up. Complete seller onboarding first." });
     }
+    // Friendly pre-check for the error message; the real race guard is the
+    // conditional UPDATE in reservePayout, which atomically decrements only
+    // if the balance still covers the amount.
     if (profile.payoutBalance < input.amount) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
         message: `Insufficient balance. Available: $${(profile.payoutBalance / 100).toFixed(2)}, requested: $${(input.amount / 100).toFixed(2)}`,
       });
+    }
+
+    // Reserve funds BEFORE any Stripe call — a concurrent requestPayout loses
+    // the conditional update and we throw here, so two parallel requests can
+    // never both reach transfers.create.
+    try {
+      await reservePayout(profile.id, input.amount);
+    } catch {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Insufficient balance. Available: $${(profile.payoutBalance / 100).toFixed(2)}, requested: $${(input.amount / 100).toFixed(2)}`,
+      });
+    }
+
+    // Ledger row first ('pending'), transfer second, status settled last.
+    let payoutId: number;
+    try {
+      const payout = await createPayout(profile.id, input.amount);
+      payoutId = payout.id;
+    } catch (err) {
+      // No ledger row was written — hand the reserved funds back.
+      await releasePayout(profile.id, input.amount);
+      throw err;
     }
 
     try {
@@ -413,11 +442,13 @@ const requestPayoutRoute = protectedProcedure
         },
       });
 
-      const result = await createPayout(profile.id, input.amount, transfer.id);
-      return { success: true, payoutId: result.id, transferId: transfer.id };
+      await setPayoutStatus(payoutId, "paid", transfer.id);
+      return { success: true, payoutId, transferId: transfer.id };
     } catch (err: any) {
-      // Record failed payout attempt
-      await createPayout(profile.id, input.amount);
+      // Transfer failed — mark the row failed and roll the reservation back
+      // so the seller can retry instead of losing the balance.
+      await setPayoutStatus(payoutId, "failed");
+      await releasePayout(profile.id, input.amount);
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: `Payout failed: ${err.message}`,

@@ -7,11 +7,12 @@
  * subscriptions. Billing transaction rows stay for tax retention with no
  * remaining PII on the user record.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   users,
   generations,
+  generationRequests,
   galleryItems,
   characters,
   brandKits,
@@ -45,6 +46,18 @@ export async function deleteUserAccount(userId: number): Promise<void> {
       console.warn("[deleteAccount] Stripe cancel failed:", err?.message);
     });
   }
+
+  // Fence in-flight durable requests before removing their generation link.
+  // Keep the financial ledger and null pending results for reconciliation.
+  await db
+    .update(generationRequests)
+    .set({
+      state: sql`CASE WHEN ${generationRequests.state} IN ('reserved', 'rendering') THEN 'reconciliation' ELSE ${generationRequests.state} END`,
+      errorCode: sql`CASE WHEN ${generationRequests.state} IN ('reserved', 'rendering', 'reconciliation') THEN 'account-deleted' ELSE ${generationRequests.errorCode} END`,
+      result: sql`CASE WHEN ${generationRequests.result} IS NULL THEN NULL ELSE ${JSON.stringify({ deleted: true })}::text::jsonb END`,
+      updatedAt: new Date(),
+    })
+    .where(eq(generationRequests.userId, userId));
 
   await db
     .update(generations)

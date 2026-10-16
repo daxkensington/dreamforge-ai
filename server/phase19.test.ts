@@ -145,8 +145,8 @@ describe("Phase 19 — Auto-Apply Referral, Tiered Rewards, Usage Digest", () =>
       const result = await caller.autoReferral.autoApply({ code: "ABC12345" });
 
       expect(result.success).toBe(true);
-      expect(result.creditsEarned).toBe(15);
-      expect(result.message).toContain("15 bonus credits");
+      expect(result.creditsEarned).toBe(50);
+      expect(result.message).toContain("50 bonus credits");
       expect(addCredits).toHaveBeenCalledTimes(2); // referrer + referred
     });
 

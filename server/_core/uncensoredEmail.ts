@@ -69,9 +69,90 @@ export async function sendPassActivatedEmail(params: {
   plan: UncensoredPlan;
   until: Date;
 }): Promise<boolean> {
+  const { subject, text, html } = buildPassActivatedEmail(params);
+  return sendResendMail({ to: params.to, subject, text, html });
+}
+
+export function buildPassExpiringEmail(params: { until: Date }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const untilText = params.until.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const extendUrl = `${STUDIO_URL}?plan=uncensored-30d`;
+  const subject = "Your Uncensored Studio Pass expires soon";
+  const lines = [
+    `Your Uncensored Pro Studio Pass expires at ${untilText}.`,
+    ``,
+    `Extend your pass in 1 click (Card / Apple Pay via Credit Packs or Bitcoin) to keep uninterrupted access to your private characters, Face Lock, Outfit Swap, and Wan 2.2 Video:`,
+    `${extendUrl}`,
+    ``,
+    `Your private vault images are safely preserved even if your pass pauses.`,
+    ``,
+    `Questions: reply to this email.`,
+  ];
+  const text = lines.join("\n");
+  const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
+<p style="font-size:16px">Your <strong>Uncensored Pro Studio Pass</strong> expires at <strong>${escapeHtml(untilText)}</strong>.</p>
+<p><a href="${extendUrl}" style="display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Extend Pass in 1 Click</a></p>
+<p style="color:#444">Extend anytime with Card / Apple Pay (via Credit Packs) or Bitcoin to keep uninterrupted access to Character Face Lock, Outfit Swap, Brush Inpaint, and Uncensored Video.<br>Your private vault creations remain safely stored in your account.</p>
+<p style="color:#888;font-size:13px">Questions: reply to this email.<br><a href="${extendUrl}" style="color:#888">${extendUrl}</a></p>
+</body></html>`;
+  return { subject, text, html };
+}
+
+export async function sendPassExpiringEmail(params: {
+  to: string;
+  until: Date;
+}): Promise<boolean> {
+  const { subject, text, html } = buildPassExpiringEmail({ until: params.until });
+  return sendResendMail({ to: params.to, subject, text, html });
+}
+
+export function buildFreePreviewsRemainingEmail(params: { remaining: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const count = Math.max(1, Math.min(3, Math.floor(params.remaining)));
+  const noun = count === 1 ? "1 free uncensored preview" : `${count} free uncensored previews`;
+  const startUrl = `${STUDIO_URL}?start=1`;
+  const subject = `You still have ${noun} waiting in Uncensored Studio`;
+  const lines = [
+    `You unlocked 18+ access on DreamForgeX and still have ${noun} ready to use.`,
+    ``,
+    `Generate now (no card required): ${startUrl}`,
+    ``,
+    `Pick from 8 photorealistic character presets or type any prompt with zero content filters. Everything you render stays 100% private.`,
+    ``,
+    `Questions: reply to this email.`,
+  ];
+  const text = lines.join("\n");
+  const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
+<p style="font-size:16px">You still have <strong>${escapeHtml(noun)}</strong> ready to use in the DreamForgeX Uncensored Studio.</p>
+<p><a href="${startUrl}" style="display:inline-block;background:#e11d48;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">Use Your Free Previews</a></p>
+<p style="color:#444">Pick from 8 photorealistic character presets or type any prompt with zero content filters. Everything you create is 100% private.</p>
+<p style="color:#888;font-size:13px">Questions: reply to this email.<br><a href="${startUrl}" style="color:#888">${startUrl}</a></p>
+</body></html>`;
+  return { subject, text, html };
+}
+
+export async function sendFreePreviewsRemainingEmail(params: {
+  to: string;
+  remaining: number;
+}): Promise<boolean> {
+  const { subject, text, html } = buildFreePreviewsRemainingEmail({ remaining: params.remaining });
+  return sendResendMail({ to: params.to, subject, text, html });
+}
+
+async function sendResendMail(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<boolean> {
   const apiKey = process.env.AUTH_RESEND_KEY || process.env.RESEND_API_KEY;
   if (!apiKey) return false;
-  const { subject, text, html } = buildPassActivatedEmail(params);
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -80,17 +161,18 @@ export async function sendPassActivatedEmail(params: {
       // Resend sits behind Cloudflare, which 403s some default client UAs
       // (error 1010 seen with python-urllib). Name ourselves.
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "User-Agent": "dreamforgex-webhook/1.0" },
-      body: JSON.stringify({ from: fromAddress(), to: params.to, subject, text, html }),
+      body: JSON.stringify({ from: fromAddress(), to: params.to, subject: params.subject, text: params.text, html: params.html }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[BTCPay] pass email not accepted (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
+      console.warn(`[UncensoredEmail] email not accepted (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
       return false;
     }
     return true;
   } catch (err: any) {
-    console.warn(`[BTCPay] pass email failed: ${err?.message ?? err}`);
+    console.warn(`[UncensoredEmail] email failed: ${err?.message ?? err}`);
     return false;
   }
 }
+

@@ -122,13 +122,18 @@ export async function POST(req: NextRequest) {
       GREATEST(COALESCE("uncensoredUntil", now()), now()) + interval '${sql.raw(String(plan.durationDays))} days'
     WHERE id = ${invoice.userId}`);
 
-  // Bonus credits
+  // Bonus credits. Purchased credits must also land in bonusCredits so the
+  // monthly subscription reset (handleMonthlyReset) folds them into the new
+  // cycle instead of destroying them — same rule as Stripe pack purchases.
   await db
     .insert(creditBalances)
-    .values({ userId: invoice.userId, balance: plan.bonusCredits, lifetimeSpent: 0 })
+    .values({ userId: invoice.userId, balance: plan.bonusCredits, bonusCredits: plan.bonusCredits, lifetimeSpent: 0 })
     .onConflictDoUpdate({
       target: creditBalances.userId,
-      set: { balance: sql`${creditBalances.balance} + ${plan.bonusCredits}` },
+      set: {
+        balance: sql`${creditBalances.balance} + ${plan.bonusCredits}`,
+        bonusCredits: sql`${creditBalances.bonusCredits} + ${plan.bonusCredits}`,
+      },
     });
   await db.insert(creditTransactions).values({
     userId: invoice.userId,
