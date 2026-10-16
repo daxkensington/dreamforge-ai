@@ -64,16 +64,25 @@ export function MetaPixelConversions() {
   // Lead + CompleteRegistration on first sight of an authenticated user
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id) return;
-    if (typeof window === "undefined" || !pixelReady || !window.fbq) return;
-    const flagKey = `df_meta_signup_${session.user.id}`;
-    if (flagSeen(flagKey)) return;
-    window.fbq("track", "Lead");
-    window.fbq("track", "CompleteRegistration");
-    // First-party mirror of the pixel events — signup_completed is defined in
-    // analytics.ts but was never fired. The same localStorage flag keeps it
-    // to exactly once per user id.
-    track("signup_completed", { userId: session.user.id });
-    markSeen(flagKey);
+    const id = session.user.id;
+    const signupFlagKey = `df_signup_tracked_${id}`;
+    const pixelFlagKey = `df_meta_signup_${id}`;
+    // Separate flags let first-party signup tracking run without the pixel.
+    // The legacy pixel flag also suppresses signups already counted under it.
+    if (!flagSeen(signupFlagKey) && !flagSeen(pixelFlagKey)) {
+      track("signup_completed", { userId: id });
+      markSeen(signupFlagKey);
+    }
+    if (
+      typeof window !== "undefined" &&
+      pixelReady &&
+      window.fbq &&
+      !flagSeen(pixelFlagKey)
+    ) {
+      window.fbq("track", "Lead");
+      window.fbq("track", "CompleteRegistration");
+      markSeen(pixelFlagKey);
+    }
   }, [status, session?.user?.id, pixelReady]);
 
   // Purchase on Stripe success redirect
