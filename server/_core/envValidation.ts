@@ -54,8 +54,10 @@ export function validateEnv(): EnvValidationResult {
     }
   }
 
-  // Production-only required vars.
-  if (process.env.NODE_ENV === "production") {
+  // Production-only required vars (Vercel Preview sets NODE_ENV="production" with VERCEL_ENV="preview" and omits live Stripe secrets).
+  const isProdDeploy =
+    process.env.NODE_ENV === "production" && process.env.VERCEL_ENV !== "preview";
+  if (isProdDeploy) {
     const prodResult = productionRequiredSchema.safeParse(process.env);
     if (!prodResult.success) {
       for (const issue of prodResult.error.issues) {
@@ -103,7 +105,7 @@ export function runEnvValidation(): void {
     ...result.missing.map((m) => `  - ${m}`),
   ].join("\n");
 
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.VERCEL_ENV !== "preview") {
     // Hard-fail in prod. The deploy is broken and serving 500s would be worse.
     console.error(message);
     throw new Error(`Missing required env vars: ${result.missing.join(", ")}`);
