@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors } from "lucide-react";
+import { Flame, Loader2, Download, Lock, Sparkles, RotateCcw, Wand2, Film, Paintbrush, Maximize, UserPlus, RefreshCw, X, LayoutGrid, Scissors, Shirt, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -17,11 +17,17 @@ import {
   UNCENSORED_WARDROBE,
   UNCENSORED_SETTINGS,
   UNCENSORED_IMAGE_COST,
+  UNCENSORED_SCENE_RECIPES,
+  UNCENSORED_CHARACTER_ARCHETYPES,
   DEFAULT_UNCENSORED_ASPECT,
   DEFAULT_UNCENSORED_NEGATIVE,
   DEFAULT_CHARACTER_STRENGTH,
   getUncensoredAspectFromSize,
   formatUncensoredRecipe,
+  enhanceUncensoredPrompt,
+  pickRandomUncensoredSceneRecipe,
+  type UncensoredSceneRecipe,
+  type UncensoredCharacterArchetype,
 } from "@shared/uncensoredStudio";
 import { UNCENSORED_STYLES, DEFAULT_UNCENSORED_STYLE } from "@shared/uncensoredStyles";
 import RenderWaitHint, { newRequestId } from "./RenderWaitHint";
@@ -38,12 +44,16 @@ export default function UncensoredImageStudio({
   onRefine,
   onInpaint,
   onAnimate,
+  onSheet,
+  onOutfit,
 }: {
   focusCharacterId?: number | null;
   recreateId?: number | null;
   onRefine?: (id: number) => void;
   onInpaint?: (id: number) => void;
   onAnimate?: (id: number) => void;
+  onSheet?: (id: number) => void;
+  onOutfit?: (id: number) => void;
 } = {}) {
   const [prompt, setPrompt] = useState("");
   const [negative, setNegative] = useState("");
@@ -66,7 +76,36 @@ export default function UncensoredImageStudio({
   const [savedCharacterId, setSavedCharacterId] = useState<number | null>(null);
   const [savingFor, setSavingFor] = useState<number | null>(null);
   const [charName, setCharName] = useState("");
+  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
+  const [activeArchetypeId, setActiveArchetypeId] = useState<string | null>(null);
+  const [showWorkspaceImports, setShowWorkspaceImports] = useState(false);
   const [results, setResults] = useState<{ url: string; seed: number | null; generationId: number }[]>([]);
+
+  const applySceneRecipe = (r: UncensoredSceneRecipe) => {
+    setActiveRecipeId(r.id);
+    setPrompt(r.prompt);
+    setStyle(r.style);
+    setAspect(r.aspect);
+    setFraming(r.framing);
+    setPose(r.pose);
+    setCamera(r.camera);
+    setLighting(r.lighting);
+    setWardrobe(r.wardrobe);
+    setSetting(r.setting);
+  };
+
+  const applyCharacterArchetype = (a: UncensoredCharacterArchetype) => {
+    setActiveArchetypeId(a.id);
+    setActiveRecipeId(null);
+    setPrompt(a.prompt);
+    setStyle(a.style);
+    setAspect("portrait");
+    setFraming(a.framing);
+    setCamera(a.camera);
+    setLighting(a.lighting);
+    setWardrobe(a.wardrobe);
+    setSetting(a.setting);
+  };
   // Renders run as background GPU jobs: `generate` returns generation ids in
   // ~1s and we poll generateStatus until every one lands. Holding one request
   // open for the render died at Vercel's 300s ceiling on a cold worker — the
@@ -77,9 +116,34 @@ export default function UncensoredImageStudio({
 
   const images = trpc.uncensored.myUncensoredImages.useQuery();
   const savedChars = trpc.uncensored.listCharacters.useQuery();
+  const workspaceImages = trpc.uncensored.myWorkspaceImages.useQuery(undefined, {
+    enabled: showWorkspaceImports,
+  });
   const utils = trpc.useUtils();
+  const importWorkspaceImage = trpc.uncensored.importWorkspaceImage.useMutation({
+    onSuccess: (res) => {
+      utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.myLibrary.invalidate();
+      setCharacterId(res.generationId);
+      setSavedCharacterId(null);
+      setShowAdvanced(true);
+      setShowWorkspaceImports(false);
+      toast.success("Workspace character imported & locked for your next scene!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const appliedRecreate = useRef<number | null>(null);
+  const appliedQueryPrompt = useRef(false);
+
+  useEffect(() => {
+    if (appliedQueryPrompt.current || recreateId || typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search).get("prompt");
+    if (p && p.trim()) {
+      appliedQueryPrompt.current = true;
+      setPrompt(p.trim());
+    }
+  }, [recreateId]);
 
   useEffect(() => {
     if (focusCharacterId) {
@@ -125,11 +189,13 @@ export default function UncensoredImageStudio({
     onSuccess: (data) => {
       if (data.status === "processing") {
         setPendingIds(data.generationIds);
+        utils.uncensored.status.invalidate();
         return;
       }
       setGenStartedAt(null);
       setResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success(data.images.length === 1 ? "Image ready." : `${data.images.length} images ready.`);
       utils.uncensored.myLibrary.invalidate();
     },
@@ -143,9 +209,6 @@ export default function UncensoredImageStudio({
     {
       enabled: pendingIds.length > 0,
       refetchInterval: (q) => (q.state.data?.allSettled ? false : 3000),
-      // react-query pauses intervals in hidden tabs; a buyer who tabs away
-      // mid-render would otherwise never see the result.
-      refetchIntervalInBackground: true,
     },
   );
   useEffect(() => {
@@ -160,6 +223,7 @@ export default function UncensoredImageStudio({
     setGenStartedAt(null);
     utils.uncensored.myUncensoredImages.invalidate();
     utils.uncensored.myLibrary.invalidate();
+    utils.uncensored.status.invalidate();
     const failed = d.items.filter((i) => i.status === "failed").length;
     if (done.length === 0) toast.error("Generation failed — your credits were returned.");
     else if (failed > 0) toast.warning(`${done.length} ready · ${failed} failed (credits returned).`);
@@ -178,6 +242,7 @@ export default function UncensoredImageStudio({
     if (finished > 0) {
       utils.uncensored.myLibrary.invalidate();
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
     }
     if (stillRunning.length && pendingIds.length === 0) {
       setPendingIds(stillRunning);
@@ -193,6 +258,7 @@ export default function UncensoredImageStudio({
       setSheetResults(data.images);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Four-view sheet ready.");
     },
     onError: (e) => toast.error(e.message),
@@ -202,6 +268,7 @@ export default function UncensoredImageStudio({
       setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
       utils.uncensored.myUncensoredImages.invalidate();
       utils.uncensored.myLibrary.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Cutout ready.");
     },
     onError: (e) => toast.error(e.message),
@@ -210,6 +277,7 @@ export default function UncensoredImageStudio({
     onSuccess: (data) => {
       setResults((prev) => [{ url: data.url, seed: null, generationId: data.generationId }, ...prev]);
       utils.uncensored.myUncensoredImages.invalidate();
+      utils.uncensored.status.invalidate();
       toast.success("Upscaled.");
     },
     onError: (e) => toast.error(e.message),
@@ -309,7 +377,56 @@ export default function UncensoredImageStudio({
       </div>
 
       <div className="mt-4">
-        <p className="text-xs text-muted-foreground mb-2">Characters — save one of your gens, then lock her for new scenes</p>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Characters — save one of your gens, spawn an archetype, or import from your Workspace
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowWorkspaceImports((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-full border border-rose-500/35 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+          >
+            <UserPlus className="h-3 w-3 text-rose-400" />
+            {showWorkspaceImports ? "Hide Workspace characters" : "Import from your Workspace"}
+          </button>
+        </div>
+
+        {showWorkspaceImports && (
+          <div className="mb-3 rounded-xl border border-rose-500/30 bg-black/30 p-3">
+            <p className="text-xs text-muted-foreground">
+              Click any AI character you generated in your standard Workspace to import &amp; lock her face in the Uncensored Studio:
+            </p>
+            {workspaceImages.isLoading ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading your Workspace images…
+              </div>
+            ) : workspaceImages.data && workspaceImages.data.length > 0 ? (
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {workspaceImages.data.map((wImg) => (
+                  <button
+                    key={wImg.id}
+                    type="button"
+                    disabled={importWorkspaceImage.isPending}
+                    onClick={() => importWorkspaceImage.mutate({ sourceGenerationId: wImg.id })}
+                    className="group relative overflow-hidden rounded-lg border border-border/60 transition-all hover:border-rose-500"
+                    title={wImg.prompt}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={wImg.imageUrl ?? ""} alt="" className="h-16 w-16 object-cover" />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-[9px] font-semibold text-rose-200 opacity-0 transition-opacity group-hover:opacity-100">
+                      Lock Face
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                No standard Workspace images found yet — use a Signature Character Archetype below to spawn one in 1 click.
+              </p>
+            )}
+          </div>
+        )}
+
         {savedChars.data && savedChars.data.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {savedChars.data.map((c) => (
@@ -386,23 +503,136 @@ export default function UncensoredImageStudio({
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Generate, then tap Save on a result to keep a named character.</p>
+          <p className="text-xs text-muted-foreground">Generate or pick an archetype below, then tap Save on a result to keep a named character.</p>
         )}
         {savedCharacterId && (
           <p className="mt-2 flex items-center gap-1 text-[11px] text-rose-300">
             <Lock className="h-3 w-3" /> {savedChars.data?.find((c) => c.id === savedCharacterId)?.name ?? "Character"} locked — new scene, same identity.
           </p>
         )}
+
+        <div className="mt-3">
+          <p className="mb-1.5 text-[11px] text-muted-foreground">
+            1-Click Signature Character Archetypes (loads identity, lens, lighting &amp; style):
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {UNCENSORED_CHARACTER_ARCHETYPES.map((arch) => (
+              <button
+                key={arch.id}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  applyCharacterArchetype(arch);
+                  toast.success(`Loaded ${arch.name} (${arch.tagline}) — click Generate, then Save Character to lock her face!`);
+                }}
+                className={`group flex items-center gap-2.5 rounded-xl border p-1.5 text-left transition-all ${
+                  activeArchetypeId === arch.id
+                    ? "border-rose-500 bg-rose-500/15 ring-1 ring-rose-500/40"
+                    : "border-border/60 bg-background/40 hover:border-rose-500/40 hover:bg-rose-500/5"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={arch.imageUrl}
+                  alt={arch.name}
+                  className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-rose-500/30 transition-transform group-hover:scale-105"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-foreground/95">
+                    <span className="truncate">{arch.name}</span>
+                  </div>
+                  <div className="truncate text-[10px] text-muted-foreground">{arch.tagline}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
+      <div className="mt-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {characterLocked
+              ? "Face-Locked Scene Swapper — click any scene to transport your locked character:"
+              : "1-Click Scene Recipes (sets prompt, style, lighting, pose & wardrobe)"}
+          </p>
+          {characterLocked && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
+              <Lock className="h-2.5 w-2.5" /> Identity Locked
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {UNCENSORED_SCENE_RECIPES.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                applySceneRecipe(r);
+                toast.success(
+                  characterLocked
+                    ? `${r.label} scene loaded with locked character identity!`
+                    : `${r.label} scene loaded.`,
+                );
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 text-xs transition-colors ${
+                activeRecipeId === r.id
+                  ? "border-rose-500 bg-rose-500/15 text-rose-200"
+                  : "border-border/60 text-muted-foreground hover:border-rose-500/40 hover:text-foreground"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={r.imageUrl}
+                alt={r.label}
+                className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-rose-500/30"
+              />
+              <span>{r.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">Prompt</p>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const r = pickRandomUncensoredSceneRecipe(activeRecipeId);
+              applySceneRecipe(r);
+              toast.success(`Surprise scene: ${r.label}`);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:text-rose-200 disabled:opacity-40"
+          >
+            <Shuffle className="h-3 w-3 text-rose-400" /> Surprise me
+          </button>
+          <button
+            type="button"
+            disabled={busy || prompt.trim().length < 3}
+            onClick={() => {
+              setPrompt(enhanceUncensoredPrompt(prompt, style));
+              toast.success("Prompt enhanced with studio lighting & lens direction.");
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-medium text-rose-200 transition-colors hover:bg-rose-500/20 disabled:opacity-40"
+          >
+            <Wand2 className="h-3 w-3 text-rose-400" /> Enhance prompt
+          </button>
+        </div>
+      </div>
       <Textarea
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          setActiveRecipeId(null);
+        }}
         placeholder="Describe the scene, character, lighting, mood…"
         rows={4}
         maxLength={1000}
         disabled={busy}
-        className="mt-4 resize-none"
+        className="mt-2 resize-none"
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
@@ -777,6 +1007,16 @@ export default function UncensoredImageStudio({
                   {onAnimate && (
                     <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onAnimate(r.generationId)}>
                       <Film className="mr-1 h-3 w-3" /> Animate
+                    </Button>
+                  )}
+                  {onOutfit && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onOutfit(r.generationId)}>
+                      <Shirt className="mr-1 h-3 w-3" /> Outfit
+                    </Button>
+                  )}
+                  {onSheet && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSheet(r.generationId)}>
+                      <LayoutGrid className="mr-1 h-3 w-3" /> Sheet
                     </Button>
                   )}
                   <Button

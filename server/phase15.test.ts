@@ -15,6 +15,8 @@ vi.mock("./stripe", () => ({
     { id: 2, userId: 1, type: "usage", amount: -1, description: "Used image-generation", createdAt: new Date() },
   ]),
   createCheckoutSession: vi.fn().mockResolvedValue({ url: "https://checkout.stripe.com/session_test" }),
+  sanitizeRedirectOrigin: vi.fn((origin?: string, fallback?: string | null) => origin || fallback || "http://localhost:3000"),
+  requestOriginFromCtx: vi.fn(() => null),
   CREDIT_PACKAGES: [
     { id: "starter", name: "Starter", credits: 100, price: 499, priceDisplay: "$4.99", perCredit: "$0.05", description: "100 credits", popular: false },
     { id: "creator", name: "Creator", credits: 500, price: 1999, priceDisplay: "$19.99", perCredit: "$0.04", description: "500 credits", popular: true },

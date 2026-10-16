@@ -19,10 +19,22 @@ on:
         description: "Base URL to test (default: https://dreamforgex.ai)"
         required: false
         default: "https://dreamforgex.ai"
+      expected_sha:
+        description: "Exact deployed source SHA (defaults to the selected workflow revision)"
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dreamforge-smoke-${{ github.event.deployment.sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Skip deployment_status events that aren't successful preview deploys
     # or successful prod deploys. The expression on the schedule + dispatch
     # branches always passes; only filters deployment_status events.
@@ -30,9 +42,21 @@ jobs:
       github.event_name != 'deployment_status' ||
       github.event.deployment_status.state == 'success'
     steps:
+      - name: Verify trusted repository source before credential use
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.deployment?.sha || context.sha;
+            if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid exact source SHA');
+            const repo = `${context.repo.owner}/${context.repo.repo}`;
+            const branches = await github.rest.repos.listBranchesForHeadCommit({ ...context.repo, commit_sha: sha });
+            if (!branches.data.length) throw new Error('Source is not the head of an owned repository branch');
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ ...context.repo, commit_sha: sha });
+            if (prs.data.some(pr => pr.head?.repo?.full_name !== repo)) throw new Error('Fork source cannot use deployment credentials');
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.deployment.sha || github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -50,18 +74,19 @@ jobs:
 
       - name: Determine base URL
         id: base
-        run: |
-          if [ "${{ github.event_name }}" = "deployment_status" ]; then
-            echo "url=${{ github.event.deployment_status.target_url }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "url=${{ github.event.inputs.base_url }}" >> $GITHUB_OUTPUT
-          else
-            echo "url=https://dreamforgex.ai" >> $GITHUB_OUTPUT
-          fi
+        run: node scripts/smoke-workflow-target.mjs
+
+      - name: Verify deployed source and app health
+        env:
+          BASE_URL: ${{ steps.base.outputs.url }}
+          EXPECTED_DEPLOYMENT_SHA: ${{ steps.base.outputs.revision }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/check-smoke-target.mjs
 
       - name: Run Playwright smoke tests
         env:
           BASE_URL: ${{ steps.base.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           CI: "true"
         run: |
           echo "🧪 Smoke testing $BASE_URL"
@@ -72,33 +97,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ github.run_id }}
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 14
 
-      - name: Comment on PR if smoke failed
-        if: failure() && github.event_name == 'deployment_status' && github.event.deployment.environment != 'production'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const sha = context.payload.deployment.sha;
-            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: sha,
-            });
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            for (const pr of prs.data) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                body: [
-                  `❌ **Smoke tests failed on preview deploy**`,
-                  ``,
-                  `Preview: ${context.payload.deployment_status.target_url}`,
-                  `Run: ${runUrl}`,
-                  ``,
-                  `Download the Playwright report from the run artifacts to see screenshots and traces.`,
-                ].join("\n"),
-              });
-            }
+      - name: Record smoke failure
+        if: failure()
+        run: |
+          echo '### DreamForge smoke failed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Read the failed assertions and downloadable report/screenshots in this run. Protected-preview network traces are omitted to protect authorization cookies.' >> "$GITHUB_STEP_SUMMARY"

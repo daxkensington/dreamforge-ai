@@ -20,10 +20,13 @@ import { ENV } from "./env";
 import { replicatePredict, downloadBuffer } from "./replicate";
 import { checkPrompt, logModerationBlock, PromptBlockedError } from "./promptModeration";
 import { isRunPodAvailable, runpodFluxDev, runpodFluxSchnell, runpodFluxImg2Img } from "./runpod";
+import { assertSafeImageUrl, fetchGuardedImage } from "./imageUrlGuard";
+import type { ImageExecutionKey, ImageGenerationProvenance } from "../../shared/imageModels";
+import { DIRECT_IMAGE_MODELS, DirectImageInputError, generateDirectImage } from "./directImageProviders";
 
 export type GenerateImageOptions = {
   prompt: string;
-  model?: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "fal-flux-dev" | "fal-flux-schnell" | "fal-flux-pro-ultra" | "fal-seedream" | "fal-flux-kontext" | "auto";
+  model?: ImageExecutionKey | "fal-flux-kontext" | "auto";
   size?: string; // "1024x1024", "1024x1792", "1792x1024"
   quality?: "standard" | "hd" | "ultra";
   style?: "natural" | "vivid";
@@ -60,7 +63,33 @@ export type GenerateImageOptions = {
 
 export type GenerateImageResponse = {
   url?: string;
+  provenance?: ImageGenerationProvenance;
 };
+
+// Track successful upstream routes without changing buffers or their consumers.
+type SuccessfulRoute = Omit<ImageGenerationProvenance, "requestedModel">;
+const imageRoutes = new WeakMap<Buffer, SuccessfulRoute>();
+function recordImageRoute(buffer: Buffer, provider: string, model: string, fallbackUsed = false): Buffer {
+  imageRoutes.set(buffer, { provider, model, fallbackUsed });
+  return buffer;
+}
+function markImageFallback(buffer: Buffer, fallbackUsed: boolean): Buffer {
+  const route = imageRoutes.get(buffer);
+  if (route && fallbackUsed) imageRoutes.set(buffer, { ...route, fallbackUsed: true });
+  return buffer;
+}
+
+/** Configuration for the existing Auto chain; no authentication or render-health probe. */
+export function isAutomaticImageConfigured(): boolean {
+  return (process.env.IMAGEN_ENABLED === "true" && !!ENV.geminiApiKey)
+    || (!!ENV.cfAiToken && !!ENV.cfAccountId)
+    || !!ENV.falApiKey
+    || isRunPodAvailable()
+    || !!ENV.grokApiKey
+    || !!ENV.replicateApiToken
+    || !!ENV.openaiApiKey
+    || !!ENV.stabilityApiKey;
+}
 
 // ─── Provider Implementations ──────────────────────────────────────────────
 
@@ -106,7 +135,7 @@ async function generateWithGrok(prompt: string): Promise<Buffer> {
       // Handle base64 response
       const b64 = result.data?.[0]?.b64_json;
       if (b64) {
-        return Buffer.from(b64, "base64");
+        return recordImageRoute(Buffer.from(b64, "base64"), "grok", model);
       }
 
       // Handle URL response as fallback
@@ -114,7 +143,7 @@ async function generateWithGrok(prompt: string): Promise<Buffer> {
       if (imageUrl) {
         const imageResp = await fetch(imageUrl);
         if (!imageResp.ok) throw new Error(`Failed to download Grok image: ${imageResp.status}`);
-        return Buffer.from(await imageResp.arrayBuffer());
+        return recordImageRoute(Buffer.from(await imageResp.arrayBuffer()), "grok", model);
       }
 
       lastError = new Error(`Grok ${model} returned no image data`);
@@ -171,7 +200,7 @@ async function generateWithGptImage(
   const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error("GPT Image returned no image data");
 
-  return Buffer.from(b64, "base64");
+  return recordImageRoute(Buffer.from(b64, "base64"), "openai", "gpt-image-1");
 }
 
 /**
@@ -210,7 +239,7 @@ async function generateWithGemini(prompt: string): Promise<Buffer> {
     for (const part of parts) {
       if (part.inlineData?.data || part.inline_data?.data) {
         const data = part.inlineData?.data ?? part.inline_data?.data;
-        return Buffer.from(data, "base64");
+        return recordImageRoute(Buffer.from(data, "base64"), "gemini", "gemini-2.5-flash-image");
       }
     }
   }
@@ -243,7 +272,7 @@ async function generateWithFlux(
     pollInterval: 2000,
   });
 
-  return downloadBuffer(outputUrl);
+  return recordImageRoute(await downloadBuffer(outputUrl), "replicate", modelMap[model]);
 }
 
 /**
@@ -286,7 +315,7 @@ async function generateWithSD3(
   const result = (await response.json()) as any;
   const b64 = result.image || result.artifacts?.[0]?.base64;
   if (!b64) throw new Error("SD3 returned no image data");
-  return Buffer.from(b64, "base64");
+  return recordImageRoute(Buffer.from(b64, "base64"), "stability", "sd3");
 }
 
 /**
@@ -309,12 +338,14 @@ async function generateUltra(
   ].join(", ");
 
   const enhancedPrompt = `${prompt}. ${qualityTokens}`;
+  let fallbackUsed = false;
 
   // Step 2: Try RunPod Flux Dev first (self-hosted, cheapest high-quality)
   if (isRunPodAvailable()) {
     try {
-      return await runpodFluxDev(enhancedPrompt, width || 1440, height || 1440, 30, 7.5);
+      return recordImageRoute(await runpodFluxDev(enhancedPrompt, width || 1440, height || 1440, 30, 7.5), "runpod", "flux-dev", fallbackUsed);
     } catch (err: any) {
+      fallbackUsed = true;
       console.warn("[Ultra] RunPod Flux Dev failed, trying Flux Pro:", err.message);
     }
   }
@@ -322,8 +353,9 @@ async function generateUltra(
   // Step 2b: Try fal.ai Flux Pro Ultra
   if (ENV.falApiKey) {
     try {
-      return await generateWithFal(enhancedPrompt, "fal-ai/flux-pro/v1.1-ultra", width || 1440, height || 1440);
+      return markImageFallback(await generateWithFal(enhancedPrompt, "fal-ai/flux-pro/v1.1-ultra", width || 1440, height || 1440), fallbackUsed);
     } catch (err: any) {
+      fallbackUsed = true;
       console.warn("[Ultra] fal.ai Flux Pro Ultra failed, trying Replicate:", err.message);
     }
   }
@@ -343,19 +375,20 @@ async function generateUltra(
         maxAttempts: 90,
         pollInterval: 2000,
       });
-      return downloadBuffer(outputUrl);
+      return recordImageRoute(await downloadBuffer(outputUrl), "replicate", "black-forest-labs/flux-1.1-pro", fallbackUsed);
     } catch (err: any) {
+      fallbackUsed = true;
       console.warn("[Ultra] Replicate Flux Pro failed, trying DALL-E HD:", err.message);
     }
   }
 
   // Step 4: Fallback to GPT Image high quality
   if (ENV.openaiApiKey) {
-    return generateWithGptImage(enhancedPrompt, "1024x1024", "hd");
+    return markImageFallback(await generateWithGptImage(enhancedPrompt, "1024x1024", "hd"), fallbackUsed);
   }
 
   // Step 5: Last resort — best available model
-  return generateWithFallback(enhancedPrompt, `${width || 1024}x${height || 1024}`, "hd", "vivid");
+  return markImageFallback(await generateWithFallback(enhancedPrompt, `${width || 1024}x${height || 1024}`, "hd", "vivid"), fallbackUsed);
 }
 
 /**
@@ -395,7 +428,7 @@ async function generateWithTogether(
   const result = (await response.json()) as any;
   const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error("Together AI returned no image data");
-  return Buffer.from(b64, "base64");
+  return recordImageRoute(Buffer.from(b64, "base64"), "together", "black-forest-labs/FLUX.1-schnell-Free");
 }
 
 /**
@@ -438,17 +471,17 @@ async function generateWithCloudflare(prompt: string): Promise<Buffer> {
     if (!b64 || typeof b64 !== "string") {
       throw new Error(`Cloudflare AI response missing result.image: ${JSON.stringify(json).slice(0, 200)}`);
     }
-    return Buffer.from(b64, "base64");
+    return recordImageRoute(Buffer.from(b64, "base64"), "cloudflare", "@cf/black-forest-labs/flux-1-schnell");
   }
   // Some models return binary directly — keep that path for safety.
-  return Buffer.from(await response.arrayBuffer());
+  return recordImageRoute(Buffer.from(await response.arrayBuffer()), "cloudflare", "@cf/black-forest-labs/flux-1-schnell");
 }
 
 /**
  * Generate image via fal.ai queue API.
  * Supports Flux Dev, Flux Schnell, Flux Pro Ultra, Seedream, and Flux Kontext.
  */
-async function generateWithFal(
+export async function generateWithFal(
   prompt: string,
   falModel: string = "fal-ai/flux/dev",
   width?: number,
@@ -516,7 +549,7 @@ async function generateWithFal(
 
       const imgResp = await fetch(imageUrl);
       if (!imgResp.ok) throw new Error("Failed to download fal.ai image");
-      return Buffer.from(await imgResp.arrayBuffer());
+      return recordImageRoute(Buffer.from(await imgResp.arrayBuffer()), "fal", falModel);
     }
 
     if (status.status === "FAILED") {
@@ -612,7 +645,28 @@ export async function generateImage(
     style = "vivid",
   } = options;
 
+  // These explicit creation models must never enter the legacy RunPod/vision
+  // replacement path. Native editing is a separate capability to integrate.
+  if (Object.hasOwn(DIRECT_IMAGE_MODELS, model) && (options.unfiltered || (options.originalImages?.length ?? 0) > 0)) {
+    throw new DirectImageInputError("The selected image model supports standard text-to-image creation only.");
+  }
+
   let imageBuffer: Buffer | undefined;
+  let imageToImageFailed = false;
+
+  // P1.8 (SSRF): every user-supplied source image URL must pass the shared
+  // guard BEFORE anything touches it. Two consumers fetch these URLs
+  // server-side: the RunPod img2img download below, and the vision-LLM
+  // handoff in describeOriginalImages. assertSafeImageUrl throws
+  // TRPCError(BAD_REQUEST) with a generic, URL-free message (see
+  // imageUrlGuard.ts), so the failure mode is clean and leaks nothing about
+  // the URL or provider internals. ~20 tools feed originalImages into this
+  // function; only a few guarded their own router input before this.
+  if (options.originalImages) {
+    for (const img of options.originalImages) {
+      if (img.url) assertSafeImageUrl(img.url);
+    }
+  }
 
   // If original images are provided, try real img2img on RunPod first
   // (dramatically better quality than the LLM describe-then-generate approach)
@@ -620,17 +674,15 @@ export async function generateImage(
     try {
       const sourceImg = options.originalImages[0];
       if (sourceImg.url) {
-        const imgResp = await fetch(sourceImg.url);
-        if (imgResp.ok) {
-          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-          const imageB64 = imgBuffer.toString("base64");
-          imageBuffer = await runpodFluxImg2Img(imageB64, prompt, 0.7);
-          console.log("[ImageGen] Used RunPod Flux img2img (real diffusion)");
-        } else {
-          throw new Error("Failed to fetch source image");
-        }
+        // fetchGuardedImage re-validates (redundant after the loop above,
+        // cheap) and caps the download at 25MB while streaming — a hostile
+        // or oversized URL can no longer exhaust the lambda's memory.
+        const { buffer: imgBuffer } = await fetchGuardedImage(sourceImg.url);
+        const imageB64 = imgBuffer.toString("base64");
+        imageBuffer = recordImageRoute(await runpodFluxImg2Img(imageB64, prompt, 0.7), "runpod", "flux-dev");
+        console.log("[ImageGen] Used RunPod Flux img2img (real diffusion)");
       } else if (sourceImg.b64Json) {
-        imageBuffer = await runpodFluxImg2Img(sourceImg.b64Json, prompt, 0.7);
+        imageBuffer = recordImageRoute(await runpodFluxImg2Img(sourceImg.b64Json, prompt, 0.7), "runpod", "flux-dev");
         console.log("[ImageGen] Used RunPod Flux img2img (real diffusion, b64)");
       } else {
         throw new Error("No source image URL or b64");
@@ -639,6 +691,7 @@ export async function generateImage(
       console.warn("[ImageGen] RunPod img2img failed, falling back to LLM approach:", err.message);
       // Fall through to LLM describe-then-generate below
       imageBuffer = undefined;
+      imageToImageFailed = true;
     }
   }
 
@@ -659,9 +712,14 @@ export async function generateImage(
     } else if (model !== "auto") {
       imageBuffer = await generateWithExplicitModel(model, prompt, size, quality, style);
     } else {
-      imageBuffer = await generateWithFallback(prompt, size, quality, style);
+      imageBuffer = await generateWithFallback(prompt, size, quality, style, options.userTier);
     }
   }
+
+  const successfulRoute = imageRoutes.get(imageBuffer);
+  const provenance = successfulRoute
+    ? { ...successfulRoute, requestedModel: model, fallbackUsed: successfulRoute.fallbackUsed || imageToImageFailed }
+    : undefined;
 
   // Watermark: SFW free-tier, and uncensored *previews* (userTier === "free"
   // on the unfiltered path). An Uncensored Pass holder on a Stripe free plan
@@ -680,7 +738,7 @@ export async function generateImage(
   const key = generateStorageKey("generations", "png");
   const { url } = await storagePut(key, imageBuffer, "image/png");
 
-  return { url };
+  return { url, ...(provenance ? { provenance } : {}) };
 }
 
 /**
@@ -723,7 +781,7 @@ async function generateUnfiltered(
 
   if (isRunPodAvailable() && wantQuality) {
     try {
-      return await runpodFluxDev(prompt, width, height, 20, 7.5, loraId, seed);
+      return recordImageRoute(await runpodFluxDev(prompt, width, height, 20, 7.5, loraId, seed), "runpod", "flux-dev", errors.length > 0);
     } catch (err: any) {
       errors.push(`RunPod Flux Dev: ${err.message}`);
       console.warn("[ImageGen] Unfiltered Flux Dev failed, trying Schnell:", err.message);
@@ -732,7 +790,7 @@ async function generateUnfiltered(
 
   if (isRunPodAvailable()) {
     try {
-      return await runpodFluxSchnell(prompt, width, height, loraId, seed);
+      return recordImageRoute(await runpodFluxSchnell(prompt, width, height, loraId, seed), "runpod", "flux-schnell", errors.length > 0);
     } catch (err: any) {
       errors.push(`RunPod: ${err.message}`);
       console.warn("[ImageGen] Unfiltered RunPod failed, trying fal:", err.message);
@@ -741,9 +799,9 @@ async function generateUnfiltered(
 
   if (ENV.falApiKey) {
     try {
-      return await generateWithFal(prompt, "fal-ai/flux/schnell", w, h, {
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux/schnell", w, h, {
         enable_safety_checker: false,
-      });
+      }), errors.length > 0);
     } catch (err: any) {
       errors.push(`fal: ${err.message}`);
     }
@@ -793,7 +851,7 @@ export async function refineUnfiltered(
     throw new PromptBlockedError(verdict);
   }
 
-  if (!isRunPodAvailable()) {
+  if (!isRunPodAvailable() && !ENV.falApiKey) {
     throw new Error("The refine GPU is unavailable right now — please try again shortly.");
   }
 
@@ -804,23 +862,59 @@ export async function refineUnfiltered(
   // Schnell LoRA, and the worker can't hold Dev next to Schnell on 48GB.
   // Img2img only runs the last strength×steps steps, so 10 total keeps ~4-6
   // real denoising steps at the strengths the studio uses (0.4–0.6).
-  return runpodFluxImg2Img(
-    imageB64,
-    prompt,
-    strength,
-    UNCENSORED_IMG2IMG_STEPS,
-    0,
-    opts?.loraId,
-    opts?.seed,
-    "schnell",
-  );
+  if (isRunPodAvailable()) {
+    try {
+      return await runpodFluxImg2Img(
+        imageB64,
+        prompt,
+        strength,
+        UNCENSORED_IMG2IMG_STEPS,
+        0,
+        opts?.loraId,
+        opts?.seed,
+        "schnell",
+        { maxAttempts: 8 },
+      );
+    } catch (err: any) {
+      if (!ENV.falApiKey) throw err;
+      console.warn(
+        "[ImageGen] refineUnfiltered RunPod cold-started or failed, rescuing via fal.ai:",
+        err?.message ?? err,
+      );
+    }
+  }
+
+  try {
+    return await generateWithFal(prompt, "fal-ai/flux/dev/image-to-image", 832, 1216, {
+      image_url: `data:image/png;base64,${imageB64}`,
+      strength,
+      enable_safety_checker: false,
+      ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+    });
+  } catch {
+    return generateWithFal(prompt, "fal-ai/flux/schnell", 832, 1216, {
+      enable_safety_checker: false,
+      ...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+    });
+  }
 }
 
 /**
  * Generate with an explicitly selected model (no fallback).
  */
+export function hasTypographyIntent(prompt: string): boolean {
+  if (/"[^"\n]{2,64}"/.test(prompt)) return true;
+  return /\b(with the text|that says|saying\s+['"]|sign that reads|banner reading|lettering|typography|logo text|poster titled|neon sign\s+['"])\b/i.test(prompt);
+}
+
+export function enhanceTypographyPrompt(prompt: string): string {
+  if (!hasTypographyIntent(prompt)) return prompt;
+  if (/spelled accurately|crisp, legible typography/i.test(prompt)) return prompt;
+  return `${prompt}. Render any quoted text or signage with exact spelling, crisp legible typography, and balanced kerning.`;
+}
+
 async function generateWithExplicitModel(
-  model: "grok" | "dall-e-3" | "gemini" | "flux-pro" | "flux-schnell" | "sd3" | "together" | "cloudflare" | "ultra" | "runpod-flux-dev" | "runpod-flux-schnell" | "fal-flux-dev" | "fal-flux-schnell" | "fal-flux-pro-ultra" | "fal-seedream" | "fal-flux-kontext",
+  model: ImageExecutionKey | "fal-flux-kontext",
   prompt: string,
   size: string,
   quality: "standard" | "hd" | "ultra",
@@ -829,19 +923,66 @@ async function generateWithExplicitModel(
   const [w, h] = size.split("x").map(Number);
 
   switch (model) {
+    case "gpt-image-2.5-flare":
+    case "gpt-image-2.5-sunburst":
+    case "grok-imagine-image-2.0": {
+      const openai = model !== "grok-imagine-image-2.0";
+      if (openai && !ENV.openaiImage25Enabled) throw new DirectImageInputError("This image model is currently unavailable.");
+      const apiKey = openai ? ENV.openaiApiKey : ENV.grokApiKey;
+      if (!apiKey) throw new DirectImageInputError("The selected image provider is not configured.");
+      const result = await generateDirectImage({ modelId: model, prompt, width: w, height: h, apiKey });
+      imageRoutes.set(result.buffer, {
+        provider: result.provenance.provider === "xai" ? "grok" : "openai",
+        model: result.provenance.providerModel,
+        fallbackUsed: false,
+        direct: result.provenance,
+        ...(result.usage ? { usage: result.usage } : {}),
+      });
+      return result.buffer;
+    }
     case "runpod-flux-dev":
-      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
-      return runpodFluxDev(prompt, w || 1024, h || 1024);
+      if (isRunPodAvailable()) {
+        try {
+          return recordImageRoute(await runpodFluxDev(prompt, w || 1024, h || 1024), "runpod", "flux-dev");
+        } catch (err: any) {
+          if (!ENV.falApiKey) throw err;
+          console.warn("[ImageGen] RunPod flux-dev failed, falling back to fal.ai flux/dev:", err.message);
+        }
+      } else if (!ENV.falApiKey) {
+        throw new Error("RunPod not configured");
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux/dev", w, h), isRunPodAvailable());
     case "runpod-flux-schnell":
-      if (!isRunPodAvailable()) throw new Error("RunPod not configured");
-      return runpodFluxSchnell(prompt, w || 1024, h || 1024);
+      if (isRunPodAvailable()) {
+        try {
+          return recordImageRoute(await runpodFluxSchnell(prompt, w || 1024, h || 1024), "runpod", "flux-schnell");
+        } catch (err: any) {
+          if (!ENV.falApiKey) throw err;
+          console.warn("[ImageGen] RunPod flux-schnell failed, falling back to fal.ai flux/schnell:", err.message);
+        }
+      } else if (!ENV.falApiKey) {
+        throw new Error("RunPod not configured");
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux/schnell", w, h), isRunPodAvailable());
     case "grok":
       if (!ENV.grokApiKey) throw new Error("Grok API key not configured");
       return generateWithGrok(prompt);
     case "dall-e-3":
       // Option key kept for UI/registry compat; routes to GPT Image now.
-      if (!ENV.openaiApiKey) throw new Error("OpenAI API key not configured");
-      return generateWithGptImage(prompt, size, quality);
+      // When OpenAI rejects with billing/quota exhaustion (429 credit_balance_exhausted)
+      // and fal.ai is configured, fall back to Flux Pro 1.1 Ultra (~$0.06, same 310-325 cr band).
+      if (!ENV.openaiApiKey && !ENV.falApiKey) throw new Error("OpenAI API key not configured");
+      if (ENV.openaiApiKey) {
+        try {
+          return await generateWithGptImage(prompt, size, quality);
+        } catch (err: any) {
+          const msg = String(err?.message ?? "");
+          const isQuotaExhausted = /credit_balance_exhausted|insufficient_quota|billing_hard_limit/i.test(msg);
+          if (!isQuotaExhausted || !ENV.falApiKey) throw err;
+          console.warn("[ImageGen] OpenAI GPT Image quota exhausted, falling back to fal.ai flux-pro/v1.1-ultra:", msg);
+        }
+      }
+      return markImageFallback(await generateWithFal(prompt, "fal-ai/flux-pro/v1.1-ultra", w, h), !!ENV.openaiApiKey);
     case "gemini":
       if (process.env.IMAGEN_ENABLED !== "true" || !ENV.geminiApiKey) {
         throw new Error("Gemini Imagen is currently unavailable on this account");
@@ -859,7 +1000,7 @@ async function generateWithExplicitModel(
         }
       }
       if (!ENV.replicateApiToken) throw new Error("No Flux provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN)");
-      return generateWithFlux(prompt, "flux-pro", w, h);
+      return markImageFallback(await generateWithFlux(prompt, "flux-pro", w, h), !!ENV.falApiKey);
     case "flux-schnell":
       if (ENV.falApiKey) {
         try {
@@ -870,7 +1011,7 @@ async function generateWithExplicitModel(
         }
       }
       if (!ENV.replicateApiToken) throw new Error("No Flux provider configured (need FAL_API_KEY or REPLICATE_API_TOKEN)");
-      return generateWithFlux(prompt, "flux-schnell", w, h);
+      return markImageFallback(await generateWithFlux(prompt, "flux-schnell", w, h), !!ENV.falApiKey);
     case "sd3":
       if (!ENV.stabilityApiKey) throw new Error("Stability API key not configured");
       return generateWithSD3(prompt, w, h);
@@ -911,22 +1052,26 @@ async function generateWithExplicitModel(
 /**
  * Try providers in cost-optimized order: free first, then cheap, then premium.
  *
- * Priority: Gemini (free) -> Together AI (free) -> Cloudflare (free) ->
- *           RunPod Flux Schnell (self-hosted) -> Grok -> Flux Schnell (Replicate) ->
- *           DALL-E 3 -> SD3 -> Flux Pro
+ * Priority: Cloudflare (free) -> fal.ai Flux Schnell (cheap + typography-capable) ->
+ *           RunPod Flux Schnell (self-hosted) -> Flux Schnell (Replicate) ->
+ *           Paid-tier backup (Grok / opt-in Gemini)
  */
 async function generateWithFallback(
   prompt: string,
   size: string,
-  quality: "standard" | "hd" | "ultra",
-  style: "natural" | "vivid",
+  _quality: "standard" | "hd" | "ultra",
+  _style: "natural" | "vivid",
+  userTier?: string,
 ): Promise<Buffer> {
   const errors: string[] = [];
   const [w, h] = size.split("x").map(Number);
+  const isPaidTier = Boolean(userTier && userTier !== "free");
+  const typographyMode = hasTypographyIntent(prompt);
+  const effectivePrompt = typographyMode ? enhanceTypographyPrompt(prompt) : prompt;
 
   const tryProvider = async (name: string, fn: () => Promise<Buffer>): Promise<Buffer | null> => {
     try {
-      return await fn();
+      return markImageFallback(await fn(), errors.length > 0);
     } catch (err: any) {
       const msg = err.message || "Unknown error";
       console.warn(`[ImageGen] ${name} failed, trying next:`, msg);
@@ -935,67 +1080,52 @@ async function generateWithFallback(
     }
   };
 
-  // Gemini Imagen — gated. The Gemini image API has NO free quota and bills
-  // ~$0.039/image; the previous "free tier" comment was wrong and helped run
-  // up the April 2026 GCP bill. Enable per-deployment with IMAGEN_ENABLED=true.
-  if (process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
-    const result = await tryProvider("Gemini", () => generateWithGemini(prompt));
-    if (result) return result;
-  }
-
-  // Together AI Flux Schnell — disabled until TOGETHER_API_KEY is rotated
-  // (confirmed 401 invalid_api_key in prod, scripts/prod-tool-sweep.ts
-  // 2026-04-20). Add the conditional back once a working key is in env.
-
-  // FREE TIER: Cloudflare Workers AI (100K free/day)
-  if (ENV.cfAiToken) {
-    const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(prompt));
-    if (result) return result;
-  }
-
-  // 4. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
-  // Ahead of RunPod: RunPod is cheaper per image but a Flex cold start takes
-  // 2+ minutes, which is a terrible default for an interactive generation.
-  if (ENV.falApiKey) {
-    const result = await tryProvider("fal.ai Flux Schnell", () =>
-      generateWithFal(prompt, "fal-ai/flux/schnell", w, h)
+  // Typography-specialist routing: when the prompt explicitly requests rendered
+  // text/lettering, try fal.ai Flux Schnell first (native dimension control +
+  // stronger text adherence than Cloudflare's fixed-resolution endpoint).
+  if (typographyMode && ENV.falApiKey) {
+    const result = await tryProvider("fal.ai Flux Schnell (Typography)", () =>
+      generateWithFal(effectivePrompt, "fal-ai/flux/schnell", w, h)
     );
     if (result) return result;
   }
 
-  // 5. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
+  // 1. FREE TIER: Cloudflare Workers AI (100K free/day)
+  if (ENV.cfAiToken && ENV.cfAccountId) {
+    const result = await tryProvider("Cloudflare AI", () => generateWithCloudflare(effectivePrompt));
+    if (result) return result;
+  }
+
+  // 2. CHEAP + FAST: fal.ai Flux Schnell (~$0.003/image, ~4s, no cold start).
+  if (!typographyMode && ENV.falApiKey) {
+    const result = await tryProvider("fal.ai Flux Schnell", () =>
+      generateWithFal(effectivePrompt, "fal-ai/flux/schnell", w, h)
+    );
+    if (result) return result;
+  }
+
+  // 3. SELF-HOSTED: RunPod Flux Schnell (~$0.001/image, slow when cold)
   if (isRunPodAvailable()) {
-    const result = await tryProvider("RunPod Flux Schnell", () => runpodFluxSchnell(prompt, w, h));
+    const result = await tryProvider("RunPod Flux Schnell", async () => recordImageRoute(await runpodFluxSchnell(effectivePrompt, w, h), "runpod", "flux-schnell"));
     if (result) return result;
   }
 
-  // 6. CHEAP: Grok (xAI team must have credits — hit its spending limit 2026-06)
-  if (ENV.grokApiKey) {
-    const result = await tryProvider("Grok", () => generateWithGrok(prompt));
-    if (result) return result;
-  }
-
-  // 7. CHEAP: Flux Schnell via Replicate (~$0.003/image)
+  // 4. CHEAP: Flux Schnell via Replicate (~$0.003/image)
   if (ENV.replicateApiToken) {
-    const result = await tryProvider("Flux Schnell", () => generateWithFlux(prompt, "flux-schnell", w, h));
+    const result = await tryProvider("Flux Schnell", () => generateWithFlux(effectivePrompt, "flux-schnell", w, h));
     if (result) return result;
   }
 
-  // 8. PAID: GPT Image (OpenAI)
-  if (ENV.openaiApiKey) {
-    const result = await tryProvider("GPT Image", () => generateWithGptImage(prompt, size, quality));
+  // 5. PAID TIER BACKUP ONLY: Grok Imagine / opt-in Gemini Imagen
+  // Never cascade 5-credit Auto into 210–325 credit models (GPT Image 1, SD3, Flux Pro),
+  // and never cascade free-tier Auto requests into paid Grok/Gemini APIs.
+  if (isPaidTier && ENV.grokApiKey) {
+    const result = await tryProvider("Grok", () => generateWithGrok(effectivePrompt));
     if (result) return result;
   }
 
-  // 9. PAID: SD3
-  if (ENV.stabilityApiKey) {
-    const result = await tryProvider("SD3", () => generateWithSD3(prompt, w, h));
-    if (result) return result;
-  }
-
-  // 10. PREMIUM: Flux Pro (highest quality, last resort)
-  if (ENV.replicateApiToken) {
-    const result = await tryProvider("Flux Pro", () => generateWithFlux(prompt, "flux-pro", w, h));
+  if (isPaidTier && process.env.IMAGEN_ENABLED === "true" && ENV.geminiApiKey) {
+    const result = await tryProvider("Gemini", () => generateWithGemini(effectivePrompt));
     if (result) return result;
   }
 
@@ -1007,3 +1137,4 @@ async function generateWithFallback(
     `All image providers failed:\n${errors.map((e) => `  - ${e}`).join("\n")}`,
   );
 }
+

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { GlobalToolStatusBanner } from "@/components/GlobalToolStatusBanner";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://dreamforgex.ai/workspace" },
   title: "Studio — DreamForgeX",
   description: "Generate AI images and videos with 100+ tools. Text-to-image, style transfer, upscaling, and more — powered by Grok, DALL-E 3, Gemini, and Claude.",
   openGraph: {

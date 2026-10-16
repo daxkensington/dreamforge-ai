@@ -26,6 +26,7 @@ import {
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
+import NextImage from "next/image";
 
 const QUICK_TEMPLATES = [
   { label: "Cinematic Portrait", value: "A cinematic close-up portrait with dramatic lighting, shallow depth of field, film grain, and rich skin tones against a moody blurred background" },
@@ -131,7 +132,7 @@ export default function ToolPromptBuilder() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <img loading="lazy" src="/showcase/tool-promptbuild.jpg" alt="Prompt building interface" className="w-full rounded-lg max-h-48 object-cover" />
+          <NextImage src="/showcase/tool-promptbuild.jpg" alt="Prompt building interface" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Controls */}

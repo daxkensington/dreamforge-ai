@@ -7,6 +7,8 @@ Self-hosted AI models on RunPod Serverless for 50-90% cost savings.
 - **Flux.1 Schnell** — Fast image generation (4 steps, ~5s on A40)
 - **Real-ESRGAN** — 4x image upscaling (~1-2s)
 - **RMBG-2.0** — Background removal (~1-2s)
+- **Depth Anything V2 Small** — Monocular depth estimation (grayscale / colored / normal map)
+- **VTracer** — Raster to SVG vectorization
 
 ## Deployment
 
@@ -36,6 +38,20 @@ RUNPOD_FLUX_ENDPOINT_ID=your-endpoint-id
 ## API Format
 
 All tasks use the same endpoint. Route via the `task` field:
+
+### Tasks
+
+| Task | Inputs | Outputs |
+|------|--------|---------|
+| `depth` | `image_b64`, `variant` (`"grayscale"` \| `"colored"` \| `"normal"`), optional `colormap` (`"jet"` \| `"rainbow"` \| `"hot"`, default `"jet"`) | `image_b64`, `inference_time` |
+| `vtracer` | `image_b64`, optional `color_precision` (server color count 2..32, default 16), `mode` (`"color"` \| `"binary"`, default `"color"`), `filter_speckle` (default 4), `corner_threshold` (default 60) | `svg`, `inference_time` |
+
+`depth` returns a PNG: 8-bit grayscale (near=white, far=black), a cv2-colored
+depth map, or a derived normal map depending on `variant`. `vtracer` returns
+the full SVG document as text.
+
+The worker image must be **rebuilt and redeployed** for these tasks to exist —
+the GitHub workflow `runpod-worker-build.yml` builds and pushes the image.
 
 ### Image Generation
 ```json

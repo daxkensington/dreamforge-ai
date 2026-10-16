@@ -1,10 +1,14 @@
 // @ts-nocheck — Express type augmentations don't resolve in Vercel's serverless compiler
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
+import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
+import { DIRECT_IMAGE_MODELS, isConfirmedDirectImageRejection } from "./_core/directImageProviders";
+import { beginGenerationRequest, claimGenerationRequest, completeGenerationRequest, failGenerationRequestAndRefund, markGenerationReconciliation, readGenerationRequest } from "./_core/generationBilling";
+import { hashGenerationRequest, pendingGenerationResponse, replayGenerationResponse } from "./_core/generationRequest";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -124,8 +128,10 @@ import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
 import { getDb } from "./db";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { currentSubscriptionOrder } from "./_core/subscriptionSelection";
 import { enforceRateLimit } from "./rate-limit";
-import { getTierConfig, resolveTierName } from "@shared/tiers";
+import { getTierConfig } from "@shared/tiers";
+import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
 import { LEGACY_CREDIT_COSTS, TOOL_CREDIT_COSTS } from "@shared/creditCosts";
 import { getModelById, canAccessModel } from "./_core/modelRegistry";
 
@@ -144,20 +150,33 @@ const PREMIUM_MODEL_IDS = new Set([
   "fal-wan-video", "minimax-video", "stable-video",
 ]);
 
+const DF_LORA_MAP: Record<string, string> = {
+  "df-cinematic": "daxkensington/dreamforge-cinematic",
+  "df-anime": "daxkensington/dreamforge-anime",
+  "df-fantasy": "daxkensington/dreamforge-fantasy",
+  "df-product": "daxkensington/dreamforge-product",
+  "df-abstract": "daxkensington/dreamforge-abstract",
+};
+
 // ─── User Tier Helper ──────────────────────────────────────────────────────
 async function getUserTier(userId: number): Promise<string> {
   try {
     const db = await getDb();
     if (!db) return "free";
     const rows = await db
-      .select({ planName: subscriptionPlans.name })
+      .select({
+        planName: subscriptionPlans.name,
+        status: userSubscriptions.status,
+        currentPeriodStart: userSubscriptions.currentPeriodStart,
+        currentPeriodEnd: userSubscriptions.currentPeriodEnd,
+        cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+      })
       .from(userSubscriptions)
       .innerJoin(subscriptionPlans, eq(userSubscriptions.planId, subscriptionPlans.id))
       .where(eq(userSubscriptions.userId, userId))
+      .orderBy(...currentSubscriptionOrder())
       .limit(1);
-    const rawTier = rows[0]?.planName ?? "free";
-    // Resolve legacy tier names (e.g. "enterprise" -> "business")
-    return resolveTierName(rawTier);
+    return getEffectiveSubscriptionTier(rows[0]);
   } catch {
     return "free";
   }
@@ -169,7 +188,7 @@ async function getUserTier(userId: number): Promise<string> {
  * For model-based generations, pass the modelId to use model-tier-aware pricing.
  * For non-model tools, falls back to TOOL_CREDIT_COSTS or LEGACY_CREDIT_COSTS.
  */
-async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string) {
+async function tryDeductCredits(userId: number, tool: string, description?: string, modelId?: string, quotedCost?: number) {
   // Kill-switch — block offline tools before we touch the wallet. Throws
   // TRPCError if the tool is in "offline" state; degraded passes through.
   try {
@@ -180,7 +199,9 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
 
   let cost: number;
 
-  if (modelId) {
+  if (quotedCost !== undefined) {
+    cost = quotedCost;
+  } else if (modelId) {
     // Model-aware pricing: use the model's creditCost.base
     const model = getModelById(modelId);
     cost = model?.creditCost.base ?? (LEGACY_CREDIT_COSTS[tool] || 1);
@@ -189,7 +210,7 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
     cost = TOOL_CREDIT_COSTS[tool] ?? LEGACY_CREDIT_COSTS[tool] ?? CREDIT_COSTS[tool] ?? 1;
   }
 
-  if (cost === 0) return { success: true, balance: 0, needed: 0 };
+  if (cost === 0) return { success: true, balance: 0, needed: 0, cost: 0 };
   try {
     const result = await deductCredits(userId, cost, description || `Used ${tool}${modelId ? ` (${modelId})` : ""}`);
     if (!result.success) {
@@ -198,7 +219,8 @@ async function tryDeductCredits(userId: number, tool: string, description?: stri
         message: `Insufficient credits. Need ${result.needed}, have ${result.balance}. Purchase more credits to continue.`,
       });
     }
-    return result;
+    // `cost` lets callers refund exactly what was charged on failure.
+    return { ...result, cost };
   } catch (e: any) {
     if (e instanceof TRPCError) throw e;
     console.error("[tryDeductCredits] Credit deduction failed for user", userId, "tool", tool, ":", e);
@@ -519,9 +541,12 @@ export const appRouter = router({
   }),
 
   generation: router({
+    imageModels: publicProcedure.query(() => listImageCreationModels()),
+
     create: protectedProcedure
       .input(
         z.object({
+          requestId: z.string().uuid().transform(value => value.toLowerCase()).default(() => randomUUID()),
           prompt: z.string().min(1).max(2000),
           negativePrompt: z.string().max(1000).optional(),
           mediaType: z.enum(["image", "video"]).default("image"),
@@ -537,6 +562,18 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 20 requests per minute per user
         await enforceRateLimit(`generation.create:user:${ctx.user.id}`, 20, 60_000, "Generation rate limit exceeded — max 20 per minute.");
+
+        // A retry reads the owned request before renewed plan/model checks.
+        // New eligibility cannot turn an old attempt into another charge.
+        const requestIdentity = { userId: ctx.user.id, requestId: input.requestId, payloadHash: hashGenerationRequest(input) };
+        let previousRequest;
+        try {
+          previousRequest = await readGenerationRequest(requestIdentity);
+        } catch (error) {
+          safeErrorMessage(error, "generation.create:request-read");
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Could not check your generation request. Retry with the same request ID." });
+        }
+        if (previousRequest) return replayGenerationResponse(previousRequest, requestIdentity.payloadHash, input.mediaType);
 
         // Uncensored mode requires an active crypto-paid entitlement + age
         // attestation. Image-only (no uncensored video providers).
@@ -595,13 +632,27 @@ export const appRouter = router({
         const userTier = await getUserTier(ctx.user.id);
         const tierConfig = getTierConfig(userTier);
 
-        // Block models the user's tier can't access
+        // Standard image choices have one authoritative catalog, quote and
+        // executor mapping. Validate before any wallet or generation writes.
+        const isImagePreset = Object.hasOwn(DF_LORA_MAP, input.modelVersion);
+        if (isImagePreset && input.mediaType !== "image") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "DreamForge image styles support image creation only." });
+        }
+        const imagePlan = input.mediaType === "image" && !input.uncensored && !isImagePreset
+          ? prepareImageCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height })
+          : undefined;
         const requestedModel = getModelById(input.modelVersion);
-        if (requestedModel && !canAccessModel(userTier, requestedModel.tier)) {
+        if (!input.uncensored && requestedModel && requestedModel.type !== input.mediaType) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a model that supports the requested media type." });
+        }
+        if (!imagePlan && requestedModel && !canAccessModel(userTier, requestedModel.tier)) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: `Model "${input.modelVersion}" requires a ${requestedModel.tier} or higher subscription.`,
           });
+        }
+        if (!input.uncensored && isImagePreset && !canAccessModel(userTier, "creator")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "DreamForge styles require a creator or higher subscription." });
         }
 
         // Cap resolution for the user's tier
@@ -612,32 +663,81 @@ export const appRouter = router({
           });
         }
 
-        // Deduct credits
+        // Reserve this logical request, debit and write its ledger together.
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
-        await tryDeductCredits(ctx.user.id, creditTool, `Generated ${input.mediaType}: ${input.prompt.slice(0, 50)}`);
-
-        // Create generation record
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: input.prompt,
-          negativePrompt: input.negativePrompt ?? null,
-          mediaType: input.mediaType,
-          width: input.width,
-          height: input.height,
-          duration: input.mediaType === "video" ? input.duration : null,
-          status: "generating",
-          modelVersion: input.modelVersion,
-          // Uncensored generations are flagged so they can never enter the
-          // public gallery (gallery.submit rejects them).
-          metadata: input.uncensored ? { uncensored: true, style: input.uncensoredStyle ?? null } : null,
-        });
-
-        if (input.tagIds && input.tagIds.length > 0) {
-          await setGenerationTags(genId, input.tagIds);
-        }
-
-        // Generate media
+        // The immutable image plan quotes exactly what this invocation debits.
+        // Existing special image/video branches keep their established pricing.
+        const billableModel =
+          !input.uncensored && requestedModel && requestedModel.type === input.mediaType
+            ? requestedModel
+            : undefined;
         try {
+          await requireToolActive(creditTool);
+        } catch (error) {
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: safeErrorMessage(error, "generation.create:tool-status") });
+        }
+        const quotedCost = imagePlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
+        const claim = await claimGenerationRequest({ ...requestIdentity, credits: quotedCost });
+        if (claim.kind === "conflict") throw new TRPCError({ code: "CONFLICT", message: "This request ID already belongs to a different generation. Start a new request." });
+        if (claim.kind === "replay") return replayGenerationResponse(claim.request, requestIdentity.payloadHash, input.mediaType);
+        if (claim.kind !== "owned") return pendingGenerationResponse(input.requestId, input.mediaType);
+        const requestOwner = claim.owner;
+        const deduction = { cost: claim.request.quotedCredits };
+
+        let genId: number | undefined;
+        let url: string | undefined;
+        let providerInvocationStarted = false;
+        let delivered = false;
+        let savedResponse;
+        let imageProvenance: Awaited<ReturnType<typeof executeImageCreation>>["provenance"];
+        const generationMetadata = input.uncensored
+          ? { billingRequestId: input.requestId, uncensored: true, style: input.uncensoredStyle ?? null }
+          : imagePlan
+            ? { billingRequestId: input.requestId, requestedModelId: imagePlan.requestedModelId, modelId: imagePlan.modelId, quotedCredits: imagePlan.creditCost }
+            : { billingRequestId: input.requestId };
+
+        const pendingForReview = async (errorCode: string) => {
+          try {
+            const review = await markGenerationReconciliation(requestOwner, { errorCode, generationId: genId });
+            if (review.kind === "reconciliation" || review.kind === "replay") {
+              const response = replayGenerationResponse(review.request, requestIdentity.payloadHash, input.mediaType);
+              return response.status === "generating" ? { ...response, reconciliationRequired: true } : response;
+            }
+          } catch (error) { safeErrorMessage(error, "generation.create:reconciliation"); }
+          return { ...pendingGenerationResponse(input.requestId, input.mediaType), reconciliationRequired: true };
+        };
+
+        // Every operation after a successful debit shares the refund scope.
+        try {
+          genId = await createGeneration({
+            userId: ctx.user.id,
+            prompt: input.prompt,
+            negativePrompt: input.negativePrompt ?? null,
+            mediaType: input.mediaType,
+            width: input.width,
+            height: input.height,
+            duration: input.mediaType === "video" ? input.duration : null,
+            status: "generating",
+            modelVersion: input.modelVersion,
+            // Uncensored generations remain private-only.
+            metadata: generationMetadata,
+          });
+          if (!Number.isSafeInteger(genId) || genId <= 0) {
+            genId = undefined;
+            throw new Error("Could not create a generation record.");
+          }
+
+          if (input.tagIds && input.tagIds.length > 0) {
+            await setGenerationTags(genId, input.tagIds);
+          }
+
+          // A reservation may begin only once. An ambiguous CAS never launches
+          // another upstream operation; the durable state remains queryable.
+          const begun = await beginGenerationRequest(requestOwner, genId);
+          if (begun.kind === "replay") return replayGenerationResponse(begun.request, requestIdentity.payloadHash, input.mediaType);
+          if (begun.kind !== "begun") return pendingGenerationResponse(input.requestId, input.mediaType);
+
+          // Generate media
           let enhancedPrompt: string;
           if (input.mediaType === "video") {
             enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
@@ -649,32 +749,33 @@ export const appRouter = router({
             enhancedPrompt = `${input.prompt}. Style: high quality digital art, ${input.width}x${input.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
           }
 
-          // Map DreamForge exclusive styles to RunPod Flux + LoRA
-          const DF_LORA_MAP: Record<string, string> = {
-            "df-cinematic": "daxkensington/dreamforge-cinematic",
-            "df-anime": "daxkensington/dreamforge-anime",
-            "df-fantasy": "daxkensington/dreamforge-fantasy",
-            "df-product": "daxkensington/dreamforge-product",
-            "df-abstract": "daxkensington/dreamforge-abstract",
-          };
-
-          let url: string | undefined;
-          const loraId = DF_LORA_MAP[input.modelVersion];
+          const loraId = isImagePreset ? DF_LORA_MAP[input.modelVersion] : undefined;
           if (loraId) {
             // DreamForge exclusive style — use RunPod Flux Dev with LoRA
             const { isRunPodAvailable, runpodFluxDev } = await import("./_core/runpod");
             if (isRunPodAvailable()) {
               const styleHint = input.modelVersion.replace("df-", "dreamforge ");
               const styledPrompt = `${styleHint} style. ${enhancedPrompt}`;
-              const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
-              const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
-              const key = gk("generations", "png");
-              ({ url } = await sp(key, buffer, "image/png"));
+              providerInvocationStarted = true;
+              try {
+                const buffer = await runpodFluxDev(styledPrompt, input.width, input.height);
+                const { storagePut: sp, generateStorageKey: gk } = await import("./storage");
+                const key = gk("generations", "png");
+                ({ url } = await sp(key, buffer, "image/png"));
+              } catch (err: any) {
+                console.warn("[ImageGen] RunPod Flux Dev preset failed, falling back to standard generation:", err.message);
+                enhancedPrompt = styledPrompt;
+              }
             }
           }
 
-          if (!url) {
-            // Standard model — map UI model names to generateImage model param
+          if (!url && imagePlan) {
+            providerInvocationStarted = true;
+            const rendered = await executeImageCreation(imagePlan, { prompt: enhancedPrompt });
+            url = rendered.url;
+            imageProvenance = rendered.provenance;
+          } else if (!url) {
+            // Compatibility path for existing video/preset/uncensored flows.
             const modelMap: Record<string, string> = {
               "built-in-v1": "auto", "grok": "grok", "flux-pro": "flux-pro",
               "flux-schnell": "flux-schnell", "dall-e-3": "dall-e-3", "sd3": "sd3",
@@ -683,6 +784,7 @@ export const appRouter = router({
             // Uncensored ignores model selection — only the unfiltered chain
             // (self-hosted RunPod + fal) may serve it.
             const model = input.uncensored ? "auto" : (modelMap[input.modelVersion] || "auto");
+            providerInvocationStarted = true;
             ({ url } = await generateImage({
               prompt: enhancedPrompt,
               model: model as any,
@@ -695,11 +797,27 @@ export const appRouter = router({
             }));
           }
 
-          await updateGeneration(genId, {
-            status: "completed",
-            imageUrl: url ?? null,
-            thumbnailUrl: url ?? null,
-          });
+          if (!url?.trim()) throw new Error("The image provider returned no downloadable image.");
+
+          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
+          // The completed generation and immutable replay result commit together.
+          // A lost acknowledgement must not enter the failure-refund path.
+          let completion;
+          try {
+            completion = await completeGenerationRequest(requestOwner, {
+              result, imageUrl: url, thumbnailUrl: url,
+              metadata: imagePlan ? { ...generationMetadata, imageGeneration: imageProvenance ?? null } : generationMetadata,
+            });
+          } catch (error) {
+            safeErrorMessage(error, "generation.create:completion-uncertain");
+            completion = { kind: "uncertain" };
+          }
+          if (completion.kind === "replay") return replayGenerationResponse(completion.request, requestIdentity.payloadHash, input.mediaType);
+          if (completion.kind !== "completed") {
+            return pendingForReview("completion-uncertain");
+          }
+          savedResponse = replayGenerationResponse(completion.request, requestIdentity.payloadHash, input.mediaType);
+          delivered = true;
 
           // Notify on completion
           try {
@@ -711,30 +829,34 @@ export const appRouter = router({
           }
 
           // Auto-check achievements and budget alerts (fire-and-forget)
-          const achievementPromise = autoCheckAchievements(ctx.user.id).catch(() => []);
+          autoCheckAchievements(ctx.user.id).catch(() => []);
           checkAndSendBudgetAlerts(ctx.user.id).catch(() => {});
-          const newAchievements = await achievementPromise;
-
-          return { id: genId, status: "completed", imageUrl: url, mediaType: input.mediaType, newAchievements };
+          return savedResponse!;
         } catch (error: any) {
-          await updateGeneration(genId, {
-            status: "failed",
-            errorMessage: error.message || "Generation failed",
-          });
+          const failureMessage = safeErrorMessage(error, "generation.create");
+          // Cosmetic follow-up failures must never undo a delivered result.
+          if (delivered && savedResponse) {
+            return savedResponse;
+          }
           // Telemetry — drives auto-degrade + admin failure dashboard
           logToolFailure({
             toolId: creditTool,
-            errorMessage: error?.message ?? "Generation failed",
+            errorMessage: failureMessage,
             userId: ctx.user.id,
           }).catch(() => {});
-          // Refund credits on generation failure
-          const refundCost = CREDIT_COSTS[creditTool] || 1;
+          // Existing renderers throw generic errors. After invocation, a lost
+          // response, polling timeout or storage failure cannot prove a terminal
+          // provider failure. Only the direct adapter's typed terminal refusal
+          // authorizes refund after invocation; other outcomes stay for review.
+          if (providerInvocationStarted && !isConfirmedDirectImageRejection(error)) return pendingForReview("provider-outcome-uncertain");
+          // State, exact refund and refund ledger are one guarded operation.
           try {
-            await refundCredits(ctx.user.id, refundCost, `Refund: ${input.mediaType} generation failed — ${(error.message || "unknown error").slice(0, 100)}`);
+            const settled = await failGenerationRequestAndRefund(requestOwner, { confirmedFailure: true, errorCode: "generation-failed", errorMessage: failureMessage, generationId: genId });
+            if (settled.kind === "refunded" || settled.kind === "replay") return replayGenerationResponse(settled.request, requestIdentity.payloadHash, input.mediaType);
           } catch (refundErr) {
-            console.error("[generation.create] Credit refund failed:", refundErr);
+            safeErrorMessage(refundErr, "generation.create:settlement-uncertain");
           }
-          return { id: genId, status: "failed", error: error.message };
+          return pendingForReview("settlement-uncertain");
         }
       }),
 
@@ -979,6 +1101,11 @@ export const appRouter = router({
         const tierConfig = getTierConfig(userTier);
 
         for (const item of input.prompts) {
+          // The legacy batch renderer always uses Auto and cannot honor these
+          // explicit routes, their quotes, or durable request ownership.
+          if (Object.hasOwn(DIRECT_IMAGE_MODELS, item.modelVersion) || Object.values(DIRECT_IMAGE_MODELS).some(model => model.model === item.modelVersion)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Use the image workspace to create one image with this model." });
+          }
           const batchModel = getModelById(item.modelVersion);
           if (batchModel && !canAccessModel(userTier, batchModel.tier)) {
             throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a ${batchModel.tier} or higher subscription.` });
@@ -997,7 +1124,16 @@ export const appRouter = router({
 
         // Deduct credits for entire batch upfront using actual total cost
         const totalCost = input.prompts.reduce((sum, p) => {
-          return sum + (CREDIT_COSTS[p.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1);
+          if (p.mediaType === "video") {
+            return sum + (CREDIT_COSTS["text-to-video"] || 1);
+          }
+          const matchedModel = p.modelVersion && p.modelVersion !== "built-in-v1" && p.modelVersion !== "auto"
+            ? getModelById(p.modelVersion)
+            : undefined;
+          const itemCost = matchedModel?.type === "image"
+            ? matchedModel.creditCost.base
+            : (CREDIT_COSTS["text-to-image"] || 1);
+          return sum + itemCost;
         }, 0);
         const batchResult = await deductCredits(ctx.user.id, totalCost, `Batch generation (${input.prompts.length} items)`);
         if (!batchResult.success) {
@@ -1146,12 +1282,31 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await reviewModerationItem(
+        const result = await reviewModerationItem(
           input.id,
           ctx.user.id,
           input.status,
           input.note
         );
+        // Gallery bounty: an approved public submission earns the creator
+        // credits — this is what seeds the social loop (1 submitter to date).
+        // Grant is best-effort: approval must never fail because credits did.
+        if (result.updated && input.status === "approved" && result.submitterUserId) {
+          try {
+            const { addCredits } = await import("./stripe");
+            await addCredits(result.submitterUserId, 25, "Gallery submission approved (+25 credits)");
+            const { createNotification } = await import("./routersPhase15");
+            await createNotification(
+              result.submitterUserId,
+              "system",
+              "Gallery Submission Approved",
+              "Your creation was approved for the public gallery — 25 credits have been added to your balance. Share more to earn more!",
+              { galleryItemId: result.galleryItemId, creditsAwarded: 25 }
+            );
+          } catch (err) {
+            console.error("[moderation.review] gallery bounty grant failed:", err);
+          }
+        }
         return { success: true };
       }),
 
@@ -1185,8 +1340,17 @@ export const appRouter = router({
               // (see server/_core/imageUrlGuard).
               const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
               const imageB64 = imgBuffer.toString("base64");
-              const scale = input.scaleFactor === "4x" ? 4 : 2;
-              const resultBuffer = await runpodUpscale(imageB64, scale);
+              const scale = (input.scaleFactor === "4x" ? 4 : 2) as 2 | 4;
+              let resultBuffer: Buffer;
+              try {
+                resultBuffer = await runpodUpscale(imageB64, scale);
+              } catch (rpErr: any) {
+                if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                  throw rpErr;
+                }
+                const { upscaleBufferSharp } = await import("./_core/svgVectorize");
+                resultBuffer = await upscaleBufferSharp(imgBuffer, scale);
+              }
               const { storagePut, generateStorageKey } = await import("./storage");
               const key = generateStorageKey("upscaled", "png");
               const { url } = await storagePut(key, resultBuffer, "image/png");
@@ -1291,7 +1455,16 @@ export const appRouter = router({
                 // (see server/_core/imageUrlGuard).
                 const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
                 const imageB64 = imgBuffer.toString("base64");
-                const resultBuffer = await runpodRemoveBackground(imageB64);
+                let resultBuffer: Buffer;
+                try {
+                  resultBuffer = await runpodRemoveBackground(imageB64);
+                } catch (rpErr: any) {
+                  if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                    throw rpErr;
+                  }
+                  const { removeBackgroundBufferSharp } = await import("./_core/svgVectorize");
+                  resultBuffer = await removeBackgroundBufferSharp(imgBuffer);
+                }
                 const { storagePut, generateStorageKey } = await import("./storage");
                 const key = generateStorageKey("bg-removed", "png");
                 const { url } = await storagePut(key, resultBuffer, "image/png");
@@ -1856,6 +2029,46 @@ export const appRouter = router({
         }
       }),
 
+    // Live Canvas Render — Krea-style fast sketch-to-image streaming (Flux Schnell / Cloudflare)
+    liveCanvasRender: protectedProcedure
+      .input(
+        z.object({
+          sketchDataUrl: z.string().max(4_000_000).optional(),
+          prompt: z.string().min(1).max(1000),
+          outputStyle: z.enum(["realistic", "digital-art", "anime", "oil-painting", "watercolor", "3d-render"]).default("digital-art"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await tryDeductCredits(ctx.user.id, "sketch-to-image", "Live canvas render");
+        const styleDescriptions: Record<string, string> = {
+          "realistic": "photorealistic rendering, lifelike details, natural studio lighting",
+          "digital-art": "polished digital concept art, vibrant colors, crisp lines",
+          "anime": "anime illustration, cel-shaded, expressive Japanese animation style",
+          "oil-painting": "classical oil painting, rich textured brushstrokes",
+          "watercolor": "delicate watercolor painting, soft washes, paper texture",
+          "3d-render": "3D Octane render, volumetric lighting, smooth shading",
+        };
+        try {
+          let layoutGuide = "";
+          if (input.sketchDataUrl?.startsWith("data:image/")) {
+            const b64 = input.sketchDataUrl.split(",")[1];
+            if (b64) {
+              const { describeSketchBufferFast } = await import("./_core/svgVectorize");
+              layoutGuide = await describeSketchBufferFast(Buffer.from(b64, "base64"));
+            }
+          }
+          const fullPrompt = `${input.prompt}. ${layoutGuide ? `${layoutGuide} ` : ""}Style: ${styleDescriptions[input.outputStyle]}. Cohesive composition, high visual clarity.`;
+          const { url } = await generateImage({
+            prompt: fullPrompt,
+            size: "1024x1024",
+            userTier: await getUserTier(ctx.user.id),
+          });
+          return { url: url ?? null, status: "completed" as const, style: input.outputStyle };
+        } catch (error: any) {
+          return { url: null, status: "failed" as const, error: error.message };
+        }
+      }),
+
     // AI Color Grading — apply cinematic color grades to images
     colorGrade: protectedProcedure
       .input(
@@ -2168,14 +2381,47 @@ export const appRouter = router({
             "logo": "logo-ready vector design, bold shapes, perfect symmetry, brand-ready",
           };
 
+          // Step 1: generate the flat vector-STYLE raster (as before).
           const { url } = await generateImage({
-            prompt: `Convert this image into a ${styleDescriptions[input.style]}. Use approximately ${input.colorCount} colors. Clean vector-style output with crisp edges, no raster artifacts. Suitable for SVG conversion. Professional graphic design quality.`,
+            prompt: `Convert this image into a ${styleDescriptions[input.style]}. Use approximately ${input.colorCount} distinct colors. Clean vector-style output with crisp edges, no raster artifacts, large uniform color regions. Professional graphic design quality.`,
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
 
-          return { url, status: "completed" as const };
+          // Step 2: true vectorization — vtracer traces the raster into an
+          // actual SVG when RunPod is warm; otherwise our pure-Node sharp
+          // color-quantized SVG tracer guarantees a real downloadable .svg.
+          let svgUrl: string | null = null;
+          if (url) {
+            try {
+              const { buffer: rasterBuf } = await fetchGuardedImage(url);
+              let svg: string | null = null;
+              const { isRunPodAvailable, runpodVectorize } = await import("./_core/runpod");
+              if (isRunPodAvailable()) {
+                try {
+                  svg = await runpodVectorize(rasterBuf.toString("base64"), input.colorCount);
+                } catch (err: any) {
+                  console.warn("[Vectorize] RunPod vtracer failed, using Node SVG fallback:", err.message);
+                }
+              }
+              if (!svg) {
+                const { vectorizeBufferToSvg } = await import("./_core/svgVectorize");
+                svg = await vectorizeBufferToSvg(rasterBuf, input.colorCount);
+              }
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const { url: storedSvg } = await storagePut(
+                generateStorageKey("vectorized", "svg"),
+                Buffer.from(svg, "utf8"),
+                "image/svg+xml"
+              );
+              svgUrl = storedSvg;
+            } catch (err: any) {
+              console.warn("[Vectorize] SVG pass failed, returning raster only:", err.message);
+            }
+          }
+
+          return { url, svgUrl, status: "completed" as const };
         } catch (error: any) {
-          return { url: null, status: "failed" as const, error: error.message };
+          return { url: null, svgUrl: null, status: "failed" as const, error: error.message };
         }
       }),
 
@@ -2592,10 +2838,38 @@ export const appRouter = router({
 
           const intensityLabel = input.intensity > 0.7 ? "strongly" : input.intensity > 0.4 ? "moderately" : "subtly";
 
-          const { url } = await generateImage({
+          let { url } = await generateImage({
             prompt: `${intensityLabel} ${effectDescriptions[input.effect]}. Preserve the original subject and composition while transforming the lighting. Professional quality.`,
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
+
+          // The "hdr" effect promises recovered detail — generative relighting
+          // can't do that alone, so run a real Real-ESRGAN pass over the
+          // result. Graceful: if RunPod is unavailable the relit image still
+          // returns, just without the pixel-level boost.
+          if (input.effect === "hdr") {
+            const { isRunPodAvailable, runpodUpscale } = await import("./_core/runpod");
+            if (isRunPodAvailable()) {
+              try {
+                const { buffer: relitBuf } = await fetchGuardedImage(url);
+                let enhanced: Buffer;
+                try {
+                  enhanced = await runpodUpscale(relitBuf.toString("base64"), 2);
+                } catch (rpErr: any) {
+                  if (!/\b409\b|ENDPOINT_PAUSED|max_workers\s*=\s*0|Endpoint is paused/i.test(rpErr?.message ?? "")) {
+                    throw rpErr;
+                  }
+                  const { upscaleBufferSharp } = await import("./_core/svgVectorize");
+                  enhanced = await upscaleBufferSharp(relitBuf, 2);
+                }
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const { url: enhancedUrl } = await storagePut(generateStorageKey("hdr", "png"), enhanced, "image/png");
+                url = enhancedUrl;
+              } catch (err: any) {
+                console.warn("[HdrEnhance] ESRGAN detail pass failed, returning relit image:", err.message);
+              }
+            }
+          }
 
           return { url, status: "completed" as const };
         } catch (error: any) {
@@ -2846,6 +3120,28 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await tryDeductCredits(ctx.user.id, "depth-map", "Depth map generation");
         try {
+          // Real path: Depth Anything V2 on the self-hosted worker — true
+          // monocular depth, and a true normal map derived from the depth
+          // field (usable in actual 3D/PBR workflows, not a picture of one).
+          const { isRunPodAvailable } = await import("./_core/runpod");
+          if (isRunPodAvailable()) {
+            try {
+              const { runpodDepth } = await import("./_core/runpod");
+              const { buffer: imgBuffer } = await fetchGuardedImage(input.imageUrl);
+              const resultBuffer = await runpodDepth(
+                imgBuffer.toString("base64"),
+                input.style === "normal-map" ? "normal" : input.style
+              );
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const { url } = await storagePut(generateStorageKey("depth", "png"), resultBuffer, "image/png");
+              return { url, status: "completed" as const, style: input.style, engine: "depth-anything" as const };
+            } catch (err: any) {
+              console.warn("[DepthMap] RunPod Depth Anything failed, falling back to vision model:", err.message);
+            }
+          }
+
+          // Fallback: vision-model rendering of a depth map (bounded accuracy;
+          // normal-map output here is NOT usable as a true normal map).
           const styleDescriptions: Record<string, string> = {
             "grayscale": "Convert this image into a precise depth map. White represents closest objects, black represents the farthest. Smooth gradients for depth transitions. Accurate depth estimation for all objects in the scene. Professional 3D-ready depth map, grayscale only.",
             "colored": "Convert this image into a color-coded depth map. Use a rainbow/viridis color palette where warm colors (red/yellow) represent near objects and cool colors (blue/purple) represent far objects. Clear depth separation, professional visualization.",
@@ -2855,7 +3151,7 @@ export const appRouter = router({
             prompt: styleDescriptions[input.style],
             originalImages: [{ url: input.imageUrl, mimeType: "image/png" }],
           });
-          return { url, status: "completed" as const, style: input.style };
+          return { url, status: "completed" as const, style: input.style, engine: "vision-model" as const };
         } catch (error: any) {
           return { url: null, status: "failed" as const, error: error.message };
         }
@@ -3074,7 +3370,8 @@ export const appRouter = router({
         }
       }),
 
-    // Virtual Try-On — overlay a garment onto a person via self-hosted CatVTON on RunPod
+    // Virtual Try-On — overlay a garment onto a person via self-hosted CatVTON on RunPod,
+    // with fal.ai CatVTON and vision-composite fallback when RunPod is paused.
     virtualTryOn: protectedProcedure
       .input(
         z.object({
@@ -3087,16 +3384,53 @@ export const appRouter = router({
         await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
         try {
           const { isRunPodAvailable, runpodTryOn } = await import("./_core/runpod");
-          if (!isRunPodAvailable()) throw new Error("RunPod not configured");
+          if (isRunPodAvailable()) {
+            try {
+              const resultBuffer = await runpodTryOn(
+                input.personImageUrl,
+                input.garmentImageUrl,
+                input.clothType,
+              );
+              const { storagePut, generateStorageKey } = await import("./storage");
+              const key = generateStorageKey("tryon", "png");
+              const { url } = await storagePut(key, resultBuffer, "image/png");
+              return { url, status: "completed" as const };
+            } catch (err: any) {
+              console.warn("[VirtualTryOn] RunPod CatVTON failed, falling back:", err.message);
+            }
+          }
 
-          const resultBuffer = await runpodTryOn(
-            input.personImageUrl,
-            input.garmentImageUrl,
-            input.clothType,
-          );
-          const { storagePut, generateStorageKey } = await import("./storage");
-          const key = generateStorageKey("tryon", "png");
-          const { url } = await storagePut(key, resultBuffer, "image/png");
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (isFalAvailable()) {
+            try {
+              const res = await falRun<{ image?: { url: string }; images?: Array<{ url: string }> }>(
+                "fal-ai/cat-vton",
+                {
+                  human_image_url: input.personImageUrl,
+                  garment_image_url: input.garmentImageUrl,
+                  cloth_type: input.clothType,
+                },
+                { pollInterval: 3000, maxPolls: 60 },
+              );
+              const remoteUrl = res.image?.url ?? res.images?.[0]?.url;
+              if (remoteUrl) {
+                const { buffer } = await fetchGuardedImage(remoteUrl);
+                const { storagePut, generateStorageKey } = await import("./storage");
+                const { url } = await storagePut(generateStorageKey("tryon", "png"), buffer, "image/png");
+                return { url, status: "completed" as const };
+              }
+            } catch (err: any) {
+              console.warn("[VirtualTryOn] fal.ai CatVTON failed, falling back to generateImage:", err.message);
+            }
+          }
+
+          const { url } = await generateImage({
+            prompt: `Virtual try-on composite: dress the person from the first image in the ${input.clothType} garment from the second image. Preserve the person's identity, pose, and background while naturally fitting the garment with realistic fabric drape and lighting.`,
+            originalImages: [
+              { url: input.personImageUrl, mimeType: "image/png" },
+              { url: input.garmentImageUrl, mimeType: "image/png" },
+            ],
+          });
 
           return { url, status: "completed" as const };
         } catch (error: any) {
@@ -4714,8 +5048,9 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Rate limit: 10 video requests per minute per user
         await enforceRateLimit(`video.textToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
-        await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
 
+        try {
         const styleEnhancers: Record<string, string> = {
           "cinematic": "cinematic, shallow depth of field, film grain, dramatic lighting, professional color grading",
           "anime": "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic",
@@ -4758,7 +5093,7 @@ export const appRouter = router({
               return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
             } catch (err: any) {
               if (!process.env.REPLICATE_API_TOKEN) {
-                return { videoUrl: null, status: "failed" as const, error: `Minimax: ${err.message}` };
+                throw new Error(`Minimax: ${err.message}`);
               }
               console.warn("[Video] fal.ai hailuo failed, falling back to Replicate:", err.message);
             }
@@ -4769,15 +5104,31 @@ export const appRouter = router({
           return { status: "completed" as const, videoUrl: result.url, model: "minimax" };
         }
 
-        // Direct CogVideoX selection
+        // Direct CogVideoX selection (falls back to fal.ai Hailuo when RunPod is paused)
         if (input.model === "cogvideo") {
           const { isRunPodAvailable, runpodCogVideo } = await import("./_core/runpod");
-          if (!isRunPodAvailable()) return { videoUrl: null, status: "failed" as const, error: "RunPod not configured" };
-          const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
-          const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
-          const key = genKey("video", "mp4");
-          const { url } = await stPut(key, videoBuffer, "video/mp4");
-          return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
+          const { isFalAvailable, falRun } = await import("./_core/fal");
+          if (isRunPodAvailable()) {
+            try {
+              const videoBuffer = await runpodCogVideo(enhancedPrompt, 49, 50, 6.0);
+              const { storagePut: stPut, generateStorageKey: genKey } = await import("./storage");
+              const key = genKey("video", "mp4");
+              const { url } = await stPut(key, videoBuffer, "video/mp4");
+              return { status: "completed" as const, videoUrl: url, model: "cogvideo-selfhosted" };
+            } catch (err: any) {
+              if (!isFalAvailable()) throw err;
+              console.warn("[Video] CogVideoX RunPod failed, falling back to fal.ai Hailuo:", err.message);
+            }
+          } else if (!isFalAvailable()) {
+            throw new Error("RunPod not configured");
+          }
+          const result = await falRun<{ video: { url: string } }>(
+            "fal-ai/minimax/hailuo-02/standard/text-to-video",
+            { prompt: enhancedPrompt, prompt_optimizer: true, duration: parseInt(input.duration) > 6 ? "10" : "6" },
+            { pollInterval: 5000, maxPolls: 120 },
+          );
+          if (!result.video?.url) throw new Error("fal.ai hailuo returned no video");
+          return { status: "completed" as const, videoUrl: result.video.url, model: "minimax-hailuo-02" };
         }
 
         // Auto mode: try providers in priority order based on availability
@@ -4807,11 +5158,11 @@ export const appRouter = router({
             const videoUrl = await generateVeo3Video({ prompt: enhancedPrompt, aspectRatio: input.aspectRatio, durationSeconds: parseInt(input.duration) });
             return { videoUrl, status: "completed" as const, duration: input.duration, style: input.style, model: "veo-3" };
           } catch (err: any) {
-            return { videoUrl: null, status: "failed" as const, error: err.message };
+            throw err;
           }
         }
         if (input.model === "veo-3") {
-          return { videoUrl: null, status: "failed" as const, error: "Veo 3 is currently unavailable on this account." };
+          throw new Error("Veo 3 is currently unavailable on this account.");
         }
 
         // Priority 3: Kling 2.0 (best value)
@@ -4876,7 +5227,16 @@ export const appRouter = router({
           }
         }
 
-        return { videoUrl: null, status: "failed" as const, error: `All video providers failed:\n${errors.join("\n")}` }
+        throw new Error(`All video providers failed:\n${errors.join("\n")}`);
+        } catch (error: any) {
+          // Refund credits on generation failure — the user received no video.
+          try {
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: text-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[video.textToVideo] Credit refund failed:", refundErr);
+          }
+          return { videoUrl: null, status: "failed" as const, error: error?.message || "Video generation failed" };
+        }
       }),
 
     // Image-to-Video — animate a still image into a video clip via Veo 3
@@ -4896,8 +5256,9 @@ export const appRouter = router({
         // forwarded to providers that fetch it themselves. Reject non-https
         // or private/loopback/metadata hosts before any credits are spent.
         assertSafeImageUrl(input.imageUrl);
-        await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
 
+        try {
         const motionDescriptions: Record<string, string> = {
           "subtle": "very subtle gentle motion, slight parallax, breathing effect",
           "moderate": "moderate natural motion, elements gently moving, ambient animation",
@@ -4991,11 +5352,20 @@ export const appRouter = router({
           provider: "veo+runway+kling+minimax",
           userId: ctx.user.id,
         });
-        return {
-          videoUrl: null,
-          status: "failed" as const,
-          error: `All image-to-video providers failed:\n${errors.join("\n")}`,
-        };
+        throw new Error(`All image-to-video providers failed:\n${errors.join("\n")}`);
+        } catch (error: any) {
+          // Refund credits on generation failure — the user received no video.
+          try {
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: image-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          } catch (refundErr) {
+            console.error("[video.imageToVideo] Credit refund failed:", refundErr);
+          }
+          return {
+            videoUrl: null,
+            status: "failed" as const,
+            error: error?.message || "Image-to-video generation failed",
+          };
+        }
       }),
   }),
 

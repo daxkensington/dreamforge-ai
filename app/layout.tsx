@@ -21,13 +21,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "DreamForgeX — AI Image & Video Generation Studio",
+  title: "DreamForgeX — AI Image & Video Generation Studio (100+ Tools & Uncensored 18+ Studio)",
   description:
-    "Create stunning AI-generated images and videos with DreamForgeX. Text-to-image, text-to-video, and image-to-video animation — all powered by cutting-edge AI models.",
+    "Create stunning AI images, cinematic videos, songs, and consistent characters with 100+ AI tools and 30+ models (FLUX, Veo 3, Runway Gen-4, Wan 2.2) — plus an Uncensored 18+ Pro Studio with 3 free previews.",
   openGraph: {
-    title: "DreamForgeX — AI Creative Studio",
+    title: "DreamForgeX — AI Creative Studio (100+ AI Tools & 30+ Models)",
     description:
-      "Turn words into stunning images, videos, and animations — powered by AI.",
+      "Turn words into stunning images, cinematic videos, consistent characters, and songs — powered by 30+ frontier & self-hosted AI models.",
     url: "https://dreamforgex.ai",
     siteName: "DreamForgeX",
     images: [
@@ -43,9 +43,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DreamForgeX — AI Creative Studio",
+    title: "DreamForgeX — AI Creative Studio (100+ Tools)",
     description:
-      "Turn words into stunning images, videos, and animations — powered by AI.",
+      "Turn words into stunning images, cinematic videos, consistent characters, and songs — powered by 30+ frontier & self-hosted AI models.",
     images: ["https://dreamforgex.ai/og-image.jpg"],
     site: "@dreamforgex_ai",
   },
@@ -70,27 +70,40 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "Organization",
+      "@id": "https://dreamforgex.ai/#organization",
       name: "DreamForgeX",
       url: "https://dreamforgex.ai",
       logo: "https://dreamforgex.ai/logo.png",
-      description: "AI Creative Studio — 100+ tools for images, video, audio, songs, and design",
+      description:
+        "All-in-one AI Creative Studio with 100+ tools and 30+ models for AI image generation, video production, audio & song synthesis, character consistency, and an Uncensored 18+ Pro Studio.",
       sameAs: ["https://x.com/dreamforgex_ai"],
     },
     {
+      "@type": "WebSite",
+      "@id": "https://dreamforgex.ai/#website",
+      url: "https://dreamforgex.ai",
+      name: "DreamForgeX",
+      publisher: { "@id": "https://dreamforgex.ai/#organization" },
+      inLanguage: "en-US",
+    },
+    {
       "@type": "SoftwareApplication",
+      "@id": "https://dreamforgex.ai/#app",
       name: "DreamForgeX",
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web",
       url: "https://dreamforgex.ai",
-      description: "All-in-one AI creative studio with 100+ tools for image generation, video creation, song production, and design",
+      description:
+        "All-in-one AI creative studio with 100+ tools and 30+ models (FLUX.1, Imagen 4, Veo 3, Runway Gen-4, Kling 2.0, Wan 2.2) plus a self-hosted Uncensored 18+ Pro Studio with Character Face Lock, Virtual Outfit Swap, Brush Inpainting, and 4-View Character Sheets.",
       offers: {
         "@type": "AggregateOffer",
         lowPrice: "0",
-        highPrice: "149",
+        highPrice: "79",
         priceCurrency: "USD",
-        offerCount: "6",
+        offerCount: "8",
       },
-      featureList: "AI Image Generation, AI Video Creation, AI Song Creator, Music Video Studio, 50+ Social Templates, 25 Design Templates, AI Presentations, Blog Writer, Ad Copy Generator",
+      featureList:
+        "AI Image Generation (FLUX.1, Imagen 4, Recraft V3, Ideogram V3), AI Video Studio (Google Veo 3, Runway Gen-4, Kling 2.0, Wan 2.2), Uncensored 18+ Pro Studio (No Content Filter, 3 Free Previews, Card/Apple Pay or Bitcoin), Character Face Lock, Virtual Outfit Swap, 4-View Character Turnaround Sheet, Canvas Brush Inpainting, AI Song & Music Video Creator, 4K Image & Video Upscaling",
     },
   ],
 };

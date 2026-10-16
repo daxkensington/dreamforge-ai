@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { exportStoryboardPdf, exportScriptPdf } from "@/lib/pdfExport";
 import {
   ArrowLeft,
   Share2,
@@ -803,8 +802,9 @@ function ProjectContentViewer({
     soundtrack: <Music className="w-5 h-5 text-emerald-400" />,
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (project.type === "storyboard" && data?.scenes) {
+      const { exportStoryboardPdf } = await import("@/lib/pdfExport");
       exportStoryboardPdf({
         title: data.title || project.title,
         synopsis: data.synopsis || "",
@@ -814,6 +814,7 @@ function ProjectContentViewer({
       });
       toast.success("PDF downloaded");
     } else if (project.type === "script" && data?.scenes) {
+      const { exportScriptPdf } = await import("@/lib/pdfExport");
       exportScriptPdf({
         title: data.title || project.title,
         logline: data.logline || "",

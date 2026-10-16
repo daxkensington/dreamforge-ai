@@ -189,13 +189,15 @@ const AUTO_DEGRADE_WINDOW_MIN = 10;
 
 /**
  * Scan recent failures and auto-flip tools with concentrated errors to
- * "degraded" state. Only promotes active → degraded; never touches offline
- * tools, and never demotes a user-set degraded state. Runs via cron.
+ * "degraded" state, and auto-recover previously auto-degraded tools once
+ * rolling failures drop below threshold. Never touches offline tools, and
+ * never demotes an operator-set degraded state (updatedBy !== null).
  */
-export async function runAutoDegradeScan(): Promise<{ flipped: string[] }> {
+export async function runAutoDegradeScan(): Promise<{ flipped: string[]; recovered: string[] }> {
   const db = await getDb();
-  if (!db) return { flipped: [] };
+  if (!db) return { flipped: [], recovered: [] };
   const flipped: string[] = [];
+  const recovered: string[] = [];
   try {
     const rows = await db
       .select({
@@ -211,8 +213,10 @@ export async function runAutoDegradeScan(): Promise<{ flipped: string[] }> {
       )
       .groupBy(toolFailureEvents.toolId);
 
+    const recentFailsByTool = new Map<string, number>();
     for (const r of rows) {
       const fails = Number(r.fails ?? 0);
+      recentFailsByTool.set(r.toolId, fails);
       if (fails < AUTO_DEGRADE_THRESHOLD) continue;
       const current = await getToolStatus(r.toolId);
       if (current.status !== "active") continue; // don't override operator state
@@ -224,8 +228,22 @@ export async function runAutoDegradeScan(): Promise<{ flipped: string[] }> {
       );
       flipped.push(r.toolId);
     }
+
+    const existingStatuses: ToolStatus[] = await db.select().from(toolStatus);
+    for (const st of existingStatuses) {
+      if (
+        st.status === "degraded" &&
+        st.updatedBy == null &&
+        typeof st.message === "string" &&
+        st.message.startsWith("Auto-degraded:") &&
+        (recentFailsByTool.get(st.toolId) ?? 0) < AUTO_DEGRADE_THRESHOLD
+      ) {
+        await clearToolStatus(st.toolId);
+        recovered.push(st.toolId);
+      }
+    }
   } catch (err: any) {
     console.warn("[toolStatus.autoDegrade] scan failed:", err?.message ?? err);
   }
-  return { flipped };
+  return { flipped, recovered };
 }
