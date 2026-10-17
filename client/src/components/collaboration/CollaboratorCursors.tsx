@@ -79,6 +79,8 @@ export default function CollaboratorCursors({
         });
       }
     }
+
+    setRenderTick((t) => t + 1);
   }, [activeCursors]);
 
   // Smooth interpolation loop
