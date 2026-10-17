@@ -29,10 +29,16 @@ export default function TimelinePreview({ timeline }: { timeline: UseTimelineRet
     };
     frame = requestAnimationFrame(draw); return () => cancelAnimationFrame(frame);
   }, [ready]);
+  const enterFullscreen = () => {
+    const el = container.current; if (!el) return;
+    if (typeof el.requestFullscreen !== "function") { setError("Fullscreen is unavailable"); return; }
+    try { void Promise.resolve(el.requestFullscreen()).catch(() => setError("Fullscreen is unavailable")); }
+    catch { setError("Fullscreen is unavailable"); }
+  };
   return <div ref={container} className="flex flex-col h-full bg-black min-h-[240px]">
     <div className="flex justify-between items-center px-3 py-2 bg-background/80 text-xs">
       <span>Preview · 1280 × 720 · 30 fps</span>
-      <Button size="icon" variant="ghost" aria-label="Fullscreen preview" onClick={() => void container.current?.requestFullscreen().catch(() => setError("Fullscreen is unavailable"))}><Maximize className="h-4 w-4" /></Button>
+      <Button size="icon" variant="ghost" aria-label="Fullscreen preview" onClick={enterFullscreen}><Maximize className="h-4 w-4" /></Button>
     </div>
     <div className="flex-1 relative flex items-center justify-center min-h-0">
       <canvas ref={canvas} width={1280} height={720} aria-label="Timeline video preview" className="w-full max-h-full object-contain aspect-video" />
