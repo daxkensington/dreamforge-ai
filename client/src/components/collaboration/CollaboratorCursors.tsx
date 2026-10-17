@@ -48,11 +48,13 @@ export default function CollaboratorCursors({
   // Update target positions when presence changes
   useEffect(() => {
     const map = cursorsRef.current;
+    let syncDirty = false;
 
     // Remove users no longer present
     for (const [uid] of map) {
       if (!activeCursors.find((p) => p.user.id === uid)) {
         map.delete(uid);
+        syncDirty = true;
       }
     }
 
@@ -63,9 +65,16 @@ export default function CollaboratorCursors({
       if (existing) {
         existing.targetX = p.cursor.x;
         existing.targetY = p.cursor.y;
-        existing.name = p.user.name;
-        existing.color = p.color;
-        existing.editingClipId = p.editingClipId;
+        if (
+          existing.name !== p.user.name ||
+          existing.color !== p.color ||
+          existing.editingClipId !== p.editingClipId
+        ) {
+          existing.name = p.user.name;
+          existing.color = p.color;
+          existing.editingClipId = p.editingClipId;
+          syncDirty = true;
+        }
       } else {
         map.set(p.user.id, {
           userId: p.user.id,
@@ -77,7 +86,12 @@ export default function CollaboratorCursors({
           targetY: p.cursor.y,
           editingClipId: p.editingClipId,
         });
+        syncDirty = true;
       }
+    }
+
+    if (syncDirty) {
+      setRenderTick((t) => t + 1);
     }
   }, [activeCursors]);
 
