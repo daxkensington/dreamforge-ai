@@ -1,5 +1,70 @@
 import jsPDF from "jspdf";
 
+// ─── Scene section pagination ───────────────────────────────────────────────
+type ScenePage = {
+  pageW: number;
+  pageH: number;
+  margin: number;
+  orientation: "landscape" | "portrait";
+};
+
+type SceneSection = {
+  label: string;
+  text: string;
+  labelSize: number;
+  bodySize: number;
+  lineHeight: number;
+  labelGap: number;
+  afterGap: number;
+  color: [number, number, number];
+};
+
+const SECTION_LABEL_COLOR: [number, number, number] = [100, 90, 150];
+
+// doc.text draws at the alphabetic baseline, so the first line on a page is
+// inset by the glyph ascent to keep it below the top margin.
+function fontAscent(doc: jsPDF, size: number): number {
+  return (size / doc.internal.scaleFactor) * 0.8;
+}
+
+function addScenePage(doc: jsPDF, page: ScenePage) {
+  doc.addPage("a4", page.orientation);
+  doc.setFillColor(15, 15, 25);
+  doc.rect(0, 0, page.pageW, page.pageH, "F");
+}
+
+// Draws a labelled, wrapped section starting at baseline y, continuing onto new
+// pages as needed. Returns the baseline for the next section.
+function addSceneSection(doc: jsPDF, page: ScenePage, y: number, section: SceneSection): number {
+  const bottom = page.pageH - page.margin;
+  doc.setFontSize(section.bodySize);
+  const lines: string[] = doc.splitTextToSize(section.text, page.pageW - page.margin * 2);
+
+  // Keep the label with its first content line.
+  if (y + section.labelGap + section.lineHeight > bottom) {
+    addScenePage(doc, page);
+    y = page.margin + fontAscent(doc, section.labelSize);
+  }
+  doc.setFontSize(section.labelSize);
+  doc.setTextColor(...SECTION_LABEL_COLOR);
+  doc.text(section.label, page.margin, y);
+  y += section.labelGap;
+
+  doc.setFontSize(section.bodySize);
+  doc.setTextColor(...section.color);
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0 && y + section.lineHeight > bottom) {
+      addScenePage(doc, page);
+      doc.setFontSize(section.bodySize);
+      doc.setTextColor(...section.color);
+      y = page.margin + fontAscent(doc, section.bodySize);
+    }
+    doc.text(lines[i], page.margin, y);
+    y += section.lineHeight;
+  }
+  return y + section.afterGap;
+}
+
 // ─── Storyboard PDF ─────────────────────────────────────────────────────────
 export function exportStoryboardPdf(data: {
   title: string;
@@ -22,6 +87,7 @@ export function exportStoryboardPdf(data: {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 15;
+  const scenePage: ScenePage = { pageW, pageH, margin, orientation: "landscape" };
 
   // Title page
   doc.setFillColor(15, 15, 25);
@@ -52,9 +118,7 @@ export function exportStoryboardPdf(data: {
 
   // Scene pages
   for (const scene of data.scenes) {
-    doc.addPage("a4", "landscape");
-    doc.setFillColor(15, 15, 25);
-    doc.rect(0, 0, pageW, pageH, "F");
+    addScenePage(doc, scenePage);
 
     // Scene header
     doc.setFillColor(40, 30, 80);
@@ -70,48 +134,51 @@ export function exportStoryboardPdf(data: {
 
     let y = margin + 22;
 
-    // Visual description
-    doc.setFontSize(8);
-    doc.setTextColor(100, 90, 150);
-    doc.text("VISUAL DESCRIPTION", margin, y);
-    y += 5;
-    doc.setFontSize(10);
-    doc.setTextColor(220, 220, 230);
-    const visLines = doc.splitTextToSize(scene.visualDescription, pageW - margin * 2);
-    doc.text(visLines, margin, y);
-    y += visLines.length * 5 + 6;
+    y = addSceneSection(doc, scenePage, y, {
+      label: "VISUAL DESCRIPTION",
+      text: scene.visualDescription,
+      labelSize: 8,
+      bodySize: 10,
+      lineHeight: 5,
+      labelGap: 5,
+      afterGap: 6,
+      color: [220, 220, 230],
+    });
 
-    // Camera
-    doc.setFontSize(8);
-    doc.setTextColor(100, 90, 150);
-    doc.text("CAMERA", margin, y);
-    y += 5;
-    doc.setFontSize(9);
-    doc.setTextColor(180, 180, 200);
-    doc.text(`Angle: ${scene.cameraAngle}  |  Movement: ${scene.cameraMovement}`, margin, y);
-    y += 8;
+    y = addSceneSection(doc, scenePage, y, {
+      label: "CAMERA",
+      text: `Angle: ${scene.cameraAngle}  |  Movement: ${scene.cameraMovement}`,
+      labelSize: 8,
+      bodySize: 9,
+      lineHeight: 4.5,
+      labelGap: 5,
+      afterGap: 3.5,
+      color: [180, 180, 200],
+    });
 
-    // Narration
     if (scene.narration) {
-      doc.setFontSize(8);
-      doc.setTextColor(100, 90, 150);
-      doc.text("NARRATION", margin, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.setTextColor(180, 170, 130);
-      const narLines = doc.splitTextToSize(`"${scene.narration}"`, pageW - margin * 2);
-      doc.text(narLines, margin, y);
-      y += narLines.length * 4.5 + 6;
+      y = addSceneSection(doc, scenePage, y, {
+        label: "NARRATION",
+        text: `"${scene.narration}"`,
+        labelSize: 8,
+        bodySize: 9,
+        lineHeight: 4.5,
+        labelGap: 5,
+        afterGap: 6,
+        color: [180, 170, 130],
+      });
     }
 
-    // Mood & Transition
-    doc.setFontSize(8);
-    doc.setTextColor(100, 90, 150);
-    doc.text("MOOD & TRANSITION", margin, y);
-    y += 5;
-    doc.setFontSize(9);
-    doc.setTextColor(180, 180, 200);
-    doc.text(`Mood: ${scene.mood}  |  Transition: ${scene.transition}`, margin, y);
+    addSceneSection(doc, scenePage, y, {
+      label: "MOOD & TRANSITION",
+      text: `Mood: ${scene.mood}  |  Transition: ${scene.transition}`,
+      labelSize: 8,
+      bodySize: 9,
+      lineHeight: 4.5,
+      labelGap: 5,
+      afterGap: 0,
+      color: [180, 180, 200],
+    });
   }
 
   doc.save(`${(data.title || "storyboard").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.pdf`);
@@ -144,6 +211,7 @@ export function exportScriptPdf(data: {
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 20;
   const contentW = pageW - margin * 2;
+  const scenePage: ScenePage = { pageW, pageH, margin, orientation: "portrait" };
 
   // Title page
   doc.setFillColor(15, 15, 25);
@@ -181,9 +249,7 @@ export function exportScriptPdf(data: {
 
   // Scene pages
   for (const scene of data.scenes) {
-    doc.addPage("a4", "portrait");
-    doc.setFillColor(15, 15, 25);
-    doc.rect(0, 0, pageW, pageH, "F");
+    addScenePage(doc, scenePage);
 
     // Scene header bar
     doc.setFillColor(40, 30, 80);
@@ -198,21 +264,16 @@ export function exportScriptPdf(data: {
     let y = margin + 24;
 
     const addSection = (label: string, text: string, color: [number, number, number] = [220, 220, 230]) => {
-      if (y > pageH - 30) {
-        doc.addPage("a4", "portrait");
-        doc.setFillColor(15, 15, 25);
-        doc.rect(0, 0, pageW, pageH, "F");
-        y = margin;
-      }
-      doc.setFontSize(7);
-      doc.setTextColor(100, 90, 150);
-      doc.text(label, margin, y);
-      y += 4;
-      doc.setFontSize(9);
-      doc.setTextColor(...color);
-      const lines = doc.splitTextToSize(text, contentW);
-      doc.text(lines, margin, y);
-      y += lines.length * 4.5 + 6;
+      y = addSceneSection(doc, scenePage, y, {
+        label,
+        text,
+        labelSize: 7,
+        bodySize: 9,
+        lineHeight: 4.5,
+        labelGap: 4,
+        afterGap: 6,
+        color,
+      });
     };
 
     addSection("VISUAL DESCRIPTION", scene.visualDescription);
