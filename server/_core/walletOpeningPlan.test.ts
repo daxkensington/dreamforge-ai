@@ -8,13 +8,15 @@ describe("reviewed wallet opening dry-run planner",()=>{
     const directory=await mkdtemp(path.join(tmpdir(),"dreamforge-wallet-plan-"));
     const file=(name:string)=>path.join(directory,name);
     try{
-      const wallet={userId:7,balance:77,bonusCredits:500,lifetimeSpent:100,walletAccountingVersion:0,updatedAt:"2026-10-16T00:00:00.000Z"};
+      const wallet={userId:7,balance:77,bonusCredits:500,lifetimeSpent:100,walletAccountingVersion:0,updatedAt:"2026-10-16T00:00:00.000Z",ownerState:"live"};
       await writeFile(file("snapshot.json"),JSON.stringify([wallet]));
-      const review={userId:7,approved:true,reviewer:"fixture-reviewer",evidenceTransactionIds:[1,2],expectedBalance:77,expectedLifetimeSpent:100,expectedUpdatedAt:wallet.updatedAt,purchasedRemaining:25};
+      const review={userId:7,approved:true,reviewer:"fixture-reviewer",evidenceTransactionIds:[1,2],expectedBalance:77,expectedBonusCredits:500,expectedLifetimeSpent:100,expectedUpdatedAt:wallet.updatedAt,purchasedRemaining:25};
+      let runNumber=0;
       const run=async(reviews:any[])=>{
+        const output=file(`plan-${runNumber++}.json`);
         await writeFile(file("reviews.json"),JSON.stringify(reviews));
-        execFileSync(process.execPath,[path.resolve("scripts/plan-wallet-opening-balances.mjs"),file("snapshot.json"),file("reviews.json"),file("plan.json")],{stdio:"pipe"});
-        return JSON.parse(await readFile(file("plan.json"),"utf8"));
+        execFileSync(process.execPath,[path.resolve("scripts/plan-wallet-opening-balances.mjs"),file("snapshot.json"),file("reviews.json"),output],{stdio:"pipe"});
+        return JSON.parse(await readFile(output,"utf8"));
       };
       const valid=await run([review]);
       expect(valid).toMatchObject({dryRun:true,executionSupported:false,releaseBlocked:false});
