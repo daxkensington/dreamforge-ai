@@ -219,9 +219,9 @@ export default function ToolSceneDirector() {
         )}
 
         {/* Error */}
-        {director.data && director.data.status === "failed" && (
+        {(director.isError || director.data?.status === "failed") && (
           <div className="text-center py-12 text-red-400">
-            <p className="text-sm">Failed to direct scene. Please try again.</p>
+            <p className="text-sm">{director.isError ? director.error?.message || "Failed to direct scene. Please try again." : "Failed to direct scene. Please try again."}</p>
           </div>
         )}
       </div>
