@@ -117,7 +117,7 @@ export default function ToolFilmGrain() {
                 <Input
                   placeholder="Paste image URL..."
                   value={imageUrl}
-                  onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }}
+                  onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value.trim() || null); setResultUrl(null); }}
                   className="text-sm"
                 />
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
