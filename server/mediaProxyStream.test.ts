@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ get: vi.fn(), revoked: vi.fn() }));
 vi.mock("./storage", () => ({ storageGetObject: mocks.get }));
-vi.mock("./_core/mediaLifecycle", async original => ({ ...(await original<any>()), isMediaRevoked: mocks.revoked }));
+vi.mock("./_core/mediaLifecycle", async original => ({ ...(await original<any>()), isMediaRevoked: mocks.revoked, isMediaPrivate: async () => false }));
 import { GET } from "../app/img/[...key]/route";
 
 describe("revocation-aware large media delivery", () => {

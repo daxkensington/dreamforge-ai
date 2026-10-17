@@ -13,6 +13,7 @@ export interface GenerationRequestInput {
   tagIds?: number[];
   uncensored: boolean;
   uncensoredStyle?: string;
+  trainedModelId?: number;
 }
 
 export interface CompletedGenerationResponse {
@@ -40,6 +41,7 @@ export function hashGenerationRequest(input: GenerationRequestInput) {
     tagIds: [...new Set(input.tagIds ?? [])].sort((a, b) => a - b),
     uncensored: input.uncensored,
     uncensoredStyle: input.uncensoredStyle ?? null,
+    ...(input.trainedModelId === undefined ? {} : { trainedModelId: input.trainedModelId }),
   })).digest("hex");
 }
 

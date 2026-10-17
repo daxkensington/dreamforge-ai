@@ -17,12 +17,18 @@ const mocks = vi.hoisted(() => ({
   neon: vi.fn(),
   send: vi.fn(),
   cancel: vi.fn(),
+  actor: 7 as number | null,
   afterStatement: null as null | ((text: string) => Promise<void>),
 }));
 vi.mock("@neondatabase/serverless", () => ({ neon: mocks.neon }));
 vi.mock("./stripe", () => ({
   cancelStripeSubscriptionsForCustomer: mocks.cancel,
 }));
+vi.mock("./_core/context", () => ({ createContext: async () => ({ user: mocks.actor === null ? null : { id: mocks.actor } }) }));
+vi.mock("./_core/privateStorage", () => {
+  const config = { bucket: "fixture-private-bucket", accountId: "a".repeat(32), accessKeyId: "fixture-private-access", secretAccessKey: "fixture-private-secret" };
+  return { assertPrivateStorage: async () => config, privateStorageConfig: () => config, privateStorageConfigured: () => true, privateStorageAvailable: async () => true };
+});
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     send(command: any) {
@@ -54,6 +60,8 @@ import { withStorageOwner } from "./_core/storageContext";
 import { storagePut } from "./storage";
 import { createUserForAuthIdentity, hasAuthIdentity } from "./db";
 import { GET as imageGet } from "../app/img/[...key]/route";
+import { GET as privateGet } from "../app/api/media/[...key]/route";
+import { emptyTimeline } from "../shared/timeline";
 
 const testUrl = process.env.DREAMFORGE_BILLING_TEST_DATABASE_URL;
 if (testUrl) {
@@ -68,6 +76,7 @@ if (testUrl) {
 }
 const suite = testUrl ? describe : describe.skip;
 suite("media lifecycle and account deletion on PostgreSQL", () => {
+  const fixtureSchema = `media_security_tools_qa_${process.pid}`;
   const pg = postgres(
     testUrl ??
       "postgresql://dreamforge_qa:local_qa_only@127.0.0.1:55439/dreamforge_billing_qa",
@@ -75,14 +84,14 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
       max: 12,
       prepare: false,
       onnotice: () => {},
-      connection: { search_path: "media_security_qa" },
+      connection: { search_path: fixtureSchema },
     }
   );
   const dialect = new PgDialect();
   const objects = new Map<string, Buffer>();
   let failDelete = false;
   const tables = Object.values(schema).filter(
-    value => is(value, PgTable) && getTableConfig(value).name !== "mediaAssets"
+    value => is(value, PgTable) && !["mediaAssets", "trainingJobs", "mediaUploads"].includes(getTableConfig(value).name)
   ) as PgTable[];
   const quote = (value: string) => '"' + value.replace(/"/g, '""') + '"';
   const literal = (value: any): string =>
@@ -146,7 +155,7 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
     vi.stubEnv("DATABASE_URL", testUrl!);
     vi.stubEnv("R2_PUBLIC_URL", "https://dreamforgex.ai/img");
     mocks.neon.mockReturnValue(query);
-    await pg.unsafe("CREATE SCHEMA media_security_qa");
+    await pg.unsafe(`CREATE SCHEMA ${quote(fixtureSchema)}`);
     for (const value of Object.values(schema)) {
       if (
         typeof value === "function" &&
@@ -204,10 +213,15 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
     );
     for (const statement of migration.split("--> statement-breakpoint"))
       await pg.unsafe(statement).simple();
+    for (const name of ["0017_owned_training_jobs", "0018_timeline_media_uploads"]) {
+      const next = await readFile(new URL(`../drizzle/${name}.sql`, import.meta.url), "utf8");
+      for (const statement of next.split("--> statement-breakpoint")) await pg.unsafe(statement).simple();
+    }
   }, 30000);
 
   beforeEach(async () => {
     mocks.afterStatement = null;
+    mocks.actor = 7;
     mocks.cancel.mockReset().mockResolvedValue(undefined);
     mocks.send.mockReset();
     objects.clear();
@@ -234,13 +248,14 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
         throw Object.assign(new Error("missing"), { name: "NoSuchKey" });
       return {
         ContentType: "image/png",
-        Body: { transformToByteArray: async () => bytes },
+        ContentLength: bytes.length,
+        Body: { transformToByteArray: async () => bytes, async *[Symbol.asyncIterator]() { yield bytes; }, destroy: () => {} },
       };
     });
   });
   afterAll(async () => {
     mocks.afterStatement = null;
-    await pg.unsafe("DROP SCHEMA IF EXISTS media_security_qa CASCADE");
+    await pg.unsafe(`DROP SCHEMA IF EXISTS ${quote(fixtureSchema)} CASCADE`);
     await pg.end();
     vi.unstubAllEnvs();
   });
@@ -282,6 +297,54 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
       params: Promise.resolve({ key: key.split("/") }),
     });
   }
+  async function privateMedia(key: string, range?: string) {
+    return privateGet(new Request(`http://localhost/api/media/${key}`, { headers: range ? { Range: range } : {} }), { params: Promise.resolve({ key: key.split("/") }) });
+  }
+  async function seedToolsContent() {
+    const imageKeys = Array.from({ length: 5 }, (_, i) => `uploads/7/training-${i}.png`);
+    const keys = [...imageKeys, "uploads/7/timeline.png", "training/7/archive.zip", "training/7/model.safetensors"];
+    for (const key of keys) await withStorageOwner(7, () => storagePut(key, Buffer.from("0123456789"), "image/png", { isPrivate: true }));
+    const document = emptyTimeline(); document.clips = [{ id: "private-clip", trackId: "video-1", type: "video", mediaKind: "image", sourceUrl: "/api/media/uploads/7/timeline.png", startTime: 0, duration: 2 }];
+    await pg`UPDATE "videoProjects" SET data=${pg.json({ timeline: { revision: 1, document } })} WHERE id=41`;
+    await pg`INSERT INTO "trainingJobs" (id,"userId","requestId","payloadHash",name,"trainingType","triggerWord",steps,"imageKeys","archiveKey",state,"executionToken","quotedCredits","purchasedCreditsDebited","debitedAt","modelKey","providerRequestId","statusUrl","responseUrl","cancelUrl","expiresAt")
+      VALUES (91,7,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',${"a".repeat(64)},'Private training name','face','PrivateFace',800,${pg.json(imageKeys)},'training/7/archive.zip','succeeded','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',100,20,now(),'training/7/model.safetensors','provider-private-request','https://fixture.example/status','https://fixture.example/result','https://fixture.example/cancel',now()+interval '1 day')`;
+    await pg`INSERT INTO "mediaUploads"(id,"userId",key,"fileName","contentType",size,purpose,"partCount",state,"expiresAt") VALUES ('cccccccc-cccc-4ccc-8ccc-cccccccccccc',7,'uploads/7/timeline.png','Private clip filename.png','image/png',10,'timeline',1,'completed',now()+interval '1 hour'),('dddddddd-dddd-4ddd-8ddd-dddddddddddd',7,'uploads/7/training-0.png','Private face.png','image/png',10,'training',1,'completed',now()+interval '1 hour')`;
+    await pg`UPDATE "creditTransactions" SET "txMetadata"="txMetadata" || '{"trainingJobId":91,"privateTrainingName":"Private training name"}'::jsonb WHERE "userId"=7`;
+    return keys;
+  }
+  it("keeps private uploads out of public URLs, shares only referenced timeline clips, and scrubs new tools on account deletion", async () => {
+    await seedContent(); const keys = await seedToolsContent();
+    expect((await image("uploads/7/timeline.png")).status).toBe(404);
+    objects.set("uploads/7/unregistered.png", Buffer.from("UNREGISTERED"));
+    expect((await privateMedia("uploads/7/unregistered.png")).status).toBe(404);
+    expect((await privateMedia("uploads/7/timeline.png")).status).toBe(200);
+    const ranged = await privateMedia("uploads/7/timeline.png", "bytes=2-5"); expect(ranged.status).toBe(206); expect(await ranged.text()).toBe("2345"); expect(ranged.headers.get("cache-control")).toContain("no-store");
+    mocks.actor = 8;
+    expect((await privateMedia("uploads/7/timeline.png")).status).toBe(200);
+    expect((await privateMedia("uploads/7/training-0.png")).status).toBe(404);
+    expect((await privateMedia("training/7/model.safetensors")).status).toBe(404);
+    mocks.actor = null; expect((await privateMedia("uploads/7/timeline.png")).status).toBe(401); mocks.actor = 7;
+    failDelete = true; await deleteUserAccount(7);
+    const [job] = await pg`SELECT * FROM "trainingJobs" WHERE id=91`;
+    expect(job).toMatchObject({ state: "deleted", name: "[deleted]", triggerWord: "deleted", imageKeys: [], archiveKey: null, modelKey: null, providerRequestId: null, statusUrl: null, responseUrl: null, cancelUrl: null }); expect(job.deletedAt).toBeTruthy();
+    expect(await pg`SELECT * FROM "mediaUploads" WHERE "userId"=7`).toHaveLength(0);
+    const [receipt] = await pg`SELECT * FROM "creditTransactions" WHERE "userId"=7`; expect(receipt.txMetadata.trainingJobId).toBe(91); expect(receipt.txMetadata).not.toHaveProperty("privateTrainingName"); expect(receipt.amount).toBe(50);
+    for (const key of keys) { expect((await privateMedia(key)).status).toBe(404); expect(await isMediaRevoked(key)).toBe(true); }
+    mocks.actor = 8; expect((await privateMedia("uploads/7/timeline.png")).status).toBe(404);
+    failDelete = false; await purgeRevokedMedia(100,7); expect(keys.some(key => objects.has(key))).toBe(false);
+    objects.set("uploads/7/timeline.png", Buffer.from("DELAYED BYTES"));
+    expect((await image("uploads/7/timeline.png")).status).toBe(404); expect((await privateMedia("uploads/7/timeline.png")).status).toBe(404);
+  });
+  it("keeps bucket classification immutable so a private replacement cannot leave a public-bucket copy", async () => {
+    await withStorageOwner(7, () => storagePut("uploads/7/reused.png", Buffer.from("PUBLIC"), "image/png"));
+    expect((await image("uploads/7/reused.png")).status).toBe(200);
+    await expect(withStorageOwner(7, () => storagePut("uploads/7/reused.png", Buffer.from("PRIVATE"), "image/png", { isPrivate: true }))).rejects.toThrow("no longer allowed");
+    expect(await (await image("uploads/7/reused.png")).text()).toBe("PUBLIC");
+    const saved = await withStorageOwner(7, () => storagePut("uploads/7/private-new.png", Buffer.from("PRIVATE"), "image/png", { isPrivate: true }));
+    expect(saved.url).toBe("/api/media/uploads/7/private-new.png"); expect((await image("uploads/7/private-new.png")).status).toBe(404);
+    await expect(withStorageOwner(7, () => storagePut("uploads/7/private-new.png", Buffer.from("PUBLIC AGAIN"), "image/png"))).rejects.toThrow("no longer allowed");
+    expect(await (await privateMedia("uploads/7/private-new.png")).text()).toBe("PRIVATE");
+  });
 
   it("atomically removes content/shares/identities, revokes assets and retains financial history", async () => {
     await seedContent();
@@ -378,6 +441,7 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
 
   it("rolls back every scrub and revocation when the final tombstone write fails", async () => {
     await seedContent();
+    await seedToolsContent();
     await pg
       .unsafe(
         `CREATE FUNCTION deletion_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."loginMethod"='deleted' THEN RAISE EXCEPTION 'fixture rollback'; END IF; RETURN NEW; END $$;
@@ -396,6 +460,9 @@ suite("media lifecycle and account deletion on PostgreSQL", () => {
         true
       );
       expect(await isMediaRevoked("private/owned.png")).toBe(false);
+      expect(await isMediaRevoked("uploads/7/timeline.png")).toBe(false);
+      expect((await pg`SELECT state,"modelKey" FROM "trainingJobs" WHERE id=91`)[0]).toMatchObject({ state: "succeeded", modelKey: "training/7/model.safetensors" });
+      expect(await pg`SELECT * FROM "mediaUploads" WHERE "userId"=7`).toHaveLength(2);
       expect(objects.has("private/owned.png")).toBe(true);
       expect(
         mocks.send.mock.calls.filter(([c]) => c.operation === "delete")

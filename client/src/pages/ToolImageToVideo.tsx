@@ -1,201 +1,258 @@
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 import ToolPageLayout from "@/components/ToolPageLayout";
+import { AnimationDialog } from "@/components/AnimationDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import { Slider } from "@/components/ui/slider";
-import { Film, Upload, Loader2, Download, Sparkles, RotateCcw } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import NextImage from "next/image";
-
-const motionTypes = [
-  { value: "subtle", label: "Subtle", desc: "Gentle parallax" },
-  { value: "moderate", label: "Moderate", desc: "Natural motion" },
-  { value: "dynamic", label: "Dynamic", desc: "Active movement" },
-  { value: "cinematic-zoom", label: "Cine Zoom", desc: "Dramatic reveal" },
-  { value: "pan-left", label: "Pan Left", desc: "Smooth left pan" },
-  { value: "pan-right", label: "Pan Right", desc: "Smooth right pan" },
-  { value: "zoom-in", label: "Zoom In", desc: "Focus closer" },
-  { value: "zoom-out", label: "Zoom Out", desc: "Reveal scene" },
-];
+import { uploadOwnedMedia } from "@/lib/mediaUpload";
+import { IMAGE_ANIMATION_POLICY } from "@shared/imageAnimation";
+import { Film, Loader2, Upload } from "lucide-react";
 
 export default function ToolImageToVideo() {
-  const [imageUrl, setImageUrl] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState("8");
-  const [motionType, setMotionType] = useState("moderate");
-  const [motionIntensity, setMotionIntensity] = useState(0.5);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const mutation = trpc.video.imageToVideo.useMutation({
-    onSuccess: (data) => {
-      if (data.status === "completed" && data.videoUrl) { setVideoUrl(data.videoUrl); toast.success("Video generated!"); }
-      else toast.error(data.error || "Generation failed");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please select an image"); return; }
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) { const { url } = await res.json(); setImageUrl(url); }
-      else toast.info("Using local preview — enter an image URL for best results");
-    } catch { toast.error("Upload failed"); }
-    finally { setUploading(false); }
-  };
-
-  const isProcessing = mutation.isPending;
-
+  const { user, loading } = useAuth();
+  const owner = useRef(user?.id);
+  owner.current = user?.id;
+  const uploading = useRef<{ userId: number; token: string } | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<{
+    userId: number;
+    id: number;
+    imageUrl: string;
+  }>();
+  const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (!isProcessing) { setProgress(0); return; }
-    const interval = setInterval(() => {
-      setProgress((prev) => (prev >= 95 ? 95 : prev + (95 / 120)));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isProcessing]);
-
+    setProgress(null);
+    setError("");
+    setSelected(undefined);
+    setOpen(false);
+  }, [user?.id]);
+  const input = useRef<HTMLInputElement>(null);
+  const history = trpc.generation.list.useQuery(
+    { limit: 50, offset: 0 },
+    { enabled: Boolean(user), retry: 1 }
+  );
+  const policy = trpc.animation.policy.useQuery();
+  const importSource = trpc.animation.importSource.useMutation();
+  const images =
+    history.data?.filter(
+      item =>
+        item.status === "completed" &&
+        item.mediaType === "image" &&
+        item.imageUrl &&
+        !(item.metadata as any)?.uncensored
+    ) ?? [];
+  const videos =
+    history.data?.filter(
+      item =>
+        item.status === "completed" &&
+        item.mediaType === "video" &&
+        (item.metadata as any)?.tool === "image-animation" &&
+        item.imageUrl
+    ) ?? [];
+  const upload = async (file?: File) => {
+    if (!file || !user || uploading.current?.userId === user.id) return;
+    if (
+      !["image/png", "image/jpeg", "image/webp", "image/avif"].includes(
+        file.type
+      ) ||
+      file.size > 10 * 1024 * 1024
+    ) {
+      setError("Choose a PNG, JPEG, WebP or AVIF image up to 10 MB.");
+      return;
+    }
+    const actorId = user.id;
+    const uploadToken = crypto.randomUUID();
+    uploading.current = { userId: actorId, token: uploadToken };
+    setError("");
+    setProgress(0);
+    try {
+      const asset = await uploadOwnedMedia(file, "animation", fraction => {
+        if (
+          owner.current === actorId &&
+          uploading.current?.token === uploadToken
+        )
+          setProgress(fraction);
+      });
+      if (owner.current !== actorId || uploading.current?.token !== uploadToken)
+        return;
+      const result = await importSource.mutateAsync({ key: asset.key });
+      if (owner.current !== actorId || uploading.current?.token !== uploadToken)
+        return;
+      setSelected({
+        userId: actorId,
+        id: result.generationId,
+        imageUrl: result.imageUrl,
+      });
+      setOpen(true);
+      void history.refetch();
+    } catch (failure) {
+      if (owner.current === actorId && uploading.current?.token === uploadToken)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Image upload failed. Try again."
+        );
+    } finally {
+      if (uploading.current?.token === uploadToken) {
+        uploading.current = null;
+        if (owner.current === actorId) setProgress(null);
+        if (input.current) input.current.value = "";
+      }
+    }
+  };
   return (
-    <ToolPageLayout title="Image-to-Video" description="Animate still images into video clips with Veo 2" icon={Film} gradient="from-purple-500 to-violet-500">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
-          <NextImage src="/showcase/tool-i2v.jpg" alt="Image to video animation" className="w-full rounded-lg max-h-48 object-cover" width={1408} height={768} />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-border/50">
-              <CardContent className="p-6 space-y-5">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Source Image</Label>
-                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="text-sm" />
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                    {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                    {uploading ? "Uploading..." : "Upload Image"}
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Motion Description</Label>
-                  <Textarea placeholder="Describe the motion — waves crashing, leaves blowing, camera slowly zooming..." value={prompt} onChange={(e) => setPrompt(e.target.value)} className="text-sm" rows={3} />
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Motion Type</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {motionTypes.map((m) => (
-                      <button key={m.value} onClick={() => setMotionType(m.value)}
-                        className={`p-2 rounded-xl border-2 transition-all text-left ${motionType === m.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
-                        <span className="text-xs font-medium">{m.label}</span>
-                        <p className="text-[10px] text-muted-foreground">{m.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Motion Intensity</Label>
-                    <span className="text-xs text-muted-foreground">{motionIntensity.toFixed(1)}</span>
-                  </div>
-                  <Slider value={[motionIntensity]} onValueChange={(v) => setMotionIntensity(v[0])} min={0.1} max={1.0} step={0.1} className="w-full" />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>Subtle</span>
-                    <span>Dramatic</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Duration</Label>
-                  <Select value={duration} onValueChange={setDuration}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="4">4 seconds</SelectItem>
-                      <SelectItem value="8">8 seconds</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button onClick={() => { setVideoUrl(null); mutation.mutate({ imageUrl, prompt, duration: duration as any, motionType: motionType as any }); }}
-                    disabled={!imageUrl || !prompt.trim() || isProcessing} className="flex-1" size="lg">
-                    {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Animating... {Math.round(progress)}%</> : <><Sparkles className="h-4 w-4 mr-2" />Animate Image</>}
-                  </Button>
-                  <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setVideoUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
-                </div>
-              </CardContent>
-            </Card>
+    <ToolPageLayout
+      title="Image-to-Video"
+      description="Create a real five-second animated video from an uploaded image or your generation history."
+      icon={Film}
+      gradient="from-cyan-500 to-blue-600"
+      costCredits={policy.data?.creditCost ?? IMAGE_ANIMATION_POLICY.creditCost}
+    >
+      {loading ? (
+        <p>Loading your account…</p>
+      ) : !user ? (
+        <Button asChild>
+          <a href={getLoginUrl()}>Sign in to animate an image</a>
+        </Button>
+      ) : (
+        <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            {policy.data
+              ? `${policy.data.creditCost.toLocaleString()} credits per five-second 480p video · Creator or higher. Uploading and selecting images is free.`
+              : "Loading the current animation quote…"}
+          </p>
+          <input
+            ref={input}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/avif"
+            className="sr-only"
+            aria-label="Upload animation source"
+            onChange={event => {
+              void upload(event.target.files?.[0]);
+            }}
+          />
+          <Button
+            disabled={progress !== null}
+            onClick={() => input.current?.click()}
+          >
+            {progress !== null ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            {progress !== null
+              ? `Uploading ${Math.round(progress * 100)}%`
+              : "Upload image"}
+          </Button>
+          <Button variant="outline" onClick={() => setOpen(true)}>
+            Check unfinished animation
+          </Button>
+          {progress !== null && (
+            <progress
+              className="block w-full"
+              value={progress}
+              max={1}
+              aria-label="Image upload progress"
+            />
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-red-500">
+              {error}
+            </p>
+          )}
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Choose one of your images</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={history.isFetching}
+              onClick={() => void history.refetch()}
+            >
+              Refresh
+            </Button>
           </div>
-
-          <div className="lg:col-span-3">
-            <Card className="border-border/50 overflow-hidden">
-              <CardContent className="p-0">
-                <AnimatePresence mode="wait">
-                  {!videoUrl && !isProcessing ? (
-                    <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      {imagePreview ? (
-                        <div className="p-4">
-                          <Badge variant="secondary" className="mb-3">Source Image</Badge>
-                          <img loading="lazy" src={imagePreview} alt="Source" className="w-full h-auto max-h-[400px] object-contain rounded-lg" />
-                          <p className="text-xs text-muted-foreground text-center mt-3">Describe the motion and click "Animate Image"</p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-[500px] text-center p-8">
-                          <div className="h-16 w-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-4"><Film className="h-8 w-8 text-purple-400" /></div>
-                          <h3 className="text-lg font-medium mb-2">Bring Images to Life</h3>
-                          <p className="text-sm text-muted-foreground max-w-xs">Upload a still image and describe how it should move.</p>
-                        </div>
-                      )}
-                    </motion.div>
-                  ) : isProcessing ? (
-                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center h-[500px] gap-4">
-                      <div className="relative">
-                        <Loader2 className="h-16 w-16 animate-spin text-purple-400" />
-                        <Film className="h-6 w-6 text-purple-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                      </div>
-                      <div className="text-center w-full px-12">
-                        <p className="text-foreground font-medium">Animating with Veo 2... {Math.round(progress)}%</p>
-                        <div className="w-full h-2 bg-muted rounded-full mt-3 overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full transition-all duration-1000 ease-linear" style={{ width: `${progress}%` }} />
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-2">This takes 1-3 minutes</p>
-                      </div>
-                    </motion.div>
-                  ) : videoUrl ? (
-                    <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <video controls autoPlay loop className="w-full" src={videoUrl} />
-                      <div className="p-4 border-t border-border/50 flex justify-end">
-                        <Button variant="outline" size="sm" onClick={() => { const a = document.createElement("a"); a.href = videoUrl; a.download = "dreamforge-animated.mp4"; a.click(); }}>
-                          <Download className="h-4 w-4 mr-2" />Download
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-          </div>
+          {history.isLoading ? (
+            <p>Loading your images…</p>
+          ) : history.isError ? (
+            <p role="alert">
+              Your images could not be loaded. Use Refresh to retry.
+            </p>
+          ) : !images.length ? (
+            <p className="text-sm text-muted-foreground">
+              Upload an image above or create one in the workspace.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {images.map(image => (
+                <button
+                  key={image.id}
+                  className="overflow-hidden rounded-lg border p-2 text-left hover:border-primary focus-visible:outline focus-visible:outline-2"
+                  onClick={() => {
+                    setSelected({
+                      userId: user.id,
+                      id: image.id,
+                      imageUrl: image.imageUrl!,
+                    });
+                    setOpen(true);
+                  }}
+                >
+                  <img
+                    src={image.imageUrl!}
+                    alt={image.prompt.slice(0, 120)}
+                    className="aspect-square w-full rounded object-cover"
+                    loading="lazy"
+                  />
+                  <span className="mt-2 block truncate text-xs">
+                    {image.prompt}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {videos.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="font-semibold">Your completed animations</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {videos.map(video => (
+                  <div key={video.id} className="rounded-lg border p-3">
+                    <video
+                      src={video.imageUrl!}
+                      controls
+                      preload="metadata"
+                      aria-label={`Animation ${video.id}`}
+                      className="w-full rounded"
+                    />
+                    <a
+                      href={video.imageUrl!}
+                      download={`dreamforge-animation-${video.id}.mp4`}
+                      className="mt-2 inline-block text-sm underline"
+                    >
+                      Download video
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
-      </div>
+      )}
+      <AnimationDialog
+        open={
+          open && Boolean(user) && (!selected || selected.userId === user?.id)
+        }
+        onOpenChange={setOpen}
+        generationId={
+          selected?.userId === user?.id ? (selected?.id ?? null) : null
+        }
+        sourceUrl={
+          selected?.userId === user?.id ? selected?.imageUrl : undefined
+        }
+        onComplete={() => {
+          void history.refetch();
+        }}
+      />
     </ToolPageLayout>
   );
 }

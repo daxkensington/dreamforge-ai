@@ -23,7 +23,7 @@ export const tagCategoryEnum = pgEnum("tagCategory", ["genre", "theme", "style",
 export const mediaTypeEnum = pgEnum("mediaType", ["image", "video"]);
 export const generationStatusEnum = pgEnum("generationStatus", ["pending", "generating", "completed", "failed"]);
 export const moderationStatusEnum = pgEnum("moderationStatus", ["pending", "approved", "rejected"]);
-export const videoProjectTypeEnum = pgEnum("videoProjectType", ["storyboard", "script", "scene-direction", "soundtrack"]);
+export const videoProjectTypeEnum = pgEnum("videoProjectType", ["storyboard", "script", "scene-direction", "soundtrack", "timeline"]);
 export const collabRoleEnum = pgEnum("collabRole", ["viewer", "editor"]);
 export const sharePermissionEnum = pgEnum("sharePermission", ["viewer", "editor"]);
 export const revisionSourceEnum = pgEnum("revisionSource", ["manual", "ai-refinement", "revert", "template"]);
@@ -113,8 +113,32 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const mediaUploads = pgTable("mediaUploads", {
+  id: uuid("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  key: text("key").notNull().unique(),
+  fileName: varchar("fileName", { length: 256 }).notNull(),
+  contentType: varchar("contentType", { length: 128 }).notNull(),
+  size: integer("size").notNull(),
+  purpose: varchar("purpose", { length: 16 }).notNull(),
+  partCount: integer("partCount").notNull(),
+  parts: jsonb("parts").notNull().default({}),
+  state: varchar("state", { length: 16 }).notNull().default("open"),
+  leaseToken: uuid("leaseToken"),
+  leaseUntil: timestamp("leaseUntil"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+}, table => [
+  index("mediaUploads_user_idx").on(table.userId), index("mediaUploads_expiry_idx").on(table.expiresAt),
+  check("mediaUploads_size_valid", sql`${table.size} BETWEEN 1 AND 26214400`),
+  check("mediaUploads_purpose_valid", sql`${table.purpose} IN ('timeline','training','animation')`),
+  check("mediaUploads_parts_valid", sql`${table.partCount} BETWEEN 1 AND 9 AND jsonb_typeof(${table.parts}) = 'object'`),
+  check("mediaUploads_state_valid", sql`${table.state} IN ('open','assembling','completed','failed')`),
+]);
+
 // Ownership and durable revocation survive account/content deletion and slow uploads.
 export const mediaAssets = pgTable("mediaAssets", {
+  isPrivate: boolean("isPrivate").default(false).notNull(),
   key: text("key").primaryKey(),
   ownerUserId: integer("ownerUserId").references(() => users.id),
   revokedAt: timestamp("revokedAt"),
@@ -1097,3 +1121,44 @@ export const analyticsEvents = pgTable(
 
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;
+
+// Custom training retains provider receipts and financial provenance across retries.
+export const trainingJobs = pgTable("trainingJobs", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  requestId: uuid("requestId").notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  trainingType: varchar("trainingType", { length: 16 }).notNull(),
+  triggerWord: varchar("triggerWord", { length: 32 }).notNull(),
+  steps: integer("steps").notNull(),
+  imageKeys: jsonb("imageKeys").notNull().$type<string[]>(),
+  archiveKey: text("archiveKey"),
+  state: varchar("state", { length: 24 }).notNull().default("draft"),
+  executionToken: uuid("executionToken").notNull(),
+  leaseToken: uuid("leaseToken"),
+  leaseUntil: timestamp("leaseUntil"),
+  providerRequestId: varchar("providerRequestId", { length: 128 }),
+  statusUrl: text("statusUrl"),
+  responseUrl: text("responseUrl"),
+  cancelUrl: text("cancelUrl"),
+  providerState: varchar("providerState", { length: 32 }),
+  queuePosition: integer("queuePosition"),
+  quotedCredits: integer("quotedCredits").notNull(),
+  purchasedCreditsDebited: integer("purchasedCreditsDebited").notNull().default(0),
+  debitTransactionId: integer("debitTransactionId"),
+  debitedAt: timestamp("debitedAt"),
+  refundedAt: timestamp("refundedAt"),
+  modelKey: text("modelKey"),
+  errorCode: varchar("errorCode", { length: 96 }),
+  expiresAt: timestamp("expiresAt").notNull(),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("trainingJobs_user_request_unique").on(table.userId, table.requestId),
+  uniqueIndex("trainingJobs_provider_request_unique").on(table.providerRequestId),
+  index("trainingJobs_user_state_idx").on(table.userId, table.state),
+  index("trainingJobs_state_updated_idx").on(table.state, table.updatedAt),
+]);
+export type TrainingJob = typeof trainingJobs.$inferSelect;

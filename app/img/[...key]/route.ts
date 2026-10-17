@@ -10,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { storageGetObject } from "../../../server/storage";
-import { isMediaRevoked, normalizeStorageKey } from "../../../server/_core/mediaLifecycle";
+import { isMediaPrivate, isMediaRevoked, normalizeStorageKey } from "../../../server/_core/mediaLifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ key
 
   let obj: Awaited<ReturnType<typeof storageGetObject>>;
   try {
-    if (await isMediaRevoked(key)) return new NextResponse("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+    if (await isMediaPrivate(key) || await isMediaRevoked(key)) return new NextResponse("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
     obj = await storageGetObject(key);
   } catch (err) {
     console.error("[/img] storage fetch failed:", key, err);

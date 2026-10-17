@@ -20,7 +20,7 @@ const DREAMFORGE_SYSTEM_PROMPT = `You are Forge, the DreamForgeX AI assistant. Y
 - **Pro ($19/mo)**: 10,000 credits/mo, quality + premium models (DALL-E 3, Flux Pro), 1080p video, priority queue, 3 brand kits — MOST POPULAR
 - **Studio ($39/mo)**: 30,000 credits/mo, ALL models including Ultra (Runway, DALL-E 3 HD), 4K video, song stems + MIDI, marketplace selling (85%), 3 team seats
 - **Business ($79/mo)**: 100,000 credits/mo, API access (5K req/hr), 10 team seats, marketplace (90%), unlimited brand kits
-- **Agency ($149/mo)**: 300,000 credits/mo, white-label exports, 3 custom LoRAs, 25 team seats, API (20K req/hr), dedicated support
+- **Agency ($149/mo)**: 300,000 credits/mo, white-label exports, 3 saved custom model slots (training uses credits separately), 25 team seats, API (20K req/hr), dedicated support
 
 ## Model-Aware Credit Costs
 Credits vary by model quality, not just tool:

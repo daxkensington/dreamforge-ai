@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanupExpiredMediaUploads } from "../../../../server/_core/mediaUpload";
 import { purgeRevokedMedia } from "../../../../server/_core/mediaLifecycle";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   try {
-    return NextResponse.json({ ok: true, ...await purgeRevokedMedia(100) });
+    const expiredUploads = await cleanupExpiredMediaUploads();
+    return NextResponse.json({ ok: true, expiredUploads, ...await purgeRevokedMedia(100) });
   } catch {
     return NextResponse.json({ ok: false, error: "Media cleanup unavailable" }, { status: 503 });
   }

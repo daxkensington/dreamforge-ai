@@ -1,3 +1,5 @@
+import { IMAGE_ANIMATION_POLICY } from "./imageAnimation";
+
 /**
  * Credit costs for every generation/tool operation.
  * Imported by both client (to show costs) and server (to deduct).
@@ -114,7 +116,7 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
   "text-to-image": 5,
   "image-to-image": 5,
   "text-to-video": 50,
-  "image-to-video": 40,
+  "image-to-video": IMAGE_ANIMATION_POLICY.creditCost,
   "storyboard": 15,
   "scene-director": 10,
   "video-style-transfer": 15,
@@ -286,7 +288,7 @@ export const SUBSCRIPTION_PLANS = [
       "API access (20,000 req/hr)",
       "25 team seats",
       "White-label exports",
-      "3 custom LoRAs included",
+      "3 saved custom model slots; training uses credits",
       "200,000 credit rollover",
       "Dedicated support",
     ],

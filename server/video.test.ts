@@ -664,22 +664,11 @@ describe("Video Studio Endpoints", () => {
       for (const key of PROVIDER_ENV_KEYS) delete process.env[key];
     });
 
-    it("refunds the 40-credit charge when all providers fail", async () => {
-      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 703, purchasedCreditsDebited: 0 });
-      const result = await caller.video.imageToVideo({
-        imageUrl: "https://example.com/photo.png",
-        prompt: "Slow cinematic zoom toward the subject",
-      });
-
-      expect(result.status).toBe("failed");
-      expect(result.videoUrl).toBeNull();
-      expect(deductCredits).toHaveBeenCalledWith(
-        1,
-        40,
-        expect.stringContaining("Image-to-video"),
-      );
-      expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(1, 40, expect.stringContaining("Refund"), { purchasedCredits: 0, operationKey: "legacy-refund:703" });
+    it("refuses legacy submissions without a durable request identity or accepted quote", async () => {
+      await expect(caller.video.imageToVideo({ imageUrl: "https://example.com/photo.png", prompt: "Slow cinematic zoom toward the subject" }))
+        .rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: expect.stringContaining("current quote") });
+      expect(deductCredits).not.toHaveBeenCalled();
+      expect(refundCredits).not.toHaveBeenCalled();
     });
 
     it("does not deduct or refund when the imageUrl fails the SSRF guard", async () => {

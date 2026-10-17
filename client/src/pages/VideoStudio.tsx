@@ -1268,6 +1268,7 @@ export default function VideoStudio() {
 
   return (
     <PageLayout>
+      <div className="mx-auto max-w-7xl px-4 pt-6"><Link href="/timeline/new"><Button variant="outline"><Film className="mr-2 h-4 w-4" />Open Timeline Editor</Button></Link></div>
       {/* Hero */}
       <div className="relative overflow-hidden border-b border-white/10 mb-8">
         <video

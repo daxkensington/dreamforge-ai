@@ -120,6 +120,20 @@
       "when": 1792180801000,
       "tag": "0016_media_revocation",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792267200000,
+      "tag": "0017_owned_training_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792267201000,
+      "tag": "0018_timeline_media_uploads",
+      "breakpoints": true
     }
   ]
 }

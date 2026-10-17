@@ -25,9 +25,12 @@ import { failLegacyJobAndRefund } from "../../../../server/_core/walletAccountin
 import { sweepGenerationBatches } from "../../../../server/_core/generationBatchBilling";
 import { TOOL_CREDIT_COSTS } from "../../../../shared/creditCosts";
 import { sweepStaleGenerationRequests } from "../../../../server/_core/generationBilling";
+import { sweepOwnedTrainingJobs } from "../../../../server/_core/modelTraining";
+import { sweepImageAnimations } from "../../../../server/_core/imageAnimation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const STALE_AFTER_MINUTES = 15;
 const BATCH_LIMIT = 200;
@@ -82,6 +85,11 @@ export async function GET(req: Request) {
   if (!db) {
     return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   }
+  // GET-only receipt recovery also runs when the creator has closed the page.
+  // One trainer + one custom image are the training share of this cron budget.
+  const [trainingCheck,animationCheck]=await Promise.allSettled([sweepOwnedTrainingJobs(),sweepImageAnimations(2)]);
+  const trainingRecovery=trainingCheck.status==='fulfilled'?trainingCheck.value:{expired:0,polled:0,errors:1};
+  const animationRecovery=animationCheck.status==='fulfilled'?animationCheck.value:{checked:0,completed:0,failed:0,pending:0,errors:1};
 
   // Durable generation requests own their exact debit/refund ledger. A stale
   // rendering request requires reconciliation; this legacy reaper cannot refund
@@ -171,6 +179,8 @@ export async function GET(req: Request) {
     requestReconciliation: requestSweep.kind === "swept" ? requestSweep.reconciliation : 0,
     requestRefunded: requestSweep.kind === "swept" ? requestSweep.refunded : 0,
     requestSweepUncertain: requestSweep.kind === "uncertain",
+    trainingRecovery,
+    animationRecovery,
     ts: new Date().toISOString(),
   });
 }

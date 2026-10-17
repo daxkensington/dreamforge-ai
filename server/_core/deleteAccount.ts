@@ -1,5 +1,6 @@
 /** Account/content scrubbing commits atomically; financial receipts remain. */
 import { eq, sql } from "drizzle-orm";
+import { trainingDeletionQueries } from "../dbTraining";
 import { getDb } from "../db";
 import { users, generations, audioGenerations, creditBalances, sceneKeyframes, videoProjects } from "../../drizzle/schema";
 import { cancelStripeSubscriptionsForCustomer } from "../stripe";
@@ -40,7 +41,7 @@ export async function deleteUserAccount(userId: number): Promise<void> {
   const authIdentities = sql`SELECT id FROM auth_users WHERE email = ${user.email}`;
   const active = sql`EXISTS (SELECT 1 FROM users WHERE id = ${userId} AND "loginMethod" IS DISTINCT FROM 'deleted')`;
   const financialMetadata = [
-    "generationRequestId", "requestId", "batchRequestId", "purchasedCreditsDebited", "purchasedCredits",
+    "trainingJobId", "generationRequestId", "requestId", "batchRequestId", "purchasedCreditsDebited", "purchasedCredits",
     "purchasedCreditsClawed", "purchasedCreditsRestored", "operationId", "operationKey",
     "stripeInvoiceId", "stripeSubscriptionId", "subscriptionItemId", "priceId", "periodStart", "periodEnd",
     "planId", "planName", "allowanceIndex", "allowanceStart", "paidPeriodEnd", "disputeId", "chargeId",
@@ -63,6 +64,8 @@ export async function deleteUserAccount(userId: number): Promise<void> {
       "errorCode" = CASE WHEN state IN ('reserved', 'submitting', 'reconciliation') THEN 'account-deleted' ELSE "errorCode" END,
       result = CASE WHEN result IS NULL THEN NULL ELSE '{"deleted":true}'::jsonb END, "updatedAt" = now()
       WHERE "userId" = ${userId} AND ${active}`),
+    ...trainingDeletionQueries(db, userId),
+    db.execute(sql`DELETE FROM "mediaUploads" WHERE "userId" = ${userId}`),
     db.execute(sql`DELETE FROM "galleryLikes" WHERE "userId" = ${userId} OR "galleryItemId" IN (${ownedGallery})`),
     db.execute(sql`DELETE FROM "galleryComments" WHERE "userId" = ${userId} OR "galleryItemId" IN (${ownedGallery})`),
     db.execute(sql`DELETE FROM "galleryItems" WHERE "userId" = ${userId}`),

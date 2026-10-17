@@ -14,7 +14,7 @@ export function normalizeStorageKey(value: string): string {
 export function storageKeyFromUrl(value: string): string | null {
   try {
     const url = new URL(value, "https://dreamforgex.ai");
-    const bases = ["https://dreamforgex.ai/img", "https://www.dreamforgex.ai/img", ...(ENV.r2PublicUrl ? [ENV.r2PublicUrl] : [])];
+    const bases = ["https://dreamforgex.ai/api/media", "https://www.dreamforgex.ai/api/media", "https://dreamforgex.ai/img", "https://www.dreamforgex.ai/img", ...(ENV.r2PublicUrl ? [ENV.r2PublicUrl] : [])];
     for (const base of bases) {
       const parsed = new URL(base);
       const prefix = parsed.pathname.replace(/\/$/, "") + "/";
@@ -50,18 +50,32 @@ async function database() {
 }
 
 /** Register before upload; a deletion racing the upload can then revoke it. */
-export async function registerMediaAsset(rawKey: string, userId?: number): Promise<void> {
+export async function registerMediaAsset(rawKey: string, userId?: number, isPrivate = false): Promise<void> {
   const key = normalizeStorageKey(rawKey);
   const db = await database();
   const result = userId === undefined
     ? await db.execute(sql`INSERT INTO "mediaAssets" (key) VALUES (${key})
         ON CONFLICT (key) DO UPDATE SET key = EXCLUDED.key
-        WHERE "mediaAssets"."ownerUserId" IS NULL AND "mediaAssets"."revokedAt" IS NULL RETURNING key`)
-    : await db.execute(sql`INSERT INTO "mediaAssets" (key, "ownerUserId")
-        SELECT ${key}, id FROM users WHERE id = ${userId} AND "loginMethod" IS DISTINCT FROM 'deleted' FOR SHARE
+        WHERE "mediaAssets"."ownerUserId" IS NULL AND "mediaAssets"."revokedAt" IS NULL AND NOT "mediaAssets"."isPrivate" RETURNING key`)
+    : await db.execute(sql`INSERT INTO "mediaAssets" (key, "ownerUserId", "isPrivate")
+        SELECT ${key}, id, ${isPrivate} FROM users WHERE id = ${userId} AND "loginMethod" IS DISTINCT FROM 'deleted' FOR SHARE
         ON CONFLICT (key) DO UPDATE SET key = EXCLUDED.key
-        WHERE "mediaAssets"."ownerUserId" = EXCLUDED."ownerUserId" AND "mediaAssets"."revokedAt" IS NULL RETURNING key`);
+        WHERE "mediaAssets"."ownerUserId" = EXCLUDED."ownerUserId" AND "mediaAssets"."revokedAt" IS NULL
+          AND "mediaAssets"."isPrivate" = EXCLUDED."isPrivate" RETURNING key`);
   if (((result as any).rows ?? result).length !== 1) throw new Error("This media upload is no longer allowed.");
+}
+
+export async function getMediaAsset(rawKey: string) {
+  const db = await database();
+  const [asset] = await db.select({ ownerUserId: mediaAssets.ownerUserId, isPrivate: mediaAssets.isPrivate,
+    revokedAt: mediaAssets.revokedAt, ownerDeleted: sql<boolean>`${users.loginMethod} = 'deleted'` })
+    .from(mediaAssets).leftJoin(users, eq(users.id, mediaAssets.ownerUserId))
+    .where(eq(mediaAssets.key, normalizeStorageKey(rawKey))).limit(1);
+  return asset;
+}
+
+export async function isMediaPrivate(rawKey: string) {
+  return (await getMediaAsset(rawKey))?.isPrivate === true;
 }
 
 export async function isMediaRevoked(rawKey: string): Promise<boolean> {

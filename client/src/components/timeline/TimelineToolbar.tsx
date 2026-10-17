@@ -17,6 +17,11 @@ import type { UseTimelineReturn } from "@/hooks/useTimeline";
 
 interface TimelineToolbarProps {
   timeline: UseTimelineReturn;
+  onUpload: () => void;
+  onGallery: () => void;
+  onExport: () => void;
+  readOnly?: boolean;
+  busy?: boolean;
 }
 
 const FPS = 30;
@@ -31,7 +36,7 @@ function formatTime(seconds: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}:${String(frames).padStart(2, "0")}`;
 }
 
-export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
+export default function TimelineToolbar({ timeline, onUpload, onGallery, onExport, readOnly, busy }: TimelineToolbarProps) {
   const { state, canUndo, canRedo, togglePlay, setPlayhead, setZoom, undo, redo, toggleSnap, addClip, addTrack, splitClip, setPlaying } = timeline;
 
   const handleSplitAtPlayhead = () => {
@@ -94,7 +99,7 @@ export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-3 py-1.5 bg-background/80 border-b border-border/30 backdrop-blur-sm">
       {/* Left: Edit tools */}
-      <div className="flex items-center gap-0.5">
+      <fieldset disabled={readOnly || busy} className="flex items-center gap-0.5 disabled:opacity-50">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSplitAtPlayhead}>
@@ -116,17 +121,13 @@ export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
             <TooltipContent>Add Clip</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>
-              <Sparkles className="mr-2 h-4 w-4" />
-              AI Generate
-            </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onUpload}>
               <Upload className="mr-2 h-4 w-4" />
               Upload
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onGallery}>
               <Image className="mr-2 h-4 w-4" />
-              From Gallery
+              My saved generations
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleAddVideoTrack}>
@@ -168,7 +169,7 @@ export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
           </TooltipTrigger>
           <TooltipContent>Redo (Ctrl+Shift+Z)</TooltipContent>
         </Tooltip>
-      </div>
+      </fieldset>
 
       {/* Center: Playback controls */}
       <div className="flex-1 flex items-center justify-center gap-1">
@@ -293,12 +294,12 @@ export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button disabled variant="default" size="sm" className="h-8 gap-1.5 px-3">
+            <Button onClick={onExport} disabled={busy || !state.clips.length} variant="default" size="sm" className="h-8 gap-1.5 px-3">
               <Download className="h-3.5 w-3.5" />
               <span className="text-xs">Export</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Video export is unavailable in this demo</TooltipContent>
+          <TooltipContent>Record a real 720p video with audio in this browser</TooltipContent>
         </Tooltip>
       </div>
     </div>

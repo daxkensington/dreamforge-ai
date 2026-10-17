@@ -3,10 +3,15 @@ import { randomUUID } from "node:crypto";
 const mocks = vi.hoisted(() => ({
   subscription: {} as Record<string, unknown>, read: vi.fn(), claim: vi.fn(), begin: vi.fn(), complete: vi.fn(), fail: vi.fn(), reconcile: vi.fn(),
   render: vi.fn(), createGeneration: vi.fn(), setTags: vi.fn(), active: vi.fn(), notify: vi.fn(), achievements: vi.fn(), deduct: vi.fn(),
+  resolveTrained: vi.fn(), renderTrained: vi.fn(), updateGeneration: vi.fn(),
 }));
 vi.mock("./db", async (original) => ({ ...(await original<Record<string, unknown>>()),
   getDb: vi.fn(async () => { const chain: Record<string, unknown> = {}; for (const key of ["select", "from", "innerJoin", "where", "orderBy"]) chain[key] = () => chain; chain.limit = async () => [mocks.subscription]; return chain; }),
   createGeneration: (...args: unknown[]) => mocks.createGeneration(...args), setGenerationTags: (...args: unknown[]) => mocks.setTags(...args),
+  updateGeneration: (...args: unknown[]) => mocks.updateGeneration(...args),
+}));
+vi.mock("./_core/modelTraining",async original=>({...await original<Record<string,unknown>>(),
+  resolveOwnedTrainingModel:(...args:unknown[])=>mocks.resolveTrained(...args),executeOwnedTrainingImage:(...args:unknown[])=>mocks.renderTrained(...args),
 }));
 vi.mock("./_core/generationBilling", () => ({
   readGenerationRequest: (...args: unknown[]) => mocks.read(...args), claimGenerationRequest: (...args: unknown[]) => mocks.claim(...args),
@@ -22,6 +27,7 @@ vi.mock("./routers/phase22", async (original) => ({ ...(await original<Record<st
 import { appRouter } from "./routers";
 import { hashGenerationRequest } from "./_core/generationRequest";
 import { DirectImageConfirmedRejection, DirectImageOutcomeUncertain } from "./_core/directImageProviders";
+import {ConfirmedTrainingImageFailure,TrainingImageOutcomeUncertain} from './_core/modelTraining';
 
 const input = () => ({ requestId: randomUUID(), prompt: "A fictional crystal mountain", modelVersion: "built-in-v1", mediaType: "image" as const, width: 768, height: 768, duration: 4, uncensored: false });
 const record = (request: ReturnType<typeof input>, state: string, extra: Record<string, unknown> = {}) => ({ id: 4, userId: 8, requestId: request.requestId, payloadHash: hashGenerationRequest(request), quotedCredits: 5, state, generationId: state === "reserved" ? null : 9, result: null, ...extra });
@@ -38,9 +44,12 @@ describe("generation request router ownership", () => {
     mocks.createGeneration.mockResolvedValue(9);
     mocks.setTags.mockResolvedValue(undefined);
     mocks.render.mockResolvedValue({ url: "https://assets.example/image.png" });
+    mocks.resolveTrained.mockResolvedValue({id:44,name:'My product',triggerWord:'qaproduct',creditCost:420,widthLimit:1024});
+    mocks.updateGeneration.mockResolvedValue(undefined);
+    mocks.renderTrained.mockImplementation(async (input)=>{await input.onProviderAccepted?.({requestId:'render_owned',statusUrl:'https://queue.fal.run/fal-ai/flux-lora/requests/render_owned/status',responseUrl:'https://queue.fal.run/fal-ai/flux-lora/requests/render_owned',acceptedAt:new Date().toISOString()});return{url:'/api/media/generations/custom/owned.jpg',key:'generations/custom/owned.jpg'};});
     mocks.claim.mockImplementation(async (identity) => ({ kind: "owned", owner: { ...identity, id: 4, executionToken: randomUUID() }, request: { id: 4, ...identity, quotedCredits: identity.credits, state: "reserved", generationId: null, result: null } }));
     mocks.begin.mockImplementation(async (owner) => ({ kind: "begun", request: { ...owner, state: "rendering", generationId: 9 } }));
-    mocks.complete.mockImplementation(async (owner, data) => ({ kind: "completed", request: { ...owner, quotedCredits: 5, state: "completed", generationId: 9, result: data.result } }));
+    mocks.complete.mockImplementation(async (owner, data) => ({ kind: "completed", request: { ...owner, quotedCredits: data.result.creditCost??5, state: "completed", generationId: 9, result: data.result } }));
     mocks.fail.mockImplementation(async (owner) => ({ kind: "refunded", request: { ...owner, quotedCredits: 5, state: "refunded", generationId: 9, result: null } }));
     mocks.reconcile.mockResolvedValue({ kind: "uncertain" });
   });
@@ -62,6 +71,34 @@ describe("generation request router ownership", () => {
     expect(await caller().generation.create(request)).toMatchObject({ status: "generating", requestId: request.requestId, id: 9 });
     expect(mocks.claim).not.toHaveBeenCalled();
     expect(mocks.render).not.toHaveBeenCalled();
+  });
+  it('dispatches an owned custom model at the exact quote and persists its recoverable receipt without fallback',async()=>{
+    const request={...input(),trainedModelId:44,modelVersion:'custom-trained',width:1024,height:1024,expectedCreditCost:420};
+    expect(await caller().generation.create(request)).toMatchObject({status:'completed',modelId:'custom-trained:44',creditCost:420});
+    expect(mocks.claim).toHaveBeenCalledWith(expect.objectContaining({credits:420}));
+    expect(mocks.renderTrained).toHaveBeenCalledTimes(1);expect(mocks.render).not.toHaveBeenCalled();
+    expect(mocks.updateGeneration).toHaveBeenCalledWith(9,expect.objectContaining({metadata:expect.objectContaining({trainedModelId:44,customTrainingReceipt:expect.objectContaining({requestId:'render_owned'})})}));
+  });
+  it('rejects a changed quote before reservation and replays an existing request before quote checks',async()=>{
+    await expect(caller().generation.create({...input(),expectedCreditCost:999})).rejects.toMatchObject({code:'PRECONDITION_FAILED'});
+    expect(mocks.claim).not.toHaveBeenCalled();
+    const request={...input(),trainedModelId:44};mocks.read.mockResolvedValue(record(request,'rendering'));
+    expect(await caller().generation.create({...request,expectedCreditCost:999})).toMatchObject({status:'generating'});
+    expect(mocks.resolveTrained).not.toHaveBeenCalled();
+  });
+  it('rejects foreign models and incompatible custom-model modes before debit',async()=>{
+    mocks.resolveTrained.mockRejectedValueOnce(new Error('Training job not found.'));
+    await expect(caller().generation.create({...input(),trainedModelId:45})).rejects.toThrow('not found');
+    await expect(caller().generation.create({...input(),trainedModelId:44,uncensored:true})).rejects.toMatchObject({code:'BAD_REQUEST'});
+    expect(mocks.claim).not.toHaveBeenCalled();expect(mocks.renderTrained).not.toHaveBeenCalled();
+  });
+  it('holds an uncertain custom image for durable recovery and refunds only a typed confirmed failure',async()=>{
+    mocks.renderTrained.mockRejectedValueOnce(new TrainingImageOutcomeUncertain('render_owned'));
+    expect(await caller().generation.create({...input(),trainedModelId:44})).toMatchObject({status:'generating',reconciliationRequired:true});
+    expect(mocks.fail).not.toHaveBeenCalled();expect(mocks.render).not.toHaveBeenCalled();
+    mocks.renderTrained.mockRejectedValueOnce(new ConfirmedTrainingImageFailure('Confirmed refusal'));
+    expect(await caller().generation.create({...input(),trainedModelId:44})).toMatchObject({status:'failed'});
+    expect(mocks.fail).toHaveBeenCalledTimes(1);
   });
   it("rejects a different payload using the same key before a debit", async () => {
     const request = input();

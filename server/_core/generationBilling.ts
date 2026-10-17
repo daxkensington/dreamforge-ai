@@ -126,7 +126,8 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
         WITH prior AS (
           SELECT id FROM "generationRequests" WHERE "userId" = ${input.userId} AND "requestId" = ${input.requestId}::uuid
         ), wallet_before AS (
-          SELECT cb.* FROM "creditBalances" cb WHERE cb."userId" = ${input.userId} FOR UPDATE
+          SELECT cb.* FROM "creditBalances" cb WHERE cb."userId" = ${input.userId}
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = cb."userId" AND u."loginMethod" IS DISTINCT FROM 'deleted') FOR UPDATE
         ), wallet AS (
           UPDATE "creditBalances" cb SET balance = wb.balance - ${input.credits},
             "bonusCredits" = CASE WHEN wb."walletAccountingVersion" = 1 THEN LEAST(wb."bonusCredits", GREATEST(wb.balance - ${input.credits}, 0)) ELSE wb."bonusCredits" END,
@@ -142,6 +143,7 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
             CASE WHEN EXISTS (SELECT 1 FROM wallet) THEN NULL ELSE COALESCE(${rejectedJson}::text::jsonb,
               jsonb_build_object('requestId', ${input.requestId}::uuid, 'status', 'failed', 'error', 'Insufficient credits.', 'needed', ${input.credits}::integer, 'creditCost', 0)) END
           WHERE NOT EXISTS (SELECT 1 FROM prior)
+            AND EXISTS (SELECT 1 FROM users u WHERE u.id = ${input.userId} AND u."loginMethod" IS DISTINCT FROM 'deleted')
           RETURNING *
         ), ledger AS (
           INSERT INTO "creditTransactions" ("userId", amount, "txType", description, "txMetadata")
@@ -169,7 +171,8 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
       WITH eligible AS (
         SELECT r.* FROM "generationRequests" r WHERE r.id = ${owner.id} AND r."userId" = ${owner.userId}
           AND r."requestId" = ${owner.requestId}::uuid AND r."payloadHash" = ${owner.payloadHash}
-          AND r."executionToken" = ${owner.executionToken}::uuid AND r.state = 'reserved' FOR UPDATE
+          AND r."executionToken" = ${owner.executionToken}::uuid AND r.state = 'reserved'
+          AND EXISTS (SELECT 1 FROM users u WHERE u.id = r."userId" AND u."loginMethod" IS DISTINCT FROM 'deleted') FOR UPDATE
       ), owned_generation AS (
         SELECT g.id FROM generations g JOIN eligible r ON g."userId" = r."userId"
           WHERE g.id = ${generationId} AND lower(g.metadata->>'billingRequestId') = r."requestId"::text

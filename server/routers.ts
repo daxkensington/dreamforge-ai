@@ -126,6 +126,11 @@ import { storyRouter } from "./routers/story";
 import { newsletterRouter } from "./routers/newsletter";
 import { collaborationRouter } from "./routers/collaboration";
 import { supportChatRouter } from "./routers/supportChat";
+import { mediaRouter } from "./routers/media";
+import { presentationRouter } from "./routers/presentation";
+import { timelineRouter } from "./routers/timeline";
+import { trainingRouter } from "./routers/training";
+import { animationRouter } from "./routers/animation";
 import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
 import { getDb } from "./db";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
@@ -416,6 +421,11 @@ const VIDEO_TEMPLATES: VideoTemplate[] = [
 ];
 
 export const appRouter = router({
+  media: mediaRouter,
+  presentation: presentationRouter,
+  timeline: timelineRouter,
+  training: trainingRouter,
+  animation: animationRouter,
   system: systemRouter,
 
   toolStatus: router({
@@ -560,6 +570,8 @@ export const appRouter = router({
           tagIds: z.array(z.number()).optional(),
           uncensored: z.boolean().default(false),
           uncensoredStyle: z.string().max(32).optional(),
+          trainedModelId: z.number().int().positive().optional(),
+          expectedCreditCost: z.number().int().positive().max(2_147_483_647).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -577,6 +589,12 @@ export const appRouter = router({
           throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Could not check your generation request. Retry with the same request ID." });
         }
         if (previousRequest) return replayGenerationResponse(previousRequest, requestIdentity.payloadHash, input.mediaType);
+
+        const training = input.trainedModelId ? await import("./_core/modelTraining") : undefined;
+        if (input.trainedModelId && (input.mediaType !== "image" || input.uncensored)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Custom models support standard image creation only." });
+        }
+        const trainedModel = input.trainedModelId && training ? await training.resolveOwnedTrainingModel(ctx.user.id, input.trainedModelId) : undefined;
 
         // Uncensored mode requires an active crypto-paid entitlement + age
         // attestation. Image-only (no uncensored video providers).
@@ -637,20 +655,20 @@ export const appRouter = router({
 
         // Standard image choices have one authoritative catalog, quote and
         // executor mapping. Validate before any wallet or generation writes.
-        const isImagePreset = Object.hasOwn(DF_LORA_MAP, input.modelVersion);
+        const isImagePreset = !trainedModel && Object.hasOwn(DF_LORA_MAP, input.modelVersion);
         if (input.uncensored && input.mediaType === "video") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Use the Uncensored Studio video tool for unfiltered video. No credits charged." });
         }
         if (isImagePreset && input.mediaType !== "image") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "DreamForge image styles support image creation only." });
         }
-        const imagePlan = input.mediaType === "image" && !input.uncensored && !isImagePreset
+        const imagePlan = input.mediaType === "image" && !input.uncensored && !isImagePreset && !trainedModel
           ? prepareImageCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height })
           : undefined;
         const videoPlan = input.mediaType === "video"
           ? prepareVideoCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height, duration: input.duration })
           : undefined;
-        const requestedModel = getModelById(input.modelVersion);
+        const requestedModel = trainedModel ? undefined : getModelById(input.modelVersion);
         if (!input.uncensored && requestedModel && requestedModel.type !== input.mediaType) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a model that supports the requested media type." });
         }
@@ -684,7 +702,11 @@ export const appRouter = router({
         } catch (error) {
           throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: safeErrorMessage(error, "generation.create:tool-status") });
         }
-        const quotedCost = imagePlan?.creditCost ?? videoPlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
+        const { getTrainingImageCredits } = await import("../shared/training");
+        const quotedCost = trainedModel ? getTrainingImageCredits(input.width,input.height) : imagePlan?.creditCost ?? videoPlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
+        if (input.expectedCreditCost !== undefined && input.expectedCreditCost !== quotedCost) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The generation quote changed. Review the current price before starting a new request. No credits charged." });
+        }
         const claim = await claimGenerationRequest({ ...requestIdentity, credits: quotedCost });
         if (claim.kind === "conflict") throw new TRPCError({ code: "CONFLICT", message: "This request ID already belongs to a different generation. Start a new request." });
         if (claim.kind === "replay") return replayGenerationResponse(claim.request, requestIdentity.payloadHash, input.mediaType);
@@ -699,7 +721,9 @@ export const appRouter = router({
         let savedResponse;
         let imageProvenance: Awaited<ReturnType<typeof executeImageCreation>>["provenance"];
         let videoProvenance: Awaited<ReturnType<typeof executeVideoCreation>>["provenance"];
-        const generationMetadata = input.uncensored
+        const generationMetadata = trainedModel
+          ? { billingRequestId: input.requestId, trainedModelId: trainedModel.id, modelName: trainedModel.name, quotedCredits: quotedCost }
+          : input.uncensored
           ? { billingRequestId: input.requestId, uncensored: true, style: input.uncensoredStyle ?? null }
           : imagePlan
             ? { billingRequestId: input.requestId, requestedModelId: imagePlan.requestedModelId, modelId: imagePlan.modelId, quotedCredits: imagePlan.creditCost }
@@ -727,7 +751,7 @@ export const appRouter = router({
             height: input.height,
             duration: input.mediaType === "video" ? input.duration : null,
             status: "generating",
-            modelVersion: input.modelVersion,
+            modelVersion: trainedModel ? `custom-trained:${trainedModel.id}` : input.modelVersion,
             // Uncensored generations remain private-only.
             metadata: generationMetadata,
           });
@@ -750,6 +774,8 @@ export const appRouter = router({
           let enhancedPrompt: string;
           if (input.mediaType === "video") {
             enhancedPrompt = `${input.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${input.width}x${input.height} resolution, ${input.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`;
+          } else if (trainedModel) {
+            enhancedPrompt = input.prompt;
           } else if (input.uncensored) {
             // Style steering (realistic/anime/fantasy/…) + the fictional-content
             // liability clause. applyUncensoredStyle keeps both in one place.
@@ -778,7 +804,15 @@ export const appRouter = router({
             }
           }
 
-          if (videoPlan) {
+          if (trainedModel && training) {
+            providerInvocationStarted = true;
+            const rendered = await training.executeOwnedTrainingImage({userId:ctx.user.id,trainedModelId:trainedModel.id,prompt:enhancedPrompt,width:input.width,height:input.height,
+              onProviderAccepted: async receipt => {
+                await updateGeneration(genId!, { metadata: { ...generationMetadata, customTrainingReceipt: receipt } });
+              },
+            });
+            url = rendered.url;
+          } else if (videoPlan) {
             providerInvocationStarted = true;
             const rendered = await executeVideoCreation(videoPlan, { prompt: enhancedPrompt, negativePrompt: input.negativePrompt });
             url = rendered.url;
@@ -813,7 +847,7 @@ export const appRouter = router({
 
           if (!url?.trim()) throw new Error("The media provider returned no downloadable result.");
 
-          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : videoPlan ? { modelId: videoPlan.modelId, provenance: videoProvenance, creditCost: deduction.cost } : {}) };
+          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(trainedModel ? {modelId:`custom-trained:${trainedModel.id}`,creditCost:deduction.cost} : imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : videoPlan ? { modelId: videoPlan.modelId, provenance: videoProvenance, creditCost: deduction.cost } : {}) };
           // The completed generation and immutable replay result commit together.
           // A lost acknowledgement must not enter the failure-refund path.
           let completion;
@@ -862,7 +896,7 @@ export const appRouter = router({
           // response, polling timeout or storage failure cannot prove a terminal
           // provider failure. Only the direct adapter's typed terminal refusal
           // authorizes refund after invocation; other outcomes stay for review.
-          if (providerInvocationStarted && !isConfirmedDirectImageRejection(error)) return pendingForReview("provider-outcome-uncertain");
+          if (providerInvocationStarted && !isConfirmedDirectImageRejection(error) && !training?.isConfirmedTrainingImageFailure(error)) return pendingForReview("provider-outcome-uncertain");
           // State, exact refund and refund ledger are one guarded operation.
           try {
             const settled = await failGenerationRequestAndRefund(requestOwner, { confirmedFailure: true, errorCode: "generation-failed", errorMessage: failureMessage, generationId: genId });
@@ -934,6 +968,9 @@ export const appRouter = router({
             message: "Only completed generations can be submitted",
           });
         }
+        if (gen.imageUrl?.startsWith("/api/media/") || (gen.metadata as any)?.trainedModelId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Private creations cannot be published to the public gallery. Download them for your own use." });
+        }
         // Uncensored generations are private-only — the public gallery has
         // no age gate, so adult content can never enter it.
         if ((gen.metadata as any)?.uncensored) {
@@ -994,7 +1031,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Image animation is currently unavailable. Use the Video Studio image-to-video tool. No credits charged." });
+        throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Use the Image-to-Video tool to select an owned image and review its current quote. No credits charged." });
 
       }),
 
@@ -5168,123 +5205,8 @@ export const appRouter = router({
           motionType: z.enum(["subtle", "moderate", "dynamic", "cinematic-zoom", "pan-left", "pan-right", "zoom-in", "zoom-out"]).default("moderate"),
         })
       )
-      .mutation(async ({ ctx, input }) => {
-        // Rate limit: 10 video requests per minute per user
-        await enforceRateLimit(`video.imageToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
-        // SSRF guard: imageUrl is fetched server-side (Veo 3 path below) and
-        // forwarded to providers that fetch it themselves. Reject non-https
-        // or private/loopback/metadata hosts before any credits are spent.
-        assertSafeImageUrl(input.imageUrl);
-        const deduction = await tryDeductCredits(ctx.user.id, "image-to-video", "Image-to-video generation");
-
-        try {
-        const motionDescriptions: Record<string, string> = {
-          "subtle": "very subtle gentle motion, slight parallax, breathing effect",
-          "moderate": "moderate natural motion, elements gently moving, ambient animation",
-          "dynamic": "dynamic movement, active motion, energetic camera work",
-          "cinematic-zoom": "slow cinematic zoom with dramatic reveal",
-          "pan-left": "smooth camera pan from right to left, revealing the scene",
-          "pan-right": "smooth camera pan from left to right, revealing the scene",
-          "zoom-in": "gradual zoom in towards the focal point, increasing intimacy",
-          "zoom-out": "gradual zoom out revealing the full scene, establishing shot",
-        };
-        const enhancedPrompt = `${input.prompt}. Motion: ${motionDescriptions[input.motionType]}. Smooth, professional quality video animation.`;
-        const errors: string[] = [];
-
-        // Veo 3 image-to-video — gated behind VEO3_ENABLED. See note above the
-        // text-to-video path. Default behavior now skips Veo 3 and goes
-        // straight to Runway / Kling / Minimax.
-        if (process.env.VEO3_ENABLED === "true" && process.env.GEMINI_API_KEY) {
-          try {
-            // Guarded fetch: https-only + private-host block + image
-            // content-type + 20MB declared / 25MB actual size caps
-            // (see server/_core/imageUrlGuard).
-            const { buffer: imgBuffer, contentType: mimeType } = await fetchGuardedImage(input.imageUrl);
-            const imgBase64 = imgBuffer.toString("base64");
-            const { generateVeo3Video } = await import("./_core/videoGeneration");
-            const videoUrl = await generateVeo3Video({
-              prompt: enhancedPrompt,
-              durationSeconds: parseInt(input.duration),
-              imageBase64: imgBase64,
-              imageMimeType: mimeType,
-            });
-            return { videoUrl, status: "completed" as const, duration: input.duration, model: "veo-3" };
-          } catch (err: any) {
-            errors.push(`Veo 3: ${err.message}`);
-            console.warn("[I2V] Veo 3 failed, trying next:", err.message);
-          }
-        }
-
-        // Priority 2: Runway Gen-4.5 image-to-video
-        if (process.env.RUNWAY_API_KEY) {
-          try {
-            const { RunwayProvider } = await import("./_core/providers/runway");
-            const provider = new RunwayProvider();
-            const result = await provider.generate({
-              prompt: enhancedPrompt,
-              model: "runway-gen4.5",
-              options: { duration: parseInt(input.duration), imageUrl: input.imageUrl },
-            });
-            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "runway-gen4.5" };
-          } catch (err: any) {
-            errors.push(`Runway: ${err.message}`);
-            console.warn("[I2V] Runway failed, trying next:", err.message);
-          }
-        }
-
-        // Priority 3: Kling image-to-video
-        if (process.env.KLING_ACCESS_KEY) {
-          try {
-            const { KlingProvider } = await import("./_core/providers/kling");
-            const provider = new KlingProvider();
-            const result = await provider.generate({
-              prompt: enhancedPrompt,
-              model: "kling-2.0",
-              options: { duration: parseInt(input.duration), imageUrl: input.imageUrl },
-            });
-            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "kling-2.0" };
-          } catch (err: any) {
-            errors.push(`Kling: ${err.message}`);
-            console.warn("[I2V] Kling failed, trying next:", err.message);
-          }
-        }
-
-        // Priority 4: Minimax via Replicate (final fallback)
-        if (process.env.REPLICATE_API_TOKEN) {
-          try {
-            const { ReplicateProvider } = await import("./_core/providers/replicate");
-            const provider = new ReplicateProvider();
-            const result = await provider.generate({
-              prompt: enhancedPrompt,
-              model: "minimax-video",
-              options: { prompt_optimizer: true, first_frame_image: input.imageUrl },
-            });
-            return { videoUrl: result.url, status: "completed" as const, duration: input.duration, model: "minimax" };
-          } catch (err: any) {
-            errors.push(`Minimax: ${err.message}`);
-          }
-        }
-
-        logToolFailure({
-          toolId: "image-to-video",
-          errorMessage: errors.join("; "),
-          provider: "veo+runway+kling+minimax",
-          userId: ctx.user.id,
-        });
-        throw new Error(`All image-to-video providers failed:\n${errors.join("\n")}`);
-        } catch (error: any) {
-          // Refund credits on generation failure — the user received no video.
-          try {
-            await refundCredits(ctx.user.id, deduction.cost, `Refund: image-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: deduction.purchasedCreditsDebited, operationKey: `legacy-refund:${deduction.transactionId}` });
-          } catch (refundErr) {
-            console.error("[video.imageToVideo] Credit refund failed:", refundErr);
-          }
-          return {
-            videoUrl: null,
-            status: "failed" as const,
-            error: error?.message || "Image-to-video generation failed",
-          };
-        }
+      .mutation(() => {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Use the Image-to-Video tool to upload or select an owned image and accept its current quote. No credits charged." });
       }),
   }),
 

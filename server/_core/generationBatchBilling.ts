@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { walletRows } from "./walletAccounting";
 
-export async function claimGenerationBatch(input: { userId: number; requestId: string; payloadHash: string; credits: number }) {
+export async function claimGenerationBatch(input: { userId: number; requestId: string; payloadHash: string; credits: number; description?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable for generation submission.");
   const read = async () => walletRows(await db.execute(sql`SELECT * FROM "generationBatchRequests" WHERE "userId" = ${input.userId} AND "requestId" = ${input.requestId}`))[0];
@@ -32,7 +32,7 @@ export async function claimGenerationBatch(input: { userId: number; requestId: s
         WHERE NOT EXISTS (SELECT 1 FROM prior) RETURNING *
       ), ledger AS (
         INSERT INTO "creditTransactions" ("userId", amount, "txType", description, "txMetadata")
-        SELECT c."userId", -c."quotedCredits", 'usage', 'Uncensored image batch reservation',
+        SELECT c."userId", -c."quotedCredits", 'usage', ${input.description ?? "Uncensored image batch reservation"},
           jsonb_build_object('batchRequestId', c.id, 'requestId', c."requestId", 'purchasedCreditsDebited', c."purchasedCreditsDebited")
         FROM claimed c WHERE c.state = 'reserved' RETURNING id
       ) SELECT c.*, (SELECT balance FROM wallet) AS balance FROM claimed c WHERE c.state = 'rejected' OR EXISTS (SELECT 1 FROM ledger)`));

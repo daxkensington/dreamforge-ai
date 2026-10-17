@@ -34,6 +34,11 @@ export const ENV = {
   get r2SecretAccessKey() { return process.env.R2_SECRET_ACCESS_KEY ?? ""; },
   get r2BucketName() { return process.env.R2_BUCKET_NAME ?? "dreamforge-assets"; },
   get r2PublicUrl() { return process.env.R2_PUBLIC_URL ?? ""; },
+  // Private user media never shares the public-assets bucket or credentials.
+  get r2PrivateBucketName() { return process.env.R2_PRIVATE_BUCKET_NAME ?? ""; },
+  get r2PrivateAccessKeyId() { return process.env.R2_PRIVATE_ACCESS_KEY_ID ?? ""; },
+  get r2PrivateSecretAccessKey() { return process.env.R2_PRIVATE_SECRET_ACCESS_KEY ?? ""; },
+  get r2PrivateReadToken() { return process.env.R2_PRIVATE_READ_TOKEN ?? ""; },
   // RunPod Self-Hosted
   get runpodApiKey() { return process.env.RUNPOD_API_KEY ?? ""; },
   get runpodFluxEndpointId() { return process.env.RUNPOD_FLUX_ENDPOINT_ID ?? ""; },

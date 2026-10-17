@@ -19,6 +19,11 @@ describe("generation request replay contract", () => {
   it("rejects a reused identity with different content", () => {
     expect(() => replayGenerationResponse(record("rendering"), "different", "image")).toThrow("different generation");
   });
+  it("binds custom model identity while preserving existing untrained request hashes", () => {
+    expect(hashGenerationRequest({...input,trainedModelId:1})).not.toBe(hashGenerationRequest(input));
+    expect(hashGenerationRequest({...input,trainedModelId:1})).not.toBe(hashGenerationRequest({...input,trainedModelId:2}));
+    expect(hashGenerationRequest({...input,trainedModelId:undefined})).toBe(hashGenerationRequest(input));
+  });
   it("replays the saved completed result without a new quote", () => {
     const result = { id: 3, status: "completed", imageUrl: "https://assets.example/image.png", mediaType: "image", creditCost: 5, newAchievements: [] };
     expect(replayGenerationResponse(record("completed", { generationId: 3, result }), hashGenerationRequest(input), "image")).toEqual({ ...result, requestId: record("completed").requestId });

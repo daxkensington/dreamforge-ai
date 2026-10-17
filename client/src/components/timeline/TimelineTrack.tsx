@@ -9,6 +9,7 @@ import TimelineClip from "./TimelineClip";
 
 interface TimelineTrackProps {
   track: Track;
+  readOnly?: boolean;
   clips: Clip[];
   zoom: number;
   pixelsPerSecond: number;
@@ -38,6 +39,7 @@ const TRACK_ACCENT: Record<string, string> = {
 
 export default function TimelineTrack({
   track,
+  readOnly,
   clips,
   zoom,
   pixelsPerSecond,
@@ -59,7 +61,7 @@ export default function TimelineTrack({
   return (
     <div className={`flex border-b border-border/30 hover:bg-white/[0.02] transition-colors ${track.isLocked ? "opacity-60" : ""}`}>
       {/* Track label */}
-      <div className={`w-48 shrink-0 flex flex-col gap-1.5 p-2 border-r border-border/30 border-l-2 ${accent} bg-background/60`}>
+      <div className={`w-48 shrink-0 sticky left-0 z-30 flex flex-col gap-1.5 p-2 border-r border-border/30 border-l-2 ${accent} bg-background`}>
         <div className="flex items-center gap-2">
           <Icon className="h-3.5 w-3.5 opacity-60" />
           <span className="text-xs font-medium truncate flex-1">{track.name}</span>
@@ -70,6 +72,8 @@ export default function TimelineTrack({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                disabled={readOnly}
+                aria-label={`${track.isMuted ? "Unmute" : "Mute"} ${track.name}`}
                 onClick={() => onUpdateTrack(track.id, { isMuted: !track.isMuted })}
                 className={`h-6 w-6 flex items-center justify-center rounded transition-colors
                   ${track.isMuted ? "bg-red-500/20 text-red-400" : "hover:bg-white/10 text-muted-foreground"}`}
@@ -84,6 +88,8 @@ export default function TimelineTrack({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                disabled={readOnly}
+                aria-label={`${track.isSolo ? "Unsolo" : "Solo"} ${track.name}`}
                 onClick={() => onUpdateTrack(track.id, { isSolo: !track.isSolo })}
                 className={`h-6 w-6 flex items-center justify-center rounded transition-colors
                   ${track.isSolo ? "bg-yellow-500/20 text-yellow-400" : "hover:bg-white/10 text-muted-foreground"}`}
@@ -98,6 +104,8 @@ export default function TimelineTrack({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                disabled={readOnly}
+                aria-label={`${track.isLocked ? "Unlock" : "Lock"} ${track.name}`}
                 onClick={() => onUpdateTrack(track.id, { isLocked: !track.isLocked })}
                 className={`h-6 w-6 flex items-center justify-center rounded transition-colors
                   ${track.isLocked ? "bg-blue-500/20 text-blue-400" : "hover:bg-white/10 text-muted-foreground"}`}
@@ -108,25 +116,15 @@ export default function TimelineTrack({
             <TooltipContent side="bottom">{track.isLocked ? "Unlock" : "Lock"}</TooltipContent>
           </Tooltip>
 
-          {/* Visibility */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => onUpdateTrack(track.id, { isMuted: !track.isMuted })}
-                className={`h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-white/10 text-muted-foreground`}
-              >
-                {track.isMuted ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{track.isMuted ? "Show" : "Hide"}</TooltipContent>
-          </Tooltip>
         </div>
 
         {/* Volume slider for audio tracks */}
-        {track.type === "audio" && (
+        {track.type !== "text" && (
           <div className="flex items-center gap-2 px-0.5">
             <Volume2 className="h-3 w-3 text-muted-foreground shrink-0" />
             <Slider
+              disabled={readOnly}
+              aria-label={`${track.name} volume`}
               value={[track.volume * 100]}
               onValueChange={([v]) => onUpdateTrack(track.id, { volume: v / 100 })}
               max={100}
@@ -167,7 +165,7 @@ export default function TimelineTrack({
             <TimelineClip
               key={clip.id}
               clip={clip}
-              track={track}
+              track={readOnly ? { ...track, isLocked: true } : track}
               zoom={zoom}
               isSelected={clip.id === selectedClipId}
               pixelsPerSecond={pixelsPerSecond}

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ContextMenu,
@@ -57,6 +57,8 @@ export default function TimelineClip({
   const [isResizingRight, setIsResizingRight] = useState(false);
   const dragStartRef = useRef({ x: 0, startTime: 0 });
   const resizeStartRef = useRef({ x: 0, startTime: 0, duration: 0 });
+  const interactionCleanup = useRef<() => void>(() => {});
+  useEffect(() => () => interactionCleanup.current(), []);
 
   const left = clip.startTime * pixelsPerSecond;
   const width = Math.max(clip.duration * pixelsPerSecond, 20);
@@ -72,6 +74,7 @@ export default function TimelineClip({
       e.preventDefault();
       e.stopPropagation();
       onSelect();
+      interactionCleanup.current();
       setIsDragging(true);
       dragStartRef.current = { x: e.clientX, startTime: clip.startTime };
 
@@ -90,6 +93,7 @@ export default function TimelineClip({
 
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
+      interactionCleanup.current = () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
     },
     [clip.startTime, pixelsPerSecond, onMove, onSelect, track.isLocked]
   );
@@ -100,6 +104,7 @@ export default function TimelineClip({
       if (track.isLocked) return;
       e.preventDefault();
       e.stopPropagation();
+      interactionCleanup.current();
       setIsResizingLeft(true);
       resizeStartRef.current = { x: e.clientX, startTime: clip.startTime, duration: clip.duration };
 
@@ -121,6 +126,7 @@ export default function TimelineClip({
 
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
+      interactionCleanup.current = () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
     },
     [clip.startTime, clip.duration, pixelsPerSecond, onResize, track.isLocked]
   );
@@ -131,6 +137,7 @@ export default function TimelineClip({
       if (track.isLocked) return;
       e.preventDefault();
       e.stopPropagation();
+      interactionCleanup.current();
       setIsResizingRight(true);
       resizeStartRef.current = { x: e.clientX, startTime: clip.startTime, duration: clip.duration };
 
@@ -149,6 +156,7 @@ export default function TimelineClip({
 
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
+      interactionCleanup.current = () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
     },
     [clip.duration, pixelsPerSecond, onResize, track.isLocked]
   );
@@ -160,6 +168,10 @@ export default function TimelineClip({
       <ContextMenuTrigger asChild>
         <motion.div
           ref={clipRef}
+          role="button"
+          tabIndex={0}
+          aria-label={`${displayName}, ${clip.startTime.toFixed(1)} seconds, duration ${clip.duration.toFixed(1)} seconds`}
+          onKeyDown={event => { if (event.key === "Enter") { event.stopPropagation(); onSelect(); } }}
           className={`absolute top-1 bottom-1 rounded-md border cursor-grab select-none flex items-center overflow-hidden group
             ${colors.bg} ${colors.border}
             ${isSelected ? "ring-2 ring-white/50 shadow-lg shadow-white/10" : ""}
@@ -196,17 +208,6 @@ export default function TimelineClip({
             <span className="text-[10px] font-medium truncate opacity-90">
               {displayName}
             </span>
-            {clip.type === "audio" && (
-              <div className="flex-1 flex items-center gap-0.5 opacity-40 ml-1">
-                {Array.from({ length: Math.min(Math.floor(width / 6), 40) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-0.5 bg-current rounded-full"
-                    style={{ height: `${4 + Math.random() * 14}px` }}
-                  />
-                ))}
-              </div>
-            )}
             {clip.type === "video" && clip.thumbnailUrl && (
               <div className="absolute inset-0 opacity-20">
                 <img
@@ -233,21 +234,16 @@ export default function TimelineClip({
       </ContextMenuTrigger>
 
       <ContextMenuContent className="w-48">
-        <ContextMenuItem onClick={() => onSplit(clip.startTime + clip.duration / 2)}>
+        <ContextMenuItem disabled={track.isLocked} onClick={() => onSplit(clip.startTime + clip.duration / 2)}>
           <Scissors className="mr-2 h-4 w-4" />
-          Split at Playhead
+          Split in Half
         </ContextMenuItem>
-        <ContextMenuItem onClick={onDuplicate}>
+        <ContextMenuItem disabled={track.isLocked} onClick={onDuplicate}>
           <Copy className="mr-2 h-4 w-4" />
           Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem>
-          <Sparkles className="mr-2 h-4 w-4" />
-          Replace with AI
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+        <ContextMenuItem disabled={track.isLocked} onClick={onDelete} className="text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </ContextMenuItem>

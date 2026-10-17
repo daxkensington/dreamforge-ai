@@ -73,6 +73,12 @@ describe("Generation retry identity", () => {
     expect(await fingerprintGenerationInput({ prompt: "edited draft", width: 768 })).not.toBe(first);
   });
 
+  it("keeps an accepted request identity when only the displayed quote refreshes", async () => {
+    const payload = { prompt: "A ceramic lamp", trainedModelId: 7, width: 768, height: 768 };
+    expect(await fingerprintGenerationInput({ ...payload, expectedCreditCost: 210 })).toBe(await fingerprintGenerationInput({ ...payload, expectedCreditCost: 420 }));
+    expect(await fingerprintGenerationInput(payload)).not.toBe(await fingerprintGenerationInput({ ...payload, trainedModelId: 8 }));
+  });
+
   it("reuses one identity for unchanged retries and creates a new one for edits or another user", () => {
     const previous = resolveGenerationRequestIdentity(null, 7, "a".repeat(64), () => firstUuid);
     expect(resolveGenerationRequestIdentity(previous, 7, "a".repeat(64), () => secondUuid)).toBe(previous);

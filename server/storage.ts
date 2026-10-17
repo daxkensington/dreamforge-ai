@@ -2,8 +2,10 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
 import { nanoid } from "nanoid";
+import { createHash } from "node:crypto";
 import { storageOwner } from "./_core/storageContext";
-import { confirmMediaUpload, normalizeStorageKey, registerMediaAsset } from "./_core/mediaLifecycle";
+import { confirmMediaUpload, getMediaAsset, normalizeStorageKey, registerMediaAsset } from "./_core/mediaLifecycle";
+import { assertPrivateStorage, privateStorageConfig, type PrivateStorageConfig } from "./_core/privateStorage";
 
 // Lazy S3 client for R2
 let _s3: S3Client | null = null;
@@ -22,6 +24,25 @@ function getS3(): S3Client {
 }
 
 const BUCKET = () => ENV.r2BucketName;
+let privateClient: { fingerprint: string; client: S3Client } | undefined;
+function getPrivateS3(config: PrivateStorageConfig): S3Client {
+  const fingerprint = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+  if (privateClient?.fingerprint !== fingerprint) privateClient = { fingerprint, client: new S3Client({ region: "auto",
+    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`, credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey } }) };
+  return privateClient.client;
+}
+async function objectLocation(key: string, deleting = false) {
+  const asset = await getMediaAsset(key);
+  if (asset?.isPrivate) {
+    // Deletion removes exposure even if public-access auditing is unavailable.
+    const config = deleting ? privateStorageConfig() : await assertPrivateStorage();
+    return { client: getPrivateS3(config), bucket: config.bucket, asset };
+  }
+  return { client: getS3(), bucket: BUCKET(), asset };
+}
+const assertReadable = (asset: Awaited<ReturnType<typeof getMediaAsset>>) => {
+  if (asset?.revokedAt || asset?.ownerDeleted) throw new Error("This media is no longer available.");
+};
 
 /**
  * Upload a file to R2
@@ -33,15 +54,19 @@ const BUCKET = () => ENV.r2BucketName;
 export async function storagePut(
   key: string,
   data: Buffer | Uint8Array | string,
-  contentType: string = "application/octet-stream"
+  contentType: string = "application/octet-stream",
+  options: { isPrivate?: boolean } = {}
 ): Promise<{ key: string; url: string }> {
   const finalKey = normalizeStorageKey(key);
-  await registerMediaAsset(finalKey, storageOwner());
+  if (options.isPrivate && !storageOwner()) throw new Error("Private media requires an owner.");
+  const config = options.isPrivate ? await assertPrivateStorage() : undefined;
+  const client = config ? getPrivateS3(config) : getS3(), bucket = config?.bucket ?? BUCKET();
+  await registerMediaAsset(finalKey, storageOwner(), options.isPrivate === true);
 
   try {
-    await getS3().send(
+    await client.send(
       new PutObjectCommand({
-        Bucket: BUCKET(),
+        Bucket: bucket,
         Key: finalKey,
         Body: typeof data === "string" ? Buffer.from(data, "base64") : data,
         ContentType: contentType,
@@ -53,11 +78,43 @@ export async function storagePut(
   }
 
   await confirmMediaUpload(finalKey);
-  const url = ENV.r2PublicUrl
+  const url = options.isPrivate ? `/api/media/${finalKey}` : ENV.r2PublicUrl
     ? `${ENV.r2PublicUrl}/${finalKey}`
-    : await getSignedUrl(getS3(), new GetObjectCommand({ Bucket: BUCKET(), Key: finalKey }), { expiresIn: 3600 * 24 * 7 });
+    : await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: finalKey }), { expiresIn: 3600 * 24 * 7 });
 
   return { key: finalKey, url };
+}
+
+/** Internal bounded read. Callers must authorize the registered key first. */
+export async function storageGetObjectBounded(key: string, maxBytes: number): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 256 * 1024 * 1024) throw new Error("Invalid object size limit.");
+  let body: any;
+  try {
+    const finalKey = normalizeStorageKey(key), location = await objectLocation(finalKey); assertReadable(location.asset);
+    const response = await location.client.send(new GetObjectCommand({ Bucket: location.bucket, Key: finalKey }));
+    body = response.Body;
+    if (!body) throw new Error("Empty storage response.");
+    if ((response.ContentLength ?? 0) > maxBytes) throw new Error("Object exceeds size limit.");
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
+      total += chunk.byteLength;
+      if (total > maxBytes) throw new Error("Object exceeds size limit.");
+      chunks.push(Buffer.from(chunk));
+    }
+    return { bytes: Buffer.concat(chunks), contentType: response.ContentType ?? "application/octet-stream" };
+  } catch (error: any) {
+    if (error?.$metadata?.httpStatusCode === 404 || error?.name === "NoSuchKey") return null;
+    throw error;
+  } finally { body?.destroy?.(); }
+}
+
+/** Fresh private provider/download URL; never fall back to a public alias. */
+export async function storageGetSigned(key: string, expiresIn = 3600): Promise<string> {
+  if (!Number.isInteger(expiresIn) || expiresIn < 60 || expiresIn > 3600) throw new Error("Invalid download expiry.");
+  const finalKey = normalizeStorageKey(key);
+  const location = await objectLocation(finalKey); assertReadable(location.asset);
+  return getSignedUrl(location.client, new GetObjectCommand({ Bucket: location.bucket, Key: finalKey }), { expiresIn });
 }
 
 /**
@@ -68,9 +125,10 @@ export async function storagePut(
 export async function storageGetObject(
   key: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
-  const finalKey = key.startsWith("/") ? key.slice(1) : key;
+  const finalKey = normalizeStorageKey(key);
   try {
-    const res = await getS3().send(new GetObjectCommand({ Bucket: BUCKET(), Key: finalKey }));
+    const location = await objectLocation(finalKey); assertReadable(location.asset);
+    const res = await location.client.send(new GetObjectCommand({ Bucket: location.bucket, Key: finalKey }));
     const bytes = await res.Body!.transformToByteArray();
     return { bytes, contentType: res.ContentType ?? "application/octet-stream" };
   } catch (err: any) {
@@ -86,7 +144,8 @@ export async function storageGetObject(
  * @returns Public or signed URL
  */
 export async function storageGet(key: string): Promise<string> {
-  const finalKey = key.startsWith("/") ? key.slice(1) : key;
+  const finalKey = normalizeStorageKey(key), asset = await getMediaAsset(finalKey); assertReadable(asset);
+  if (asset?.isPrivate) throw new Error("Private media cannot use public download aliases.");
 
   if (ENV.r2PublicUrl) {
     return `${ENV.r2PublicUrl}/${finalKey}`;
@@ -104,11 +163,11 @@ export async function storageGet(key: string): Promise<string> {
  * @param key - Storage key
  */
 export async function storageDelete(key: string): Promise<void> {
-  const finalKey = key.startsWith("/") ? key.slice(1) : key;
+  const finalKey = normalizeStorageKey(key), location = await objectLocation(finalKey, true);
 
-  await getS3().send(
+  await location.client.send(
     new DeleteObjectCommand({
-      Bucket: BUCKET(),
+      Bucket: location.bucket,
       Key: finalKey,
     })
   );
@@ -137,11 +196,14 @@ export async function getUploadUrl(
   expiresIn: number = 3600,
   maxSizeBytes: number = 50 * 1024 * 1024 // 50MB default
 ): Promise<string> {
+  const finalKey = normalizeStorageKey(key), asset = await getMediaAsset(finalKey);
+  if (asset?.isPrivate) throw new Error("Private media cannot use public upload aliases.");
+  assertReadable(asset);
   return getSignedUrl(
     getS3(),
     new PutObjectCommand({
       Bucket: BUCKET(),
-      Key: key,
+      Key: finalKey,
       ContentType: contentType,
       ContentLength: maxSizeBytes,
     }),

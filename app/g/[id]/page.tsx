@@ -34,7 +34,7 @@ async function loadGeneration(rawId: string) {
     if (gen.status !== "completed" || !gen.imageUrl) return null;
     // Uncensored generations are private-only — never publicly shareable
     // (this page has no age gate and gets indexed via the sitemap).
-    if ((gen.metadata as any)?.uncensored) return null;
+    if ((gen.metadata as any)?.uncensored || (gen.metadata as any)?.trainedModelId || (gen.metadata as any)?.tool === "image-animation" || new URL(gen.imageUrl, SITE).pathname.startsWith("/api/media/")) return null;
     return gen;
   } catch (err) {
     console.error("[/g/:id] DB lookup failed:", err);

@@ -23,7 +23,7 @@ function normalizeFingerprintValue(value: unknown): unknown {
 
 /** Hash only; the serialized input and prompt are never persisted. */
 export async function fingerprintGenerationInput(input: Record<string, unknown>): Promise<string> {
-  const { requestId: _requestId, ...payload } = input;
+  const { requestId: _requestId, expectedCreditCost: _quote, ...payload } = input;
   const bytes = new TextEncoder().encode(JSON.stringify(normalizeFingerprintValue(payload)));
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");

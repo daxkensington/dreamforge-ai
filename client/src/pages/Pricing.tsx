@@ -153,7 +153,7 @@ const comparisonFeatures: { label: string; values: (string | boolean)[] }[] = [
   { label: "API access", values: [false, false, false, false, "5K req/hr", "20K req/hr"] },
   { label: "Priority queue", values: [false, false, true, true, true, true] },
   { label: "White-label exports", values: [false, false, false, false, false, true] },
-  { label: "Custom LoRAs", values: [false, false, false, false, false, "3 included"] },
+  { label: "Custom model slots (training uses credits)", values: [false, false, false, false, false, "3 slots"] },
   { label: "Dedicated support", values: [false, false, false, false, false, true] },
 ];
 
@@ -604,7 +604,7 @@ export default function Pricing() {
                                     "API access (20,000 req/hr)",
                                     "25 team seats",
                                     "White-label exports",
-                                    "3 custom LoRAs included",
+                                    "3 saved custom model slots; training uses credits",
                                     "Batch gen (up to 100)",
                                     "200,000 credit rollover",
                                     "Dedicated support",
