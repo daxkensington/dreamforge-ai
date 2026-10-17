@@ -57,7 +57,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${promptSnippet} — DreamForgeX`;
   const description = `${gen.mediaType === "video" ? "AI video" : "AI image"} created on DreamForgeX. Try this prompt yourself with 100+ AI tools.`;
   const url = `${SITE}/g/${gen.id}`;
-  const ogImage = gen.imageUrl ?? gen.thumbnailUrl ?? FALLBACK_OG;
+  // Videos must not use gen.imageUrl (a video file) as the social preview;
+  // prefer a non-empty thumbnail (blank/whitespace counts as empty).
+  const thumbnailUrl = gen.thumbnailUrl?.trim() ? gen.thumbnailUrl : undefined;
+  const ogImage =
+    gen.mediaType === "video"
+      ? thumbnailUrl ?? FALLBACK_OG
+      : gen.imageUrl ?? thumbnailUrl ?? FALLBACK_OG;
 
   return {
     title,
