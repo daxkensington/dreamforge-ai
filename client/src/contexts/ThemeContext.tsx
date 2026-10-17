@@ -24,8 +24,12 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return defaultTheme;
     if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+      try {
+        const stored = localStorage.getItem("theme");
+        return (stored as Theme) || defaultTheme;
+      } catch {
+        return defaultTheme;
+      }
     }
     return defaultTheme;
   });
@@ -39,7 +43,11 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      try {
+        localStorage.setItem("theme", theme);
+      } catch {
+        // Keep the selected theme in memory when storage is unavailable.
+      }
     }
   }, [theme, switchable]);
 
