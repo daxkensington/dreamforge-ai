@@ -9,6 +9,7 @@ vi.mock("./db", () => ({ getDb: vi.fn(async () => {
 }) }));
 vi.mock("./stripe", () => ({ refundCredits: (...args: unknown[]) => mocks.refund(...args) }));
 vi.mock("./_core/generationBilling", () => ({ sweepStaleGenerationRequests: (...args: unknown[]) => mocks.sweep(...args) }));
+vi.mock("./_core/generationBatchBilling", () => ({ sweepGenerationBatches: vi.fn(async () => {}) }));
 import { GET } from "../app/api/cron/stale-generations/route";
 
 describe("stale generation request ownership", () => {

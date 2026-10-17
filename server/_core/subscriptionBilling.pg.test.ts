@@ -48,18 +48,21 @@ suite("paid invoice allocation and subscription history on PostgreSQL", () => {
       CREATE TYPE "subStatus" AS ENUM ('active', 'canceled', 'past_due', 'trialing', 'incomplete');
       CREATE TYPE "txType" AS ENUM ('purchase', 'usage', 'bonus', 'refund', 'subscription', 'reward', 'referral', 'dispute');
       CREATE TYPE "webhookStatus" AS ENUM ('pending', 'processed', 'failed', 'ignored');
-      CREATE TABLE users (id serial PRIMARY KEY);
+      CREATE TABLE users (id serial PRIMARY KEY, "loginMethod" text);
       CREATE TABLE "subscriptionPlans" (id serial PRIMARY KEY, name varchar(64) UNIQUE NOT NULL, "monthlyCredits" integer NOT NULL);
       CREATE TABLE "userSubscriptions" (id serial PRIMARY KEY, "userId" integer NOT NULL REFERENCES users(id), "planId" integer NOT NULL,
         "stripeSubscriptionId" varchar(128) UNIQUE, "subStatus" "subStatus" NOT NULL DEFAULT 'active',
         "currentPeriodStart" timestamp, "currentPeriodEnd" timestamp, "cancelAtPeriodEnd" boolean NOT NULL DEFAULT false,
         "createdAt" timestamp NOT NULL DEFAULT now());
       CREATE TABLE "creditBalances" (id serial PRIMARY KEY, "userId" integer UNIQUE NOT NULL, balance integer NOT NULL,
-        "bonusCredits" integer NOT NULL DEFAULT 0, "monthlyAllocation" integer NOT NULL DEFAULT 0, "lastResetAt" timestamp);
+        "bonusCredits" integer NOT NULL DEFAULT 0, "walletAccountingVersion" integer NOT NULL DEFAULT 1, "monthlyAllocation" integer NOT NULL DEFAULT 0, "lastResetAt" timestamp);
       CREATE TABLE "creditTransactions" (id serial PRIMARY KEY, "userId" integer NOT NULL REFERENCES users(id), amount integer NOT NULL,
         "txType" "txType" NOT NULL, description varchar(512), "txMetadata" jsonb);
       CREATE TABLE "webhookEvents" (id serial PRIMARY KEY, "eventId" varchar(256) UNIQUE NOT NULL, "eventType" varchar(128) NOT NULL,
         "webhookStatus" "webhookStatus" NOT NULL DEFAULT 'processed', summary text);
+      CREATE TABLE "subscriptionCreditPeriods" (id serial PRIMARY KEY, "userId" integer NOT NULL, "stripeSubscriptionId" varchar(128) NOT NULL,
+        "stripeInvoiceId" varchar(128) UNIQUE NOT NULL, "subscriptionItemId" varchar(128) NOT NULL, "priceId" varchar(128) NOT NULL,
+        "periodStart" timestamp NOT NULL, "periodEnd" timestamp NOT NULL, "monthlyCredits" integer NOT NULL, "lastAllowanceIndex" integer NOT NULL DEFAULT 0, "createdAt" timestamp NOT NULL DEFAULT now());
       CREATE TABLE invoice_test_fault (mode text);
       INSERT INTO invoice_test_fault VALUES ('none');
       CREATE FUNCTION invoice_test_ledger_fault() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -74,7 +77,7 @@ suite("paid invoice allocation and subscription history on PostgreSQL", () => {
   beforeEach(async () => {
     mockedDb.execute.mockReset().mockImplementation(deferred);
     mockedDb.batch.mockReset().mockImplementation(executeBatch);
-    await db.unsafe('TRUNCATE "webhookEvents", "creditTransactions", "userSubscriptions", "creditBalances", "subscriptionPlans", users RESTART IDENTITY CASCADE').simple();
+    await db.unsafe('TRUNCATE "subscriptionCreditPeriods", "webhookEvents", "creditTransactions", "userSubscriptions", "creditBalances", "subscriptionPlans", users RESTART IDENTITY CASCADE').simple();
     await db`UPDATE invoice_test_fault SET mode = 'none'`;
     await db`INSERT INTO users (id) VALUES (1), (2)`;
     await db`INSERT INTO "subscriptionPlans" (id, name, "monthlyCredits") VALUES (1, 'pro', 10000), (2, 'free', 0), (3, 'creator', 3000), (4, 'business', 100000)`;
@@ -87,14 +90,14 @@ suite("paid invoice allocation and subscription history on PostgreSQL", () => {
     const results = await Promise.all(Array.from({ length: 10 }, () => allocatePaidSubscriptionInvoice(mapping)));
     expect(results.filter(result => result === "allocated")).toHaveLength(1);
     expect(results.filter(result => result === "duplicate")).toHaveLength(9);
-    expect(await financialState()).toEqual({ wallet: { balance: 10050, bonusCredits: 0, monthlyAllocation: 10000 }, ledger: 1, receipts: 2 });
+    expect(await financialState()).toEqual({ wallet: { balance: 10050, bonusCredits: 50, monthlyAllocation: 10000 }, ledger: 1, receipts: 2 });
   });
 
   it("holds a second distinct invoice for the same period without another reset", async () => {
     await allocatePaidSubscriptionInvoice(mapping);
     await db`UPDATE "creditBalances" SET balance = 9000 WHERE "userId" = 1`;
     await expect(allocatePaidSubscriptionInvoice({ ...mapping, invoiceId: "in_second" })).rejects.toThrow(/reconcile/);
-    expect(await financialState()).toEqual({ wallet: { balance: 9000, bonusCredits: 0, monthlyAllocation: 10000 }, ledger: 1, receipts: 2 });
+    expect(await financialState()).toEqual({ wallet: { balance: 9000, bonusCredits: 50, monthlyAllocation: 10000 }, ledger: 1, receipts: 2 });
   });
 
   it("allows only one of two distinct concurrent invoices for the same period", async () => {
@@ -172,7 +175,7 @@ suite("paid invoice allocation and subscription history on PostgreSQL", () => {
     expect(await allocatePaidSubscriptionInvoice(current)).toBe("allocated");
     await db`UPDATE "creditBalances" SET balance = 99000 WHERE "userId" = 1`;
     await expect(allocatePaidSubscriptionInvoice(mapping)).rejects.toThrow(/reconcile/);
-    expect(await financialState()).toEqual({ wallet: { balance: 99000, bonusCredits: 0, monthlyAllocation: 100000 }, ledger: 1, receipts: 2 });
+    expect(await financialState()).toEqual({ wallet: { balance: 99000, bonusCredits: 50, monthlyAllocation: 100000 }, ledger: 1, receipts: 2 });
   });
 
   it("checks current history in a fresh snapshot after waiting on the wallet lock", async () => {
@@ -195,7 +198,7 @@ suite("paid invoice allocation and subscription history on PostgreSQL", () => {
       const oldResult = await oldInvoice;
       expect("error" in oldResult).toBe(true);
       expect(await newInvoice).toBe("allocated");
-      expect(await financialState()).toEqual({ wallet: { balance: 100050, bonusCredits: 0, monthlyAllocation: 100000 }, ledger: 1, receipts: 2 });
+      expect(await financialState()).toEqual({ wallet: { balance: 100050, bonusCredits: 50, monthlyAllocation: 100000 }, ledger: 1, receipts: 2 });
     } finally {
       await held.unsafe("ROLLBACK");
       held.release();

@@ -19,13 +19,17 @@ export default function ApiKeys() {
   const [newKey, setNewKey] = useState<string | null>(null);
 
   const keys = trpc.apiKey.list.useQuery(undefined, { enabled: !!user });
+  const showError = (error: { message: string }) => toast.error(error.message || "The request failed. Please try again.");
   const createMut = trpc.apiKey.create.useMutation({
+    onError: showError,
     onSuccess: (data) => { keys.refetch(); setNewKey(data.key); setName(""); toast.success("API key created"); },
   });
   const revokeMut = trpc.apiKey.revoke.useMutation({
+    onError: showError,
     onSuccess: () => { keys.refetch(); toast.success("API key revoked"); },
   });
   const deleteMut = trpc.apiKey.delete.useMutation({
+    onError: showError,
     onSuccess: () => { keys.refetch(); toast.success("API key deleted"); },
   });
 
@@ -46,7 +50,7 @@ export default function ApiKeys() {
         <Link href="/profile"><Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
         <div>
           <h1 className="text-3xl font-bold">API Keys</h1>
-          <p className="text-muted-foreground">Manage your API keys for programmatic access</p>
+          <p className="text-muted-foreground">Manage your API keys for programmatic access. Creating keys requires a Business or Agency subscription.</p>
         </div>
       </div>
 
@@ -69,7 +73,7 @@ export default function ApiKeys() {
       <div className="flex justify-end mb-4">
         <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) setNewKey(null); }}>
           <DialogTrigger asChild>
-            <Button onClick={() => { setName(""); setNewKey(null); setShowCreate(true); }}>
+            <Button onClick={() => { createMut.reset(); setName(""); setNewKey(null); setShowCreate(true); }}>
               <Plus className="w-4 h-4 mr-2" /> Create API Key
             </Button>
           </DialogTrigger>
@@ -83,7 +87,7 @@ export default function ApiKeys() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Input value={newKey} readOnly className="font-mono text-xs" />
-                  <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(newKey); toast.success("Copied!"); }}>
+                  <Button aria-label="Copy API key" size="icon" variant="outline" onClick={() => { void navigator.clipboard.writeText(newKey).then(() => toast.success("Copied!"), () => toast.error("Could not copy. Select and copy the key manually.")); }}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -91,8 +95,9 @@ export default function ApiKeys() {
               </div>
             ) : (
               <div className="space-y-4">
-                <Input placeholder="Key name (e.g., Production, Testing)" value={name} onChange={(e) => setName(e.target.value)} />
-                <Button className="w-full" onClick={() => createMut.mutate({ name })} disabled={!name || createMut.isPending}>
+                {createMut.error && <p role="alert" className="text-sm text-destructive">{createMut.error.message} <Link href="/pricing" className="underline">View subscription plans</Link></p>}
+                <Input aria-label="API key name" placeholder="Key name (e.g., Production, Testing)" value={name} onChange={(e) => setName(e.target.value)} />
+                <Button className="w-full" onClick={() => createMut.mutate({ name: name.trim() })} disabled={!name.trim() || createMut.isPending}>
                   {createMut.isPending ? "Creating..." : "Create Key"}
                 </Button>
               </div>
@@ -101,7 +106,12 @@ export default function ApiKeys() {
         </Dialog>
       </div>
 
-      {keys.isLoading ? (
+      {keys.isError ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 p-4 space-y-3">
+          <p>Could not load API keys. {keys.error.message}</p>
+          <Button variant="outline" onClick={() => void keys.refetch()}>Try again</Button>
+        </div>
+      ) : keys.isLoading ? (
         <div className="space-y-3">
           {[1, 2].map(i => <Skeleton key={i} className="h-20" />)}
         </div>
@@ -139,7 +149,7 @@ export default function ApiKeys() {
                         Revoke
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" className="text-destructive" onClick={() => deleteMut.mutate({ id: key.id })}>
+                    <Button size="sm" variant="outline" className="text-destructive" aria-label={`Delete ${key.name} API key`} disabled={deleteMut.isPending} onClick={() => deleteMut.mutate({ id: key.id })}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>

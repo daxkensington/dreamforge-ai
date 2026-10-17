@@ -2,6 +2,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
+  requireMarketplaceBuying,
+  requireMarketplaceSelling,
+} from "../_core/marketplaceEntitlement";
+import {
   browseListings,
   getListingDetail,
   getFeaturedListings,
@@ -21,7 +25,6 @@ import {
   submitReview,
   hasReviewed,
   createPayout,
-  reservePayout,
   releasePayout,
   setPayoutStatus,
   getListingById,
@@ -44,12 +47,16 @@ function getStripe(): Stripe {
 const browseRoute = publicProcedure
   .input(
     z.object({
-      type: z.enum(["prompt", "preset", "workflow", "asset_pack", "lora"]).optional(),
+      type: z
+        .enum(["prompt", "preset", "workflow", "asset_pack", "lora"])
+        .optional(),
       minPrice: z.number().min(0).optional(),
       maxPrice: z.number().min(0).optional(),
       tags: z.array(z.string()).optional(),
       search: z.string().max(256).optional(),
-      sort: z.enum(["popular", "new", "rating", "price_low", "price_high"]).optional(),
+      sort: z
+        .enum(["popular", "new", "rating", "price_low", "price_high"])
+        .optional(),
       limit: z.number().min(1).max(100).optional(),
       offset: z.number().min(0).optional(),
     })
@@ -78,10 +85,7 @@ const getTopSellersRoute = publicProcedure
   .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
   .query(async ({ input }) => {
     const sellers = await getTopSellers(input?.limit ?? 10);
-    return sellers.map((s) => ({
-      ...s.profile,
-      userName: s.userName,
-    }));
+    return sellers;
   });
 
 const getCategoriesRoute = publicProcedure.query(async () => {
@@ -103,19 +107,38 @@ const purchaseRoute = protectedProcedure
       throw new TRPCError({ code: "NOT_FOUND", message: "Listing not found" });
     }
     if (listing.listing.status !== "published") {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Listing is not available for purchase" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Listing is not available for purchase",
+      });
     }
     if (listing.listing.sellerId === ctx.user.id) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot purchase your own listing" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "You cannot purchase your own listing",
+      });
     }
 
     // Check if already purchased
     const alreadyOwned = await hasPurchased(ctx.user.id, input.listingId);
     if (alreadyOwned) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "You already own this listing" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "You already own this listing",
+      });
     }
 
     const price = listing.listing.price;
+
+    // Generation credits include free and promotional grants. They cannot
+    // fund cash payable to a seller, regardless of the buyer's balance.
+    if (price > 0 && input.paymentMethod === "credits") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Paid marketplace purchases require a card payment. Generation credits cannot be used.",
+      });
+    }
 
     // Free listings - just record the purchase
     if (price === 0) {
@@ -129,6 +152,7 @@ const purchaseRoute = protectedProcedure
 
     // For paid listings with Stripe, create a checkout session
     if (input.paymentMethod === "stripe") {
+      await requireMarketplaceBuying(ctx.user.id);
       const session = await getStripe().checkout.sessions.create({
         client_reference_id: ctx.user.id.toString(),
         mode: "payment",
@@ -151,6 +175,13 @@ const purchaseRoute = protectedProcedure
           listing_id: input.listingId.toString(),
           price: price.toString(),
         },
+        payment_intent_data: {
+          metadata: {
+            type: "marketplace_purchase",
+            buyer_id: ctx.user.id.toString(),
+            listing_id: input.listingId.toString(),
+          },
+        },
         success_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/purchases?success=true`,
         cancel_url: `${process.env.APP_URL || "https://dreamforgex.ai"}/marketplace/${input.listingId}?canceled=true`,
       });
@@ -158,25 +189,10 @@ const purchaseRoute = protectedProcedure
       return { success: true, checkoutUrl: session.url, free: false };
     }
 
-    // Credits payment - deduct from credit balance and record immediately
-    // Import deductCredits at the top-level would create circular deps, so use dynamic
-    const { deductCredits } = await import("../stripe");
-    const creditsNeeded = Math.ceil(price / 100); // 1 credit per $1
-    const deductResult = await deductCredits(ctx.user.id, creditsNeeded, `Marketplace purchase: ${listing.listing.title}`);
-    if (!deductResult.success) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: `Insufficient credits. Need ${creditsNeeded}, have ${deductResult.balance}.`,
-      });
-    }
-
-    const result = await recordPurchase({
-      buyerId: ctx.user.id,
-      listingId: input.listingId,
-      price,
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Unsupported marketplace payment method.",
     });
-
-    return { success: true, purchaseId: result.id, free: false };
   });
 
 const getMyPurchasesRoute = protectedProcedure
@@ -198,13 +214,22 @@ const downloadAssetRoute = protectedProcedure
     if (!listing) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Listing not found" });
     }
+    if (
+      listing.listing.status !== "published" &&
+      listing.listing.sellerId !== ctx.user.id
+    ) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Listing not found" });
+    }
 
     // Free listings are available to everyone; paid listings require purchase
     if (listing.listing.price > 0) {
       const owned = await hasPurchased(ctx.user.id, input.listingId);
       const isSeller = listing.listing.sellerId === ctx.user.id;
       if (!owned && !isSeller) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "You must purchase this listing first" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must purchase this listing first",
+        });
       }
     }
 
@@ -229,13 +254,19 @@ const submitReviewRoute = protectedProcedure
     // Must have purchased to review
     const owned = await hasPurchased(ctx.user.id, input.listingId);
     if (!owned) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "You must purchase this listing before reviewing" });
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You must purchase this listing before reviewing",
+      });
     }
 
     // Can only review once
     const alreadyReviewed = await hasReviewed(ctx.user.id, input.listingId);
     if (alreadyReviewed) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "You have already reviewed this listing" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "You have already reviewed this listing",
+      });
     }
 
     const result = await submitReview({
@@ -256,13 +287,14 @@ const createListingRoute = protectedProcedure
       title: z.string().min(3).max(256),
       description: z.string().max(5000).optional(),
       type: z.enum(["prompt", "preset", "workflow", "asset_pack", "lora"]),
-      price: z.number().min(0).max(99999), // max $999.99
+      price: z.number().int().min(0).max(99999), // max $999.99, whole cents
       previewImages: z.array(z.string().url()).max(10).optional(),
       promptData: z.any(),
       tags: z.array(z.string()).max(20).optional(),
     })
   )
   .mutation(async ({ ctx, input }) => {
+    await requireMarketplaceSelling(ctx.user.id);
     // Ensure seller profile exists
     const userName = ctx.user.name || "Anonymous";
     await getOrCreateSellerProfile(ctx.user.id, userName);
@@ -288,14 +320,17 @@ const updateListingRoute = protectedProcedure
       id: z.number(),
       title: z.string().min(3).max(256).optional(),
       description: z.string().max(5000).optional(),
-      type: z.enum(["prompt", "preset", "workflow", "asset_pack", "lora"]).optional(),
-      price: z.number().min(0).max(99999).optional(),
+      type: z
+        .enum(["prompt", "preset", "workflow", "asset_pack", "lora"])
+        .optional(),
+      price: z.number().int().min(0).max(99999).optional(),
       previewImages: z.array(z.string().url()).max(10).optional(),
       promptData: z.any().optional(),
       tags: z.array(z.string()).max(20).optional(),
     })
   )
   .mutation(async ({ ctx, input }) => {
+    await requireMarketplaceSelling(ctx.user.id);
     const { id, ...updates } = input;
     // Filter out undefined values
     const data: Record<string, unknown> = {};
@@ -303,7 +338,10 @@ const updateListingRoute = protectedProcedure
       if (value !== undefined) data[key] = value;
     }
     if (Object.keys(data).length === 0) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No fields to update" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No fields to update",
+      });
     }
     return updateListing(id, ctx.user.id, data as any);
   });
@@ -311,6 +349,7 @@ const updateListingRoute = protectedProcedure
 const publishListingRoute = protectedProcedure
   .input(z.object({ id: z.number() }))
   .mutation(async ({ ctx, input }) => {
+    await requireMarketplaceSelling(ctx.user.id);
     return publishListing(input.id, ctx.user.id);
   });
 
@@ -341,7 +380,11 @@ const setupSellerAccountRoute = protectedProcedure
     })
   )
   .mutation(async ({ ctx, input }) => {
-    const profile = await getOrCreateSellerProfile(ctx.user.id, input.displayName);
+    await requireMarketplaceSelling(ctx.user.id);
+    const profile = await getOrCreateSellerProfile(
+      ctx.user.id,
+      input.displayName
+    );
 
     // Create Stripe Connect account if not already set up
     if (!profile.stripeConnectId) {
@@ -367,7 +410,11 @@ const setupSellerAccountRoute = protectedProcedure
           type: "account_onboarding",
         });
 
-        return { success: true, onboardingUrl: accountLink.url, profileId: profile.id };
+        return {
+          success: true,
+          onboardingUrl: accountLink.url,
+          profileId: profile.id,
+        };
       } catch (err: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -387,20 +434,29 @@ const setupSellerAccountRoute = protectedProcedure
 const requestPayoutRoute = protectedProcedure
   .input(
     z.object({
-      amount: z.number().min(500), // minimum $5.00 payout
+      amount: z.number().int().min(500), // minimum $5.00 payout, whole cents
     })
   )
   .mutation(async ({ ctx, input }) => {
+    // A downgrade must not trap already-earned money. This withdrawal path
+    // keeps its verified cash-earnings cap; plan gates apply to new purchases,
+    // listings and seller onboarding, not settlement of existing obligations.
     const profile = await getSellerProfile(ctx.user.id);
     if (!profile) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Seller profile not found. Set up your seller account first." });
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Seller profile not found. Set up your seller account first.",
+      });
     }
     if (!profile.stripeConnectId) {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe Connect account not set up. Complete seller onboarding first." });
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message:
+          "Stripe Connect account not set up. Complete seller onboarding first.",
+      });
     }
-    // Friendly pre-check for the error message; the real race guard is the
-    // conditional UPDATE in reservePayout, which atomically decrements only
-    // if the balance still covers the amount.
+    // Friendly pre-check; createPayout enforces the stronger cash-backed cap
+    // and reserves funds with its pending ledger row in one transaction.
     if (profile.payoutBalance < input.amount) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
@@ -408,52 +464,52 @@ const requestPayoutRoute = protectedProcedure
       });
     }
 
-    // Reserve funds BEFORE any Stripe call — a concurrent requestPayout loses
-    // the conditional update and we throw here, so two parallel requests can
-    // never both reach transfers.create.
-    try {
-      await reservePayout(profile.id, input.amount);
-    } catch {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: `Insufficient balance. Available: $${(profile.payoutBalance / 100).toFixed(2)}, requested: $${(input.amount / 100).toFixed(2)}`,
-      });
-    }
-
-    // Ledger row first ('pending'), transfer second, status settled last.
+    // Cash-backed eligibility, balance reservation and the pending ledger row
+    // commit together. Historic credits-funded sales never fund a withdrawal.
     let payoutId: number;
     try {
       const payout = await createPayout(profile.id, input.amount);
       payoutId = payout.id;
-    } catch (err) {
-      // No ledger row was written — hand the reserved funds back.
-      await releasePayout(profile.id, input.amount);
-      throw err;
+    } catch {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Insufficient cash-backed earnings for this payout.",
+      });
     }
 
+    let transfer: Stripe.Transfer;
     try {
-      const transfer = await getStripe().transfers.create({
-        amount: input.amount,
-        currency: "usd",
-        destination: profile.stripeConnectId,
-        metadata: {
-          seller_id: profile.id.toString(),
-          user_id: ctx.user.id.toString(),
+      transfer = await getStripe().transfers.create(
+        {
+          amount: input.amount,
+          currency: "usd",
+          destination: profile.stripeConnectId,
+          metadata: {
+            seller_id: profile.id.toString(),
+            user_id: ctx.user.id.toString(),
+          },
         },
-      });
-
-      await setPayoutStatus(payoutId, "paid", transfer.id);
-      return { success: true, payoutId, transferId: transfer.id };
+        { idempotencyKey: `marketplace-payout:${payoutId}` }
+      );
     } catch (err: any) {
-      // Transfer failed — mark the row failed and roll the reservation back
-      // so the seller can retry instead of losing the balance.
-      await setPayoutStatus(payoutId, "failed");
-      await releasePayout(profile.id, input.amount);
+      const confirmedRejection =
+        Number.isInteger(err?.statusCode) &&
+        err.statusCode >= 400 &&
+        err.statusCode < 500 &&
+        ![408, 409, 429].includes(err.statusCode);
+      if (confirmedRejection) {
+        await releasePayout(profile.id, input.amount, payoutId);
+      }
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: `Payout failed: ${err.message}`,
+        message: confirmedRejection
+          ? "Payout was declined. Your funds remain available."
+          : "Payout outcome requires reconciliation. Your funds remain reserved; contact support before retrying.",
       });
     }
+    // A persistence failure after Stripe succeeded must never release funds.
+    await setPayoutStatus(payoutId, "paid", transfer.id);
+    return { success: true, payoutId, transferId: transfer.id };
   });
 
 // ─── Export Router ──────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { generateImage } from "./_core/imageGeneration";
 import { executeImageCreation, listImageCreationModels, prepareImageCreation } from "./_core/imageGateway";
+import { executeVideoCreation, listVideoCreationModels, prepareVideoCreation } from "./_core/videoGateway";
 import { DIRECT_IMAGE_MODELS, isConfirmedDirectImageRejection } from "./_core/directImageProviders";
 import { beginGenerationRequest, claimGenerationRequest, completeGenerationRequest, failGenerationRequestAndRefund, markGenerationReconciliation, readGenerationRequest } from "./_core/generationBilling";
 import { hashGenerationRequest, pendingGenerationResponse, replayGenerationResponse } from "./_core/generationRequest";
@@ -45,6 +46,7 @@ import {
   getUserActivityTimeline,
   createVideoProject,
   updateVideoProject,
+  updateEditableVideoProject,
   getVideoProject,
   listVideoProjects,
   deleteVideoProject,
@@ -542,6 +544,7 @@ export const appRouter = router({
 
   generation: router({
     imageModels: publicProcedure.query(() => listImageCreationModels()),
+    videoModels: publicProcedure.query(() => listVideoCreationModels()),
 
     create: protectedProcedure
       .input(
@@ -635,11 +638,17 @@ export const appRouter = router({
         // Standard image choices have one authoritative catalog, quote and
         // executor mapping. Validate before any wallet or generation writes.
         const isImagePreset = Object.hasOwn(DF_LORA_MAP, input.modelVersion);
+        if (input.uncensored && input.mediaType === "video") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Use the Uncensored Studio video tool for unfiltered video. No credits charged." });
+        }
         if (isImagePreset && input.mediaType !== "image") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "DreamForge image styles support image creation only." });
         }
         const imagePlan = input.mediaType === "image" && !input.uncensored && !isImagePreset
           ? prepareImageCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height })
+          : undefined;
+        const videoPlan = input.mediaType === "video"
+          ? prepareVideoCreation({ modelId: input.modelVersion, userTier, width: input.width, height: input.height, duration: input.duration })
           : undefined;
         const requestedModel = getModelById(input.modelVersion);
         if (!input.uncensored && requestedModel && requestedModel.type !== input.mediaType) {
@@ -665,8 +674,7 @@ export const appRouter = router({
 
         // Reserve this logical request, debit and write its ledger together.
         const creditTool = input.mediaType === "video" ? "text-to-video" : "text-to-image";
-        // The immutable image plan quotes exactly what this invocation debits.
-        // Existing special image/video branches keep their established pricing.
+        // The immutable media plan quotes exactly what this invocation debits.
         const billableModel =
           !input.uncensored && requestedModel && requestedModel.type === input.mediaType
             ? requestedModel
@@ -676,7 +684,7 @@ export const appRouter = router({
         } catch (error) {
           throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: safeErrorMessage(error, "generation.create:tool-status") });
         }
-        const quotedCost = imagePlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
+        const quotedCost = imagePlan?.creditCost ?? videoPlan?.creditCost ?? billableModel?.creditCost.base ?? TOOL_CREDIT_COSTS[creditTool] ?? LEGACY_CREDIT_COSTS[creditTool] ?? CREDIT_COSTS[creditTool] ?? 1;
         const claim = await claimGenerationRequest({ ...requestIdentity, credits: quotedCost });
         if (claim.kind === "conflict") throw new TRPCError({ code: "CONFLICT", message: "This request ID already belongs to a different generation. Start a new request." });
         if (claim.kind === "replay") return replayGenerationResponse(claim.request, requestIdentity.payloadHash, input.mediaType);
@@ -690,6 +698,7 @@ export const appRouter = router({
         let delivered = false;
         let savedResponse;
         let imageProvenance: Awaited<ReturnType<typeof executeImageCreation>>["provenance"];
+        let videoProvenance: Awaited<ReturnType<typeof executeVideoCreation>>["provenance"];
         const generationMetadata = input.uncensored
           ? { billingRequestId: input.requestId, uncensored: true, style: input.uncensoredStyle ?? null }
           : imagePlan
@@ -769,13 +778,18 @@ export const appRouter = router({
             }
           }
 
-          if (!url && imagePlan) {
+          if (videoPlan) {
+            providerInvocationStarted = true;
+            const rendered = await executeVideoCreation(videoPlan, { prompt: enhancedPrompt, negativePrompt: input.negativePrompt });
+            url = rendered.url;
+            videoProvenance = rendered.provenance;
+          } else if (!url && imagePlan) {
             providerInvocationStarted = true;
             const rendered = await executeImageCreation(imagePlan, { prompt: enhancedPrompt });
             url = rendered.url;
             imageProvenance = rendered.provenance;
           } else if (!url) {
-            // Compatibility path for existing video/preset/uncensored flows.
+            // Compatibility path for image presets and uncensored images only.
             const modelMap: Record<string, string> = {
               "built-in-v1": "auto", "grok": "grok", "flux-pro": "flux-pro",
               "flux-schnell": "flux-schnell", "dall-e-3": "dall-e-3", "sd3": "sd3",
@@ -797,16 +811,16 @@ export const appRouter = router({
             }));
           }
 
-          if (!url?.trim()) throw new Error("The image provider returned no downloadable image.");
+          if (!url?.trim()) throw new Error("The media provider returned no downloadable result.");
 
-          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : {}) };
+          const result = { id: genId, status: "completed", requestId: input.requestId, imageUrl: url, mediaType: input.mediaType, newAchievements: [], ...(imagePlan ? { modelId: imagePlan.modelId, provenance: imageProvenance, creditCost: deduction.cost } : videoPlan ? { modelId: videoPlan.modelId, provenance: videoProvenance, creditCost: deduction.cost } : {}) };
           // The completed generation and immutable replay result commit together.
           // A lost acknowledgement must not enter the failure-refund path.
           let completion;
           try {
             completion = await completeGenerationRequest(requestOwner, {
-              result, imageUrl: url, thumbnailUrl: url,
-              metadata: imagePlan ? { ...generationMetadata, imageGeneration: imageProvenance ?? null } : generationMetadata,
+              result, imageUrl: url, thumbnailUrl: videoPlan ? null : url,
+              metadata: imagePlan ? { ...generationMetadata, imageGeneration: imageProvenance ?? null } : videoPlan ? { ...generationMetadata, videoGeneration: videoProvenance } : generationMetadata,
             });
           } catch (error) {
             safeErrorMessage(error, "generation.create:completion-uncertain");
@@ -980,87 +994,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Deduct credits for animation
-        await tryDeductCredits(ctx.user.id, "animate", `Animated image #${input.sourceGenerationId}`);
+        throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Image animation is currently unavailable. Use the Video Studio image-to-video tool. No credits charged." });
 
-        // Verify source generation exists and belongs to user
-        const sourceGen = await getGenerationById(input.sourceGenerationId);
-        if (!sourceGen) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Source generation not found" });
-        }
-        if (sourceGen.userId !== ctx.user.id && ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
-        if (sourceGen.status !== "completed" || !sourceGen.imageUrl) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Source generation must be a completed image with a URL",
-          });
-        }
-        if (sourceGen.mediaType !== "image") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Can only animate image generations, not videos",
-          });
-        }
-
-        // Create the animated video generation record
-        const animPrompt = `Animate this image with ${input.animationStyle.replace("-", " ")} motion: ${sourceGen.prompt}. Style: cinematic ${input.duration}-second animation, smooth fluid motion, high quality. 100% fictional synthetic content.`;
-
-        const genId = await createGeneration({
-          userId: ctx.user.id,
-          prompt: animPrompt,
-          negativePrompt: sourceGen.negativePrompt ?? null,
-          mediaType: "video",
-          width: sourceGen.width ?? 768,
-          height: sourceGen.height ?? 768,
-          duration: input.duration,
-          status: "generating",
-          modelVersion: "animate-from-image",
-          parentGenerationId: input.sourceGenerationId,
-          animationStyle: input.animationStyle,
-        });
-
-        // Copy tags from source if no new tags provided
-        if (input.tagIds && input.tagIds.length > 0) {
-          await setGenerationTags(genId, input.tagIds);
-        }
-
-        // Generate the animated version using the source image as reference
-        try {
-          const { url } = await generateImage({
-            prompt: animPrompt,
-            originalImages: [{
-              url: sourceGen.imageUrl,
-              mimeType: "image/png",
-            }],
-          });
-
-          await updateGeneration(genId, {
-            status: "completed",
-            imageUrl: url ?? null,
-            thumbnailUrl: sourceGen.imageUrl, // Use source image as thumbnail
-          });
-
-          return {
-            id: genId,
-            status: "completed" as const,
-            imageUrl: url,
-            mediaType: "video" as const,
-            parentGenerationId: input.sourceGenerationId,
-          };
-        } catch (error: any) {
-          await updateGeneration(genId, {
-            status: "failed",
-            errorMessage: error.message || "Animation failed",
-          });
-          return {
-            id: genId,
-            status: "failed" as const,
-            error: error.message,
-            parentGenerationId: input.sourceGenerationId,
-          };
-        }
       }),
 
     getChildren: protectedProcedure
@@ -1096,24 +1031,14 @@ export const appRouter = router({
         // Rate limit: 5 batch requests per minute per user
         await enforceRateLimit(`generation.batchCreate:user:${ctx.user.id}`, 5, 60_000, "Batch generation rate limit exceeded — max 5 per minute.");
 
-        // Tier enforcement for batch
         const userTier = await getUserTier(ctx.user.id);
-        const tierConfig = getTierConfig(userTier);
-
-        for (const item of input.prompts) {
-          // The legacy batch renderer always uses Auto and cannot honor these
-          // explicit routes, their quotes, or durable request ownership.
-          if (Object.hasOwn(DIRECT_IMAGE_MODELS, item.modelVersion) || Object.values(DIRECT_IMAGE_MODELS).some(model => model.model === item.modelVersion)) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "Use the image workspace to create one image with this model." });
-          }
-          const batchModel = getModelById(item.modelVersion);
-          if (batchModel && !canAccessModel(userTier, batchModel.tier)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: `Model "${item.modelVersion}" requires a ${batchModel.tier} or higher subscription.` });
-          }
-          if (item.width > tierConfig.maxImageResolution || item.height > tierConfig.maxImageResolution) {
-            throw new TRPCError({ code: "FORBIDDEN", message: `Max resolution for your plan is ${tierConfig.maxImageResolution}x${tierConfig.maxImageResolution}.` });
-          }
+        if (input.prompts.some(item => item.mediaType === "video")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Batch video generation is currently unavailable. Generate a video in the Workspace. No credits charged." });
         }
+        if (input.prompts.some(item => Object.hasOwn(DIRECT_IMAGE_MODELS, item.modelVersion) || Object.values(DIRECT_IMAGE_MODELS).some(model => model.model === item.modelVersion))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Use the image workspace to create one image with this model." });
+        }
+        const plans = input.prompts.map(item => prepareImageCreation({ modelId: item.modelVersion, userTier, width: item.width, height: item.height }));
 
         // Kill-switch — block offline tools before batch charge
         try {
@@ -1122,19 +1047,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: e.message });
         }
 
-        // Deduct credits for entire batch upfront using actual total cost
-        const totalCost = input.prompts.reduce((sum, p) => {
-          if (p.mediaType === "video") {
-            return sum + (CREDIT_COSTS["text-to-video"] || 1);
-          }
-          const matchedModel = p.modelVersion && p.modelVersion !== "built-in-v1" && p.modelVersion !== "auto"
-            ? getModelById(p.modelVersion)
-            : undefined;
-          const itemCost = matchedModel?.type === "image"
-            ? matchedModel.creditCost.base
-            : (CREDIT_COSTS["text-to-image"] || 1);
-          return sum + itemCost;
-        }, 0);
+        const totalCost = plans.reduce((sum, plan) => sum + plan.creditCost, 0);
         const batchResult = await deductCredits(ctx.user.id, totalCost, `Batch generation (${input.prompts.length} items)`);
         if (!batchResult.success) {
           throw new TRPCError({
@@ -1145,8 +1058,14 @@ export const appRouter = router({
 
         const results: Array<{ id: number; status: string; prompt: string; error?: string; imageUrl?: string | null }> = [];
 
-        for (const item of input.prompts) {
-          const genId = await createGeneration({
+        let subscriptionRemaining = totalCost - (batchResult.purchasedCreditsDebited ?? 0);
+        for (const [itemIndex, item] of input.prompts.entries()) {
+          const plan = plans[itemIndex];
+          const itemPurchased = Math.max(0, plan.creditCost - subscriptionRemaining);
+          subscriptionRemaining = Math.max(0, subscriptionRemaining - plan.creditCost);
+          let genId: number | undefined;
+          try {
+          genId = await createGeneration({
             userId: ctx.user.id,
             prompt: item.prompt,
             negativePrompt: item.negativePrompt ?? null,
@@ -1155,19 +1074,19 @@ export const appRouter = router({
             height: item.height,
             duration: item.mediaType === "video" ? item.duration : null,
             status: "generating",
-            modelVersion: item.modelVersion,
+            modelVersion: plan.modelId,
+            metadata: { purchasedCreditsDebited: itemPurchased, quotedCredits: plan.creditCost },
           });
 
           if (input.tagIds && input.tagIds.length > 0) {
             await setGenerationTags(genId, input.tagIds);
           }
 
-          try {
             const enhancedPrompt = item.mediaType === "video"
               ? `${item.prompt}. Style: cinematic motion, fluid animation, high quality digital art, ${item.width}x${item.height} resolution, ${item.duration}-second sequence, detailed, professional. 100% fictional synthetic content, no real people.`
               : `${item.prompt}. Style: high quality digital art, ${item.width}x${item.height} resolution, detailed, professional illustration. 100% fictional synthetic content, no real people.`;
 
-            const { url } = await generateImage({ prompt: enhancedPrompt, userTier });
+            const { url } = await executeImageCreation(plan, { prompt: enhancedPrompt });
 
             await updateGeneration(genId, {
               status: "completed",
@@ -1177,23 +1096,23 @@ export const appRouter = router({
 
             results.push({ id: genId, status: "completed", prompt: item.prompt, imageUrl: url });
           } catch (error: any) {
-            await updateGeneration(genId, {
+            if (genId) await updateGeneration(genId, {
               status: "failed",
               errorMessage: error.message || "Generation failed",
-            });
+            }).catch(() => undefined);
             logToolFailure({
               toolId: item.mediaType === "video" ? "text-to-video" : "text-to-image",
               errorMessage: error?.message ?? "Batch item failed",
               userId: ctx.user.id,
             }).catch(() => {});
             // Refund credits for this failed batch item
-            const itemCost = CREDIT_COSTS[item.mediaType === "video" ? "text-to-video" : "text-to-image"] || 1;
+            const itemCost = plan.creditCost;
             try {
-              await refundCredits(ctx.user.id, itemCost, `Refund: batch item failed — ${(error.message || "unknown error").slice(0, 100)}`);
+              await refundCredits(ctx.user.id, itemCost, `Refund: batch item failed — ${(error.message || "unknown error").slice(0, 100)}`, { purchasedCredits: itemPurchased, operationKey: `batch-refund:${batchResult.transactionId}:${itemIndex}` });
             } catch (refundErr) {
               console.error("[generation.batchCreate] Credit refund failed:", refundErr);
             }
-            results.push({ id: genId, status: "failed", prompt: item.prompt, error: error.message });
+            results.push({ id: genId ?? 0, status: "failed", prompt: item.prompt, error: error.message });
           }
         }
 
@@ -5231,7 +5150,7 @@ export const appRouter = router({
         } catch (error: any) {
           // Refund credits on generation failure — the user received no video.
           try {
-            await refundCredits(ctx.user.id, deduction.cost, `Refund: text-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: text-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: deduction.purchasedCreditsDebited, operationKey: `legacy-refund:${deduction.transactionId}` });
           } catch (refundErr) {
             console.error("[video.textToVideo] Credit refund failed:", refundErr);
           }
@@ -5356,7 +5275,7 @@ export const appRouter = router({
         } catch (error: any) {
           // Refund credits on generation failure — the user received no video.
           try {
-            await refundCredits(ctx.user.id, deduction.cost, `Refund: image-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+            await refundCredits(ctx.user.id, deduction.cost, `Refund: image-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: deduction.purchasedCreditsDebited, operationKey: `legacy-refund:${deduction.transactionId}` });
           } catch (refundErr) {
             console.error("[video.imageToVideo] Credit refund failed:", refundErr);
           }
@@ -5387,14 +5306,20 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         if (input.id) {
-          // Check if user is owner or editor collaborator
-          const project = await getVideoProject(input.id, ctx.user.id);
-          const collabRole = project ? null : await getUserCollaboratorRole(input.id, ctx.user.id);
-          if (!project && collabRole !== "editor") {
+          // Persistence itself checks current owner/editor authority, so a
+          // revoked collaborator cannot race a prior authorization lookup.
+          const project = await updateEditableVideoProject(input.id, ctx.user.id, {
+            title: input.title,
+            description: input.description ?? undefined,
+            data: input.data,
+            thumbnailUrl: input.thumbnailUrl ?? undefined,
+          });
+          if (!project) {
             throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this project" });
           }
-          const ownerId = project ? ctx.user.id : (await getVideoProject(input.id, 0 as any))?.userId ?? ctx.user.id;
-          // Auto-save revision before updating
+          const ownerId = project.userId;
+          // Revision and notification failures cannot turn a persisted save
+          // into a false failure, or turn a rejected save into a success.
           try {
             const latestVersion = await getLatestRevisionVersion(input.id);
             await createRevision({
@@ -5406,27 +5331,16 @@ export const appRouter = router({
               source: (input.source as any) ?? "manual",
             });
           } catch (_) { /* revision save is best-effort */ }
-          if (project) {
-            await updateVideoProject(input.id, ctx.user.id, {
-              title: input.title,
-              description: input.description ?? undefined,
-              data: input.data,
-              thumbnailUrl: input.thumbnailUrl ?? undefined,
-            });
-          }
           // Notify project owner if editor is a collaborator
-          if (collabRole === "editor" && project === null) {
+          if (ownerId !== ctx.user.id) {
             try {
-              const ownerProject = await getVideoProject(input.id, ownerId);
-              if (ownerProject) {
-                await createNotification(
-                  ownerId,
-                  "collaboration",
-                  "Project Edited",
-                  `A collaborator edited your project "${input.title}"`,
-                  { projectId: input.id }
-                );
-              }
+              await createNotification(
+                ownerId,
+                "collaboration",
+                "Project Edited",
+                `A collaborator edited your project "${input.title}"`,
+                { projectId: input.id }
+              );
             } catch (err) {
               // Best-effort owner notification — log sanitized, never fail the save.
               console.warn("[videoProject.save] owner notification failed:", safeErrorMessage(err, "videoProject.save"));

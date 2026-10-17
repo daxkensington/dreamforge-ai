@@ -15,6 +15,7 @@ vi.mock("./_core/llm", () => ({
 // Mock the db functions for video projects
 const mockCreateVideoProject = vi.fn();
 const mockUpdateVideoProject = vi.fn();
+const mockUpdateEditableVideoProject = vi.fn();
 const mockGetVideoProject = vi.fn();
 const mockListVideoProjects = vi.fn();
 const mockDeleteVideoProject = vi.fn();
@@ -28,6 +29,7 @@ vi.mock("./db", async (importOriginal) => {
     ...original,
     createVideoProject: (...args: any[]) => mockCreateVideoProject(...args),
     updateVideoProject: (...args: any[]) => mockUpdateVideoProject(...args),
+    updateEditableVideoProject: (...args: any[]) => mockUpdateEditableVideoProject(...args),
     getVideoProject: (...args: any[]) => mockGetVideoProject(...args),
     listVideoProjects: (...args: any[]) => mockListVideoProjects(...args),
     deleteVideoProject: (...args: any[]) => mockDeleteVideoProject(...args),
@@ -141,12 +143,11 @@ describe("Video Project CRUD & Templates", () => {
   // ─── Save (Update) ────────────────────────────────────────────
   describe("videoProject.save (update)", () => {
     it("should update an existing project", async () => {
-      // getVideoProject is called to check ownership
-      mockGetVideoProject.mockResolvedValueOnce({ id: 42, userId: 1, type: "storyboard" });
+      // Authority and persistence are checked by the same guarded UPDATE.
+      mockUpdateEditableVideoProject.mockResolvedValueOnce({ id: 42, userId: 1, type: "storyboard" });
       // getLatestRevisionVersion for auto-revision
       mockGetLatestRevisionVersion.mockResolvedValueOnce(1);
       mockCreateRevision.mockResolvedValueOnce({ id: 200 });
-      mockUpdateVideoProject.mockResolvedValueOnce({ success: true });
 
       const result = await caller.videoProject.save({
         id: 42,
@@ -158,7 +159,7 @@ describe("Video Project CRUD & Templates", () => {
 
       expect(result.id).toBe(42);
       expect(result.action).toBe("updated");
-      expect(mockUpdateVideoProject).toHaveBeenCalledWith(42, 1, {
+      expect(mockUpdateEditableVideoProject).toHaveBeenCalledWith(42, 1, {
         title: "Updated Mars Storyboard",
         description: "Updated description",
         data: expect.any(Object),

@@ -125,11 +125,14 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
       const result = rows(await driver.execute(sql`/* generation-billing:claim */
         WITH prior AS (
           SELECT id FROM "generationRequests" WHERE "userId" = ${input.userId} AND "requestId" = ${input.requestId}::uuid
+        ), wallet_before AS (
+          SELECT cb.* FROM "creditBalances" cb WHERE cb."userId" = ${input.userId} FOR UPDATE
         ), wallet AS (
-          UPDATE "creditBalances" cb SET balance = cb.balance - ${input.credits},
-            "lifetimeSpent" = cb."lifetimeSpent" + ${input.credits}, "updatedAt" = now()
-          WHERE cb."userId" = ${input.userId} AND cb.balance >= ${input.credits} AND NOT EXISTS (SELECT 1 FROM prior)
-          RETURNING cb.balance
+          UPDATE "creditBalances" cb SET balance = wb.balance - ${input.credits},
+            "bonusCredits" = CASE WHEN wb."walletAccountingVersion" = 1 THEN LEAST(wb."bonusCredits", GREATEST(wb.balance - ${input.credits}, 0)) ELSE wb."bonusCredits" END,
+            "lifetimeSpent" = wb."lifetimeSpent" + ${input.credits}, "updatedAt" = now()
+          FROM wallet_before wb WHERE cb.id = wb.id AND wb.balance >= ${input.credits} AND NOT EXISTS (SELECT 1 FROM prior)
+          RETURNING cb.balance, CASE WHEN wb."walletAccountingVersion" = 1 THEN wb."bonusCredits" - cb."bonusCredits" ELSE 0 END AS "purchasedCreditsDebited"
         ), claimed AS (
           INSERT INTO "generationRequests" ("userId", "requestId", "payloadHash", "executionToken", "quotedCredits", state, "debitedAt", "errorCode", result)
           SELECT ${input.userId}, ${input.requestId}::uuid, ${input.payloadHash}, ${token}::uuid, ${input.credits},
@@ -143,7 +146,7 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
         ), ledger AS (
           INSERT INTO "creditTransactions" ("userId", amount, "txType", description, "txMetadata")
           SELECT c."userId", -c."quotedCredits", 'usage', 'Generation request debit',
-            jsonb_build_object('generationRequestId', c.id, 'requestId', c."requestId")
+            jsonb_build_object('generationRequestId', c.id, 'requestId', c."requestId", 'purchasedCreditsDebited', wallet."purchasedCreditsDebited")
           FROM claimed c CROSS JOIN wallet RETURNING id
         )
         SELECT c.* FROM claimed c WHERE c.state = 'rejected' OR EXISTS (SELECT 1 FROM ledger)
@@ -234,6 +237,7 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
           WHERE lower(g.metadata->>'billingRequestId') = r."requestId"::text AND g.status IN ('pending', 'generating', 'failed') FOR UPDATE OF g
       ), wallet AS (
         UPDATE "creditBalances" cb SET balance = cb.balance + r."quotedCredits",
+          "bonusCredits" = cb."bonusCredits" + CASE WHEN cb."walletAccountingVersion" = 1 THEN COALESCE((SELECT LEAST(r."quotedCredits", (t."txMetadata"->>'purchasedCreditsDebited')::integer) FROM "creditTransactions" t WHERE t."userId" = r."userId" AND t."txType" = 'usage' AND t."txMetadata"->>'generationRequestId' = r.id::text ORDER BY t.id LIMIT 1), 0) ELSE 0 END,
           "lifetimeSpent" = GREATEST(cb."lifetimeSpent" - r."quotedCredits", 0), "updatedAt" = now()
         FROM eligible r WHERE cb."userId" = r."userId" AND (r.target_generation IS NULL OR EXISTS (SELECT 1 FROM owned_generation)) RETURNING cb.id
       ), failed_generation AS (
@@ -292,9 +296,12 @@ export function createGenerationBillingStore(driver: GenerationBillingDriver) {
           WHERE r.state = 'reserved' AND (r."generationId" IS NOT NULL OR o.orphan_count <= 1)
             AND NOT EXISTS (SELECT 1 FROM generations g WHERE g.id = COALESCE(r."generationId", o.orphan_id) AND g.status = 'completed')
         ), wallet_totals AS (
-          SELECT "userId", sum("quotedCredits")::integer AS credits FROM refundable GROUP BY "userId"
+          SELECT r."userId", sum(r."quotedCredits")::integer AS credits,
+            sum(COALESCE((SELECT LEAST(r."quotedCredits", (t."txMetadata"->>'purchasedCreditsDebited')::integer) FROM "creditTransactions" t WHERE t."userId" = r."userId" AND t."txType" = 'usage' AND t."txMetadata"->>'generationRequestId' = r.id::text ORDER BY t.id LIMIT 1), 0))::integer AS purchased
+          FROM refundable r GROUP BY r."userId"
         ), wallet AS (
           UPDATE "creditBalances" cb SET balance = cb.balance + w.credits,
+            "bonusCredits" = cb."bonusCredits" + CASE WHEN cb."walletAccountingVersion" = 1 THEN w.purchased ELSE 0 END,
             "lifetimeSpent" = GREATEST(cb."lifetimeSpent" - w.credits, 0), "updatedAt" = now()
           FROM wallet_totals w WHERE cb."userId" = w."userId" RETURNING cb."userId"
         ), refunded AS (

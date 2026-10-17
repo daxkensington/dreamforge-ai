@@ -1,3 +1,4 @@
+import { failLegacyJobAndRefund } from "../_core/walletAccounting";
 /**
  * One-Click Story router — turns "an idea" into a 4-6 scene illustrated
  * story with optional character consistency and optional generated music.
@@ -37,9 +38,9 @@ function totalCost(sceneCount: number, withMusic: boolean): number {
 }
 
 // Refunds must never throw — a failed refund must not mask the original error.
-async function safeRefund(userId: number, amount: number, reason: string) {
+async function safeRefund(userId: number, amount: number, reason: string, options?: {purchasedCredits?: number; operationKey?: string}) {
   try {
-    await refundCredits(userId, amount, reason);
+    await refundCredits(userId, amount, reason, options);
   } catch (err) {
     console.error("[story] Credit refund failed:", err);
   }
@@ -74,6 +75,14 @@ export const storyRouter = router({
           message: `Insufficient credits. Story costs ${cost} — you have ${debit.balance}.`,
         });
       }
+
+      let remainingPurchased = debit.purchasedCreditsDebited ?? 0;
+      const refund = async (_userId: number, amount: number, reason: string) => {
+        const purchased = Math.min(amount, remainingPurchased);
+        await safeRefund(ctx.user.id, amount, reason, { purchasedCredits: purchased,
+          operationKey: debit.transactionId ? `story-refund:${debit.transactionId}:${amount}:${reason.slice(0,40)}` : undefined });
+        remainingPurchased -= purchased;
+      };
 
       // Optional character description prepended to every scene prompt for
       // visual consistency across scenes — the OpenArt pattern.
@@ -142,7 +151,7 @@ export const storyRouter = router({
         storyboard = typeof content === "string" ? JSON.parse(content) : null;
       } catch (err) {
         // LLM step failed before anything was produced — refund the whole bundle.
-        await safeRefund(
+        await refund(
           ctx.user.id,
           cost,
           `Refund: story creation failed — ${(err as Error)?.message ?? "storyboard generation failed"}`,
@@ -152,7 +161,7 @@ export const storyRouter = router({
       if (!storyboard?.scenes?.length) {
         // LLM returned unusable output — the user received nothing for the
         // storyboard portion, so refund the entire bundle.
-        await safeRefund(
+        await refund(
           ctx.user.id,
           cost,
           "Refund: story creation failed — storyboard generation returned no scenes",
@@ -182,7 +191,7 @@ export const storyRouter = router({
       // Refund the per-scene image cost for every scene that produced no
       // image — the user paid for N scenes and got N - failedImages.
       if (failedImages > 0) {
-        await safeRefund(
+        await refund(
           ctx.user.id,
           failedImages * STORY_IMAGE_COST,
           `Refund: ${failedImages} story scene image(s) failed to generate`,
@@ -204,7 +213,7 @@ export const storyRouter = router({
                 duration: 30,
                 model: "musicgen",
                 status: "generating",
-                metadata: { storyTitle: storyboard.title },
+                metadata: { storyTitle: storyboard.title, cost: STORY_MUSIC_COST, purchasedCreditsDebited: Math.min(STORY_MUSIC_COST, remainingPurchased) },
               })
               .returning({ id: audioGenerations.id });
             audioGenerationId = inserted?.id ?? null;
@@ -233,13 +242,8 @@ export const storyRouter = router({
                 console.error("[story] music gen failed:", err);
                 const dbInner = await getDb();
                 if (dbInner && audioGenerationId) {
-                  await dbInner
-                    .update(audioGenerations)
-                    .set({
-                      status: "failed",
-                      errorMessage: (err as Error)?.message ?? "music gen failed",
-                    } as any)
-                    .where(eq(audioGenerations.id, audioGenerationId));
+                  await failLegacyJobAndRefund({ table: "audioGenerations", id: audioGenerationId, userId: ctx.user.id,
+                    amount: STORY_MUSIC_COST, purchasedCredits: Math.min(STORY_MUSIC_COST, remainingPurchased), reason: "Story music failed. Credits returned." });
                 }
               }
             })().catch(() => {});

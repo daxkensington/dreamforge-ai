@@ -62,11 +62,11 @@ import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { getTierConfig } from "@shared/tiers";
 import { getSubscriptionEntitlement } from "@shared/subscriptionEntitlement";
+import { initialWorkspaceVideoModel, workspaceVideoSelectionError } from "@shared/workspaceVideoSelection";
 import {
   getWorkspaceImageSelectionError,
   hasWorkspaceModelAccess,
   WORKSPACE_AUTO_IMAGE_MODEL,
-  WORKSPACE_AUTO_VIDEO_MODEL,
   fingerprintGenerationInput,
   isGenerationRequestRetry,
   isTerminalGenerationResult,
@@ -98,12 +98,7 @@ const DF_IMAGE_PRESETS = [
   { value: "df-abstract", label: "DreamForge Abstract", desc: "Artistic, painterly, surreal compositions", types: ["image"], tier: "creator", badge: "Exclusive" },
 ];
 
-const VIDEO_MODEL_OPTIONS = [
-  { value: WORKSPACE_AUTO_VIDEO_MODEL, label: "Auto (Best Available)", desc: "Automatically picks an available model", types: ["video"], tier: "free", badge: "Recommended" },
-  { value: "veo-3", label: "Google Veo 3", desc: "State-of-the-art video with audio", types: ["video"], tier: "premium", badge: "Premium" },
-  { value: "cogvideo", label: "CogVideoX (Self-Hosted)", desc: "Text-to-video on DreamForge GPUs — 75% cheaper", types: ["video"], tier: "creator" },
-  { value: "minimax", label: "Minimax Video", desc: "High-quality short video clips", types: ["video"], tier: "creator" },
-];
+
 
 const PRESET_PROMPTS = [
   "A crystalline dragon perched atop a floating island surrounded by aurora borealis, digital art style",
@@ -154,11 +149,7 @@ export default function Workspace() {
   const [submitTitle, setSubmitTitle] = useState("");
   const [submitDesc, setSubmitDesc] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [seed, setSeed] = useState("");
-  const [styleRef, setStyleRef] = useState("");
   const [aspectPreset, setAspectPreset] = useState("1:1");
-  const [variationStrength, setVariationStrength] = useState(50); // 0-100 slider
-  const [creativityLevel, setCreativityLevel] = useState(70); // for upscale/variation quality
   const [animateDialogOpen, setAnimateDialogOpen] = useState(false);
   const [animateGenId, setAnimateGenId] = useState<number | null>(null);
   const [animateDuration, setAnimateDuration] = useState(4);
@@ -188,6 +179,7 @@ export default function Workspace() {
     enabled: isAuthenticated,
     retry: 1,
   });
+  const videoModelsQuery = trpc.generation.videoModels.useQuery(undefined, { enabled: isAuthenticated, retry: 1 });
   const subscriptionQuery = trpc.pricing.getCurrentSubscription.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: 1,
@@ -219,7 +211,16 @@ export default function Workspace() {
   const uncensoredEnabled = uncensored && uncensoredActive && mediaType === "image";
   const selectedDFPreset = DF_IMAGE_PRESETS.some((preset) => preset.value === modelVersion);
   const selectedImageModel = imageModelsQuery.data?.find((model) => model.id === modelVersion);
-  const getCurrentImageSelectionError = (tier = userTier) => mediaType !== "image" || uncensoredEnabled
+  const selectedVideoModel = videoModelsQuery.data?.find(model => model.id === modelVersion);
+  const videoCatalogReady = videoModelsQuery.isSuccess && !videoModelsQuery.isFetching;
+  const selectVideoModel = (id: string) => {
+    setModelVersion(id);
+    const model = videoModelsQuery.data?.find(item => item.id === id);
+    if (model) setDuration(model.supportedDurations[0]);
+  };
+  const getCurrentImageSelectionError = (tier = userTier) => mediaType === "video"
+    ? workspaceVideoSelectionError({ catalog: videoModelsQuery.data, catalogReady: videoCatalogReady, planReady, userTier: tier, modelId: modelVersion, duration })
+    : uncensoredEnabled
     ? null
     : selectedDFPreset
       ? !planReady
@@ -355,16 +356,6 @@ export default function Workspace() {
   });
 
   const animateMutation = trpc.generation.animateImage.useMutation({
-    onSuccess: (data) => {
-      if (data.status === "completed") {
-        toast.success("Image animated into video clip!");
-      } else if (data.status === "failed") {
-        toast.error(`Animation failed: ${data.error || "Unknown error"}`);
-      }
-      setAnimateDialogOpen(false);
-      setAnimateGenId(null);
-      refetchGens();
-    },
     onError: (err) => toast.error(err.message),
   });
 
@@ -381,7 +372,9 @@ export default function Workspace() {
     setMediaType(type);
     // Auto-select appropriate model
     if (type === "video") {
-      setModelVersion(WORKSPACE_AUTO_VIDEO_MODEL);
+      const model = initialWorkspaceVideoModel(videoModelsQuery.data, userTier);
+      setModelVersion(model?.id ?? "");
+      if (model) setDuration(model.supportedDurations[0]);
     } else {
       setModelVersion(WORKSPACE_AUTO_IMAGE_MODEL);
     }
@@ -617,16 +610,12 @@ export default function Workspace() {
                         <Timer className="h-3 w-3" />
                         Duration: {duration}s
                       </Label>
-                      <span className="text-[10px] text-muted-foreground">2-8 seconds</span>
+                      <span className="text-[10px] text-muted-foreground">Model-supported durations</span>
                     </div>
-                    <Slider
-                      value={[duration]}
-                      onValueChange={([v]) => setDuration(v)}
-                      min={2}
-                      max={8}
-                      step={1}
-                      className="w-full"
-                    />
+                    <Select value={String(duration)} onValueChange={value => setDuration(Number(value))} disabled={!selectedVideoModel}>
+                      <SelectTrigger aria-label="Video duration"><SelectValue placeholder="Choose a video model first" /></SelectTrigger>
+                      <SelectContent>{selectedVideoModel?.supportedDurations.map(value => <SelectItem key={value} value={String(value)}>{value} seconds</SelectItem>)}</SelectContent>
+                    </Select>
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                       <Film className="h-3 w-3" />
                       Creates a {duration}-second animated video clip
@@ -643,7 +632,7 @@ export default function Workspace() {
                   <Cpu className="h-3 w-3" />
                   Model
                 </Label>
-                <Select value={modelVersion} onValueChange={setModelVersion} disabled={uncensoredEnabled}>
+                <Select value={modelVersion} onValueChange={mediaType === "video" ? selectVideoModel : setModelVersion} disabled={uncensoredEnabled}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose an available model" />
                   </SelectTrigger>
@@ -682,26 +671,20 @@ export default function Workspace() {
                           ))}
                         </SelectGroup>
                       </>
-                    ) : VIDEO_MODEL_OPTIONS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        <div className="flex items-center gap-2">
-                          <span>{m.label}</span>
-                          {m.badge && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-semibold">
-                              {m.badge}
-                            </span>
-                          )}
-                          {m.tier === "creator" && !m.badge && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-semibold">
-                              Pro
-                            </span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">— {m.desc}</span>
-                        </div>
+                    ) : videoModelsQuery.data?.map(model => (
+                      <SelectItem key={model.id} value={model.id} disabled={!videoCatalogReady || !planReady || !model.isConfigured || !hasWorkspaceModelAccess(userTier, model.requiredTier)}>
+                        <span>{model.name} · {model.creditCost} credits · {getTierConfig(model.requiredTier).displayName}+{model.isConfigured ? "" : " · unavailable"}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {mediaType === "video" && (
+                  <div className="mt-3 space-y-2 text-xs" role="status">
+                    {selectedVideoModel && <p>{selectedVideoModel.creditCost} credits per render. {selectedVideoModel.outputInfo}</p>}
+                    {imageSelectionError && <p className="text-amber-400">{imageSelectionError}</p>}
+                    <Button variant="ghost" size="sm" onClick={() => void videoModelsQuery.refetch()} disabled={videoModelsQuery.isFetching}>{videoModelsQuery.isError ? "Retry video models" : "Refresh video models"}</Button>
+                  </div>
+                )}
                 {mediaType === "image" && (
                   <div className="mt-2 space-y-2">
                     {uncensoredEnabled ? (
@@ -799,8 +782,6 @@ export default function Workspace() {
                   onApply={(preset) => {
                     setPrompt((prev) => prev ? `${prev}, ${preset.promptSuffix}` : preset.promptSuffix);
                     if (preset.negativePrompt) setNegativePrompt(preset.negativePrompt);
-                    if (preset.creativity) setCreativityLevel(preset.creativity);
-                    if (preset.resemblance) setVariationStrength(100 - preset.resemblance);
                   }}
                 />
 
@@ -862,85 +843,6 @@ export default function Workspace() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden space-y-4"
                     >
-                      {/* Seed Control */}
-                      <div>
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          Seed
-                          <span className="text-[10px]">(leave empty for random)</span>
-                        </Label>
-                        <div className="flex gap-2 mt-1.5">
-                          <Input
-                            type="number"
-                            placeholder="Random"
-                            value={seed}
-                            onChange={(e) => setSeed(e.target.value)}
-                            className="text-sm font-mono"
-                          />
-                          <Button variant="outline" size="sm" onClick={() => setSeed(String(Math.floor(Math.random() * 2147483647)))}>
-                            <RotateCcw className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Style Reference */}
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Style Reference Image URL</Label>
-                        <Input
-                          placeholder="Paste a style reference image URL..."
-                          value={styleRef}
-                          onChange={(e) => setStyleRef(e.target.value)}
-                          className="mt-1.5 text-sm"
-                        />
-                        {styleRef && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <img loading="lazy" src={styleRef} alt="Style ref" className="h-12 w-12 rounded object-cover border border-border/50" />
-                            <span className="text-[10px] text-muted-foreground">Style will be applied to generation</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Variation Strength */}
-                      <div>
-                        <Label className="text-xs text-muted-foreground flex items-center justify-between">
-                          <span>Variation Strength</span>
-                          <span className="text-[10px] font-mono">{variationStrength}%</span>
-                        </Label>
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[10px] text-muted-foreground">Subtle</span>
-                          <Slider
-                            value={[variationStrength]}
-                            onValueChange={([v]) => setVariationStrength(v)}
-                            min={10}
-                            max={100}
-                            step={5}
-                            className="flex-1"
-                          />
-                          <span className="text-[10px] text-muted-foreground">Strong</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-1">Low = subtle tweaks. High = creative reimagination.</p>
-                      </div>
-
-                      {/* Creativity Level */}
-                      <div>
-                        <Label className="text-xs text-muted-foreground flex items-center justify-between">
-                          <span>Detail Creativity</span>
-                          <span className="text-[10px] font-mono">{creativityLevel}%</span>
-                        </Label>
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[10px] text-muted-foreground">Faithful</span>
-                          <Slider
-                            value={[creativityLevel]}
-                            onValueChange={([v]) => setCreativityLevel(v)}
-                            min={0}
-                            max={100}
-                            step={5}
-                            className="flex-1"
-                          />
-                          <span className="text-[10px] text-muted-foreground">Creative</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-1">How much new detail the AI invents (Magnific-style).</p>
-                      </div>
-
                       {/* Dimensions */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1182,11 +1084,11 @@ export default function Workspace() {
                           <div className="aspect-[4/3] bg-muted/30 relative overflow-hidden">
                             {gen.status === "completed" && gen.imageUrl ? (
                               <>
-                                <img
+                                {gen.mediaType === "video" ? <video src={gen.imageUrl} controls preload="metadata" aria-label="Generated video" className="w-full h-full object-contain" /> : <img
                                   src={gen.imageUrl}
                                   alt="Synthetic output"
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
+                                />}
                                 {gen.mediaType === "video" && (
                                   <div className="absolute top-2 left-2 video-badge px-2 py-0.5 rounded-md flex items-center gap-1">
                                     <Film className="h-3 w-3 text-white" />
@@ -1230,7 +1132,7 @@ export default function Workspace() {
                             )}
 
                             {/* Hover overlay */}
-                            {gen.status === "completed" && gen.imageUrl && (
+                            {gen.status === "completed" && gen.imageUrl && gen.mediaType !== "video" && (
                               <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
                                 <Button
                                   size="sm"
@@ -1270,7 +1172,7 @@ export default function Workspace() {
                                 </Button>
                                 <ShareButton
                                   generationId={gen.id}
-                                  shareText={`Check out this AI ${gen.mediaType === "video" ? "video" : "image"} I made on DreamForgeX:`}
+                                  shareText="Check out this AI image I made on DreamForgeX:"
                                   variant="secondary"
                                   iconOnly
                                   className="text-xs h-8 px-2"
@@ -1281,6 +1183,10 @@ export default function Workspace() {
 
                           {/* Info */}
                           <div className="p-3 space-y-2">
+                            {gen.status === "completed" && gen.mediaType === "video" && gen.imageUrl && <div className="flex gap-2">
+                              <Button asChild variant="outline" size="sm"><a href={gen.imageUrl} target="_blank" rel="noopener noreferrer">Open video</a></Button>
+                              <ShareButton generationId={gen.id} shareText="Check out this AI video I made on DreamForgeX:" variant="outline" />
+                            </div>}
                             <p className="text-xs text-foreground line-clamp-2 leading-relaxed">{gen.prompt}</p>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">

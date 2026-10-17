@@ -81,6 +81,18 @@ export default function Navbar() {
   useGlobalShortcuts();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [mobileOpen]);
   const [scrolled, setScrolled] = useState(false);
   const welcomeShown = useRef(false);
 
@@ -210,9 +222,9 @@ export default function Navbar() {
           : "bg-black/55 backdrop-blur-xl border-white/[0.08]"
       }`}
     >
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container flex h-16 items-center justify-between gap-3">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5 group">
           <NextImage
             src="/logo.png"
             alt="DreamForgeX"
@@ -220,13 +232,13 @@ export default function Navbar() {
             height={36}
             className="h-9 w-9 rounded-lg ring-1 ring-cyan-400/30 shadow-lg shadow-cyan-500/25 group-hover:shadow-cyan-400/40 group-hover:scale-105 transition-all"
           />
-          <span className="text-base font-extrabold tracking-tight bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <span className="hidden min-[380px]:inline text-base font-extrabold tracking-tight bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
             DreamForgeX
           </span>
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav aria-label="Main navigation" className="hidden xl:flex items-center gap-1 whitespace-nowrap">
           {navLinks.map((link) => {
             if (link.auth && !isAuthenticated) return null;
             const isUncensored = link.href === "/uncensored";
@@ -338,11 +350,11 @@ export default function Navbar() {
         </nav>
 
         {/* Right side */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full p-1 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button aria-label="Open account menu" className="flex items-center gap-2 rounded-full p-1 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Avatar className="h-8 w-8 border border-border">
                     <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
                       {user?.name?.charAt(0)?.toUpperCase() || "U"}
@@ -484,7 +496,7 @@ export default function Navbar() {
             onClick={() =>
               document.dispatchEvent(new CustomEvent("toggle-shortcuts-modal"))
             }
-            className="hidden md:inline-flex p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            className="hidden xl:inline-flex p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
             aria-label="Keyboard shortcuts"
             title="Keyboard shortcuts (Shift + ?)"
           >
@@ -493,7 +505,12 @@ export default function Navbar() {
 
           {/* Mobile menu toggle */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
+            ref={mobileToggleRef}
+            type="button"
+            aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
+            className="xl:hidden p-2 rounded-lg hover:bg-accent transition-colors"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -503,8 +520,8 @@ export default function Navbar() {
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/5 bg-black/95 backdrop-blur-xl">
-          <nav className="container py-4 flex flex-col gap-1">
+        <div id="mobile-navigation" className="xl:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-white/5 bg-black/95 backdrop-blur-xl">
+          <nav aria-label="Main navigation" className="container py-4 flex flex-col gap-1">
             {/* Mobile Credit Balance */}
             {isAuthenticated && creditBalance !== null && (
               <Link

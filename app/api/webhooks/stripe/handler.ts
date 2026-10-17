@@ -1,7 +1,8 @@
 import Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
 import { getDb } from "../../../../server/db";
-import { addCredits } from "../../../../server/stripe";
+import { addCredits, CREDIT_PACKAGES } from "../../../../server/stripe";
+import { walletRows } from "../../../../server/_core/walletAccounting";
 import { createNotification } from "../../../../server/routersPhase15";
 import { hasPurchased, recordPurchase } from "../../../../server/dbMarketplace";
 import {
@@ -142,75 +143,32 @@ async function clawBackCredits(
   metadata: Record<string, unknown>,
   sentryContext: Record<string, unknown>
 ): Promise<number> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const rows = await db
-      .select({
-        id: creditTransactions.id,
-        userId: creditTransactions.userId,
-        amount: creditTransactions.amount,
-        clawedBackCredits: creditTransactions.clawedBackCredits,
-      })
-      .from(creditTransactions)
-      .where(eq(creditTransactions.id, purchaseId))
-      .limit(1);
-
-    const current = rows[0];
-    if (!current) {
-      throw new Error(`Purchase transaction ${purchaseId} vanished mid-clawback`);
-    }
-
-    const alreadyClawed = current.clawedBackCredits ?? 0;
-    // Never claw back more than the purchase granted, and never move the
-    // counter backwards (a refund event arriving after a dispute already
-    // clawed everything must not "un-claw").
-    const target = Math.min(Math.max(targetClawedTotal, alreadyClawed), current.amount);
-    const delta = target - alreadyClawed;
-    if (delta <= 0) return 0;
-
-    // Atomically claim the delta. If a concurrent event moved the counter
-    // first, this matches zero rows and we re-read + recompute.
-    const updated = await db
-      .update(creditTransactions)
-      .set({ clawedBackCredits: target })
-      .where(
-        and(
-          eq(creditTransactions.id, current.id),
-          eq(creditTransactions.clawedBackCredits, alreadyClawed)
-        )
-      )
-      .returning({ id: creditTransactions.id });
-
-    if (updated.length === 0) continue;
-
-    try {
-      // Deduct from balance — allow it to go negative if the user already
-      // spent the credits, so they can't simply spend-then-refund.
-      await db
-        .update(creditBalances)
-        .set({
-          balance: sql`${creditBalances.balance} - ${delta}`,
-        })
-        .where(eq(creditBalances.userId, current.userId));
-
-      await db.insert(creditTransactions).values({
-        userId: current.userId,
-        amount: -delta,
-        type: kind,
-        description: `${descriptionPrefix}: ${delta} credits clawed back`,
-        stripePaymentIntentId: (metadata.paymentIntentId as string) || null,
-        metadata,
-      });
-    } catch (err) {
-      Sentry.captureException(err, { extra: sentryContext });
-      throw err;
-    }
-
-    return delta;
-  }
-
-  throw new Error(
-    `Clawback conflict resolution exhausted retries for transaction ${purchaseId}`
-  );
+  const receiptKey = kind === "dispute" ? `dispute-clawback:${metadata.disputeId}` : `refund-clawback:${metadata.chargeId}:${metadata.refundAmount}`;
+  const result = walletRows(await db.execute(sql`
+    WITH locked AS (SELECT * FROM "creditTransactions" WHERE id = ${purchaseId} FOR UPDATE),
+    eligible AS (SELECT l.*, LEAST(GREATEST(${targetClawedTotal}, l."clawedBackCredits"), l.amount) - l."clawedBackCredits" AS delta FROM locked l
+      WHERE NOT EXISTS (SELECT 1 FROM "webhookEvents" WHERE "eventId" = ${receiptKey})
+        AND (${kind}::text <> 'dispute' OR NOT EXISTS (SELECT 1 FROM "creditTransactions" d WHERE d."txType" = 'dispute' AND d.amount < 0 AND d."txMetadata"->>'disputeId' = ${(metadata.disputeId as string) ?? null}))),
+    wallet_before AS (SELECT cb.* FROM "creditBalances" cb JOIN eligible p ON p."userId" = cb."userId" FOR UPDATE OF cb),
+    wallet AS (
+      UPDATE "creditBalances" cb SET balance = cb.balance - p.delta,
+        "bonusCredits" = CASE WHEN cb."walletAccountingVersion" = 1 THEN GREATEST(0, cb."bonusCredits" - p.delta) ELSE cb."bonusCredits" END,
+        "updatedAt" = now()
+      FROM eligible p JOIN wallet_before wb ON wb."userId" = p."userId" WHERE cb.id = wb.id AND p.delta > 0
+      RETURNING cb."userId", p.delta, CASE WHEN wb."walletAccountingVersion" = 1 THEN LEAST(p.delta, wb."bonusCredits") ELSE 0 END AS purchased
+    ), purchase AS (
+      UPDATE "creditTransactions" t SET "clawedBackCredits" = t."clawedBackCredits" + w.delta
+      FROM wallet w WHERE t.id = ${purchaseId} RETURNING t.id
+    ), ledger AS (
+      INSERT INTO "creditTransactions" ("userId", amount, "txType", description, "stripePaymentIntentId", "txMetadata")
+      SELECT w."userId", -w.delta, ${kind}::"txType", ${descriptionPrefix} || ': ' || w.delta || ' credits clawed back',
+        ${(metadata.paymentIntentId as string) ?? null}, ${JSON.stringify(metadata)}::jsonb || jsonb_build_object('purchasedCreditsClawed', w.purchased)
+      FROM wallet w WHERE EXISTS (SELECT 1 FROM purchase) RETURNING amount
+    ), receipt AS (
+      INSERT INTO "webhookEvents" ("eventId", "eventType", "webhookStatus", summary)
+      SELECT ${receiptKey}, 'internal.payment_clawback', 'processed', 'Payment clawback committed atomically' FROM ledger RETURNING id
+    ) SELECT -amount AS delta FROM ledger WHERE EXISTS (SELECT 1 FROM receipt)`));
+  return Number(result[0]?.delta ?? 0);
 }
 
 /**
@@ -253,6 +211,12 @@ export async function processStripeEvent(
   event: Stripe.Event,
   db: WebhookDb | null
 ): Promise<StripeEventResult> {
+  if (!db) throw new Error("Database unavailable for payment processing; retry the same event.");
+  const checkout = event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded"
+    ? event.data.object as Stripe.Checkout.Session : null;
+  const recoverableCreditPack = !!checkout?.metadata?.package_id && checkout.metadata?.type !== "marketplace_purchase";
+  const recoverableMarketplace = checkout?.metadata?.type === "marketplace_purchase";
+  const recoverableClawback = ["charge.refunded", "charge.dispute.created", "charge.dispute.closed"].includes(event.type);
   // ─── Atomic idempotency claim ──────────────────────────────────
   if (db) {
     const claimed = await db
@@ -266,7 +230,7 @@ export async function processStripeEvent(
       .onConflictDoNothing({ target: webhookEvents.eventId })
       .returning({ id: webhookEvents.id });
 
-    if (claimed.length === 0) {
+    if (claimed.length === 0 && !recoverableCreditPack && !recoverableMarketplace && !recoverableClawback) {
       // These paths are now idempotent state sync or atomic invoice allocation.
       // Their failed events can be retried without reopening unrelated payment paths.
       const retryable = ["invoice.paid", "invoice.payment_succeeded", "customer.subscription.created", "customer.subscription.updated"].includes(event.type);
@@ -312,7 +276,8 @@ export async function processStripeEvent(
   try {
     switch (event.type) {
       // ─── Checkout Completed (credit packs & marketplace) ─────────
-      case "checkout.session.completed": {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
 
         // ─── Marketplace Purchase ────────────────────────────────
@@ -430,6 +395,31 @@ export async function processStripeEvent(
         const userId = parseInt(session.metadata?.user_id || "0");
         const credits = parseInt(session.metadata?.credits || "0");
         const packageId = session.metadata?.package_id || "";
+        const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
+        if (session.mode === "subscription") {
+          await logWebhookEvent("processed", `Subscription checkout ${session.id}: awaiting verified invoice`);
+          break;
+        }
+        if (!pkg || !Number.isSafeInteger(userId) || userId <= 0 || credits !== pkg.credits
+          || !(session.payment_status === "paid" || session.payment_status === "no_payment_required" && session.amount_total === 0) || session.currency !== "usd"
+          || !Number.isSafeInteger(session.amount_total) || session.amount_total! < 0 || session.amount_total! > pkg.price) {
+          throw new Error("Credit purchase requires a settled, valid USD package checkout.");
+        }
+        // Read Stripe's current receipt and original line price. Discounts are
+        // accepted only when Stripe applied them to the server-priced package.
+        const verified = await getStripeClient().checkout.sessions.retrieve(session.id, { expand: ["line_items"] });
+        const line = verified.line_items?.data?.[0];
+        const discount = verified.total_details?.amount_discount ?? 0;
+        if (verified.id !== session.id || verified.mode !== "payment" || verified.status !== "complete"
+          || !(verified.payment_status === "paid" || verified.payment_status === "no_payment_required" && verified.amount_total === 0) || verified.currency !== "usd"
+          || verified.metadata?.user_id !== String(userId) || verified.metadata?.package_id !== pkg.id
+          || verified.metadata?.credits !== String(pkg.credits)
+          || verified.line_items?.has_more || verified.line_items?.data.length !== 1 || line?.quantity !== 1
+          || line.price?.unit_amount !== pkg.price || line.price.currency !== "usd"
+          || verified.amount_subtotal !== pkg.price || !Number.isSafeInteger(discount) || discount < 0
+          || verified.amount_total !== pkg.price - discount) {
+          throw new Error("The current payment receipt does not match the purchased credit package.");
+        }
 
         let grantSkipped = false;
         if (userId && credits) {
@@ -466,13 +456,14 @@ export async function processStripeEvent(
               `[Stripe Webhook] Credits already granted for session ${session.id}, skipping addCredits`
             );
           } else {
-            await addCredits(
+            const grant = await addCredits(
               userId,
               credits,
               `Purchased ${packageId} pack (${credits} credits)`,
               session.id,
-              session.payment_intent as string
+              typeof verified.payment_intent === "string" ? verified.payment_intent : verified.payment_intent?.id
             );
+            grantSkipped = grant === "duplicate";
             console.log(
               `[Stripe Webhook] Added ${credits} credits to user ${userId}`
             );
@@ -916,62 +907,33 @@ export async function processStripeEvent(
           break;
         }
 
-        // Give the credits back: counter first (optimistic, bounded by what's
-        // actually clawed on the row), then balance + ledger row.
-        let restored = 0;
-        for (let attempt = 0; attempt < 5 && restored === 0; attempt++) {
-          const rows = await db
-            .select({ clawedBackCredits: creditTransactions.clawedBackCredits })
-            .from(creditTransactions)
-            .where(eq(creditTransactions.id, purchase.id))
-            .limit(1);
-          const current = rows[0];
-          if (!current) break;
-          const clawed = current.clawedBackCredits ?? 0;
-          const delta = Math.min(restoreTotal, clawed);
-          if (delta <= 0) break;
-
-          const updated = await db
-            .update(creditTransactions)
-            .set({ clawedBackCredits: clawed - delta })
-            .where(
-              and(
-                eq(creditTransactions.id, purchase.id),
-                eq(creditTransactions.clawedBackCredits, clawed)
-              )
-            )
-            .returning({ id: creditTransactions.id });
-          if (updated.length === 0) continue;
-
-          try {
-            await db
-              .update(creditBalances)
-              .set({ balance: sql`${creditBalances.balance} + ${delta}` })
-              .where(eq(creditBalances.userId, purchase.userId));
-
-            await db.insert(creditTransactions).values({
-              userId: purchase.userId,
-              amount: delta,
-              type: "dispute",
-              description: `Stripe dispute won — ${delta} credits restored (dispute ${dispute.id})`,
-              stripePaymentIntentId: paymentIntentId,
-              metadata: {
-                disputeId: dispute.id,
-                chargeId,
-                paymentIntentId,
-                originalPurchaseTransactionId: purchase.id,
-                restored: true,
-              },
-            });
-          } catch (err) {
-            Sentry.captureException(err, {
-              extra: { disputeId: dispute.id, paymentIntentId, purchaseId: purchase.id },
-            });
-            throw err;
-          }
-
-          restored = delta;
-        }
+        const restoration = walletRows(await db.execute(sql`
+          WITH locked AS (SELECT * FROM "creditTransactions" WHERE id = ${purchase.id} FOR UPDATE),
+          dispute AS (
+            SELECT GREATEST(0, -sum(amount))::integer AS remaining,
+              GREATEST(0, sum(CASE WHEN amount < 0 THEN COALESCE(("txMetadata"->>'purchasedCreditsClawed')::integer, 0)
+                ELSE -COALESCE(("txMetadata"->>'purchasedCreditsRestored')::integer, 0) END))::integer AS purchased
+            FROM "creditTransactions" WHERE "stripePaymentIntentId" = ${paymentIntentId} AND "txType" = 'dispute'
+              AND "txMetadata"->>'disputeId' = ${dispute.id}
+          ), eligible AS (SELECT l.*, LEAST(l."clawedBackCredits", d.remaining) AS delta, d.purchased FROM locked l CROSS JOIN dispute d
+            WHERE NOT EXISTS (SELECT 1 FROM "webhookEvents" WHERE "eventId" = ${`dispute-restore:${dispute.id}`})),
+          wallet AS (
+            UPDATE "creditBalances" cb SET balance = cb.balance + e.delta,
+              "bonusCredits" = cb."bonusCredits" + CASE WHEN cb."walletAccountingVersion" = 1 THEN LEAST(e.delta,e.purchased) ELSE 0 END,
+              "updatedAt" = now()
+            FROM eligible e WHERE cb."userId" = e."userId" AND e.delta > 0 RETURNING cb."userId",e.delta,LEAST(e.delta,e.purchased) AS purchased
+          ), counter AS (
+            UPDATE "creditTransactions" t SET "clawedBackCredits" = t."clawedBackCredits" - w.delta FROM wallet w WHERE t.id = ${purchase.id} RETURNING t.id
+          ), ledger AS (
+            INSERT INTO "creditTransactions" ("userId",amount,"txType",description,"stripePaymentIntentId","txMetadata")
+            SELECT w."userId",w.delta,'dispute','Dispute won: credits restored',${paymentIntentId},
+              jsonb_build_object('disputeId',${dispute.id}::text,'restored',true,'purchasedCreditsRestored',w.purchased)
+            FROM wallet w WHERE EXISTS (SELECT 1 FROM counter) RETURNING amount
+          ), receipt AS (
+            INSERT INTO "webhookEvents" ("eventId", "eventType", "webhookStatus", summary)
+            SELECT ${`dispute-restore:${dispute.id}`}, 'internal.dispute_restore', 'processed', 'Dispute restoration committed atomically' FROM ledger RETURNING id
+          ) SELECT amount FROM ledger WHERE EXISTS (SELECT 1 FROM receipt)`));
+        const restored = Number(restoration[0]?.amount ?? 0);
 
         if (restored <= 0) {
           await logWebhookEvent(

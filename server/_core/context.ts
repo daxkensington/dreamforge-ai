@@ -58,18 +58,21 @@ export async function createContext(req?: Request): Promise<TrpcContext> {
     const session = await auth();
 
     if (session?.user?.email) {
+      if (!session.user.id || !(await db.hasAuthIdentity(session.user.id, session.user.email))) {
+        return { user: null, session: null, ip };
+      }
       // Look up or create user in our DB
       const found = await db.getUserByEmail(session.user.email);
+      if (found?.loginMethod === "deleted") return { user: null, session: null, ip };
       user = found ?? null;
 
       if (!user && session.user.email) {
         // Auto-create user on first sign-in
-        await db.upsertUser({
-          openId: session.user.id || session.user.email,
+        await db.createUserForAuthIdentity({
+          id: session.user.id,
           name: session.user.name || null,
           email: session.user.email,
-          loginMethod: (session as any).provider || "oauth",
-          lastSignedIn: new Date(),
+          provider: (session as any).provider || "oauth",
         });
         const created = await db.getUserByEmail(session.user.email);
         user = created ?? null;
@@ -81,7 +84,7 @@ export async function createContext(req?: Request): Promise<TrpcContext> {
         const last = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
         if (Date.now() - last > 30 * 60 * 1000) {
           try {
-            await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+            await db.touchUserLastSignIn(user.id);
           } catch {
             // telemetry only — never fail the request over it
           }

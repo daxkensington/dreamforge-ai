@@ -128,6 +128,7 @@ export const viralRouter = router({
             ctx.user.id,
             cost,
             `Refund: ${preset.label} generation failed — ${(error?.message || "unknown error").slice(0, 100)}`,
+            { purchasedCredits: result.purchasedCreditsDebited ?? 0, operationKey: result.transactionId ? `usage-refund:${result.transactionId}` : undefined },
           );
         } catch (refundErr) {
           console.error("[viral.transform] Credit refund failed:", refundErr);

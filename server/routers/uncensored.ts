@@ -1,3 +1,6 @@
+import { createHash, randomUUID } from "node:crypto";
+import { claimGenerationBatch, beginGenerationBatch, completeGenerationBatch } from "../_core/generationBatchBilling";
+import { failLegacyJobAndRefund } from "../_core/walletAccounting";
 /**
  * Uncensored tier router — crypto-paid (BTCPay) entitlement.
  *
@@ -156,15 +159,9 @@ async function finalizePaidImageRow(gen: GenerationRow, userId: number): Promise
   const db = await requireDb();
   const cost = Number(meta.cost) || 0;
   const failRow = async (reason: string): Promise<ImageRowState> => {
-    const claimed = await db
-      .update(generations)
-      .set({ status: "failed" })
-      .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
-      .returning({ id: generations.id });
-    if (claimed.length) {
-      if (cost > 0) await refundCredits(userId, cost, reason);
-      await logToolFailure({ toolId: "uncensored-generate", errorMessage: reason, userId });
-    }
+    const claimed = await failLegacyJobAndRefund({ table: "generations", id: gen.id, userId, amount: cost,
+      purchasedCredits: Number(meta.purchasedCreditsDebited) || 0, reason });
+    if (claimed) await logToolFailure({ toolId: "uncensored-generate", errorMessage: reason, userId });
     return { generationId: gen.id, status: "failed", url: null, seed };
   };
 
@@ -538,7 +535,7 @@ export const uncensoredRouter = router({
       // rendering. Multi-minute renders get re-sent at the transport layer
       // and this was double-charging paying users.
       if (input.requestId) {
-        const prior = await findGenerationsByRequestId(ctx.user.id, input.requestId);
+        const prior = (await findGenerationsByRequestId(ctx.user.id, input.requestId)).filter(r => !(r.metadata as any)?.batchRequestId);
         if (prior.length) {
           const live = prior.filter((r) => r.status !== "failed");
           if (live.length === 0) {
@@ -601,19 +598,24 @@ export const uncensoredRouter = router({
         "Slow down a moment between generations.",
       );
 
-      const debit = await deductCredits(
-        ctx.user.id,
-        cost,
-        `Uncensored ${characterUrl ? "character" : input.quality} ×${input.count}`,
-        "usage",
-        { uncensored: true, quality: input.quality, count: input.count },
-      );
-      if (!debit.success) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.`,
-        });
+      await getOrCreateBalance(ctx.user.id);
+      const requestId = input.requestId ?? randomUUID();
+      const payloadHash = createHash("sha256").update(JSON.stringify({ ...input, requestId: undefined })).digest("hex");
+      const batch = await claimGenerationBatch({ userId: ctx.user.id, requestId, payloadHash, credits: cost });
+      if (batch.kind === "conflict") throw new TRPCError({ code: "CONFLICT", message: "This request belongs to a different generation. Start a new request." });
+      if (batch.kind === "replay") {
+        if (batch.result.status === "failed") throw new TRPCError({ code: "BAD_REQUEST", message: String(batch.result.error) });
+        return batch.result as { status: "completed" | "processing"; generationIds: number[]; images: { generationId: number; url: string; seed: number | null }[]; cost: number; creditsRemaining: number };
       }
+      if (batch.kind !== "owned" || !await beginGenerationBatch(batch.id, batch.token)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Your earlier request is being submitted. Check your library shortly." });
+      }
+      const debit = { balance: batch.balance, purchasedCreditsDebited: batch.purchasedCreditsDebited };
+      const finishBatch = async <T extends Record<string, any>>(result: T): Promise<T> => {
+        if (!await completeGenerationBatch(batch.id, batch.token, result)) throw new TRPCError({ code: "CONFLICT", message: "Your generation is being checked. Check your library shortly." });
+        return result;
+      };
+      const purchasedForItem = (index: number) => Math.max(0, Math.min(unitCost, batch.purchasedCreditsDebited - (cost - unitCost * (index + 1))));
 
       const aspect = getUncensoredAspect(input.aspect);
       const characterStrength = characterUrl ? clampCharacterStrength(input.characterStrength) : null;
@@ -659,6 +661,8 @@ export const uncensoredRouter = router({
           quality: input.quality,
           seed,
           cost: unitCost,
+          purchasedCreditsDebited: purchasedForItem(seed - baseSeed),
+          batchRequestId: batch.id,
           character: !!characterUrl,
           characterStrength,
           savedCharacterId,
@@ -676,7 +680,8 @@ export const uncensoredRouter = router({
           try {
             characterB64 = await fetchAsBase64(characterUrl);
           } catch {
-            await refundCredits(ctx.user.id, cost, "Uncensored generate: character source unavailable");
+            await refundCredits(ctx.user.id, cost, "Uncensored generate: character source unavailable", { purchasedCredits: batch.purchasedCreditsDebited, operationKey: `batch-source:${batch.id}` });
+            await finishBatch({ status: "failed", error: "Character source unavailable. Your credits were returned." });
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "Couldn't load the locked character — your credits were returned. Please try again.",
@@ -724,28 +729,25 @@ export const uncensoredRouter = router({
               }
             }
             failed += 1;
-            await updateGeneration(genId, { status: "failed" });
+            await failLegacyJobAndRefund({ table: "generations", id: genId, userId: ctx.user.id, amount: unitCost, purchasedCredits: purchasedForItem(i), reason: "Image generation failed. Credits returned." });
             await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
           }
         }
         if (generationIds.length === 0) {
-          await refundCredits(ctx.user.id, cost, "Uncensored generate submit failed");
+          await finishBatch({ status: "failed", error: "Generation submission failed. Your credits were returned." });
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Couldn't start the generation — your credits were returned. Please try again.",
           });
         }
-        if (failed > 0) {
-          await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate submit partial fail ×${failed}`);
-        }
         const allCompletedInline = results.length === generationIds.length;
-        return {
+        return finishBatch({
           status: allCompletedInline ? ("completed" as const) : ("processing" as const),
           generationIds,
           images: results,
           cost: unitCost * generationIds.length,
-          creditsRemaining: debit.balance - unitCost * failed,
-        };
+          creditsRemaining: debit.balance + unitCost * failed,
+        });
       }
 
       // ── Sync fallback (no self-hosted GPU): the fal chain answers inline. ──
@@ -783,30 +785,27 @@ export const uncensoredRouter = router({
           results.push({ generationId: genId, url, seed });
         } catch (err: any) {
           failed += 1;
-          await updateGeneration(genId, { status: "failed" });
+          await failLegacyJobAndRefund({ table: "generations", id: genId, userId: ctx.user.id, amount: unitCost, purchasedCredits: purchasedForItem(i), reason: "Image generation failed. Credits returned." });
           await logToolFailure({ toolId: "uncensored-generate", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         }
       }
 
       if (results.length === 0) {
-        await refundCredits(ctx.user.id, cost, "Uncensored generate failed");
+        await finishBatch({ status: "failed", error: "Generation failed. Your credits were returned." });
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Generation failed — your credits were returned. Please try again.",
         });
       }
 
-      if (failed > 0) {
-        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored generate partial fail ×${failed}`);
-      }
 
-      return {
+      return finishBatch({
         status: "completed" as const,
         generationIds: results.map((r) => r.generationId),
         images: results,
         cost: unitCost * results.length,
-        creditsRemaining: debit.balance - unitCost * failed,
-      };
+        creditsRemaining: debit.balance + unitCost * failed,
+      });
     }),
 
   /**
@@ -963,7 +962,7 @@ export const uncensoredRouter = router({
         parentGenerationId,
         animationStyle: input.mode === "i2v" ? "wan-i2v" : null,
         thumbnailUrl: sourceImageUrl,
-        metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
+        metadata: { purchasedCreditsDebited: debit.purchasedCreditsDebited ?? 0, uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost },
       });
 
       // Submit the job and return immediately — video outlasts a serverless
@@ -983,12 +982,11 @@ export const uncensoredRouter = router({
           loraId: resolveUncensoredLora("video"),
         });
         await updateGeneration(genId, {
-          metadata: { uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
+          metadata: { purchasedCreditsDebited: debit.purchasedCreditsDebited ?? 0, uncensored: true, video: true, mode: input.mode, quality: input.quality, duration: duration.id, motion: input.motion ?? null, camera: input.camera ?? null, intensity: input.intensity, seed: input.seed ?? null, cost, runpodJobId: jobId },
         });
         return { generationId: genId, status: "processing" as const, creditsRemaining: debit.balance };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored video submit failed");
+        await failLegacyJobAndRefund({ table: "generations", id: genId, userId: ctx.user.id, amount: cost, purchasedCredits: debit.purchasedCreditsDebited ?? 0, reason: "Uncensored video submit failed" });
         await logToolFailure({ toolId: "uncensored-video", errorMessage: err?.message, userId: ctx.user.id });
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Couldn't start the video — your credits were refunded. Please try again.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
@@ -1033,15 +1031,10 @@ export const uncensoredRouter = router({
         return { status: "completed" as const, url: result.url, seed: typeof doneMeta.seed === "number" ? doneMeta.seed : null };
       }
       if (result.status === "failed") {
-        const claimed = await db
-          .update(generations)
-          .set({ status: "failed" })
-          .where(and(eq(generations.id, gen.id), eq(generations.status, "generating")))
-          .returning({ id: generations.id });
-        if (claimed.length) {
-          await refundCredits(ctx.user.id, Number(meta.cost) || 0, "Uncensored video generation failed");
-          await logToolFailure({ toolId: "uncensored-video", errorMessage: result.error, userId: ctx.user.id });
-        }
+        const claimed = await failLegacyJobAndRefund({ table: "generations", id: gen.id, userId: ctx.user.id,
+          amount: Number(meta.cost) || 0, purchasedCredits: Number(meta.purchasedCreditsDebited) || 0,
+          reason: "Uncensored video generation failed" });
+        if (claimed) await logToolFailure({ toolId: "uncensored-video", errorMessage: result.error, userId: ctx.user.id });
         return { status: "failed" as const, url: null, seed: null };
       }
       return { status: "processing" as const, url: null, seed: null };
@@ -1169,7 +1162,7 @@ export const uncensoredRouter = router({
         await updateGeneration(genId, { status: "failed" });
         // The credit is refunded on every failure path — a refine that produced
         // nothing must never be billable.
-        await refundCredits(ctx.user.id, UNCENSORED_REFINE_COST, "Uncensored refine failed");
+        await refundCredits(ctx.user.id, UNCENSORED_REFINE_COST, "Uncensored refine failed", { purchasedCredits: Math.min(UNCENSORED_REFINE_COST, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-refine", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Refine failed — your credits were returned.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
@@ -1239,7 +1232,7 @@ export const uncensoredRouter = router({
         return { generationId: genId, url, cost };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored upscale failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored upscale failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-upscale", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Upscale failed — your credits were returned." });
       }
@@ -1360,14 +1353,14 @@ export const uncensoredRouter = router({
       }
 
       if (results.length === 0) {
-        await refundCredits(ctx.user.id, cost, "Uncensored character sheet failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored character sheet failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Character sheet failed — your credits were returned.",
         });
       }
       if (failed > 0) {
-        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored sheet partial fail ×${failed}`);
+        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored sheet partial fail ×${failed}`, { purchasedCredits: Math.min(unitCost * failed, debit.purchasedCreditsDebited ?? 0) });
       }
       return { images: results, cost: unitCost * results.length };
     }),
@@ -1424,7 +1417,7 @@ export const uncensoredRouter = router({
         return { generationId: genId, url, cost };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored cutout failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored cutout failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-cutout", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cutout failed — your credits were returned." });
       }
@@ -1510,7 +1503,7 @@ export const uncensoredRouter = router({
         return { generationId: genId, url, cost };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored outfit transfer failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored outfit transfer failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-outfit", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Outfit transfer failed — your credits were returned." });
       }
@@ -1578,7 +1571,7 @@ export const uncensoredRouter = router({
         return { generationId: genId, url, cost };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored relight failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored relight failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-relight", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Relight failed — your credits were returned." });
       }
@@ -1676,7 +1669,7 @@ export const uncensoredRouter = router({
         return { generationId: genId, url, cost };
       } catch (err: any) {
         await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored inpaint failed");
+        await refundCredits(ctx.user.id, cost, "Uncensored inpaint failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
         await logToolFailure({ toolId: "uncensored-inpaint", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
         const msg = typeof err?.userMessage === "string" ? err.userMessage : "Inpaint failed — your credits were returned.";
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });

@@ -50,7 +50,7 @@ export class RunwayProvider implements ProviderAdapter {
       const body: Record<string, unknown> = {
         model: modelId,
         promptText: request.prompt,
-        ratio: "1280:720",
+        ratio: request.options?.ratio === "720:1280" ? "720:1280" : "1280:720",
         duration: (request.options?.duration as number) || 10,
         watermark: false,
       };

@@ -7,10 +7,10 @@
  * reset their counters. This implementation persists hits to the
  * `rate_limit_hits` table and counts within a sliding window.
  *
- * Single round-trip per call via a CTE that:
- *   1. counts existing hits in the window
- *   2. inserts a new hit ONLY if under the limit
- *   3. returns the current count + whether the call was allowed
+ * One HTTP round trip runs a READ COMMITTED transaction: acquire a per-key
+ * advisory lock, then count/insert using the next statement's fresh snapshot.
+ * A lock inside the same CTE would retain a stale snapshot while waiting and
+ * still allow parallel requests through the cap.
  *
  * Failure mode: if the DB is unavailable, the limiter fails OPEN (allows
  * the request) and logs a warning. The reasoning is that rejecting legit
@@ -36,7 +36,7 @@ export async function enforceRateLimit(
   key: string,
   maxHits: number,
   windowMs: number,
-  message?: string,
+  message?: string
 ): Promise<void> {
   const db = await getDb();
   if (!db) {
@@ -49,30 +49,34 @@ export async function enforceRateLimit(
   const intervalSeconds = Math.max(1, Math.ceil(windowMs / 1000));
 
   try {
-    // CTE: count, conditionally insert, return both. One round-trip.
-    const result: any = await db.execute(sql`
+    const [, , result]: any = await db.batch([
+      db.execute(sql`SET TRANSACTION ISOLATION LEVEL READ COMMITTED`),
+      db.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`rate-limit:${key}`}, 0))`
+      ),
+      db.execute(sql`
       WITH counted AS (
         SELECT COUNT(*)::int AS hits
         FROM rate_limit_hits
         WHERE key = ${key}
-          AND ts > NOW() - (${intervalSeconds}::int * INTERVAL '1 second')
+          AND ts > clock_timestamp() - (${intervalSeconds}::int * INTERVAL '1 second')
       ),
       inserted AS (
-        INSERT INTO rate_limit_hits (key)
-        SELECT ${key}
+        INSERT INTO rate_limit_hits (key, ts)
+        SELECT ${key}, clock_timestamp()
         WHERE (SELECT hits FROM counted) < ${maxHits}
         RETURNING 1
       )
       SELECT
         (SELECT hits FROM counted) AS current_hits,
         EXISTS(SELECT 1 FROM inserted) AS allowed
-    `);
+      `),
+    ]);
 
     // Drizzle's neon adapter returns { rows: [...] }; the http adapter
     // sometimes returns the array directly. Handle both.
     const row = (result.rows ?? result)[0] as
-      | { current_hits: number; allowed: boolean }
-      | undefined;
+      { current_hits: number; allowed: boolean } | undefined;
 
     if (!row?.allowed) {
       throw new TRPCError({
@@ -97,13 +101,13 @@ export async function enforceUserRateLimit(
   userId: number | string,
   maxHits: number,
   windowMs: number,
-  message?: string,
+  message?: string
 ): Promise<void> {
   return enforceRateLimit(
     `${procedureName}:user:${userId}`,
     maxHits,
     windowMs,
-    message,
+    message
   );
 }
 
@@ -116,12 +120,12 @@ export async function enforceIpRateLimit(
   ip: string,
   maxHits: number,
   windowMs: number,
-  message?: string,
+  message?: string
 ): Promise<void> {
   return enforceRateLimit(
     `${procedureName}:ip:${ip}`,
     maxHits,
     windowMs,
-    message,
+    message
   );
 }

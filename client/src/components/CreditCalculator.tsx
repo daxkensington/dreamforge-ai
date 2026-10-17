@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { SUBSCRIPTION_PLANS, MODEL_CREDIT_COSTS } from "@shared/creditCosts";
+import { SUBSCRIPTION_PLANS, MODEL_CREDIT_COSTS, TOOL_CREDIT_COSTS } from "@shared/creditCosts";
 import { Calculator, Sparkles } from "lucide-react";
 
 /**
@@ -14,7 +14,7 @@ import { Calculator, Sparkles } from "lucide-react";
 
 // Use STANDARD-tier costs for the estimate — matches what most paid users
 // will pick by default. Premium users can read the badge and adjust.
-const COST_PER_IMAGE = MODEL_CREDIT_COSTS.image.standard; // 5
+const COST_PER_IMAGE = TOOL_CREDIT_COSTS["text-to-image"]; // Automatic image quote
 const COST_PER_VIDEO = MODEL_CREDIT_COSTS.video.standard; // 40
 const COST_PER_TOOL = 8; // average across TOOL_CREDIT_COSTS (5-15 typical)
 
@@ -89,7 +89,7 @@ export function CreditCalculator() {
             </div>
 
             <Slider
-              label="Images"
+              label="Images (Automatic model)"
               value={images}
               onChange={setImages}
               min={0}
@@ -98,7 +98,7 @@ export function CreditCalculator() {
               hint={`${images * COST_PER_IMAGE} credits`}
             />
             <Slider
-              label="Videos (10-15s)"
+              label={`Video estimate (${COST_PER_VIDEO} credits each; model/duration vary)`}
               value={videos}
               onChange={setVideos}
               min={0}
@@ -176,7 +176,7 @@ export function CreditCalculator() {
               </a>
 
               <p className="text-xs text-muted-foreground/80 mt-4 leading-relaxed">
-                Estimates use standard-tier model costs. Premium ({MODEL_CREDIT_COSTS.image.premium} cr/image, {MODEL_CREDIT_COSTS.video.premium} cr/video) and ultra cost more; free models cost less. Tool costs vary 0-25 credits per use.
+                Estimates use the Automatic image model and standard video cost. Named image models have their own prices in the catalog above. Premium ({MODEL_CREDIT_COSTS.image.premium} cr/image, {MODEL_CREDIT_COSTS.video.premium} cr/video) and ultra cost more; free models cost less. Tool costs vary 0-25 credits per use.
               </p>
             </div>
           </div>

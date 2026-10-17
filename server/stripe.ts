@@ -4,6 +4,8 @@ import { creditBalances, creditTransactions } from "../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
 import { TIERS } from "../shared/tiers";
+import { debitWallet, grantWalletCredits, refundWallet } from "./_core/walletAccounting";
+import { refreshPaidSubscriptionAllowance } from "./_core/subscriptionBilling";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripeClient: Stripe | null = null;
@@ -132,6 +134,9 @@ export async function getOrCreateBalance(userId: number) {
 
   if (existing.length > 0) {
     // Refill before anyone reads or spends this balance.
+    if (existing[0].walletAccountingVersion === 1 && existing[0].monthlyAllocation > 0) {
+      await refreshPaidSubscriptionAllowance(userId);
+    }
     await applyDailyFreeCredits(userId);
     const refreshed = await db
       .select()
@@ -144,8 +149,9 @@ export async function getOrCreateBalance(userId: number) {
   await db.insert(creditBalances).values({
     userId,
     balance: DAILY_FREE_CREDITS,
+    walletAccountingVersion: 1,
     lastResetAt: sql`(now() AT TIME ZONE 'UTC')` as any,
-  });
+  }).onConflictDoNothing({ target: creditBalances.userId });
   const created = await db
     .select()
     .from(creditBalances)
@@ -161,116 +167,26 @@ export async function deductCredits(
   type: "usage" | "purchase" | "bonus" | "refund" | "subscription" | "reward" | "referral" = "usage",
   metadata?: Record<string, any>
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
   const balance = await getOrCreateBalance(userId);
-  if (balance.balance < amount) {
-    return { success: false, balance: balance.balance, needed: amount };
-  }
-
-  // Atomic deduction — uses SQL expression so concurrent requests can't overdraw
-  const result = await db
-    .update(creditBalances)
-    .set({
-      balance: sql`GREATEST(${creditBalances.balance} - ${amount}, 0)`,
-      lifetimeSpent: sql`${creditBalances.lifetimeSpent} + ${amount}`,
-    })
-    .where(
-      and(
-        eq(creditBalances.userId, userId),
-        sql`${creditBalances.balance} >= ${amount}`
-      )
-    )
-    .returning({ id: creditBalances.id });
-
-  // If no rows were returned, balance was insufficient (race condition protection)
-  if (result.length === 0) {
-    return { success: false, balance: balance.balance, needed: amount };
-  }
-
-  await db.insert(creditTransactions).values({
-    userId,
-    amount: -amount,
-    type,
-    description,
-    metadata: metadata || null,
-  });
-
-  return { success: true, balance: balance.balance - amount, needed: amount };
+  const result = await debitWallet(userId, amount, description, type, metadata);
+  return result.success ? result : { ...result, balance: balance.balance };
 }
 
 export async function addCredits(
-  userId: number,
-  amount: number,
-  description: string,
-  stripeSessionId?: string,
-  stripePaymentIntentId?: string,
-  options?: { bonus?: boolean }
+  userId: number, amount: number, description: string, stripeSessionId?: string,
+  stripePaymentIntentId?: string, options?: { bonus?: boolean }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
   await getOrCreateBalance(userId);
-
-  // Purchased top-ups/packs must survive the monthly reset, which rebuilds
-  // balance as plan credits + bonusCredits — so they also accumulate in
-  // bonusCredits. Payment webhooks (checkout.session.completed for credit
-  // packs) always pass a Stripe session/payment id; referral/signup/daily
-  // grants never do. That id is what separates the two classes here, with an
-  // explicit override for callers that know better.
-  const isBonus = options?.bonus ?? Boolean(stripeSessionId || stripePaymentIntentId);
-
-  if (isBonus) {
-    await db
-      .update(creditBalances)
-      .set({
-        balance: sql`${creditBalances.balance} + ${amount}`,
-        bonusCredits: sql`${creditBalances.bonusCredits} + ${amount}`,
-      })
-      .where(eq(creditBalances.userId, userId));
-  } else {
-    await db
-      .update(creditBalances)
-      .set({
-        balance: sql`${creditBalances.balance} + ${amount}`,
-      })
-      .where(eq(creditBalances.userId, userId));
-  }
-
-  await db.insert(creditTransactions).values({
-    userId,
-    amount,
-    type: "purchase",
-    description,
-    stripeSessionId: stripeSessionId || null,
-    stripePaymentIntentId: stripePaymentIntentId || null,
-  });
+  return grantWalletCredits({ userId, amount, description, sessionId: stripeSessionId, paymentIntentId: stripePaymentIntentId,
+    purchased: options?.bonus ?? Boolean(stripeSessionId || stripePaymentIntentId) });
 }
 
 export async function refundCredits(
-  userId: number,
-  amount: number,
-  reason: string
+  userId: number, amount: number, reason: string,
+  options?: { purchasedCredits?: number; operationKey?: string }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
   await getOrCreateBalance(userId);
-
-  await db
-    .update(creditBalances)
-    .set({
-      balance: sql`${creditBalances.balance} + ${amount}`,
-      lifetimeSpent: sql`GREATEST(${creditBalances.lifetimeSpent} - ${amount}, 0)`,
-    })
-    .where(eq(creditBalances.userId, userId));
-
-  await db.insert(creditTransactions).values({
-    userId,
-    amount,
-    type: "refund" as const,
-    description: reason,
-  });
-
-  return { success: true, refunded: amount };
+  return refundWallet(userId, amount, reason, options);
 }
 
 export async function getCreditHistory(userId: number, limit = 50) {
@@ -387,6 +303,7 @@ export async function createCheckoutSession(
           product_data: {
             name: `DreamForgeX ${pkg.name}`,
             description: `${pkg.credits} generation credits`,
+            metadata: { dreamforge_type: "credit_pack", package_id: pkg.id, credits: String(pkg.credits) },
           },
           unit_amount: pkg.price,
         },
@@ -411,13 +328,21 @@ export async function createCheckoutSession(
 // The dead Express handler that used to be here was removed — Stripe is
 // configured to POST to /api/webhooks/stripe and only that path responds.
 
-/** Cancel every active/trialing Stripe subscription for a customer. Best-effort. */
+/** Cancel every billable subscription; deletion must surface incomplete cancellation. */
 export async function cancelStripeSubscriptionsForCustomer(customerId: string): Promise<void> {
-  if (!process.env.STRIPE_SECRET_KEY) return;
+  if (!/^cus_[A-Za-z0-9_]+$/.test(customerId)) throw new Error("Invalid billing customer.");
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error("Billing cancellation is unavailable. Please retry account deletion later.");
   const stripe = getStripeClient();
-  const subs = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
-  for (const sub of subs.data) {
-    if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
-    await stripe.subscriptions.cancel(sub.id);
-  }
+  let startingAfter: string | undefined;
+  do {
+    const page = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) });
+    for (const sub of page.data) {
+      if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+      await stripe.subscriptions.cancel(sub.id);
+    }
+    if (!page.has_more) return;
+    const lastId = page.data.at(-1)?.id;
+    if (!lastId || lastId === startingAfter) throw new Error("Billing cancellation could not verify all subscriptions.");
+    startingAfter = lastId;
+  } while (startingAfter);
 }

@@ -113,6 +113,24 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// Ownership and durable revocation survive account/content deletion and slow uploads.
+export const mediaAssets = pgTable("mediaAssets", {
+  key: text("key").primaryKey(),
+  ownerUserId: integer("ownerUserId").references(() => users.id),
+  revokedAt: timestamp("revokedAt"),
+  deletedAt: timestamp("deletedAt"),
+  deleteReason: varchar("deleteReason", { length: 64 }),
+  deleteAttempts: integer("deleteAttempts").default(0).notNull(),
+  lastDeleteAttemptAt: timestamp("lastDeleteAttemptAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("mediaAssets_owner_idx").on(table.ownerUserId),
+  index("mediaAssets_cleanup_idx").on(table.revokedAt, table.deletedAt),
+  check("mediaAssets_key_valid", sql`length(${table.key}) BETWEEN 1 AND 1024`),
+  check("mediaAssets_attempts_valid", sql`${table.deleteAttempts} >= 0`),
+  check("mediaAssets_deleted_revoked", sql`${table.deletedAt} IS NULL OR ${table.revokedAt} IS NOT NULL`),
+]);
+
 // ─── Crypto Invoices (BTCPay) ───────────────────────────────────────────────
 // One row per BTCPay invoice for the uncensored tier. Settlement is claimed
 // atomically by the webhook (status flips new→settled exactly once).
@@ -520,6 +538,8 @@ export const creditBalances = pgTable("creditBalances", {
   balance: integer("balance").default(50).notNull(), // free starter credits
   monthlyAllocation: integer("monthlyAllocation").default(0).notNull(), // credits from subscription
   bonusCredits: integer("bonusCredits").default(0).notNull(), // extra purchased/reward credits
+  // Existing wallets require a reviewed opening purchased balance before reset.
+  walletAccountingVersion: integer("walletAccountingVersion").default(0).notNull(),
   lifetimeSpent: integer("lifetimeSpent").default(0).notNull(),
   lastResetAt: timestamp("lastResetAt"), // when monthly credits were last allocated
   stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
@@ -529,6 +549,38 @@ export const creditBalances = pgTable("creditBalances", {
 
 export type CreditBalance = typeof creditBalances.$inferSelect;
 export type InsertCreditBalance = typeof creditBalances.$inferInsert;
+
+export const subscriptionCreditPeriods = pgTable("subscriptionCreditPeriods", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }).notNull(),
+  stripeInvoiceId: varchar("stripeInvoiceId", { length: 128 }).notNull().unique(),
+  subscriptionItemId: varchar("subscriptionItemId", { length: 128 }).notNull(),
+  priceId: varchar("priceId", { length: 128 }).notNull(),
+  periodStart: timestamp("periodStart").notNull(),
+  periodEnd: timestamp("periodEnd").notNull(),
+  monthlyCredits: integer("monthlyCredits").notNull(),
+  lastAllowanceIndex: integer("lastAllowanceIndex").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("subscriptionCreditPeriods_user_end_idx").on(table.userId, table.periodEnd)]);
+
+export const generationBatchRequests = pgTable("generationBatchRequests", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  requestId: varchar("requestId", { length: 64 }).notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  executionToken: uuid("executionToken").notNull(),
+  quotedCredits: integer("quotedCredits").notNull(),
+  purchasedCreditsDebited: integer("purchasedCreditsDebited").default(0).notNull(),
+  state: varchar("state", { length: 24 }).notNull(),
+  result: jsonb("result"),
+  errorCode: varchar("errorCode", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("generationBatchRequests_user_request_unique").on(table.userId, table.requestId),
+  index("generationBatchRequests_state_updated_idx").on(table.state, table.updatedAt),
+]);
 
 // ─── Credit Transactions ─────────────────────────────────────────────────
 export const creditTransactions = pgTable("creditTransactions", {

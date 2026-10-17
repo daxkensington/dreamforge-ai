@@ -14,6 +14,7 @@ import {
   moderationQueue,
   moderationLog,
   takedownRequests,
+  authUsers,
   videoProjects,
   projectCollaborators,
   projectShareTokens,
@@ -1127,6 +1128,52 @@ export async function getVideoProject(id: number, userId: number) {
     .where(and(eq(videoProjects.id, id), eq(videoProjects.userId, userId)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** A deleted adapter identity must not be resurrected by an unexpired JWT. */
+export async function hasAuthIdentity(id: string, email: string) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: authUsers.id }).from(authUsers)
+    .where(and(eq(authUsers.id, id), eq(authUsers.email, email))).limit(1);
+  return rows.length === 1;
+}
+
+/** Bridge a newly signed-in adapter user while holding its identity row lock. */
+export async function createUserForAuthIdentity(identity: { id: string; email: string; name?: string | null; provider?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.execute(sql`INSERT INTO users ("openId", name, email, "loginMethod", role, "lastSignedIn")
+    SELECT id, ${identity.name ?? null}, email, ${identity.provider ?? "oauth"}, ${identity.id === ENV.ownerOpenId ? "admin" : "user"}::role, now()
+    FROM auth_users WHERE id = ${identity.id} AND email = ${identity.email} FOR SHARE
+    ON CONFLICT ("openId") DO UPDATE SET "lastSignedIn" = now()
+    WHERE users."loginMethod" IS DISTINCT FROM 'deleted'`);
+}
+
+export async function touchUserLastSignIn(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: new Date() })
+    .where(and(eq(users.id, id), sql`${users.loginMethod} IS DISTINCT FROM 'deleted'`));
+}
+
+/** Recheck editor authority in the same statement that persists the update. */
+export async function updateEditableVideoProject(
+  id: number,
+  actorId: number,
+  updates: { title?: string; description?: string; data?: unknown; thumbnailUrl?: string },
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [project] = await db.update(videoProjects).set({ ...updates, updatedAt: new Date() })
+    .where(and(eq(videoProjects.id, id),
+      or(eq(videoProjects.userId, actorId), sql`EXISTS (
+        SELECT 1 FROM ${projectCollaborators} pc
+        WHERE pc."projectId" = ${videoProjects.id} AND pc."userId" = ${actorId} AND pc."collabRole" = 'editor'
+      )`),
+      sql`EXISTS (SELECT 1 FROM ${users} owner WHERE owner.id = ${videoProjects.userId} AND owner."loginMethod" IS DISTINCT FROM 'deleted')`,
+    )).returning();
+  return project ?? null;
 }
 
 export async function listVideoProjects(

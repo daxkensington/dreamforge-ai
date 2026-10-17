@@ -45,6 +45,8 @@ vi.mock("./dbExtended", () => ({
   searchGenerations: vi.fn().mockResolvedValue({ items: [{ id: 1, prompt: "test", imageUrl: "https://cdn.example.com/img.png", mediaType: "image", status: "completed", createdAt: new Date() }], total: 1 }),
 }));
 
+// Wallet accounting has real concurrency/rollback coverage in walletAccounting.pg.test.ts.
+vi.mock("./_core/walletAccounting", () => ({ debitWallet: vi.fn(async()=>({success:true,balance:995,needed:5,purchasedCreditsDebited:0,transactionId:1})) }));
 // Mock db (for getVideoProject)
 vi.mock("./db", () => ({
   getVideoProject: vi.fn().mockResolvedValue({ id: 1, userId: 1, title: "Test Project", type: "storyboard", data: "{}" }),

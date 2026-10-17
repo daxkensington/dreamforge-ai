@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTableName } from "drizzle-orm";
 const subscriptionsRetrieve = vi.hoisted(() => vi.fn());
-vi.mock("stripe", () => ({ default: class StripeMock { subscriptions = { retrieve: subscriptionsRetrieve }; } }));
+const checkoutRetrieve = vi.hoisted(() => vi.fn(async(id:string)=>({id,mode:"payment",status:"complete",payment_status:"paid",currency:"usd",amount_subtotal:499,amount_total:499,total_details:{amount_discount:0},payment_intent:"pi_new",metadata:{user_id:"7",package_id:"starter",credits:"100"},line_items:{has_more:false,data:[{quantity:1,price:{unit_amount:499,currency:"usd"}}]}})));
+vi.mock("stripe", () => ({ default: class StripeMock { subscriptions = { retrieve: subscriptionsRetrieve }; checkout = {sessions:{retrieve:checkoutRetrieve}}; } }));
 vi.mock("./_core/subscriptionBilling", () => ({
   allocatePaidSubscriptionInvoice: vi.fn(async () => "allocated"),
   hasPaidSubscriptionInvoiceAllocation: vi.fn(async () => false),
@@ -16,7 +17,8 @@ vi.mock("./db", () => ({
 }));
 
 vi.mock("./stripe", () => ({
-  addCredits: vi.fn().mockResolvedValue(undefined),
+  addCredits: vi.fn().mockResolvedValue("granted"),
+  CREDIT_PACKAGES: [{id:"starter",credits:100,price:499}],
 }));
 
 vi.mock("./routersPhase15", () => ({
@@ -68,7 +70,7 @@ function makeDb(behavior: DbBehavior = {}) {
   const selectCounts: Record<string, number> = {};
   const updateReturningCounts: Record<string, number> = {};
 
-  const db: any = {};
+  const db: any = { execute: vi.fn(async()=>[{delta:100,amount:100}]) };
 
   db.select = vi.fn((..._cols: any[]) => ({
     from: vi.fn((table: any) => {
@@ -140,7 +142,7 @@ const PURCHASE = {
 const checkoutEvent = (id: string, sessionId: string) =>
   makeEvent(id, "checkout.session.completed", {
     id: sessionId,
-    payment_intent: "pi_new",
+    payment_intent: "pi_new", mode:"payment", payment_status:"paid",currency:"usd",amount_total:499,
     metadata: { user_id: "7", credits: "100", package_id: "starter" },
   });
 
@@ -290,24 +292,10 @@ describe("Stripe webhook — processStripeEvent", () => {
 
   // ─── 1. Atomic idempotency claim ──────────────────────────────────────
   describe("atomic idempotency claim", () => {
-    it("returns 'duplicate' and does not process when the claim insert hits the unique conflict", async () => {
-      const { db, calls } = makeDb({ claimRows: [] });
-
-      const result = await processStripeEvent(
-        checkoutEvent("evt_dup", "cs_dup"),
-        db
-      );
-
-      expect(result).toBe("duplicate");
-      // claimed with a 'pending' row up front
-      expect(calls.inserts[0].table).toBe("webhookEvents");
-      expect(calls.inserts[0].values).toMatchObject({
-        eventId: "evt_dup",
-        status: "pending",
-      });
-      // never reached the credit-grant path
-      expect(addCredits).not.toHaveBeenCalled();
-      expect(calls.selects).toHaveLength(0);
+    it("retries a credit-pack event claim because the session grant has its own atomic receipt", async () => {
+      const {db} = makeDb({claimRows:[]});
+      expect(await processStripeEvent(checkoutEvent("evt_dup","cs_dup"),db)).toBe("processed");
+      expect(addCredits).toHaveBeenCalledTimes(1);
     });
 
     it("grants credits on first delivery of checkout.session.completed", async () => {
@@ -361,108 +349,40 @@ describe("Stripe webhook — processStripeEvent", () => {
   });
 
   // ─── 2. Refund clawback deltas ────────────────────────────────────────
-  describe("charge.refunded clawback", () => {
-    it("claws only the delta for a single partial refund", async () => {
-      const { db, calls } = makeDb({
-        // 1st select: purchase lookup; 2nd select: claw loop re-read
-        selectRows: () => [PURCHASE],
-      });
-
-      const result = await processStripeEvent(refundEvent("evt_ref_1", 5000), db);
-
-      expect(result).toBe("processed");
-      // counter moved to the cumulative target
-      const counterUpdate = calls.updates.find((u) => u.table === "creditTransactions")!;
-      expect(counterUpdate.set.clawedBackCredits).toBe(50);
-      // balance debited exactly the delta
-      expect(balanceDeltaOf(calls)).toBe(50);
-      // audit transaction recorded
-      const clawTx = calls.inserts.find((i) => i.table === "creditTransactions")!;
-      expect(clawTx.values.amount).toBe(-50);
-      expect(clawTx.values.type).toBe("refund");
-      expect(createNotification).toHaveBeenCalledWith(
-        42,
-        "payment",
-        "Refund Processed",
-        expect.any(String),
-        expect.objectContaining({ creditsRemoved: 50 })
-      );
+  describe("authoritative package checkout validation",()=>{
+    it("honors a Stripe-applied promotion against the original package price",async()=>{
+      const {db}=makeDb();
+      const receipt=await checkoutRetrieve("cs_discount");
+      checkoutRetrieve.mockResolvedValueOnce({...receipt,amount_total:399,total_details:{amount_discount:100}});
+      const event=checkoutEvent("evt_discount","cs_discount");event.data.object.amount_total=399;
+      expect(await processStripeEvent(event,db)).toBe("processed");
+      expect(addCredits).toHaveBeenCalledWith(7,100,expect.any(String),"cs_discount","pi_new");
     });
-
-    it("claws exactly 100% across two staged partial refunds (50% then 100%), not 150%", async () => {
-      // First refund: 50% of the charge refunded → 50 credits
-      const first = makeDb({ selectRows: () => [PURCHASE] });
-      const firstResult = await processStripeEvent(
-        refundEvent("evt_ref_50", 5000),
-        first.db
-      );
-      expect(firstResult).toBe("processed");
-      expect(balanceDeltaOf(first.calls)).toBe(50);
-
-      // Second refund event: amount_refunded is now CUMULATIVE at 100%.
-      // The purchase row remembers 50 already clawed.
-      const second = makeDb({
-        selectRows: () => [{ ...PURCHASE, clawedBackCredits: 50 }],
-      });
-      const secondResult = await processStripeEvent(
-        refundEvent("evt_ref_100", 10000),
-        second.db
-      );
-      expect(secondResult).toBe("processed");
-      expect(balanceDeltaOf(second.calls)).toBe(50); // NOT another 100
-
-      const counterUpdate = second.calls.updates.find(
-        (u) => u.table === "creditTransactions"
-      )!;
-      expect(counterUpdate.set.clawedBackCredits).toBe(100);
-
-      // total clawed across both events: 50 + 50 = 100
-      const total = balanceDeltaOf(first.calls) + balanceDeltaOf(second.calls);
-      expect(total).toBe(100);
-    });
-
-    it("recomputes instead of double-clawing when a concurrent event wins the counter race", async () => {
-      const { db, calls } = makeDb({
-        selectRows: (_table, idx) => {
-          // idx 0: purchase lookup (clawed 0)
-          // idx 1: claw loop attempt 1 sees clawed 0
-          // idx 2: claw loop attempt 2 re-reads after losing the race: clawed 50
-          if (idx === 2) return [{ ...PURCHASE, clawedBackCredits: 50 }];
-          return [PURCHASE];
-        },
-        updateReturningRows: (table, idx) => {
-          // first counter update loses the optimistic race
-          if (table === "creditTransactions" && idx === 0) return [];
-          return [{ id: 7 }];
-        },
-      });
-
-      const result = await processStripeEvent(refundEvent("evt_ref_race", 10000), db);
-
-      expect(result).toBe("processed");
-      // recomputed delta: 100 expected - 50 clawed by the winner = 50
-      expect(balanceDeltaOf(calls)).toBe(50);
-      const counterUpdate = calls.updates.find((u) => u.table === "creditTransactions")!;
-      expect(counterUpdate.set.clawedBackCredits).toBe(100);
-    });
-
-    it("does not claw again when a refund event arrives after the purchase is fully clawed", async () => {
-      const { db, calls } = makeDb({
-        selectRows: () => [{ ...PURCHASE, clawedBackCredits: 100 }],
-      });
-
-      const result = await processStripeEvent(refundEvent("evt_ref_late", 10000), db);
-
-      expect(result).toBe("ignored");
-      expect(calls.updates.some((u) => u.table === "creditBalances")).toBe(false);
-      expect(
-        calls.inserts.some((i) => i.table === "creditTransactions")
-      ).toBe(false);
-      expect(createNotification).not.toHaveBeenCalled();
+    it("refuses a mismatched original line price even when the session metadata claims a valid pack",async()=>{
+      const {db}=makeDb();const receipt=await checkoutRetrieve("cs_bad_price");
+      checkoutRetrieve.mockResolvedValueOnce({...receipt,line_items:{has_more:false,data:[{quantity:1,price:{unit_amount:99,currency:"usd"}}]}});
+      await expect(processStripeEvent(checkoutEvent("evt_bad_price","cs_bad_price"),db)).rejects.toThrow("does not match");
+      expect(addCredits).not.toHaveBeenCalled();
     });
   });
 
-  // ─── 3. Disputes ──────────────────────────────────────────────────────
+  describe("charge.refunded atomic settlement", () => {
+    it("settles the counter, purchased bucket and immutable refund ledger in one statement", async () => {
+      const {db,calls} = makeDb({selectRows:()=>[PURCHASE]});
+      db.execute.mockResolvedValue([{delta:50}]);
+      expect(await processStripeEvent(refundEvent("evt_atomic",5000),db)).toBe("processed");
+      expect(db.execute).toHaveBeenCalledTimes(1);
+      expect(calls.updates.every(u=>u.table==="webhookEvents")).toBe(true);
+      expect(createNotification).toHaveBeenCalledWith(42,"payment","Refund Processed",expect.any(String),expect.objectContaining({creditsRemoved:50}));
+    });
+    it("propagates a ledger failure and retains a failed event for reconciliation", async()=>{
+      const {db,calls} = makeDb({selectRows:()=>[PURCHASE]});
+      db.execute.mockRejectedValue(new Error("ledger fault"));
+      await expect(processStripeEvent(refundEvent("evt_fault",5000),db)).rejects.toThrow("ledger fault");
+      expect(calls.updates.at(-1)?.set.status).toBe("failed");
+    });
+  });
+
   describe("charge.dispute", () => {
     const disputeCreatedEvent = () =>
       makeEvent("evt_dp_1", "charge.dispute.created", {
@@ -479,12 +399,8 @@ describe("Stripe webhook — processStripeEvent", () => {
       const result = await processStripeEvent(disputeCreatedEvent(), db);
 
       expect(result).toBe("processed");
-      expect(balanceDeltaOf(calls)).toBe(100);
-      const counterUpdate = calls.updates.find((u) => u.table === "creditTransactions")!;
-      expect(counterUpdate.set.clawedBackCredits).toBe(100);
-      const clawTx = calls.inserts.find((i) => i.table === "creditTransactions")!;
-      expect(clawTx.values.amount).toBe(-100);
-      expect(clawTx.values.type).toBe("dispute");
+      expect(db.execute).toHaveBeenCalledTimes(1);
+      expect(calls.updates.every(u=>u.table==="webhookEvents")).toBe(true);
       expect(createNotification).toHaveBeenCalledWith(
         42,
         "payment",
@@ -516,12 +432,8 @@ describe("Stripe webhook — processStripeEvent", () => {
       );
 
       expect(result).toBe("processed");
-      expect(balanceDeltaOf(calls)).toBe(100);
-      const counterUpdate = calls.updates.find((u) => u.table === "creditTransactions")!;
-      expect(counterUpdate.set.clawedBackCredits).toBe(0);
-      const restoreTx = calls.inserts.find((i) => i.table === "creditTransactions")!;
-      expect(restoreTx.values.amount).toBe(100);
-      expect(restoreTx.values.type).toBe("dispute");
+      expect(db.execute).toHaveBeenCalledTimes(1);
+      expect(calls.updates.every(u=>u.table==="webhookEvents")).toBe(true);
       expect(createNotification).toHaveBeenCalledWith(
         42,
         "payment",

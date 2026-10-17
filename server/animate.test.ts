@@ -142,7 +142,7 @@ describe("generation.animateImage", () => {
     ).rejects.toThrow();
   });
 
-  it("rejects non-existent source generation", async () => {
+  it("reports unavailable before looking up a source generation", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
@@ -152,7 +152,7 @@ describe("generation.animateImage", () => {
         duration: 4,
         animationStyle: "gentle-zoom",
       })
-    ).rejects.toThrow(/not found/i);
+    ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", message: expect.stringContaining("No credits charged") });
   });
 
   it("accepts all valid animation styles", async () => {
@@ -169,7 +169,7 @@ describe("generation.animateImage", () => {
     const caller = appRouter.createCaller(ctx);
 
     for (const style of validStyles) {
-      // Each should fail with NOT_FOUND (since source doesn't exist)
+      // Each should fail with SERVICE_UNAVAILABLE (since source doesn't exist)
       // but should NOT fail with validation error
       try {
         await caller.generation.animateImage({
@@ -178,8 +178,8 @@ describe("generation.animateImage", () => {
           animationStyle: style,
         });
       } catch (error: any) {
-        // Should be NOT_FOUND, not BAD_REQUEST (validation)
-        expect(error.code).toBe("NOT_FOUND");
+        // Should be SERVICE_UNAVAILABLE, not BAD_REQUEST (validation)
+        expect(error.code).toBe("SERVICE_UNAVAILABLE");
       }
     }
   });
@@ -196,8 +196,8 @@ describe("generation.animateImage", () => {
           animationStyle: "smooth-pan",
         });
       } catch (error: any) {
-        // Should be NOT_FOUND, not a validation error
-        expect(error.code).toBe("NOT_FOUND");
+        // Should be SERVICE_UNAVAILABLE, not a validation error
+        expect(error.code).toBe("SERVICE_UNAVAILABLE");
       }
     }
   });
@@ -214,7 +214,7 @@ describe("generation.animateImage", () => {
         tagIds: [1, 2, 3],
       });
     } catch (error: any) {
-      expect(error.code).toBe("NOT_FOUND");
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
     }
   });
 
@@ -228,8 +228,8 @@ describe("generation.animateImage", () => {
         animationStyle: "smooth-pan",
       } as any);
     } catch (error: any) {
-      // Should reach NOT_FOUND, meaning the default was applied
-      expect(error.code).toBe("NOT_FOUND");
+      // Should reach SERVICE_UNAVAILABLE, meaning the default was applied
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
     }
   });
 
@@ -243,7 +243,7 @@ describe("generation.animateImage", () => {
         duration: 4,
       } as any);
     } catch (error: any) {
-      expect(error.code).toBe("NOT_FOUND");
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
     }
   });
 });
@@ -286,7 +286,7 @@ describe("animateImage schema validation", () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    // Negative IDs should either fail validation or return NOT_FOUND
+    // Negative IDs should either fail validation or return SERVICE_UNAVAILABLE
     try {
       await caller.generation.animateImage({
         sourceGenerationId: -1,
@@ -295,7 +295,7 @@ describe("animateImage schema validation", () => {
       });
     } catch (error: any) {
       // Either validation error or NOT_FOUND is acceptable
-      expect(["BAD_REQUEST", "NOT_FOUND"]).toContain(error.code);
+      expect(["BAD_REQUEST", "SERVICE_UNAVAILABLE"]).toContain(error.code);
     }
   });
 
@@ -303,7 +303,7 @@ describe("animateImage schema validation", () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    // z.number().min(2).max(8) allows fractional, but we test it reaches NOT_FOUND
+    // z.number().min(2).max(8) allows fractional, but we test it reaches SERVICE_UNAVAILABLE
     try {
       await caller.generation.animateImage({
         sourceGenerationId: 999999,
@@ -311,8 +311,8 @@ describe("animateImage schema validation", () => {
         animationStyle: "smooth-pan",
       });
     } catch (error: any) {
-      // Should reach NOT_FOUND since 3.5 is within 2-8 range
-      expect(error.code).toBe("NOT_FOUND");
+      // Should reach SERVICE_UNAVAILABLE since 3.5 is within 2-8 range
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
     }
   });
 

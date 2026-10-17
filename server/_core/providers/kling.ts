@@ -61,7 +61,7 @@ export class KlingProvider implements ProviderAdapter {
         model_name: modelId,
         prompt: request.prompt,
         duration: String((request.options?.duration as number) || 5),
-        aspect_ratio: "16:9",
+        aspect_ratio: request.options?.aspectRatio === "9:16" ? "9:16" : request.options?.aspectRatio === "1:1" ? "1:1" : "16:9",
         mode: "std",
       };
 

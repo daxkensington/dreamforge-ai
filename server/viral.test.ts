@@ -110,6 +110,7 @@ describe("viral.transform", () => {
       42,
       10,
       expect.stringContaining("Refund"),
+      expect.any(Object),
     );
   });
 });

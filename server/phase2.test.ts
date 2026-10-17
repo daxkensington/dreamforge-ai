@@ -462,62 +462,13 @@ describe("generation.create", () => {
     });
   });
 
-  it("accepts valid video generation input", async () => {
+  it("rejects legacy image-backed video IDs before a debit or generation record", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-
-    const result = await caller.generation.create({
-      prompt: "A phoenix rising from flames",
-      mediaType: "video",
-      width: 768,
-      height: 768,
-      duration: 4,
-      modelVersion: "animatediff-v2",
-    });
-
-    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-video"] ?? 1);
-    expect(mockCreateGeneration).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: ctx.user.id,
-        prompt: "A phoenix rising from flames",
-        mediaType: "video",
-        duration: 4,
-        modelVersion: "animatediff-v2",
-        status: "generating",
-      }),
-    );
-    expect(result).toEqual({
-      id: 101,
-      status: "completed",
-      imageUrl: "https://cdn.example.com/phase2-generated.png",
-      mediaType: "video",
-      requestId: expect.any(String),
-      newAchievements: [],
-    });
-    expect(result.mediaType).toBe("video");
-  });
-
-  it.each(["provider exploded", "provider poll timed out", "image download unavailable", "storage write unavailable"])("holds an unconfirmed renderer error for reconciliation (%s)", async message => {
-    mockGenerateImage.mockRejectedValueOnce(new Error(message));
-
-    const { ctx } = createAuthContext();
-    const caller = appRouter.createCaller(ctx);
-
-    const result = await caller.generation.create({
-      prompt: "A beautiful sunset over mountains",
-      mediaType: "image",
-      width: 768,
-      height: 768,
-      modelVersion: "built-in-v1",
-    });
-
-    expect(result).toMatchObject({ status: "generating", reconciliationRequired: true });
-    expect(result).not.toHaveProperty("refundedCredits");
-    expectGenerationQuote(ctx.user.id, TOOL_CREDIT_COSTS["text-to-image"] ?? 1);
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    expect(generationBillingMocks.fail).not.toHaveBeenCalled();
-    expect(generationBillingMocks.complete).not.toHaveBeenCalled();
-    expect(generationBillingMocks.reconcile).toHaveBeenCalledTimes(1);
+    await expect(caller.generation.create({ prompt: "A fictional phoenix rising from flames", mediaType: "video", width: 768, height: 768, duration: 4, modelVersion: "animatediff-v2" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(generationBillingMocks.claim).not.toHaveBeenCalled();
+    expect(createGeneration).not.toHaveBeenCalled();
+    expect(generateImage).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown explicit model before charging or creating a row", async () => {

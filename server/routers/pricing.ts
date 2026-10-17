@@ -14,6 +14,7 @@ import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
 import Stripe from "stripe";
 import { currentSubscriptionOrder } from "../_core/subscriptionSelection";
 import { getEffectiveSubscriptionTier } from "../../shared/subscriptionEntitlement";
+import { refreshPaidSubscriptionAllowance } from "../_core/subscriptionBilling";
 
 // ─── Stripe Client (lazy init to avoid crash if key is missing) ────────────
 let _stripe: Stripe | null = null;
@@ -330,30 +331,35 @@ export const pricingRouter = router({
         return { success: true, action: "downgrade_to_free" as const };
       }
 
-      if (!newPlan.stripePriceId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Plan not yet available for subscription. Contact support.",
-        });
-      }
-
       // Get current Stripe subscription to find the item ID
       const stripeSub = await getStripe().subscriptions.retrieve(sub.stripeSubscriptionId);
-      const itemId = stripeSub.items.data[0]?.id;
+      const item = stripeSub.items.data[0];
+      const itemId = item?.id;
       if (!itemId) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not find subscription item" });
       }
+
+      // A tier change preserves the existing billing cadence and annual discount.
+      const interval = item?.price?.recurring?.interval ?? stripeSub.metadata?.billing_interval ?? "month";
+      if (interval !== "month" && interval !== "year") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This subscription's billing interval requires support to change plans." });
+      }
+      const priceId = interval === "month" && newPlan.stripePriceId
+        ? newPlan.stripePriceId
+        : await resolveStripePriceId(newPlan, interval);
 
       // Update with proration. Merge metadata instead of replacing it:
       // customer.subscription.deleted reads user_id from it, and replacing
       // the map with only plan keys would orphan cancellations.
       await getStripe().subscriptions.update(sub.stripeSubscriptionId, {
-        items: [{ id: itemId, price: newPlan.stripePriceId! }],
+        items: [{ id: itemId, price: priceId }],
+        cancel_at_period_end: false,
         proration_behavior: "create_prorations",
         metadata: {
           ...(stripeSub.metadata ?? {}),
           plan_id: newPlan.id.toString(),
           plan_name: newPlan.name,
+          billing_interval: interval,
         },
       });
 
@@ -640,30 +646,7 @@ export async function handleMonthlyReset(stripeSubscriptionId: string) {
   if (!subs[0]) return;
   const sub = subs[0];
 
-  const plan = await getPlanById(sub.planId);
-  if (!plan) return;
-
-  // Reset balance to monthly allocation plus purchased credits, then zero the
-  // bonusCredits counter — it has been folded into balance. Without the
-  // zeroing, the same purchased credits would be re-added on every reset.
-  const balance = await getOrCreateBalance(sub.userId);
-
-  await db
-    .update(creditBalances)
-    .set({
-      balance: sql`${plan.monthlyCredits} + ${creditBalances.bonusCredits}`,
-      bonusCredits: 0,
-      monthlyAllocation: plan.monthlyCredits,
-      lastResetAt: new Date(),
-    })
-    .where(eq(creditBalances.userId, sub.userId));
-
-  // Record transaction
-  await db.insert(creditTransactions).values({
-    userId: sub.userId,
-    amount: plan.monthlyCredits,
-    type: "subscription",
-    description: `Monthly credit reset — ${plan.displayName} plan`,
-    metadata: { planId: plan.id, planName: plan.name },
-  });
+  // Never infer paid service from a subscription row alone. The verified
+  // invoice period and monthly receipt are the sole allowance authority.
+  await refreshPaidSubscriptionAllowance(sub.userId);
 }

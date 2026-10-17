@@ -1,3 +1,4 @@
+import { failLegacyJobAndRefund } from "../_core/walletAccounting";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -132,7 +133,7 @@ export const audioRouter = router({
         model: input.type === "voiceover" ? "bark" : input.type === "sfx" ? "audiogen" : "musicgen",
         status: "generating",
         projectId: input.projectId ?? null,
-        metadata: input.options ?? {},
+        metadata: { ...input.options, cost: deduction.cost, purchasedCreditsDebited: deduction.purchasedCreditsDebited ?? 0 },
       }).returning({ id: audioGenerations.id });
       const audioId = inserted.id;
 
@@ -159,19 +160,14 @@ export const audioRouter = router({
             })
             .where(eq(audioGenerations.id, Number(audioId)));
         } catch (error: any) {
-          // The background job produced nothing — refund the exact charge.
           try {
-            await refundCredits(ctx.user.id, deduction.cost, `Refund: audio ${input.type} generation failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+            await failLegacyJobAndRefund({ table: "audioGenerations", id: Number(audioId), userId: ctx.user.id,
+              amount: deduction.cost, purchasedCredits: deduction.purchasedCreditsDebited ?? 0,
+              reason: "Refund: audio generation failed. Credits returned." });
           } catch (refundErr) {
-            console.error("[audio.generate] Credit refund failed:", refundErr);
+            // Keep generating so the durable reaper retries the same atomic refund.
+            console.error("[audio.generate] Refund settlement pending:", refundErr);
           }
-          await db
-            .update(audioGenerations)
-            .set({
-              status: "failed",
-              errorMessage: error.message,
-            })
-            .where(eq(audioGenerations.id, Number(audioId)));
         }
       })();
 
@@ -399,7 +395,7 @@ export const audioRouter = router({
       } catch (error: any) {
         // The merge produced nothing — refund the merge charge.
         try {
-          await refundCredits(ctx.user.id, mergeDeduction.cost, `Refund: audio merge failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          await refundCredits(ctx.user.id, mergeDeduction.cost, `Refund: audio merge failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: mergeDeduction.purchasedCreditsDebited ?? 0, operationKey: mergeDeduction.transactionId ? `usage-refund:${mergeDeduction.transactionId}` : undefined });
         } catch (refundErr) {
           console.error("[audio.mergeAudioVideo] Credit refund failed:", refundErr);
         }
@@ -433,7 +429,7 @@ export const audioRouter = router({
       const provider = new SyncLabsProvider();
       if (!provider.isAvailable) {
         try {
-          await refundCredits(ctx.user.id, lipSyncDeduction.cost, "Refund: lip sync failed — Sync Labs is not configured");
+          await refundCredits(ctx.user.id, lipSyncDeduction.cost, "Refund: lip sync failed — Sync Labs is not configured", { purchasedCredits: lipSyncDeduction.purchasedCreditsDebited ?? 0, operationKey: lipSyncDeduction.transactionId ? `usage-refund:${lipSyncDeduction.transactionId}` : undefined });
         } catch (refundErr) {
           console.error("[audio.lipSync] Credit refund failed:", refundErr);
         }
@@ -456,7 +452,7 @@ export const audioRouter = router({
       } catch (error: any) {
         // Lip sync produced nothing — refund the charge.
         try {
-          await refundCredits(ctx.user.id, lipSyncDeduction.cost, `Refund: lip sync failed — ${(error?.message || "unknown error").slice(0, 100)}`);
+          await refundCredits(ctx.user.id, lipSyncDeduction.cost, `Refund: lip sync failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: lipSyncDeduction.purchasedCreditsDebited ?? 0, operationKey: lipSyncDeduction.transactionId ? `usage-refund:${lipSyncDeduction.transactionId}` : undefined });
         } catch (refundErr) {
           console.error("[audio.lipSync] Credit refund failed:", refundErr);
         }

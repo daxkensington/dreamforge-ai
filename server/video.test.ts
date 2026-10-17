@@ -13,7 +13,7 @@ vi.mock("./_core/llm", () => ({
 }));
 // Mock credit deduction (always succeeds in tests)
 vi.mock('./stripe', () => ({
-  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99 }),
+  deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 99, needed: 0, transactionId: 700, purchasedCreditsDebited: 0 }),
   refundCredits: vi.fn().mockResolvedValue(undefined),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
@@ -608,6 +608,7 @@ describe("Video Studio Endpoints", () => {
     });
 
     it("refunds the 50-credit charge when all providers fail", async () => {
+      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 701, purchasedCreditsDebited: 17 });
       const result = await caller.video.textToVideo({
         prompt: "A cinematic mountain flyover at dawn",
       });
@@ -624,10 +625,12 @@ describe("Video Studio Endpoints", () => {
         1,
         50,
         expect.stringContaining("Refund"),
+        { purchasedCredits: 17, operationKey: "legacy-refund:701" },
       );
     });
 
     it("refunds when an explicitly selected model is unavailable", async () => {
+      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 702, purchasedCreditsDebited: 50 });
       const result = await caller.video.textToVideo({
         prompt: "Ocean waves crashing on black sand",
         model: "veo-3",
@@ -635,7 +638,7 @@ describe("Video Studio Endpoints", () => {
 
       expect(result.status).toBe("failed");
       expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(1, 50, expect.stringContaining("Refund"));
+      expect(refundCredits).toHaveBeenCalledWith(1, 50, expect.stringContaining("Refund"), { purchasedCredits: 50, operationKey: "legacy-refund:702" });
     });
 
     it("does not deduct or refund on input validation failures", async () => {
@@ -662,6 +665,7 @@ describe("Video Studio Endpoints", () => {
     });
 
     it("refunds the 40-credit charge when all providers fail", async () => {
+      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 703, purchasedCreditsDebited: 0 });
       const result = await caller.video.imageToVideo({
         imageUrl: "https://example.com/photo.png",
         prompt: "Slow cinematic zoom toward the subject",
@@ -675,7 +679,7 @@ describe("Video Studio Endpoints", () => {
         expect.stringContaining("Image-to-video"),
       );
       expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(1, 40, expect.stringContaining("Refund"));
+      expect(refundCredits).toHaveBeenCalledWith(1, 40, expect.stringContaining("Refund"), { purchasedCredits: 0, operationKey: "legacy-refund:703" });
     });
 
     it("does not deduct or refund when the imageUrl fails the SSRF guard", async () => {

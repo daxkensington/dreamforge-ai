@@ -37,6 +37,9 @@ vi.mock("./_core/toolStatus", () => ({
 }));
 
 // Mock the credit ledger
+vi.mock("./_core/walletAccounting", () => ({ failLegacyJobAndRefund: vi.fn(async (input:any)=>{
+  await refundCredits(input.userId,input.amount,input.reason,{purchasedCredits:input.purchasedCredits}); return true;
+}) }));
 vi.mock("./stripe", async () => {
   const actual = await vi.importActual<any>("./stripe");
   return {
@@ -100,7 +103,7 @@ describe("audio.generate", () => {
     });
     expect(res.status).toBe("generating");
     await vi.waitFor(() => expect(refundCredits).toHaveBeenCalledTimes(1));
-    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"));
+    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"), expect.any(Object));
   });
 
   it("does not deduct when the request is invalid", async () => {
@@ -125,7 +128,7 @@ describe("audio.mergeAudioVideo", () => {
     // "audio-merge" = 2 credits — refund exactly that, exactly once.
     expect(deductCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Merge"));
     expect(refundCredits).toHaveBeenCalledTimes(1);
-    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"));
+    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"), expect.any(Object));
   });
 
   it("does not refund when the merge succeeds", async () => {
@@ -157,7 +160,7 @@ describe("audio.lipSync", () => {
       // "video-lipsync" = 50 credits.
       expect(deductCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Lip sync"));
       expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Refund"));
+      expect(refundCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Refund"), expect.any(Object));
     } finally {
       SyncLabsProvider.prototype.generate = original;
     }

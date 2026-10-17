@@ -63,7 +63,16 @@ vi.mock("./db", () => ({
   updateGeneration: vi.fn(async () => undefined),
 }));
 
+vi.mock("./_core/generationBatchBilling", () => ({
+  claimGenerationBatch: vi.fn(async (input:any) => { state.debited += input.credits; return {kind:"owned",id:1,token:"11111111-1111-4111-8111-111111111111",balance:500,purchasedCreditsDebited:0}; }),
+  beginGenerationBatch: vi.fn(async()=>true), completeGenerationBatch: vi.fn(async()=>true),
+}));
+vi.mock("./_core/walletAccounting", () => ({ failLegacyJobAndRefund: vi.fn(async(input:any)=>{
+  await refundCredits(input.userId,input.amount,input.reason);
+  return true;
+}) }));
 vi.mock("./stripe", () => ({
+  getOrCreateBalance: vi.fn(async()=>({balance:500})),
   deductCredits: vi.fn(async (_u: number, amount: number) => {
     state.debited += amount;
     return { success: true, balance: 500, needed: amount };
@@ -123,6 +132,7 @@ import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
 import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
 import { refineUnfiltered } from "./_core/imageGeneration";
 import { updateGeneration } from "./db";
+import { refundCredits } from "./stripe";
 import { runpodRemoveBackground, runpodTryOn } from "./_core/runpod";
 
 const OWNER = 7;

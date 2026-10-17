@@ -43,7 +43,6 @@ export default function PresentationBuilder() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [generating, setGenerating] = useState(false);
-  const [generatingImages, setGeneratingImages] = useState(false);
 
   const storyboardMutation = trpc.video.generateStoryboard.useMutation();
 
@@ -91,17 +90,6 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
     });
   };
 
-  const generateSlideImage = async (index: number) => {
-    if (!slides[index]?.imagePrompt) return;
-    setGeneratingImages(true);
-    try {
-      const result = await fetch("/api/trpc/tools.upscale", { method: "POST" }); // placeholder
-      toast.info("Slide image generation launching soon — stay tuned!");
-    } catch {
-      toast.error("Failed to generate slide image");
-    }
-    setGeneratingImages(false);
-  };
 
 
   return (
@@ -122,7 +110,7 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
             </span>
           </h1>
           <p className="text-muted-foreground max-w-md">
-            Describe your topic and AI creates a full slide deck with content, speaker notes, and images.
+            Create an editable presentation draft. PDF export and individual slide-image generation are currently unavailable.
           </p>
         </div>
       </div>
@@ -214,7 +202,7 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Slide {currentSlide + 1} of {slides.length}</span>
               </div>
-              <Button variant="outline" className="gap-2 bg-transparent" onClick={() => toast.info("PDF export launching soon — stay tuned!")}>
+              <Button variant="outline" className="gap-2 bg-transparent" disabled title="PDF export is unavailable">
                 <Download className="h-4 w-4" /> Export PDF
               </Button>
             </div>
@@ -326,8 +314,8 @@ Structure: Title slide, content slides, conclusion slide with call-to-action.`;
                     ) : (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">{slides[currentSlide]?.imagePrompt}</p>
-                        <Button size="sm" variant="outline" className="w-full bg-transparent text-xs gap-1" onClick={() => generateSlideImage(currentSlide)}>
-                          <Sparkles className="h-3 w-3" /> Generate Image
+                        <Button size="sm" variant="outline" className="w-full bg-transparent text-xs gap-1" disabled title="Individual slide-image generation is unavailable">
+                          <Sparkles className="h-3 w-3" /> Image generation unavailable
                         </Button>
                       </div>
                     )}

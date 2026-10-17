@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 
 // Mock credit deduction
 vi.mock('./stripe', () => ({
-  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99 }),
+  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99, transactionId: 900, purchasedCreditsDebited: 0 }),
+  refundCredits: vi.fn().mockResolvedValue(undefined),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
     'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,
@@ -19,6 +20,7 @@ vi.mock('./stripe', () => ({
 
 // Mock image generation
 vi.mock('./_core/imageGeneration', () => ({
+  isAutomaticImageConfigured: () => true,
   generateImage: vi.fn().mockResolvedValue({ url: 'https://cdn.example.com/result.png' }),
 }));
 
@@ -35,14 +37,26 @@ vi.mock('./db', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
-    getDb: vi.fn().mockResolvedValue(null),
-    createGeneration: vi.fn().mockImplementation(async () => ({ id: genIdCounter++ })),
+    getDb: vi.fn(async () => {
+      const chain: Record<string, unknown> = {};
+      for (const key of ["select", "from", "innerJoin", "where", "orderBy"]) chain[key] = () => chain;
+      chain.limit = async () => [{ planName: "business", status: "active", currentPeriodStart: new Date(Date.now() - 60_000), currentPeriodEnd: new Date(Date.now() + 3600_000) }];
+      return chain;
+    }),
+    createGeneration: vi.fn().mockImplementation(async () => genIdCounter++),
     updateGeneration: vi.fn().mockResolvedValue(undefined),
     getUserUsageStats: vi.fn().mockResolvedValue(null),
     getUserActivityTimeline: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   };
 });
 
+vi.mock("./_core/env", async original => ({ ...(await original<Record<string, unknown>>()), ENV: { falApiKey: "fixture-only", grokApiKey: "fixture-only" } }));
+vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => {}) }));
+vi.mock("./_core/toolStatus", () => ({ requireToolActive: vi.fn(async () => {}), logToolFailure: vi.fn(async () => {}) }));
+import { deductCredits, refundCredits } from "./stripe";
+import { generateImage } from "./_core/imageGeneration";
+import { getModelById } from "./_core/modelRegistry";
+beforeEach(() => vi.clearAllMocks());
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -182,18 +196,22 @@ describe("generation.batchCreate", () => {
     expect(result.completed).toBeLessThanOrEqual(3);
   }, 60000);
 
-  it("accepts mixed media types in batch", async () => {
+  it("rejects mixed image/video batches before any debit or render", async () => {
     const { ctx } = createAuthContext();
-    const result = await caller(ctx).generation.batchCreate({
-      prompts: [
-        { prompt: "A still image of a castle", mediaType: "image" },
-        { prompt: "A flowing river animation", mediaType: "video" },
-      ],
-    });
-    expect(result).toBeDefined();
-    expect(result.total).toBe(2);
-    expect(result.results).toHaveLength(2);
-  }, 60000);
+    await expect(caller(ctx).generation.batchCreate({ prompts: [{ prompt: "A fictional castle", mediaType: "image" }, { prompt: "A fictional river", mediaType: "video" }] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(deductCredits).not.toHaveBeenCalled(); expect(generateImage).not.toHaveBeenCalled();
+  });
+
+  it("charges exact catalog quotes and refunds only the failed named model with its purchased bucket", async () => {
+    const { ctx } = createAuthContext();
+    const namedCost = getModelById("grok-image")!.creditCost.base;
+    vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 500, needed: namedCost + 5, transactionId: 901, purchasedCreditsDebited: namedCost } as never);
+    vi.mocked(generateImage).mockResolvedValueOnce({ url: "https://fixture.example/automatic.png" }).mockRejectedValueOnce(new Error("Synthetic terminal render failure"));
+    const result = await caller(ctx).generation.batchCreate({ prompts: [{ prompt: "A fictional automatic image" }, { prompt: "A fictional Grok image", modelVersion: "grok-image" }] });
+    expect(result.completed).toBe(1);
+    expect(deductCredits).toHaveBeenCalledWith(1, namedCost + 5, expect.any(String));
+    expect(refundCredits).toHaveBeenCalledExactlyOnceWith(1, namedCost, expect.stringContaining("Refund"), { purchasedCredits: namedCost, operationKey: "batch-refund:901:1" });
+  });
 
   it("validates width and height bounds", async () => {
     const { ctx } = createAuthContext();

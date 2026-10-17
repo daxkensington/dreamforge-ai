@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
+import { revokeMediaUrls, purgeRevokedMedia } from "./_core/mediaLifecycle";
 import {
   listTakedownRequests,
   resolveTakedownRequest,
@@ -61,13 +62,13 @@ export async function createNotification(
   // If preference exists and is disabled, skip
   if (prefs.length > 0 && !prefs[0].enabled) return;
 
-  await db.insert(notifications).values({
-    userId,
-    type,
-    title,
-    message,
-    metadata: metadata || null,
-  });
+  try {
+    await db.insert(notifications).values({ userId, type, title, message, metadata: metadata || null });
+  } catch (error: any) {
+    // The database owner fence may win after the preference read. A deleted
+    // recipient is intentionally skipped; other failures remain observable.
+    if ((error?.code ?? error?.cause?.code) !== "23514") throw error;
+  }
 }
 
 // ─── Credits Router ─────────────────────────────────────────────────────────
@@ -495,8 +496,12 @@ export const adminRouter = router({
             });
           }
           if (target.kind === "gallery_item") {
+            // Revoke origin reads before removing the public row. The durable
+            // registry retries object deletion if storage is temporarily down.
+            await revokeMediaUrls([target.item.imageUrl, target.item.thumbnailUrl], "takedown");
             const removal = await removeGalleryItem(target.item.id);
             itemRemoved = removal.removed;
+            await purgeRevokedMedia(20).catch(() => undefined);
           }
         }
 
@@ -675,7 +680,8 @@ export const adminRouter = router({
         // Send to all users
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const allUsers = await db.select({ id: users.id }).from(users);
+        const allUsers = await db.select({ id: users.id }).from(users)
+          .where(sql`${users.loginMethod} IS DISTINCT FROM 'deleted'`);
         for (const user of allUsers) {
           await createNotification(
             user.id,

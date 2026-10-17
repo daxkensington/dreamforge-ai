@@ -211,6 +211,7 @@ export default function Footer() {
                 >
                   <input
                     type="email"
+                    aria-label="Email address for newsletter"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
@@ -219,6 +220,8 @@ export default function Footer() {
                   />
                   <button
                     type="submit"
+                    aria-label="Subscribe to newsletter"
+                    disabled={subscribe.isPending}
                     className="h-9 px-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-semibold hover:from-cyan-600 hover:to-blue-700 transition-colors flex items-center gap-1"
                   >
                     <ArrowRight className="h-3 w-3" />

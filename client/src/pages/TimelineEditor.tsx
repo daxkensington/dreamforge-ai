@@ -121,14 +121,18 @@ export default function TimelineEditorPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Film className="h-4 w-4 text-violet-400" />
-            <h1 className="text-sm font-semibold">Timeline Editor</h1>
+            <h1 className="text-sm font-semibold">Timeline Demo</h1>
           </div>
           {projectId && (
             <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
-              Project #{projectId}
+              Demo opened from Project #{projectId}
             </span>
           )}
         </div>
+
+        <p role="status" className="px-4 py-3 text-sm bg-amber-500/10 text-amber-200 border-b border-amber-500/30">
+          This standalone demo uses sample clips. It does not load or update your project. Changes are temporary and are lost when you leave or reload.
+        </p>
 
         {/* Toolbar */}
         <div className="shrink-0">
@@ -149,7 +153,7 @@ export default function TimelineEditorPage() {
 
           {/* Properties Panel */}
           <motion.div
-            className="w-72 shrink-0"
+            className="hidden md:block w-72 shrink-0"
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}

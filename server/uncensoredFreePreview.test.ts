@@ -67,6 +67,15 @@ vi.mock("./db", () => ({
   }),
 }));
 
+vi.mock("./_core/generationBatchBilling", () => ({
+  claimGenerationBatch: vi.fn(async (input:any) => { state.debited += input.credits; return {kind:"owned",id:1,token:"11111111-1111-4111-8111-111111111111",balance:500,purchasedCreditsDebited:0}; }),
+  beginGenerationBatch: vi.fn(async()=>true), completeGenerationBatch: vi.fn(async()=>true),
+}));
+vi.mock("./_core/walletAccounting", () => ({ failLegacyJobAndRefund: vi.fn(async(input:any)=>{
+  await refundCredits(input.userId,input.amount,input.reason);
+  state.updated.push({id:input.id,data:{status:"failed"}});
+  return true;
+}) }));
 vi.mock("./stripe", () => ({
   deductCredits: vi.fn(async (_u: number, amount: number) => {
     state.debited += amount;
@@ -311,7 +320,7 @@ describe("uncensored.generate — paid path is submit-and-poll", () => {
     expect(res.generationIds).toHaveLength(3);
     expect(res.images).toHaveLength(0);
     expect(res.cost).toBe(15);
-    expect(deductCredits).toHaveBeenCalledTimes(1);
+    expect(state.debited).toBe(15);
     expect(state.submitted).toHaveLength(3);
     // every row remembers its job + the click id, and none was awaited inline
     expect(state.updated.filter((u) => u.data.metadata?.runpodJobId).map((u) => u.data.metadata.runpodJobId)).toEqual(["job-1", "job-2", "job-3"]);

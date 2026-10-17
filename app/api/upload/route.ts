@@ -14,6 +14,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateStorageKey, storagePut } from "../../../server/storage";
 import { enforceIpRateLimit, enforceRateLimit } from "../../../server/rate-limit";
+import { getClientIp } from "../../../server/_core/context";
+import { getUserByEmail, hasAuthIdentity } from "../../../server/db";
+import { withStorageOwner } from "../../../server/_core/storageContext";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -29,21 +32,23 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
 };
 
 function clientIp(req: NextRequest): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return getClientIp(req.headers) ?? "unknown";
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.email || !session.user.id || !(await hasAuthIdentity(session.user.id, session.user.email))) {
+    return NextResponse.json({ error: "Sign in to upload images" }, { status: 401 });
+  }
+  const appUser = await getUserByEmail(session.user.email);
+  if (!appUser || appUser.loginMethod === "deleted") {
     return NextResponse.json({ error: "Sign in to upload images" }, { status: 401 });
   }
 
   const ip = clientIp(req);
   try {
     await enforceIpRateLimit("upload", ip, 30, 60 * 60 * 1000);
-    await enforceRateLimit(`upload:user:${(session.user as { id?: number }).id ?? session.user.email ?? "unknown"}`, 20, 60 * 60 * 1000);
+    await enforceRateLimit(`upload:user:${appUser.id}`, 20, 60 * 60 * 1000);
   } catch {
     return NextResponse.json({ error: "Too many uploads — try again later" }, { status: 429 });
   }
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   const bytes = Buffer.from(await file.arrayBuffer());
   try {
-    const { url } = await storagePut(generateStorageKey("uploads", ext), bytes, file.type);
+    const { url } = await withStorageOwner(appUser.id, () => storagePut(generateStorageKey("uploads", ext), bytes, file.type));
     return NextResponse.json({ url }, { status: 200 });
   } catch (err) {
     console.error("[upload] R2 put failed:", err);

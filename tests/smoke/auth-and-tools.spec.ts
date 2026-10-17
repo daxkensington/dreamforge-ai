@@ -65,6 +65,6 @@ test("anonymous homepage CTA reaches the no-signup demo", async ({ page, baseURL
     cta.click({ noWaitAfter: true }),
   ]);
   await expect(page).toHaveURL(url => url.origin === expectedOrigin && url.pathname === '/demo/text-to-image' && !url.search);
-  await expect(page.getByRole('heading', { level: 1, name: 'Try AI image generation free', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Try AI Image Generation Free', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Generate (free)', exact: true })).toBeDisabled();
 });

@@ -11,10 +11,16 @@ import { Paintbrush, Loader2, Download, Sparkles, RotateCcw, Trash2, Undo2, Zap 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { createLiveCanvasScheduler } from "@shared/liveCanvasScheduler";
+import { TOOL_CREDIT_COSTS } from "@shared/creditCosts";
+
+type LiveRenderInput = { sketchDataUrl: string; prompt: string; outputStyle: "realistic" | "digital-art" | "anime" | "oil-painting" | "watercolor" | "3d-render" };
 
 export default function ToolCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const uploadInFlight = useRef(false);
+  const [preparingCanvas, setPreparingCanvas] = useState(false);
   const [brushSize, setBrushSize] = useState(8);
   const [brushColor, setBrushColor] = useState("#ffffff");
   const [prompt, setPrompt] = useState("");
@@ -23,7 +29,21 @@ export default function ToolCanvas() {
   const [liveMode, setLiveMode] = useState(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const historyRef = useRef<ImageData[]>([]);
-  const liveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
+  const liveSubmitRef = useRef<(input: LiveRenderInput) => Promise<unknown>>(async () => undefined);
+  const schedulerRef = useRef<ReturnType<typeof createLiveCanvasScheduler<LiveRenderInput>> | null>(null);
+  if (schedulerRef.current === null) {
+    schedulerRef.current = createLiveCanvasScheduler<LiveRenderInput>({
+      submit: input => { setLiveError(null); setPreviewStale(true); return liveSubmitRef.current(input); },
+      onError: error => setLiveError(error instanceof Error ? error.message : "Live render failed. Please try again."),
+    });
+  }
+  useEffect(() => {
+    const scheduler = schedulerRef.current!;
+    scheduler.setEnabled(liveMode);
+    return () => scheduler.setEnabled(false);
+  }, [liveMode]);
 
   const styles = [
     { value: "photorealistic", label: "Photo" }, { value: "anime", label: "Anime" },
@@ -131,7 +151,7 @@ export default function ToolCanvas() {
   };
 
   // Use sketch-to-image via the existing tools endpoint
-  const mutation = trpc.tools.sketchToImage?.useMutation?.({
+  const mutation = trpc.tools.sketchToImage.useMutation({
     onSuccess: (data: any) => {
       if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Image generated from canvas!"); }
       else toast.error(data.error || "Generation failed");
@@ -140,33 +160,35 @@ export default function ToolCanvas() {
   });
 
   // Fast Krea-style live canvas streaming endpoint
-  const liveMutation = trpc.tools.liveCanvasRender?.useMutation?.({
+  const liveMutation = trpc.tools.liveCanvasRender.useMutation({
     onSuccess: (data: any) => {
       if (data.status === "completed" && data.url) {
         setResultUrl(data.url);
-      } else if (!liveMode) {
-        toast.error(data.error || "Generation failed");
+        setPreviewStale(false);
+        setLiveError(null);
+      } else {
+        setLiveError(data.error || "Generation failed");
+        setPreviewStale(true);
       }
     },
     onError: (err: any) => {
-      if (!liveMode) toast.error(err.message);
+      setLiveError(err.message || "Live render failed. Please try again.");
+      setPreviewStale(true);
     },
   });
 
-  const scheduleLiveRender = useCallback(() => {
-    if (!liveMode) return;
-    if (liveDebounceRef.current) clearTimeout(liveDebounceRef.current);
-    liveDebounceRef.current = setTimeout(() => {
-      const canvas = canvasRef.current;
-      if (!canvas || liveMutation?.isPending) return;
-      const sketchDataUrl = canvas.toDataURL("image/png");
-      liveMutation?.mutate({
-        sketchDataUrl,
-        prompt: prompt || "Transform this sketch into a detailed artwork",
-        outputStyle: (styleMap[style] || "digital-art") as any,
-      });
-    }, 700);
-  }, [liveMode, prompt, style, liveMutation]);
+  liveSubmitRef.current = input => liveMutation.mutateAsync(input);
+
+  const scheduleLiveRender = () => {
+    const canvas = canvasRef.current;
+    if (!liveMode || !canvas) return;
+    setPreviewStale(true);
+    schedulerRef.current!.schedule({
+      sketchDataUrl: canvas.toDataURL("image/png"),
+      prompt: prompt || "Transform this sketch into a detailed artwork",
+      outputStyle: (styleMap[style] || "digital-art") as LiveRenderInput["outputStyle"],
+    });
+  };
 
   const stopDrawing = () => {
     if (isDrawing) {
@@ -177,9 +199,14 @@ export default function ToolCanvas() {
   };
 
   const generateFromCanvas = async () => {
+    if (uploadInFlight.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    schedulerRef.current!.setEnabled(false);
+    setLiveMode(false);
+    uploadInFlight.current = true;
+    setPreparingCanvas(true);
     // Convert canvas to data URL and upload
     const dataUrl = canvas.toDataURL("image/png");
 
@@ -193,28 +220,31 @@ export default function ToolCanvas() {
 
       if (res.ok) {
         const { url } = await res.json();
-        mutation?.mutate({ imageUrl: url, description: prompt || "Transform this sketch into a detailed image", outputStyle: (styleMap[style] || "digital-art") as any });
+        mutation.mutate({ imageUrl: url, description: prompt || "Transform this sketch into a detailed image", outputStyle: (styleMap[style] || "digital-art") as any });
       } else {
         // Fallback: direct base64 sketch render via liveCanvasRender
-        liveMutation?.mutate({
+        liveMutation.mutate({
           sketchDataUrl: dataUrl,
           prompt: prompt || "Transform this sketch into a detailed image",
           outputStyle: (styleMap[style] || "digital-art") as any,
         });
       }
     } catch {
-      liveMutation?.mutate({
+      liveMutation.mutate({
         sketchDataUrl: dataUrl,
         prompt: prompt || "Transform this sketch into a detailed image",
         outputStyle: (styleMap[style] || "digital-art") as any,
       });
+    } finally {
+      uploadInFlight.current = false;
+      setPreparingCanvas(false);
     }
   };
 
-  const isProcessing = mutation?.isPending || liveMutation?.isPending || false;
+  const isProcessing = preparingCanvas || mutation.isPending || liveMutation.isPending || false;
 
   return (
-    <ToolPageLayout title="AI Canvas" description="Draw and let AI transform your sketches in real-time" icon={Paintbrush} gradient="from-violet-500 to-indigo-400">
+    <ToolPageLayout toolKey="sketch-to-image" title="AI Canvas" description="Draw and let AI transform your sketches in real-time" icon={Paintbrush} gradient="from-violet-500 to-indigo-400">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6 p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground mb-2">Example output:</p>
@@ -232,8 +262,10 @@ export default function ToolCanvas() {
                       variant={liveMode ? "default" : "outline"}
                       size="sm"
                       className={liveMode ? "h-7 text-xs bg-violet-600 hover:bg-violet-500 text-white" : "h-7 text-xs"}
+                      aria-pressed={liveMode}
                       onClick={() => {
                         const next = !liveMode;
+                        schedulerRef.current!.setEnabled(next);
                         setLiveMode(next);
                         toast.info(next ? "Live Mode enabled — preview updates automatically after each stroke" : "Live Mode paused");
                       }}
@@ -243,10 +275,11 @@ export default function ToolCanvas() {
                     </Button>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={undo}><Undo2 className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={clearCanvas}><Trash2 className="h-4 w-4" /></Button>
+                    <Button aria-label="Undo last stroke" variant="ghost" size="sm" onClick={undo}><Undo2 className="h-4 w-4" /></Button>
+                    <Button aria-label="Clear canvas" variant="ghost" size="sm" onClick={clearCanvas}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
+                <p className="mb-3 text-xs text-muted-foreground">Each render uses {TOOL_CREDIT_COSTS["sketch-to-image"]} credits. Live Render submits automatically after strokes. Pause cancels queued renders; a submitted render may still finish.</p>
                 <canvas
                   ref={canvasRef}
                   className="w-full aspect-square rounded-lg cursor-crosshair border border-border/30 touch-none"
@@ -262,17 +295,17 @@ export default function ToolCanvas() {
 
             {/* Brush Controls */}
             <Card className="border-border/50">
-              <CardContent className="p-4 flex items-center gap-6">
-                <div className="flex gap-1.5">
+              <CardContent className="p-4 flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap gap-1.5">
                   {colors.map((c) => (
-                    <button key={c} onClick={() => setBrushColor(c)}
+                    <button aria-label={`Brush color ${c}`} aria-pressed={brushColor === c} key={c} onClick={() => setBrushColor(c)}
                       className={`w-6 h-6 rounded-full border-2 transition-all ${brushColor === c ? "border-white scale-110" : "border-transparent"}`}
                       style={{ backgroundColor: c }} />
                   ))}
                 </div>
                 <div className="flex items-center gap-3 flex-1">
                   <Label className="text-xs whitespace-nowrap">Brush</Label>
-                  <Slider value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} min={1} max={40} step={1} className="flex-1" />
+                  <Slider aria-label="Brush size" value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} min={1} max={40} step={1} className="flex-1" />
                   <span className="text-xs text-muted-foreground w-8">{brushSize}px</span>
                 </div>
               </CardContent>
@@ -306,6 +339,8 @@ export default function ToolCanvas() {
               </CardContent>
             </Card>
 
+            {liveError && <div role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{liveError} Check your sign-in and credits, then draw again or choose Generate from Canvas to retry.</div>}
+            {previewStale && resultUrl && <p role="status" className="text-xs text-muted-foreground">Showing the last successful preview. It may not match your latest sketch.</p>}
             {/* Result */}
             <Card className="border-border/50 overflow-hidden">
               <CardContent className="p-0">

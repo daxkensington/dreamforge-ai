@@ -2,6 +2,8 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
 import { nanoid } from "nanoid";
+import { storageOwner } from "./_core/storageContext";
+import { confirmMediaUpload, normalizeStorageKey, registerMediaAsset } from "./_core/mediaLifecycle";
 
 // Lazy S3 client for R2
 let _s3: S3Client | null = null;
@@ -33,7 +35,8 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType: string = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const finalKey = key.startsWith("/") ? key.slice(1) : key;
+  const finalKey = normalizeStorageKey(key);
+  await registerMediaAsset(finalKey, storageOwner());
 
   try {
     await getS3().send(
@@ -49,6 +52,7 @@ export async function storagePut(
     throw new Error(`Failed to upload file to storage: ${error.message || "Unknown R2 error"}`);
   }
 
+  await confirmMediaUpload(finalKey);
   const url = ENV.r2PublicUrl
     ? `${ENV.r2PublicUrl}/${finalKey}`
     : await getSignedUrl(getS3(), new GetObjectCommand({ Bucket: BUCKET(), Key: finalKey }), { expiresIn: 3600 * 24 * 7 });
@@ -59,7 +63,7 @@ export async function storagePut(
 /**
  * Fetch an object's bytes + content type for proxy serving (the /img route).
  * Returns null if the key doesn't exist. Buffers fully — fine for images/short
- * clips; the /img route sets immutable caching so R2 is hit once per asset.
+ * clips; the /img route checks revocation and disables shared caching.
  */
 export async function storageGetObject(
   key: string,

@@ -293,12 +293,12 @@ export default function TimelineToolbar({ timeline }: TimelineToolbarProps) {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="default" size="sm" className="h-8 gap-1.5 px-3">
+            <Button disabled variant="default" size="sm" className="h-8 gap-1.5 px-3">
               <Download className="h-3.5 w-3.5" />
               <span className="text-xs">Export</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Export Video</TooltipContent>
+          <TooltipContent>Video export is unavailable in this demo</TooltipContent>
         </Tooltip>
       </div>
     </div>

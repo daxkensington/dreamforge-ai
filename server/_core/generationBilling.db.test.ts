@@ -54,14 +54,15 @@ databaseSuite("generation billing on isolated PostgreSQL", () => {
     // Only the dedicated empty fixture database is used. Existing tables are real PostgreSQL
     // constraints with the same column types consumed by the production statements.
     await db.unsafe(`
-      CREATE TABLE users (id serial PRIMARY KEY);
+      CREATE TABLE users (id serial PRIMARY KEY, "loginMethod" text);
       CREATE TYPE "generationStatus" AS ENUM ('pending', 'generating', 'completed', 'failed');
       CREATE TYPE "txType" AS ENUM ('purchase', 'usage', 'bonus', 'refund', 'subscription', 'reward', 'referral', 'dispute');
       CREATE TABLE generations (id serial PRIMARY KEY, "userId" integer NOT NULL REFERENCES users(id),
         status "generationStatus" DEFAULT 'pending' NOT NULL, "imageUrl" text, "thumbnailUrl" text, "errorMessage" text,
         metadata jsonb, "updatedAt" timestamp DEFAULT now() NOT NULL);
       CREATE TABLE "creditBalances" (id serial PRIMARY KEY, "userId" integer UNIQUE NOT NULL,
-        balance integer DEFAULT 50 NOT NULL, "lifetimeSpent" integer DEFAULT 0 NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL);
+        balance integer DEFAULT 50 NOT NULL, "bonusCredits" integer DEFAULT 0 NOT NULL, "walletAccountingVersion" integer DEFAULT 1 NOT NULL,
+        "lifetimeSpent" integer DEFAULT 0 NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL);
       CREATE TABLE "creditTransactions" (id serial PRIMARY KEY, "userId" integer NOT NULL REFERENCES users(id),
         amount integer NOT NULL, "txType" "txType" NOT NULL, description varchar(512), "txMetadata" jsonb);
     `).simple();

@@ -23,13 +23,12 @@ vi.mock("./db", () => ({
 // orchestration points so router tests can simulate races and Stripe failures.
 const payoutMocks = vi.hoisted(() => ({
   getSellerProfile: vi.fn(),
-  reservePayout: vi.fn(),
   releasePayout: vi.fn(),
   createPayout: vi.fn(),
   setPayoutStatus: vi.fn(),
 }));
 
-vi.mock("./dbMarketplace", async (importOriginal) => {
+vi.mock("./dbMarketplace", async importOriginal => {
   const actual = await importOriginal<typeof import("./dbMarketplace")>();
   return { ...actual, ...payoutMocks };
 });
@@ -40,7 +39,8 @@ import { marketplaceRouter } from "./routers/marketplace";
 let realDbMarketplace!: typeof import("./dbMarketplace");
 
 beforeAll(async () => {
-  realDbMarketplace = await vi.importActual<typeof import("./dbMarketplace")>("./dbMarketplace");
+  realDbMarketplace =
+    await vi.importActual<typeof import("./dbMarketplace")>("./dbMarketplace");
 });
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────
@@ -73,7 +73,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.STRIPE_SECRET_KEY = "sk_test_123";
   payoutMocks.getSellerProfile.mockResolvedValue(profile);
-  payoutMocks.reservePayout.mockResolvedValue(19500);
   payoutMocks.createPayout.mockResolvedValue({ id: 42 });
   payoutMocks.setPayoutStatus.mockResolvedValue(undefined);
   stripeMocks.transfersCreate.mockResolvedValue({ id: "tr_1" });
@@ -87,74 +86,105 @@ describe("marketplace.requestPayout (P1.10)", () => {
 
     expect(result).toEqual({ success: true, payoutId: 42, transferId: "tr_1" });
 
-    // Conditional balance reservation happens BEFORE any Stripe transfer.
-    expect(payoutMocks.reservePayout).toHaveBeenCalledWith(5, 500);
-    expect(payoutMocks.reservePayout.mock.invocationCallOrder[0]).toBeLessThan(
-      stripeMocks.transfersCreate.mock.invocationCallOrder[0]
-    );
     // Pending ledger row before the transfer; settled after.
     expect(payoutMocks.createPayout).toHaveBeenCalledWith(5, 500);
     expect(payoutMocks.createPayout.mock.invocationCallOrder[0]).toBeLessThan(
       stripeMocks.transfersCreate.mock.invocationCallOrder[0]
     );
-    expect(payoutMocks.setPayoutStatus).toHaveBeenCalledWith(42, "paid", "tr_1");
-    expect(payoutMocks.setPayoutStatus.mock.invocationCallOrder[0]).toBeGreaterThan(
-      stripeMocks.transfersCreate.mock.invocationCallOrder[0]
+    expect(payoutMocks.setPayoutStatus).toHaveBeenCalledWith(
+      42,
+      "paid",
+      "tr_1"
     );
+    expect(
+      payoutMocks.setPayoutStatus.mock.invocationCallOrder[0]
+    ).toBeGreaterThan(stripeMocks.transfersCreate.mock.invocationCallOrder[0]);
     expect(stripeMocks.transfersCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 500, currency: "usd", destination: "acct_1" })
+      expect.objectContaining({
+        amount: 500,
+        currency: "usd",
+        destination: "acct_1",
+      }),
+      { idempotencyKey: "marketplace-payout:42" }
     );
   });
 
   it("pre-check rejects with the existing insufficient-balance message without reserving or transferring", async () => {
-    payoutMocks.getSellerProfile.mockResolvedValue({ ...profile, payoutBalance: 400 });
+    payoutMocks.getSellerProfile.mockResolvedValue({
+      ...profile,
+      payoutBalance: 400,
+    });
 
     await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
       "Insufficient balance. Available: $4.00, requested: $5.00"
     );
-    expect(payoutMocks.reservePayout).not.toHaveBeenCalled();
+    expect(payoutMocks.createPayout).not.toHaveBeenCalled();
     expect(stripeMocks.transfersCreate).not.toHaveBeenCalled();
   });
 
   it("losing the conditional update throws before any transfer (concurrent requests transfer once)", async () => {
     // Simulate two simultaneous requests against one $200 balance: the
     // reservation succeeds once and fails once — only one may reach Stripe.
-    payoutMocks.reservePayout
-      .mockResolvedValueOnce(19500)
-      .mockRejectedValueOnce(new Error("Insufficient balance for payout of 500"));
+    payoutMocks.createPayout
+      .mockResolvedValueOnce({ id: 42 })
+      .mockRejectedValueOnce(
+        new Error("Insufficient balance for payout of 500")
+      );
 
     const [first, second] = await Promise.allSettled([
       caller.requestPayout({ amount: 500 }),
       caller.requestPayout({ amount: 500 }),
     ]);
 
-    const fulfilled = [first, second].filter((r) => r.status === "fulfilled");
-    const rejected = [first, second].filter((r) => r.status === "rejected");
+    const fulfilled = [first, second].filter(r => r.status === "fulfilled");
+    const rejected = [first, second].filter(r => r.status === "rejected");
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(1);
-    expect((rejected[0] as PromiseRejectedResult).reason.message).toContain("Insufficient balance");
+    expect((rejected[0] as PromiseRejectedResult).reason.message).toContain(
+      "Insufficient cash-backed earnings"
+    );
     expect(stripeMocks.transfersCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("transfer failure marks the row failed and restores the reserved balance", async () => {
-    stripeMocks.transfersCreate.mockRejectedValue(new Error("stripe down"));
-
-    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow("Payout failed: stripe down");
-
-    expect(payoutMocks.setPayoutStatus).toHaveBeenCalledWith(42, "failed");
-    expect(payoutMocks.releasePayout).toHaveBeenCalledWith(5, 500);
-    expect(payoutMocks.releasePayout.mock.invocationCallOrder[0]).toBeGreaterThan(
-      payoutMocks.setPayoutStatus.mock.invocationCallOrder[0]
+  it("uncertain transfer failures keep funds pending for reconciliation", async () => {
+    stripeMocks.transfersCreate.mockRejectedValue(
+      new Error("stripe connection lost")
     );
+    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
+      "requires reconciliation"
+    );
+    expect(payoutMocks.setPayoutStatus).not.toHaveBeenCalled();
+    expect(payoutMocks.releasePayout).not.toHaveBeenCalled();
   });
 
-  it("ledger insert failure releases the reservation and never transfers", async () => {
+  it("confirmed Stripe rejection releases the exact pending payout once", async () => {
+    stripeMocks.transfersCreate.mockRejectedValue(
+      Object.assign(new Error("declined"), { statusCode: 400 })
+    );
+    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
+      "declined"
+    );
+    expect(payoutMocks.releasePayout).toHaveBeenCalledWith(5, 500, 42);
+  });
+
+  it("ledger/reservation failure never transfers or compensates unreserved funds", async () => {
     payoutMocks.createPayout.mockRejectedValue(new Error("db write failed"));
-
-    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow("db write failed");
-
-    expect(payoutMocks.releasePayout).toHaveBeenCalledWith(5, 500);
+    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
+      "Insufficient cash-backed earnings"
+    );
+    expect(payoutMocks.releasePayout).not.toHaveBeenCalled();
     expect(stripeMocks.transfersCreate).not.toHaveBeenCalled();
+  });
+
+  it("status persistence failure after transfer never releases the funds", async () => {
+    payoutMocks.setPayoutStatus.mockRejectedValueOnce(
+      new Error("database connection lost")
+    );
+    await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
+      "database connection lost"
+    );
+    expect(stripeMocks.transfersCreate).toHaveBeenCalledTimes(1);
+    expect(payoutMocks.releasePayout).not.toHaveBeenCalled();
   });
 
   it("keeps existing guards: missing profile and missing Connect account", async () => {
@@ -163,7 +193,10 @@ describe("marketplace.requestPayout (P1.10)", () => {
       "Seller profile not found. Set up your seller account first."
     );
 
-    payoutMocks.getSellerProfile.mockResolvedValueOnce({ ...profile, stripeConnectId: null });
+    payoutMocks.getSellerProfile.mockResolvedValueOnce({
+      ...profile,
+      stripeConnectId: null,
+    });
     await expect(caller.requestPayout({ amount: 500 })).rejects.toThrow(
       "Stripe Connect account not set up. Complete seller onboarding first."
     );
@@ -218,61 +251,17 @@ function makePayoutDb({ updateReturning = [] as any[] } = {}) {
 }
 
 describe("dbMarketplace payout helpers", () => {
-  it("reservePayout atomically decrements with a balance guard and returns the new balance", async () => {
-    const { db, captured } = makePayoutDb({ updateReturning: [{ payoutBalance: 19500 }] });
-    (getDb as any).mockResolvedValue(db);
-
-    const newBalance = await realDbMarketplace.reservePayout(5, 500);
-
-    expect(newBalance).toBe(19500);
-    // The WHERE must include the >= guard — this is the race protection.
-    const whereText = sqlText(captured.updates[0].where);
-    expect(whereText).toContain(">=");
-    expect(whereText).toContain("payoutBalance");
-    expect(sqlText(captured.updates[0].set.payoutBalance)).toContain("-");
-  });
-
-  it("reservePayout throws when the conditional update matches no row", async () => {
-    const { db } = makePayoutDb({ updateReturning: [] });
-    (getDb as any).mockResolvedValue(db);
-
-    await expect(realDbMarketplace.reservePayout(5, 500)).rejects.toThrow(
-      "Insufficient balance for payout of 500"
-    );
-  });
-
-  it("releasePayout issues a compensating increment", async () => {
-    const { db, captured } = makePayoutDb();
-    (getDb as any).mockResolvedValue(db);
-
-    await realDbMarketplace.releasePayout(5, 500);
-
-    expect(sqlText(captured.updates[0].set.payoutBalance)).toContain("+");
-  });
-
   it("setPayoutStatus records paid with a transfer id, failed without one", async () => {
     const { db, captured } = makePayoutDb();
     (getDb as any).mockResolvedValue(db);
 
     await realDbMarketplace.setPayoutStatus(42, "paid", "tr_1");
-    expect(captured.updates[0].set).toEqual({ status: "paid", stripeTransferId: "tr_1" });
+    expect(captured.updates[0].set).toEqual({
+      status: "paid",
+      stripeTransferId: "tr_1",
+    });
 
     await realDbMarketplace.setPayoutStatus(42, "failed");
     expect(captured.updates[1].set).toEqual({ status: "failed" });
-  });
-
-  it("createPayout writes the ledger row but no longer decrements the balance", async () => {
-    const { db, captured } = makePayoutDb();
-    (getDb as any).mockResolvedValue(db);
-
-    await realDbMarketplace.createPayout(5, 500);
-    expect(captured.inserts[0].values).toMatchObject({ sellerId: 5, amount: 500, status: "pending" });
-    expect(captured.inserts[0].values.stripeTransferId).toBeNull();
-
-    await realDbMarketplace.createPayout(5, 500, "tr_1");
-    expect(captured.inserts[1].values).toMatchObject({ status: "paid", stripeTransferId: "tr_1" });
-
-    // Balance movement is reservePayout's job now — no plain decrement here.
-    expect(captured.updates).toHaveLength(0);
   });
 });

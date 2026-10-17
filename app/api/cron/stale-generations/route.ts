@@ -21,7 +21,8 @@ import { NextResponse } from "next/server";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../../../../server/db";
 import { generations, audioGenerations } from "../../../../drizzle/schema";
-import { refundCredits } from "../../../../server/stripe";
+import { failLegacyJobAndRefund } from "../../../../server/_core/walletAccounting";
+import { sweepGenerationBatches } from "../../../../server/_core/generationBatchBilling";
 import { TOOL_CREDIT_COSTS } from "../../../../shared/creditCosts";
 import { sweepStaleGenerationRequests } from "../../../../server/_core/generationBilling";
 
@@ -87,6 +88,7 @@ export async function GET(req: Request) {
   // it independently or declare an upstream request safe to run again.
   let requestSweep;
   try {
+    await sweepGenerationBatches();
     requestSweep = await sweepStaleGenerationRequests({ olderThanMinutes: STALE_AFTER_MINUTES, limit: BATCH_LIMIT });
   } catch {
     requestSweep = { kind: "uncertain" as const };
@@ -114,21 +116,6 @@ export async function GET(req: Request) {
     try {
       const rowMetadata = row.metadata as Record<string, unknown> | null;
       if (rowMetadata?.billingRequestId || rowMetadata?.deleted) continue;
-      // Atomic claim — only act if this run actually moved the row out of a
-      // non-terminal state; a job that finished (or another reaper instance
-      // that got there first) returns zero rows and is skipped.
-      const claimed = await db
-        .update(generations)
-        .set({
-          status: "failed",
-          errorMessage: `Stale job reaper — no update for ${STALE_AFTER_MINUTES}+ minutes, job presumed dead`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(generations.id, row.id), inArray(generations.status, [...REAP_STATUSES]), sql`${generations.metadata}->>'billingRequestId' IS NULL`, sql`COALESCE(${generations.metadata}->>'deleted', 'false') <> 'true'`))
-        .returning({ id: generations.id });
-      if (claimed.length === 0) continue;
-      reaped++;
-
       const meta = (row.metadata ?? {}) as Record<string, unknown>;
       // Charged jobs record their exact debit in metadata.cost (uncensored
       // flows). Free previews (metadata.free) were never charged — never
@@ -141,10 +128,9 @@ export async function GET(req: Request) {
             ? TOOL_CREDIT_COSTS["text-to-video"] ?? 0
             : TOOL_CREDIT_COSTS["text-to-image"] ?? 0;
       }
-      if (cost <= 0) continue;
-
-      await refundCredits(row.userId, cost, REFUND_DESCRIPTION);
-      refunded++;
+      const claimed = await failLegacyJobAndRefund({ table: "generations", id: row.id, userId: row.userId, amount: cost,
+        purchasedCredits: Number(meta.purchasedCreditsDebited) || 0, reason: REFUND_DESCRIPTION });
+      if (claimed) { reaped++; if (cost > 0) refunded++; }
     } catch (err) {
       errors++;
       console.error(`[cron/stale-generations] failed to reap generation ${row.id}:`, err);
@@ -165,23 +151,11 @@ export async function GET(req: Request) {
 
   for (const row of staleAudio) {
     try {
-      const claimed = await db
-        .update(audioGenerations)
-        .set({
-          status: "failed",
-          errorMessage: `Stale job reaper — no update for ${STALE_AFTER_MINUTES}+ minutes, job presumed dead`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(audioGenerations.id, row.id), inArray(audioGenerations.status, [...AUDIO_REAP_STATUSES])))
-        .returning({ id: audioGenerations.id });
-      if (claimed.length === 0) continue;
-      reaped++;
-
       const cost = audioRefundCost(row);
-      if (cost <= 0) continue;
-
-      await refundCredits(row.userId, cost, REFUND_DESCRIPTION);
-      refunded++;
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      const claimed = await failLegacyJobAndRefund({ table: "audioGenerations", id: row.id, userId: row.userId,
+        amount: cost, purchasedCredits: Number(meta.purchasedCreditsDebited) || 0, reason: REFUND_DESCRIPTION });
+      if (claimed) { reaped++; if (cost > 0) refunded++; }
     } catch (err) {
       errors++;
       console.error(`[cron/stale-generations] failed to reap audio generation ${row.id}:`, err);

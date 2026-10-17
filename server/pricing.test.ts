@@ -9,6 +9,7 @@ const stripeMocks = vi.hoisted(() => ({
   productsCreate: vi.fn(),
   pricesList: vi.fn(),
   pricesCreate: vi.fn(),
+  subscriptionsList: vi.fn(), subscriptionsCancel: vi.fn(),
   subscriptionsRetrieve: vi.fn(),
   subscriptionsUpdate: vi.fn(),
 }));
@@ -20,6 +21,7 @@ vi.mock("stripe", () => ({
     products = { create: stripeMocks.productsCreate };
     prices = { list: stripeMocks.pricesList, create: stripeMocks.pricesCreate };
     subscriptions = {
+      list: stripeMocks.subscriptionsList, cancel: stripeMocks.subscriptionsCancel,
       retrieve: stripeMocks.subscriptionsRetrieve,
       update: stripeMocks.subscriptionsUpdate,
     };
@@ -41,7 +43,7 @@ vi.mock("./stripe", async (importOriginal) => {
 });
 
 import { getDb } from "./db";
-import { addCredits, createCheckoutSession, getOrCreateBalance, sanitizeRedirectOrigin, CREDIT_PACKAGES } from "./stripe";
+import { addCredits, createCheckoutSession, getOrCreateBalance, sanitizeRedirectOrigin, CREDIT_PACKAGES, cancelStripeSubscriptionsForCustomer } from "./stripe";
 import { pricingRouter, activateSubscription, handleMonthlyReset, handleSubscriptionUpdated, handleSubscriptionDeleted } from "./routers/pricing";
 import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
 import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../shared/creditCosts";
@@ -78,7 +80,8 @@ function makeDb(opts: { selectQueue?: any[][]; updateReturningQueue?: any[][] } 
     insertCount: 0,
   };
   const db: any = {
-    execute: vi.fn().mockResolvedValue([]),
+    execute: vi.fn().mockResolvedValue([{ id: 1 }]),
+    batch: vi.fn().mockResolvedValue([[], [], []]),
     select: vi.fn(() => {
       const c: any = {};
       c.from = vi.fn(() => c);
@@ -221,77 +224,16 @@ describe("provider subscription state persistence", () => {
 
 // ─── P0.2 — pack-credit carryover ───────────────────────────────────────────
 
-describe("addCredits bonus tracking (P0.2)", () => {
-  it("increments bonusCredits for a purchased pack (stripe session id present)", async () => {
-    const { db, captured } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
+describe("wallet grant delegation", () => {
+  it("purchased and ordinary grants use the atomic wallet operation", async () => {
+    const { db } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
     installDb(db);
-
-    await addCredits(1, 500, "Purchased pack-500 pack (500 credits)", "cs_test_1", "pi_test_1");
-
-    const setArg = captured.sets[captured.sets.length - 1];
-    expect(setArg).toHaveProperty("balance");
-    expect(setArg).toHaveProperty("bonusCredits");
-    // Both are SQL increments of 500.
-    expect(sqlText(setArg.balance)).toContain("+");
-    expect(sqlText(setArg.bonusCredits)).toContain("+");
-    // Ledger row still written as a purchase.
-    expect(captured.values[0]).toMatchObject({ amount: 500, type: "purchase" });
-  });
-
-  it("does NOT increment bonusCredits for referral/signup-style grants", async () => {
-    const { db, captured } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
-    installDb(db);
-
-    await addCredits(1, 15, "Referral bonus — a friend joined via your link");
-
-    const setArg = captured.sets[captured.sets.length - 1];
-    expect(setArg).toHaveProperty("balance");
-    expect(setArg).not.toHaveProperty("bonusCredits");
-  });
-
-  it("honours the explicit bonus option override", async () => {
-    const { db, captured } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
-    installDb(db);
-
-    await addCredits(1, 15, "Manual grant", undefined, undefined, { bonus: true });
-    expect(captured.sets[captured.sets.length - 1]).toHaveProperty("bonusCredits");
-
-    await addCredits(1, 15, "Not a bonus", "cs_x", "pi_x", { bonus: false });
-    expect(captured.sets[captured.sets.length - 1]).not.toHaveProperty("bonusCredits");
+    await addCredits(1,100,"pack","cs_pack","pi_pack");
+    expect(db.execute).toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
-
-describe("handleMonthlyReset (P0.2)", () => {
-  it("folds bonusCredits into balance and then zeroes the counter", async () => {
-    const plan = planRow("pro");
-    const { db, captured } = makeDb({
-      selectQueue: [
-        [{ id: 9, userId: 1, planId: 2, stripeSubscriptionId: "sub_1" }],
-        [plan],
-      ],
-    });
-    installDb(db);
-    vi.mocked(getOrCreateBalance).mockResolvedValue({ ...balanceRow, bonusCredits: 750 } as any);
-
-    await handleMonthlyReset("sub_1");
-
-    const setArg = captured.sets[captured.sets.length - 1];
-    // Balance rebuilt as plan credits + bonusCredits…
-    expect(sqlText(setArg.balance)).toContain("bonusCredits");
-    expect(sqlText(setArg.balance)).toContain(String(plan.monthlyCredits));
-    // …and the counter is zeroed so the same credits aren't re-added next reset.
-    expect(setArg.bonusCredits).toBe(0);
-    expect(setArg.monthlyAllocation).toBe(plan.monthlyCredits);
-    // Transaction recorded for the full reset amount.
-    expect(captured.values[0]).toMatchObject({
-      userId: 1,
-      amount: plan.monthlyCredits,
-      type: "subscription",
-    });
-  });
-});
-
-// ─── P0.6a — Meta Purchase attribution ──────────────────────────────────────
 
 describe("checkout success_url attribution (P0.6a)", () => {
   it("pricing.subscribe (month) embeds value/currency/credits and the session placeholder", async () => {
@@ -530,5 +472,33 @@ describe("changePlan metadata", () => {
       plan_name: "studio", // updated
       billing_interval: "month", // preserved
     });
+  });
+});
+
+describe("plan changes preserve cadence and resume billing consistently", () => {
+  it("uses an annual target price and explicitly clears scheduled cancellation", async () => {
+    const sub = { id:1,userId:1,planId:2,stripeSubscriptionId:"sub_year",status:"active",cancelAtPeriodEnd:true };
+    const { db,captured } = makeDb({selectQueue:[[sub],[{id:1}],[planRow("creator")]]});
+    installDb(db);
+    stripeMocks.subscriptionsRetrieve.mockResolvedValue({metadata:{user_id:"1",billing_interval:"year"},cancel_at_period_end:true,items:{data:[{id:"si_year",price:{recurring:{interval:"year"}}}]}});
+    await caller.changePlan({newPlanName:"creator"});
+    expect(stripeMocks.subscriptionsUpdate).toHaveBeenCalledWith("sub_year",expect.objectContaining({items:[{id:"si_year",price:"price_creator_year"}],cancel_at_period_end:false,metadata:expect.objectContaining({billing_interval:"year"})}));
+    expect(captured.sets).toEqual(expect.arrayContaining([expect.objectContaining({cancelAtPeriodEnd:false})]));
+  });
+});
+
+describe("account cancellation billing completeness",()=>{
+  it("requires billing credentials for an account with a saved customer",async()=>{
+    delete process.env.STRIPE_SECRET_KEY;
+    await expect(cancelStripeSubscriptionsForCustomer("cus_existing")).rejects.toThrow("cancellation is unavailable");
+    expect(stripeMocks.subscriptionsList).not.toHaveBeenCalled();
+  });
+  it("cancels every page of billable subscriptions and skips terminal rows",async()=>{
+    stripeMocks.subscriptionsList.mockResolvedValueOnce({data:[{id:"sub_active",status:"active"},{id:"sub_old",status:"canceled"}],has_more:true})
+      .mockResolvedValueOnce({data:[{id:"sub_trial",status:"trialing"}],has_more:false});
+    stripeMocks.subscriptionsCancel.mockResolvedValue({});
+    await cancelStripeSubscriptionsForCustomer("cus_existing");
+    expect(stripeMocks.subscriptionsList).toHaveBeenLastCalledWith(expect.objectContaining({starting_after:"sub_old"}));
+    expect(stripeMocks.subscriptionsCancel.mock.calls.map(c=>c[0])).toEqual(["sub_active","sub_trial"]);
   });
 });

@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
+      "path": "/api/cron/media-cleanup",
+      "schedule": "17 * * * *"
+    },
+    {
       "path": "/api/cron/auto-degrade",
       "schedule": "*/5 * * * *"
     },

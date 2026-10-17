@@ -3,6 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { sanitizeErrorMessage } from "./errorSanitizer";
+import { withStorageOwner } from "./storageContext";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -49,8 +50,9 @@ function sanitizeReturnedErrors(data: unknown, depth = 0): unknown {
   return mutated ?? obj;
 }
 
-const sanitizeMiddleware = t.middleware(async ({ next }) => {
-  const result = await next();
+const sanitizeMiddleware = t.middleware(async ({ ctx, next }) => {
+  const user = ctx.user;
+  const result = await (user && user.loginMethod !== "deleted" ? withStorageOwner(user.id, () => next()) : next());
   if (result.ok) {
     return { ...result, data: sanitizeReturnedErrors(result.data) };
   }
@@ -71,16 +73,17 @@ export const publicProcedure = baseProcedure;
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
-  if (!ctx.user) {
+  if (!ctx.user || ctx.user.loginMethod === "deleted") {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
-  return next({
+  const user = ctx.user;
+  return withStorageOwner(user.id, () => next({
     ctx: {
       ...ctx,
-      user: ctx.user,
+      user,
     },
-  });
+  }));
 });
 
 export const protectedProcedure = baseProcedure.use(requireUser);
@@ -89,15 +92,16 @@ export const adminProcedure = baseProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== 'admin') {
+    if (!ctx.user || ctx.user.loginMethod === "deleted" || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
-    return next({
+    const user = ctx.user;
+    return withStorageOwner(user.id, () => next({
       ctx: {
         ...ctx,
-        user: ctx.user,
+        user,
       },
-    });
+    }));
   }),
 );

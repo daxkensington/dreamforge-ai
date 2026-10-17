@@ -140,7 +140,7 @@ describe("story.create", () => {
     // 5 (storyboard) + 4*5 (images) + 6 (music) = 31 — the user received nothing.
     expect(deductCredits).toHaveBeenCalledTimes(1);
     expect(refundCredits).toHaveBeenCalledTimes(1);
-    expect(refundCredits).toHaveBeenCalledWith(7, 31, expect.stringContaining("Refund"));
+    expect(refundCredits).toHaveBeenCalledWith(7, 31, expect.stringContaining("Refund"), expect.any(Object));
   });
 
   it("refunds the per-scene image cost for scenes that fail to render", async () => {
@@ -158,7 +158,7 @@ describe("story.create", () => {
     expect(res.scenes.filter((s: any) => s.imageUrl === null)).toHaveLength(1);
     // Exactly one of the four 5-credit scene images failed → refund 5, once.
     expect(refundCredits).toHaveBeenCalledTimes(1);
-    expect(refundCredits).toHaveBeenCalledWith(7, 5, expect.stringContaining("Refund"));
+    expect(refundCredits).toHaveBeenCalledWith(7, 5, expect.stringContaining("Refund"), expect.any(Object));
   });
 
   it("does not refund when every scene renders", async () => {

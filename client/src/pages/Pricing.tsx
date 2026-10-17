@@ -30,6 +30,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { CREDIT_PACKS } from "@shared/creditCosts";
+import { getTierConfig } from "@shared/tiers";
 import { CreditCalculator } from "@/components/CreditCalculator";
 
 /* -- Animation variants -- */
@@ -164,7 +165,7 @@ const faqs = [
   },
   {
     q: "What are credits and how do they work?",
-    a: "Credits are the universal currency for all AI operations on DreamForgeX. Different models cost different amounts -- a free-tier image costs 2 credits, a standard model costs 5, quality 10, premium 15, and ultra models cost 25 credits. Video generation ranges from 10 to 200 credits depending on the model.",
+    a: "Credits pay for AI operations on DreamForgeX. Each image model has its own credit cost and plan requirement. The current image model catalog below shows those exact prices; Workspace shows the selected model quote before generation. Video and tool prices vary by model and operation.",
   },
   {
     q: "Do unused credits roll over?",
@@ -192,7 +193,7 @@ const faqs = [
   },
   {
     q: "What models can I use on the free tier?",
-    a: "Free tier includes Flux Schnell via Cloudflare Workers AI and Together AI for images, Grok Image Gen, our self-hosted CogVideoX for video, and Edge TTS for speech — all running on infrastructure where the marginal cost is near zero. Premium models like Veo 3, Gemini Imagen, DALL-E 3, Flux Pro, Runway, Kling, and Minimax are available on Creator and Premium tiers, where the credit cost reflects the underlying API price.",
+    a: "Look for Explorer in the current image model catalog below. Other models require the displayed subscription tier or higher. Availability depends on provider configuration; an unavailable model cannot be selected for a new render. Grok Image Gen requires Creator or higher.",
   },
 ];
 
@@ -219,6 +220,8 @@ function packSavingsPercent(idx: number): string | null {
 /* ====================================================== */
 export default function Pricing() {
   const { isAuthenticated } = useAuth();
+  const imageModels = trpc.generation.imageModels.useQuery(undefined, { retry: 1 });
+  const videoModels = trpc.generation.videoModels.useQuery(undefined, { retry: 1 });
   const [billing, setBilling] = useState<BillingPeriod>("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
@@ -538,7 +541,7 @@ export default function Pricing() {
                       {(plan.tier === "free"
                         ? [
                             "50 credits / day (~1,500/mo)",
-                            "Free models only (Flux Schnell on Cloudflare/Together, Grok Image, CogVideoX self-hosted)",
+                            "Free-plan image models from the current catalog",
                             "5 songs / day (watermarked)",
                             "1 music video / day",
                             "1024px images / 480p video",
@@ -860,19 +863,15 @@ export default function Pricing() {
             >
               <h3 className="text-lg font-bold mb-4">Image Generation</h3>
               <div className="space-y-3">
-                {[
-                  { tier: "Free", models: "Gemini, Together, Cloudflare", credits: 2, color: "text-emerald-400" },
-                  { tier: "Standard", models: "Grok, fal Schnell, RunPod", credits: 5, color: "text-cyan-400" },
-                  { tier: "Quality", models: "fal Dev, Replicate, Seedream", credits: 10, color: "text-blue-400" },
-                  { tier: "Premium", models: "DALL-E 3, Flux Pro, Kontext Pro", credits: 15, color: "text-violet-400" },
-                  { tier: "Ultra", models: "DALL-E 3 HD, Flux Pro Ultra", credits: 25, color: "text-fuchsia-400" },
-                ].map((row) => (
-                  <div key={row.tier} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                    <div>
-                      <span className={`text-sm font-semibold ${row.color}`}>{row.tier}</span>
-                      <p className="text-xs text-muted-foreground">{row.models}</p>
+                {imageModels.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading current model prices…</p> : imageModels.isError ? (
+                  <div role="alert" className="text-sm space-y-2"><p>Current model prices could not be loaded.</p><Button variant="outline" size="sm" onClick={() => void imageModels.refetch()}>Retry prices</Button></div>
+                ) : imageModels.data?.map((model) => (
+                  <div key={model.id} className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0">
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold">{model.name}</span>
+                      <p className="text-xs text-muted-foreground">{getTierConfig(model.requiredTier).displayName}{model.requiredTier === "free" ? "" : "+"}{model.isConfigured ? "" : " · Unavailable"}</p>
                     </div>
-                    <span className="text-sm font-bold">{row.credits} cr</span>
+                    <span className="shrink-0 text-sm font-bold">{model.creditCost} cr</span>
                   </div>
                 ))}
               </div>
@@ -889,20 +888,12 @@ export default function Pricing() {
             >
               <h3 className="text-lg font-bold mb-4">Video Generation</h3>
               <div className="space-y-3">
-                {[
-                  { tier: "Free", models: "CogVideoX (self-hosted)", credits: 10, color: "text-emerald-400" },
-                  { tier: "Standard", models: "fal Wan 2.5", credits: 40, color: "text-cyan-400" },
-                  { tier: "Quality", models: "Kling 1.6, fal Kling", credits: 50, color: "text-blue-400" },
-                  { tier: "Premium", models: "Kling 2.0", credits: 75, color: "text-violet-400" },
-                  { tier: "Ultra", models: "Runway Gen-4.5, Gen-4 Turbo", credits: 200, color: "text-fuchsia-400" },
-                  { tier: "Veo 3", models: "Google Veo 3 (with audio)", credits: 350, color: "text-amber-400" },
-                ].map((row) => (
-                  <div key={row.tier} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                    <div>
-                      <span className={`text-sm font-semibold ${row.color}`}>{row.tier}</span>
-                      <p className="text-xs text-muted-foreground">{row.models}</p>
-                    </div>
-                    <span className="text-sm font-bold">{row.credits} cr</span>
+                {videoModels.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading current video prices…</p> : videoModels.isError ? (
+                  <div role="alert" className="text-sm space-y-2"><p>Current video prices could not be loaded.</p><Button variant="outline" size="sm" onClick={() => void videoModels.refetch()}>Retry video prices</Button></div>
+                ) : videoModels.data?.map(model => (
+                  <div key={model.id} className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0">
+                    <div className="min-w-0"><span className="text-sm font-semibold">{model.name}</span><p className="text-xs text-muted-foreground">{getTierConfig(model.requiredTier).displayName}+ · {model.supportedDurations.join(" / ")} seconds{model.isConfigured ? "" : " · Unavailable"}</p></div>
+                    <span className="shrink-0 text-sm font-bold">{model.creditCost} cr</span>
                   </div>
                 ))}
               </div>

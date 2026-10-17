@@ -14,6 +14,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["server/testNetworkGuard.ts"],
     // shared/ is included too — code there ships to both the server and the
     // browser, so a test that lives beside it must actually run rather than be
     // silently filtered out.
