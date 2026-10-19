@@ -67,12 +67,18 @@ export const test = base.extend<{ smokeGuard: void }>({
       // overrides would otherwise carry into a redirected request's origin.
       const toolbarHeaders = toolbarHeadersForRequest(target.origin, url.href);
       if (route.request().isNavigationRequest() && route.request().resourceType() === 'document' && Object.keys(toolbarHeaders).length) {
-        const response = await route.fetch({
-          headers: { ...route.request().headers(), ...toolbarHeaders },
-          maxRedirects: 0,
-          timeout: info.project.use.navigationTimeout ?? 110_000,
-        });
-        await route.fulfill({ response });
+        try {
+          const response = await route.fetch({
+            headers: { ...route.request().headers(), ...toolbarHeaders },
+            maxRedirects: 0,
+            timeout: info.project.use.navigationTimeout ?? 110_000,
+          });
+          await route.fulfill({ response });
+        } catch {
+          // Playwright call logs can include protected request details.
+          try { await route.abort(); } catch {}
+          throw new Error('Preview document request failed (request headers withheld)');
+        }
       } else {
         await route.continue();
       }
