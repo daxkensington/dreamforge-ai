@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type { UseCase } from "../../../shared/useCaseData";
 import { TOOL_SEO_COPY } from "../../../shared/toolSeoCopy";
+import { TOOL_SAMPLES } from "@/lib/toolSamples";
 
 export default function UseCasePage({ useCase }: { useCase: UseCase }) {
   return (
@@ -88,7 +89,7 @@ export default function UseCasePage({ useCase }: { useCase: UseCase }) {
                   <div className="aspect-[4/3] overflow-hidden bg-muted/30">
                     <img
                       loading="lazy"
-                      src={`/showcase/tool-${t.slug}.jpg`}
+                      src={TOOL_SAMPLES[t.slug]?.[0] || "/showcase/gallery-4.jpg"}
                       alt={title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => ((e.target as HTMLImageElement).src = "/showcase/gallery-4.jpg")}
