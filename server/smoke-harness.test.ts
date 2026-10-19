@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { smokeTarget, bypassHeaders, deployedRevision, assertDeployedHealth, workflowSmokeTarget, consumesAuthBudget, authBudgetDelay } from '../shared/smoke-target.mjs';
+import { smokeTarget, bypassHeaders, deployedRevision, assertDeployedHealth, workflowSmokeTarget, consumesAuthBudget, authBudgetDelay, toolbarHeadersForRequest } from '../shared/smoke-target.mjs';
 
 const sha = 'a'.repeat(40);
 const preview = 'https://dreamforgex-example-englandsfinest.vercel.app';
@@ -30,6 +30,29 @@ describe('deployed smoke target safety', () => {
   it('allows explicit dispatch replay source but does not interpolate URL input into shell', () => {
     expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).expected).toBe(sha);
     expect(() => workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:'https://dreamforgex.ai/$(command)'}},sha)).toThrow();
+  });
+});
+
+describe('request-scoped preview toolbar suppression', () => {
+  it('uses the documented non-secret header only for the exact validated preview', () => {
+    for (const request of [preview, preview + '/auth/signin?callbackUrl=synthetic', preview + '/_next/static/chunk.js']) {
+      expect(toolbarHeadersForRequest(preview, request)).toEqual({ 'x-vercel-skip-toolbar': '1' });
+    }
+  });
+  it.each([
+    'https://dreamforgex.ai/', 'https://www.dreamforgex.ai/',
+    'https://dreamforgex-other-englandsfinest.vercel.app/', 'https://attacker.example/',
+    'https://vercel.live/_next-live/feedback/feedback.js',
+    'https://user:pass@dreamforgex-example-englandsfinest.vercel.app/',
+    preview + ':8443/', preview + '/#fragment',
+  ])('does not send toolbar suppression to foreign or malformed recipients %s', request => {
+    expect(toolbarHeadersForRequest(preview, request)).toEqual({});
+  });
+  it('never changes production requests and refuses an unapproved smoke target', () => {
+    for (const target of ['https://dreamforgex.ai', 'https://www.dreamforgex.ai', 'https://genesis-synth-lab.vercel.app']) {
+      expect(toolbarHeadersForRequest(target, target + '/')).toEqual({});
+    }
+    expect(() => toolbarHeadersForRequest('https://attacker.example', 'https://attacker.example/')).toThrow();
   });
 });
 

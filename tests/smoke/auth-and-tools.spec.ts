@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { assertCanonicalSignIn } from '../../shared/smoke-target.mjs';
+import { assertSmokeSignIn } from '../../shared/smoke-target.mjs';
 
 /**
  * Auth-flow + tool-routing smoke tests — verifies that auth-gated routes
@@ -10,15 +10,14 @@ import { assertCanonicalSignIn } from '../../shared/smoke-target.mjs';
 const AUTH_GATED = ["/profile", "/credits", "/api-keys", "/notifications", "/admin"];
 
 for (const path of AUTH_GATED) {
-  test(`${path} requires auth`, async ({ page }) => {
+  test(`${path} requires auth`, async ({ page, baseURL }) => {
     const response = await page.goto(path, { waitUntil: "domcontentloaded" });
     expect(response).toBeTruthy();
     expect(response!.status()).toBeLessThan(400);
     await expect(page).toHaveURL(url => url.pathname === '/auth/signin');
-    // The existing Production AUTH_URL intentionally stays canonical during
-    // protected staging. Preflight compares the actual canonical auth source;
-    // final production smoke exercises sign-in on the same merged deployment.
-    assertCanonicalSignIn(page.url(), path);
+    // Bind both the sign-in page and its exact original callback to this
+    // validated preview origin; public production remains strictly canonical.
+    assertSmokeSignIn(page.url(), path, baseURL);
     await expect(page.getByRole('heading', { name: 'DreamForge', exact: true })).toBeVisible();
     await expect(page.getByText('Sign in to start creating', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();

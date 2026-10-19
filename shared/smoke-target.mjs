@@ -23,20 +23,41 @@ export function deployedRevision(value) {
 
 export const CANONICAL_AUTH_ORIGIN = 'https://dreamforgex.ai';
 
-/** Production-config staging intentionally uses the existing AUTH_URL. */
-export function assertCanonicalSignIn(input, originalPath) {
+function assertSignInAtOrigin(input, originalPath, expectedOrigin) {
   if (!gated.has(originalPath)) throw new Error('Unrecognized gated smoke path');
   const url = new URL(input);
-  if (url.origin !== CANONICAL_AUTH_ORIGIN || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
-    throw new Error('Sign-in must use the existing canonical auth origin and exact path');
+  if (url.origin !== expectedOrigin || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
+    throw new Error('Sign-in must use the expected auth origin and exact path');
   }
   if ([...url.searchParams.keys()].length !== 1 || !url.searchParams.has('callbackUrl')) {
-    throw new Error('Sign-in must retain exactly the original canonical callback');
+    throw new Error('Sign-in must retain exactly the original callback');
   }
   const callback = new URL(url.searchParams.get('callbackUrl'));
-  if (callback.origin !== CANONICAL_AUTH_ORIGIN || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
-    throw new Error('Sign-in callback does not match the original canonical gated path');
+  if (callback.origin !== expectedOrigin || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
+    throw new Error('Sign-in callback does not match the original gated path and auth origin');
   }
+}
+
+/** Production must retain its canonical sign-in and exact callback contract. */
+export function assertCanonicalSignIn(input, originalPath) {
+  assertSignInAtOrigin(input, originalPath, CANONICAL_AUTH_ORIGIN);
+}
+
+/** Protected previews authenticate on that exact validated deployment origin. */
+export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_AUTH_ORIGIN) {
+  const target = smokeTarget(targetInput);
+  assertSignInAtOrigin(input, originalPath, target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN);
+}
+
+/**
+ * Vercel's documented request-scoped automation opt-out; no app/CSP changes.
+ * @returns {Record<string, string>}
+ */
+export function toolbarHeadersForRequest(targetInput, requestInput) {
+  const target = smokeTarget(targetInput);
+  const request = new URL(requestInput);
+  if (!target.protectedTarget || request.origin !== target.origin || request.username || request.password || request.hash) return {};
+  return { 'x-vercel-skip-toolbar': '1' };
 }
 
 export function assertDeployedHealth(status, type, body, expected) {
