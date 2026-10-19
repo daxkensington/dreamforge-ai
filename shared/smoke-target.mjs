@@ -49,17 +49,6 @@ export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_A
   assertSignInAtOrigin(input, originalPath, target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN);
 }
 
-/**
- * Vercel's documented request-scoped automation opt-out; no app/CSP changes.
- * @returns {Record<string, string>}
- */
-export function toolbarHeadersForRequest(targetInput, requestInput) {
-  const target = smokeTarget(targetInput);
-  const request = new URL(requestInput);
-  if (!target.protectedTarget || request.origin !== target.origin || request.username || request.password || request.hash) return {};
-  return { 'x-vercel-skip-toolbar': '1' };
-}
-
 export function assertDeployedHealth(status, type, body, expected) {
   if (status !== 200 || !type?.includes('application/json') || body?.ok !== true) {
     throw new Error('Smoke target is not the healthy DreamForge app (deployment protection is not app acceptance)');

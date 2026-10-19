@@ -1,7 +1,7 @@
 import { test as base, expect, request as apiRequest } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay, CANONICAL_AUTH_ORIGIN, toolbarHeadersForRequest } from '../../shared/smoke-target.mjs';
+import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay, CANONICAL_AUTH_ORIGIN } from '../../shared/smoke-target.mjs';
 
 let queue: Promise<void> = Promise.resolve();
 
@@ -18,7 +18,7 @@ export const test = base.extend<{ smokeGuard: void }>({
         let result;
         try {
           result = await bootstrap.get(target.origin + '/', {
-            headers: { ...bypassHeaders(target, process.env.VERCEL_AUTOMATION_BYPASS_SECRET), ...toolbarHeadersForRequest(target.origin, target.origin), 'x-vercel-set-bypass-cookie': 'true' },
+            headers: { ...bypassHeaders(target, process.env.VERCEL_AUTOMATION_BYPASS_SECRET), 'x-vercel-set-bypass-cookie': 'true' },
             maxRedirects: 0,
           });
         } catch { throw new Error('Deployment bypass request failed (request headers withheld)'); }
@@ -61,27 +61,7 @@ export const test = base.extend<{ smokeGuard: void }>({
         queue = turn;
         await turn;
       }
-      // https://vercel.com/docs/vercel-toolbar/managing-toolbar#disable-toolbar-for-automation
-      // Suppress platform UI on exact-preview document navigations only. Fetch
-      // one unmodified response without following redirects: continue() header
-      // overrides would otherwise carry into a redirected request's origin.
-      const toolbarHeaders = toolbarHeadersForRequest(target.origin, url.href);
-      if (route.request().isNavigationRequest() && route.request().resourceType() === 'document' && Object.keys(toolbarHeaders).length) {
-        try {
-          const response = await route.fetch({
-            headers: { ...route.request().headers(), ...toolbarHeaders },
-            maxRedirects: 0,
-            timeout: info.project.use.navigationTimeout ?? 110_000,
-          });
-          await route.fulfill({ response });
-        } catch {
-          // Playwright call logs can include protected request details.
-          try { await route.abort(); } catch {}
-          throw new Error('Preview document request failed (request headers withheld)');
-        }
-      } else {
-        await route.continue();
-      }
+      await route.continue(); // real traffic, with existing app security untouched
     });
     await use();
   }, { auto: true }],
