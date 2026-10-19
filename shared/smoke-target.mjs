@@ -51,12 +51,18 @@ export function assertCanonicalSignIn(input, originalPath) {
  * @param {string} [authOrigin]
  */
 export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_AUTH_ORIGIN, authOrigin = undefined) {
+  const contract = smokeAuthContract(targetInput, authOrigin);
+  assertSignInAtOrigin(input, originalPath, contract.origin);
+}
+
+/** Select source/behavior claims from the same validated target auth origin. */
+export function smokeAuthContract(targetInput = CANONICAL_AUTH_ORIGIN, authOrigin = undefined) {
   const target = smokeTarget(targetInput);
   const expectedOrigin = target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN;
   if (authOrigin !== undefined && authOrigin !== expectedOrigin) {
     throw new Error('Explicit auth expectation must equal the validated target auth origin');
   }
-  assertSignInAtOrigin(input, originalPath, expectedOrigin);
+  return { mode: target.protectedTarget ? 'own-origin-preview' : 'canonical', origin: expectedOrigin };
 }
 
 export function assertDeployedHealth(status, type, body, expected) {
