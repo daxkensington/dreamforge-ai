@@ -1,4 +1,10 @@
 import { test, expect } from "./fixtures";
+import { smokeTarget } from "../../shared/smoke-target.mjs";
+import {
+  assertHomepageCsp,
+  classifyHomepageConsole,
+  PREVIEW_PLATFORM_LOADER,
+} from "./console-policy.mjs";
 
 /**
  * Public-page smoke tests — verifies that the pages anyone can reach without
@@ -205,18 +211,58 @@ test("no broken images on homepage", async ({ page }) => {
   expect(broken, `broken images:\n${broken.join("\n")}`).toEqual([]);
 });
 
-test("no console errors on homepage", async ({ page }) => {
+test("homepage enforces the audited Content Security Policy", async ({ page, baseURL }) => {
+  const target = smokeTarget(baseURL || "https://dreamforgex.ai");
+  // Only anonymous www has a source-defined public homepage redirect. Other
+  // supported targets must retain their exact requested document origin.
+  const expectedUrl = (target.origin === "https://www.dreamforgex.ai"
+    ? "https://dreamforgex.ai" : target.origin) + "/";
+  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
+  expect(response).toBeTruthy();
+  expect(response!.status()).toBe(200);
+  expect(response!.url()).toBe(expectedUrl);
+  expect(page.url()).toBe(expectedUrl);
+  assertHomepageCsp({
+    enforced: await response!.headerValues("content-security-policy"),
+    reportOnly: await response!.headerValues("content-security-policy-report-only"),
+  });
+});
+
+test("no application console errors on homepage", async ({ page, baseURL }, testInfo) => {
   const errors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
   page.on("console", msg => {
     if (msg.type() === "error") {
-      const text = msg.text();
-      // Filter known third-party noise we don't control.
-      if (text.includes("Sentry") && text.includes("DSN")) return;
-      if (text.includes("favicon")) return;
-      errors.push(text);
+      errors.push(msg.text());
     }
   });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
+  expect(response).toBeTruthy();
+  expect(response!.status()).toBeLessThan(400);
   await page.waitForTimeout(2500);
-  expect(errors, `console errors:\n${errors.join("\n")}`).toEqual([]);
+  const result = classifyHomepageConsole(errors, {
+    targetInput: baseURL || "https://dreamforgex.ai",
+    responseUrl: response!.url(),
+    documentUrl: page.url(),
+    policy: {
+      enforced: await response!.headerValues("content-security-policy"),
+      reportOnly: await response!.headerValues("content-security-policy-report-only"),
+    },
+  });
+  if (result.knownPreviewBlockages.length) {
+    const description = `${result.knownPreviewBlockages.length} known preview loader CSP message(s); audited policy remains enforced. Signature classification is not proof of injection provenance.`;
+    testInfo.annotations.push({ type: "known-preview-platform-csp", description });
+    await testInfo.attach("known-preview-platform-csp.json", {
+      body: JSON.stringify({
+        description,
+        loader: PREVIEW_PLATFORM_LOADER,
+        messages: result.knownPreviewBlockages,
+      }, null, 2),
+      contentType: "application/json",
+    });
+    console.warn(description);
+  }
+  expect(result.errors, `application console errors:\n${result.errors.join("\n")}`).toEqual([]);
+  expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
 });
