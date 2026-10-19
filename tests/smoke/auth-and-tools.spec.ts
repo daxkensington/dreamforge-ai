@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { assertSmokeSignIn, smokeTarget } from '../../shared/smoke-target.mjs';
+import { assertSmokeSignIn } from '../../shared/smoke-target.mjs';
 
 /**
  * Auth-flow + tool-routing smoke tests — verifies that auth-gated routes
@@ -15,9 +15,9 @@ for (const path of AUTH_GATED) {
     expect(response).toBeTruthy();
     expect(response!.status()).toBeLessThan(400);
     await expect(page).toHaveURL(url => url.pathname === '/auth/signin');
-    // Deployment previews retain their exact verified origin. Production and
-    // explicit production-config staging retain the strict canonical contract.
-    assertSmokeSignIn(page.url(), path, smokeTarget(baseURL || 'https://dreamforgex.ai'), process.env.EXPECTED_AUTH_ORIGIN);
+    // Bind both the sign-in page and its exact original callback to this
+    // validated preview origin; public production remains strictly canonical.
+    assertSmokeSignIn(page.url(), path, baseURL, process.env.EXPECTED_AUTH_ORIGIN);
     await expect(page.getByRole('heading', { name: 'DreamForge', exact: true })).toBeVisible();
     await expect(page.getByText('Sign in to start creating', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();

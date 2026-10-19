@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertCanonicalSignIn } from '../shared/smoke-target.mjs';
+import { assertCanonicalSignIn, assertSmokeSignIn } from '../shared/smoke-target.mjs';
 import { CANONICAL_AUTH_PATHS, checkCanonicalAuth, gitBlobId } from '../scripts/check-canonical-auth.mjs';
 
 const revision = 'a'.repeat(40), treeSha = 'b'.repeat(40);
@@ -37,6 +37,44 @@ describe('actual canonical sign-in URL contract', () => {
     ['https://dreamforgex.ai/auth/signin?callbackUrl=https://dreamforgex.ai/other', '/other'],
   ])('refuses recipient, callback, or path drift %s', (url, path) => {
     expect(() => assertCanonicalSignIn(url, path)).toThrow();
+  });
+});
+
+describe('exact deployed sign-in URL contract', () => {
+  const preview = 'https://dreamforgex-example-englandsfinest.vercel.app';
+  const otherPreview = 'https://dreamforgex-other-englandsfinest.vercel.app';
+  const signIn = (origin: string, callback: string) => origin + '/auth/signin?callbackUrl=' + encodeURIComponent(callback);
+
+  it.each(['/profile', '/credits', '/api-keys', '/notifications', '/admin'])('binds preview sign-in and callback to the exact target for %s', path => {
+    expect(() => assertSmokeSignIn(signIn(preview, preview + path), path, preview)).not.toThrow();
+  });
+  it('retains strict canonical production checks, including public aliases', () => {
+    for (const target of ['https://dreamforgex.ai', 'https://www.dreamforgex.ai', 'https://genesis-synth-lab.vercel.app']) {
+      expect(() => assertSmokeSignIn(signIn('https://dreamforgex.ai', 'https://dreamforgex.ai/profile'), '/profile', target)).not.toThrow();
+      expect(() => assertSmokeSignIn(signIn(preview, preview + '/profile'), '/profile', target)).toThrow();
+    }
+    expect(() => assertCanonicalSignIn(signIn(preview, preview + '/profile'), '/profile')).toThrow();
+  });
+  it.each([
+    [otherPreview, preview + '/profile'],
+    [preview, otherPreview + '/profile'],
+    ['https://dreamforgex.ai', 'https://dreamforgex.ai/profile'],
+    ['https://attacker.example', preview + '/profile'],
+    [preview, 'https://attacker.example/profile'],
+    [preview.replace('https://', 'https://user:pass@'), preview + '/profile'],
+    [preview, preview.replace('https://', 'https://user:pass@') + '/profile'],
+    [preview, preview + '/admin'],
+    [preview, preview + '/profile?input=synthetic'],
+    [preview, preview + '/profile#fragment'],
+  ])('rejects foreign origins, userinfo and callback drift %s %s', (origin, callback) => {
+    expect(() => assertSmokeSignIn(signIn(origin, callback), '/profile', preview)).toThrow();
+  });
+  it.each(['#fragment', '&extra=synthetic', '&callbackUrl=duplicate'])('rejects sign-in fragment or extra queries %s', suffix => {
+    expect(() => assertSmokeSignIn(signIn(preview, preview + '/profile') + suffix, '/profile', preview)).toThrow();
+  });
+  it('rejects unapproved targets and non-gated paths', () => {
+    expect(() => assertSmokeSignIn(signIn(preview, preview + '/profile'), '/profile', 'https://attacker.example')).toThrow();
+    expect(() => assertSmokeSignIn(signIn(preview, preview + '/other'), '/other', preview)).toThrow();
   });
 });
 

@@ -29,7 +29,7 @@ describe('deployed smoke target safety', () => {
   });
   it('allows explicit dispatch replay source but does not interpolate URL input into shell', () => {
     expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).expected).toBe(sha);
-    expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).authOrigin).toBe('https://dreamforgex.ai');
+    expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).authOrigin).toBe(preview);
     expect(() => workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:'https://dreamforgex.ai/$(command)'}},sha)).toThrow();
   });
 });

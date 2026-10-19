@@ -1,7 +1,7 @@
 import { test as base, expect, request as apiRequest } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay, CANONICAL_AUTH_ORIGIN, previewToolbarHeaders } from '../../shared/smoke-target.mjs';
+import { smokeTarget, bypassHeaders, consumesAuthBudget, authBudgetDelay, CANONICAL_AUTH_ORIGIN } from '../../shared/smoke-target.mjs';
 
 let queue: Promise<void> = Promise.resolve();
 
@@ -61,11 +61,7 @@ export const test = base.extend<{ smokeGuard: void }>({
         queue = turn;
         await turn;
       }
-      // Prevent Vercel's injected feedback script from conflicting with the
-      // unchanged app CSP. This documented non-secret header is exact-origin.
-      const toolbarHeaders = previewToolbarHeaders(target, url.href);
-      await route.continue(Object.keys(toolbarHeaders).length
-        ? { headers: { ...route.request().headers(), ...toolbarHeaders } } : undefined);
+      await route.continue(); // real traffic, with existing app security untouched
     });
     await use();
   }, { auto: true }],

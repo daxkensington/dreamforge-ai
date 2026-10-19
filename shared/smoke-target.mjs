@@ -23,62 +23,40 @@ export function deployedRevision(value) {
 
 export const CANONICAL_AUTH_ORIGIN = 'https://dreamforgex.ai';
 
-/** Production-config staging intentionally uses the existing AUTH_URL. */
-export function assertCanonicalSignIn(input, originalPath) {
-  assertExactSignIn(input, originalPath, CANONICAL_AUTH_ORIGIN);
-}
-
-/** Preview callbacks must remain on the exact source-verified smoke origin. */
-export function assertSmokeSignIn(input, originalPath, target, authOrigin = CANONICAL_AUTH_ORIGIN) {
-  const verified = smokeTarget(target.origin);
-  if (authOrigin === CANONICAL_AUTH_ORIGIN) return assertCanonicalSignIn(input, originalPath);
-  if (!verified.protectedTarget || authOrigin !== verified.origin) {
-    throw new Error('Preview auth expectation must equal the exact verified preview origin');
-  }
-  assertExactSignIn(input, originalPath, verified.origin);
-}
-
-function assertExactSignIn(input, originalPath, origin) {
+function assertSignInAtOrigin(input, originalPath, expectedOrigin) {
   if (!gated.has(originalPath)) throw new Error('Unrecognized gated smoke path');
   const url = new URL(input);
-  if (url.origin !== origin || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
-    throw new Error('Sign-in must use the exact expected auth origin and path');
+  if (url.origin !== expectedOrigin || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
+    throw new Error('Sign-in must use the expected auth origin and exact path');
   }
   if ([...url.searchParams.keys()].length !== 1 || !url.searchParams.has('callbackUrl')) {
     throw new Error('Sign-in must retain exactly the original callback');
   }
   const callback = new URL(url.searchParams.get('callbackUrl'));
-  if (callback.origin !== origin || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
-    throw new Error('Sign-in callback does not match the exact original gated path');
+  if (callback.origin !== expectedOrigin || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
+    throw new Error('Sign-in callback does not match the original gated path and auth origin');
   }
 }
 
-/**
- * Vercel's documented non-secret E2E header; never attach it to another origin.
- * @returns {Record<string, string>}
- */
-export function previewToolbarHeaders(target, requestUrl) {
-  const verified = smokeTarget(target.origin);
-  return verified.protectedTarget && new URL(requestUrl).origin === verified.origin
-    ? { 'x-vercel-skip-toolbar': '1' } : {};
+/** Production must retain its canonical sign-in and exact callback contract. */
+export function assertCanonicalSignIn(input, originalPath) {
+  assertSignInAtOrigin(input, originalPath, CANONICAL_AUTH_ORIGIN);
 }
 
-// Exact observed engine messages from fresh preview smoke, not arbitrary CSP
-// errors or another script. Keep production's zero-console-error contract.
-const previewToolbarCspMessages = new Set([
-  `Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' https://connect.facebook.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.`,
-  'Refused to load https://vercel.live/_next-live/feedback/feedback.js because it does not appear in the script-src directive of the Content Security Policy.',
-]);
-
-export function isPreviewToolbarCspCollision(message, target, finalDocumentUrl) {
-  if (typeof message !== 'string') return false;
-  try {
-    const verified = smokeTarget(target.origin);
-    const documentUrl = new URL(finalDocumentUrl);
-    return verified.protectedTarget && documentUrl.origin === verified.origin
-      && !documentUrl.username && !documentUrl.password
-      && previewToolbarCspMessages.has(message);
-  } catch { return false; }
+/**
+ * Protected previews authenticate on that exact validated deployment origin.
+ * @param {string} input
+ * @param {string} originalPath
+ * @param {string} [targetInput]
+ * @param {string} [authOrigin]
+ */
+export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_AUTH_ORIGIN, authOrigin = undefined) {
+  const target = smokeTarget(targetInput);
+  const expectedOrigin = target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN;
+  if (authOrigin !== undefined && authOrigin !== expectedOrigin) {
+    throw new Error('Explicit auth expectation must equal the validated target auth origin');
+  }
+  assertSignInAtOrigin(input, originalPath, expectedOrigin);
 }
 
 export function assertDeployedHealth(status, type, body, expected) {
@@ -99,7 +77,7 @@ export function workflowSmokeTarget(eventName, event, githubSha) {
   const expected = deploymentEvent ? event.deployment?.sha : event.inputs?.expected_sha || githubSha;
   if (!deployedRevision(expected)) throw new Error('Expected deployment source must be an exact Git commit SHA');
   const target = smokeTarget(input);
-  return { ...target, expected, authOrigin: deploymentEvent && !production && target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN };
+  return { ...target, expected, authOrigin: target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN };
 }
 
 const gated = new Set(['/profile', '/credits', '/api-keys', '/notifications', '/admin']);
