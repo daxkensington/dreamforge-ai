@@ -17,7 +17,7 @@ for (const path of AUTH_GATED) {
     await expect(page).toHaveURL(url => url.pathname === '/auth/signin');
     // Bind both the sign-in page and its exact original callback to this
     // validated preview origin; public production remains strictly canonical.
-    assertSmokeSignIn(page.url(), path, baseURL);
+    assertSmokeSignIn(page.url(), path, baseURL, process.env.EXPECTED_AUTH_ORIGIN);
     await expect(page.getByRole('heading', { name: 'DreamForge', exact: true })).toBeVisible();
     await expect(page.getByText('Sign in to start creating', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();

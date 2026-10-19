@@ -56,6 +56,7 @@ describe('transparent known protected-preview CSP message classification', () =>
     preview + ':8443/',
     preview.replace('https://', 'http://') + '/',
     preview.replace('https://', 'https://user:pass@') + '/',
+    'not-a-url',
   ])('does not classify after any response or document URL drift %s', url => {
     for (const key of ['responseUrl', 'documentUrl'] as const) {
       const result = classifyHomepageConsole([chromiumBlock], { ...context(), [key]: url });
@@ -73,6 +74,9 @@ describe('transparent known protected-preview CSP message classification', () =>
     chromiumBlock.replace('https://vercel.live/', 'https://attacker.example/'),
     chromiumBlock.replace('feedback.js', 'other.js'),
     chromiumBlock.replace('feedback.js', 'feedback.js?input=synthetic'),
+    chromiumBlock.replace('feedback.js', 'feedback.js/'),
+    chromiumBlock.replace('feedback.js', 'feedback.js#fragment'),
+    chromiumBlock.replace('https://vercel.live/', 'https://vercel.live:8443/'),
     chromiumBlock.replace('https://vercel.live/', 'http://vercel.live/'),
     chromiumBlock.replace('https://vercel.live/', 'https://user:pass@vercel.live/'),
     chromiumBlock.replace('https://vercel.live/', 'https://vercel.live.attacker.example/'),
@@ -80,6 +84,9 @@ describe('transparent known protected-preview CSP message classification', () =>
     chromiumBlock.replace('has been blocked', 'has been allowed'),
     'Application console error: ' + chromiumBlock,
     webkitBlock + ' Additional application error.',
+    webkitBlock + ' ',
+    webkitBlock.replace('script-src directive', 'connect-src directive'),
+    chromiumBlock + '\nTypeError: application handler failed',
     'Failed to load resource: https://vercel.live/_next-live/feedback/feedback.js',
     'TypeError: application exception',
     'Application favicon loader failed',

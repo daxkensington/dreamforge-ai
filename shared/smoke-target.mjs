@@ -43,10 +43,20 @@ export function assertCanonicalSignIn(input, originalPath) {
   assertSignInAtOrigin(input, originalPath, CANONICAL_AUTH_ORIGIN);
 }
 
-/** Protected previews authenticate on that exact validated deployment origin. */
-export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_AUTH_ORIGIN) {
+/**
+ * Protected previews authenticate on that exact validated deployment origin.
+ * @param {string} input
+ * @param {string} originalPath
+ * @param {string} [targetInput]
+ * @param {string} [authOrigin]
+ */
+export function assertSmokeSignIn(input, originalPath, targetInput = CANONICAL_AUTH_ORIGIN, authOrigin = undefined) {
   const target = smokeTarget(targetInput);
-  assertSignInAtOrigin(input, originalPath, target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN);
+  const expectedOrigin = target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN;
+  if (authOrigin !== undefined && authOrigin !== expectedOrigin) {
+    throw new Error('Explicit auth expectation must equal the validated target auth origin');
+  }
+  assertSignInAtOrigin(input, originalPath, expectedOrigin);
 }
 
 export function assertDeployedHealth(status, type, body, expected) {
@@ -66,7 +76,8 @@ export function workflowSmokeTarget(eventName, event, githubSha) {
     : (eventName === 'workflow_dispatch' ? event.inputs?.base_url || 'https://dreamforgex.ai' : 'https://dreamforgex.ai');
   const expected = deploymentEvent ? event.deployment?.sha : event.inputs?.expected_sha || githubSha;
   if (!deployedRevision(expected)) throw new Error('Expected deployment source must be an exact Git commit SHA');
-  return { ...smokeTarget(input), expected };
+  const target = smokeTarget(input);
+  return { ...target, expected, authOrigin: target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN };
 }
 
 const gated = new Set(['/profile', '/credits', '/api-keys', '/notifications', '/admin']);
