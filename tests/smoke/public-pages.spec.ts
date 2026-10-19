@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { isPreviewToolbarCspCollision, previewToolbarHeaders, smokeTarget } from "../../shared/smoke-target.mjs";
+import { isPreviewToolbarCspCollision, smokeTarget } from "../../shared/smoke-target.mjs";
 
 /**
  * Public-page smoke tests — verifies that the pages anyone can reach without
@@ -124,19 +124,8 @@ test("no console errors on homepage", async ({ page, baseURL }) => {
   await page.waitForTimeout(2500);
   const unexpectedErrors = errors.filter(error => !isPreviewToolbarCspCollision(error, target, page.url()));
   if (target.protectedTarget) {
-    // This is Playwright's request-header observation, not an independent
-    // on-wire capture: routed overrides may differ from this API's view.
-    // Consume headers/HTML in memory and emit only booleans/finite counts.
-    const headers = response ? await response.request().allHeaders() : {};
-    const html = response ? await response.text() : "";
-    const isFeedbackScript = (input: string) => {
-      try {
-        const url = new URL(input, target.origin);
-        return url.origin === "https://vercel.live" && url.pathname === "/_next-live/feedback/feedback.js";
-      } catch { return false; }
-    };
-    const htmlScriptCount = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
-      .filter(match => isFeedbackScript(match[1])).length;
+    // Historical cause diagnostics are retained separately. Keep only finite
+    // current DOM/status observations; response bodies can expire in WebKit.
     const domScriptCount = await page.locator("script[src]").evaluateAll(scripts => scripts.filter(script => {
       try {
         const url = new URL(script.getAttribute("src") || "", location.href);
@@ -146,12 +135,9 @@ test("no console errors on homepage", async ({ page, baseURL }) => {
     const feedbackCspCount = errors.filter(text => text.includes("https://vercel.live/_next-live/feedback/feedback.js")
       && text.includes("Content Security Policy") && text.includes("script-src")).length;
     console.log("Preview toolbar document diagnostics", JSON.stringify({
-      intended_skip_header_present: previewToolbarHeaders(target, target.origin + "/")["x-vercel-skip-toolbar"] === "1",
-      playwright_document_request_skip_header_observed: headers["x-vercel-skip-toolbar"] === "1",
       final_document_same_origin: new URL(page.url()).origin === target.origin
         && !!response && new URL(response.url()).origin === target.origin,
       final_document_http_status: response?.status() || 0,
-      feedback_script_main_html_count: htmlScriptCount,
       feedback_script_dom_count: domScriptCount,
       exact_feedback_csp_signature_count: feedbackCspCount,
       classified_preview_toolbar_csp_count: errors.length - unexpectedErrors.length,
