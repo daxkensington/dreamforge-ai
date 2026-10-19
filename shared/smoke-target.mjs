@@ -63,6 +63,24 @@ export function previewToolbarHeaders(target, requestUrl) {
     ? { 'x-vercel-skip-toolbar': '1' } : {};
 }
 
+// Exact observed engine messages from fresh preview smoke, not arbitrary CSP
+// errors or another script. Keep production's zero-console-error contract.
+const previewToolbarCspMessages = new Set([
+  `Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' https://connect.facebook.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.`,
+  'Refused to load https://vercel.live/_next-live/feedback/feedback.js because it does not appear in the script-src directive of the Content Security Policy.',
+]);
+
+export function isPreviewToolbarCspCollision(message, target, finalDocumentUrl) {
+  if (typeof message !== 'string') return false;
+  try {
+    const verified = smokeTarget(target.origin);
+    const documentUrl = new URL(finalDocumentUrl);
+    return verified.protectedTarget && documentUrl.origin === verified.origin
+      && !documentUrl.username && !documentUrl.password
+      && previewToolbarCspMessages.has(message);
+  } catch { return false; }
+}
+
 export function assertDeployedHealth(status, type, body, expected) {
   if (status !== 200 || !type?.includes('application/json') || body?.ok !== true) {
     throw new Error('Smoke target is not the healthy DreamForge app (deployment protection is not app acceptance)');

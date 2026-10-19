@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { previewToolbarHeaders, smokeTarget } from "../../shared/smoke-target.mjs";
+import { isPreviewToolbarCspCollision, previewToolbarHeaders, smokeTarget } from "../../shared/smoke-target.mjs";
 
 /**
  * Public-page smoke tests — verifies that the pages anyone can reach without
@@ -122,6 +122,7 @@ test("no console errors on homepage", async ({ page, baseURL }) => {
   const target = smokeTarget(baseURL || "https://dreamforgex.ai");
   const response = await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2500);
+  const unexpectedErrors = errors.filter(error => !isPreviewToolbarCspCollision(error, target, page.url()));
   if (target.protectedTarget) {
     // This is Playwright's request-header observation, not an independent
     // on-wire capture: routed overrides may differ from this API's view.
@@ -153,8 +154,9 @@ test("no console errors on homepage", async ({ page, baseURL }) => {
       feedback_script_main_html_count: htmlScriptCount,
       feedback_script_dom_count: domScriptCount,
       exact_feedback_csp_signature_count: feedbackCspCount,
+      classified_preview_toolbar_csp_count: errors.length - unexpectedErrors.length,
       other_console_error_count: errors.length - feedbackCspCount,
     }));
   }
-  expect(errors, `console errors:\n${errors.join("\n")}`).toEqual([]);
+  expect(unexpectedErrors, `console errors:\n${unexpectedErrors.join("\n")}`).toEqual([]);
 });
