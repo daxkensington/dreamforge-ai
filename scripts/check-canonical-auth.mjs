@@ -1,8 +1,12 @@
 import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { CANONICAL_AUTH_ORIGIN, smokeAuthContract, smokeTarget } from '../shared/smoke-target.mjs';
 
 export const CANONICAL_AUTH_PATHS = Object.freeze([
   'middleware.ts', 'client/src/lib/auth.ts', 'app/auth/signin/page.tsx', 'shared/returnTo.ts',
+]);
+export const MATERIAL_AUTH_PATHS = Object.freeze([
+  'middleware.ts', 'client/src/lib/auth.ts', 'shared/returnTo.ts',
 ]);
 const repo = 'https://api.github.com/repos/daxkensington/dreamforge-ai';
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
@@ -11,7 +15,9 @@ export function gitBlobId(bytes) {
 }
 
 /** Public immutable source metadata only. No token, cookies, or app requests. */
-export async function checkCanonicalAuth({ fetcher = fetch, readSource = path => fs.readFile(new URL('../' + path, import.meta.url)) } = {}) {
+export async function checkCanonicalAuth({ fetcher = fetch, readSource = path => fs.readFile(new URL('../' + path, import.meta.url)), target = smokeTarget(CANONICAL_AUTH_ORIGIN), authOrigin = CANONICAL_AUTH_ORIGIN } = {}) {
+  const contract = smokeAuthContract(target.origin, authOrigin);
+  const paths = contract.mode === 'canonical' ? CANONICAL_AUTH_PATHS : MATERIAL_AUTH_PATHS;
   const read = async path => {
     const response = await fetcher(repo + path, {
       method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(15_000),
@@ -28,7 +34,7 @@ export async function checkCanonicalAuth({ fetcher = fetch, readSource = path =>
   const tree = await read('/git/trees/' + commit.tree.sha + '?recursive=1');
   if (tree.sha !== commit.tree.sha || tree.truncated !== false || !Array.isArray(tree.tree)) throw new Error('Canonical auth immutable source tree incomplete');
   const pins = [];
-  for (const path of CANONICAL_AUTH_PATHS) {
+  for (const path of paths) {
     const matches = tree.tree.filter(row => row.path === path);
     if (matches.length !== 1 || matches[0].type !== 'blob' || !['100644', '100755'].includes(matches[0].mode) || !sha(matches[0].sha)) throw new Error('Canonical auth required source file missing');
     const bytes = await readSource(path);
@@ -39,5 +45,15 @@ export async function checkCanonicalAuth({ fetcher = fetch, readSource = path =>
   }
   const finalRef = await read('/git/ref/heads/main');
   if (finalRef.ref !== 'refs/heads/main' || finalRef.object?.type !== 'commit' || finalRef.object?.sha !== revision) throw new Error('Canonical auth main changed during preflight');
-  return { canonicalOrigin: 'https://dreamforgex.ai', canonicalMainRevision: revision, canonicalMainAuthSourceMatchesCandidate: true, pins };
+  return {
+    canonicalOrigin: CANONICAL_AUTH_ORIGIN,
+    canonicalMainRevision: revision,
+    authMode: contract.mode,
+    expectedAuthOrigin: contract.origin,
+    canonicalMainAuthSourceMatchesCandidate: contract.mode === 'canonical' ? true : null,
+    canonicalMainMaterialAuthSourceMatchesCandidate: true,
+    signInUiSourceCompared: contract.mode === 'canonical',
+    previewUiBehaviorAcceptanceRequired: contract.mode === 'own-origin-preview',
+    pins,
+  };
 }

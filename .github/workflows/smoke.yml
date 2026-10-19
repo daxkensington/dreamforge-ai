@@ -79,6 +79,7 @@ jobs:
       - name: Verify deployed source and app health
         env:
           BASE_URL: ${{ steps.base.outputs.url }}
+          EXPECTED_AUTH_ORIGIN: ${{ steps.base.outputs.auth_origin }}
           EXPECTED_DEPLOYMENT_SHA: ${{ steps.base.outputs.revision }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node scripts/check-smoke-target.mjs
