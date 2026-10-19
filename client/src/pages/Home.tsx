@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
@@ -8,87 +7,58 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
-  Eye,
   Film,
-  Play,
-  Star,
-  ChevronDown,
   Image,
-  Video,
   Music,
   Users,
   ShoppingBag,
-  Search,
   Check,
-  Crown,
   Wand2,
-  Shirt,
-  Box,
-  LayoutGrid,
-  Sun,
   Server,
-  Mic,
   Palette,
   Cat,
   Moon,
   Clapperboard,
   Gamepad2,
   Flame,
-  Shield,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
 import OnboardingWizard, { useOnboarding } from "@/components/OnboardingWizard";
 
-/* ── Animation variants ── */
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
-  }),
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: (i: number) => ({
-    opacity: 1,
-    scale: 1,
-    transition: { delay: i * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
-  }),
-};
-
-/* ── Data ── */
+/* Homepage content */
 const galleryImages = [
-  { src: "/showcase/gallery-1.jpg", prompt: "Bioluminescent underwater cathedral with jellyfish stained glass" },
-  { src: "/showcase/gallery-2.jpg", prompt: "Cyberpunk samurai in neon rain, holographic katana" },
-  { src: "/showcase/gallery-3.jpg", prompt: "Enchanted forest library where trees are bookshelves" },
-  { src: "/showcase/gallery-4.jpg", prompt: "Crystalline phoenix emerging from a supernova" },
-  { src: "/showcase/gallery-7.jpg", prompt: "Japanese zen garden with koi pond reflecting cherry blossoms" },
-  { src: "/showcase/gallery-9.jpg", prompt: "Futuristic fashion model in liquid mercury clothes" },
-  { src: "/showcase/gallery-10.jpg", prompt: "Ancient dragon sleeping on a mountain of gold" },
-  { src: "/showcase/gallery-12.jpg", prompt: "Surreal melting clocktower in a desert of mirrors" },
-];
-
-const beforeAfterDemos = [
   {
-    label: "AI Upscaler",
-    desc: "Enhance resolution up to 4x with zero quality loss",
-    before: "/showcase/demo-upscale-before.jpg",
-    after: "/showcase/demo-upscale-after.jpg",
+    src: "/showcase/gallery-1.jpg",
+    prompt: "Bioluminescent underwater cathedral with jellyfish stained glass",
   },
   {
-    label: "Style Transfer",
-    desc: "Apply any artistic style to your images instantly",
-    before: "/showcase/demo-style-before.jpg",
-    after: "/showcase/demo-style-after.jpg",
+    src: "/showcase/gallery-2.jpg",
+    prompt: "Cyberpunk samurai in neon rain, holographic katana",
   },
   {
-    label: "Background Replace",
-    desc: "Swap backgrounds with AI-powered scene generation",
-    before: "/showcase/demo-bg-before.jpg",
-    after: "/showcase/demo-bg-after.jpg",
+    src: "/showcase/gallery-3.jpg",
+    prompt: "Enchanted forest library where trees are bookshelves",
+  },
+  {
+    src: "/showcase/gallery-4.jpg",
+    prompt: "Crystalline phoenix emerging from a supernova",
+  },
+  {
+    src: "/showcase/gallery-7.jpg",
+    prompt: "Japanese zen garden with koi pond reflecting cherry blossoms",
+  },
+  {
+    src: "/showcase/gallery-9.jpg",
+    prompt: "Futuristic fashion model in liquid mercury clothes",
+  },
+  {
+    src: "/showcase/gallery-10.jpg",
+    prompt: "Ancient dragon sleeping on a mountain of gold",
+  },
+  {
+    src: "/showcase/gallery-12.jpg",
+    prompt: "Surreal melting clocktower in a desert of mirrors",
   },
 ];
 
@@ -98,66 +68,94 @@ const whatsNew = [
     title: "Pet Portrait",
     desc: "Royal, fantasy, and sci-fi portraits of your pet",
     href: "/tools/pet-portrait",
-    img: "/showcase/tool-pet-portrait.jpg",
-    tag: "New tool",
   },
   {
     icon: Moon,
     title: "Tarot Card Designer",
     desc: "Custom major arcana decks with rich symbolism",
     href: "/tools/tarot-card",
-    img: "/showcase/tool-tarot-card.jpg",
-    tag: "New tool",
   },
   {
     icon: Clapperboard,
     title: "Movie Poster",
     desc: "Theatrical-quality one-sheets for any genre",
     href: "/tools/movie-poster",
-    img: "/showcase/tool-movie-poster.jpg",
-    tag: "New tool",
   },
   {
     icon: Gamepad2,
     title: "Pixel Art Generator",
     desc: "Game-ready 8/16/32-bit sprites and scenes",
     href: "/tools/pixel-art",
-    img: "/showcase/tool-pixel-art.jpg",
-    tag: "New tool",
   },
   {
     icon: Palette,
     title: "Brand Style Guide",
     desc: "Logo + color palette + typography on one page",
     href: "/tools/brand-style-guide",
-    img: "/showcase/tool-brand-style-guide.jpg",
-    tag: "New tool",
   },
   {
     icon: Server,
     title: "Self-Hosted Audio",
     desc: "Bark TTS + MusicGen + AudioGen on our GPUs",
     href: "/tools/song-creator",
-    img: "/showcase/tool-audio-self.jpg",
-    tag: "Self-hosted",
   },
 ];
 
 const tools = [
-  { icon: Image, title: "Text-to-Image", desc: "30+ models — Flux, DALL-E 3, Gemini, Grok, Seedream", bg: "/showcase/home-tool-txtimg.jpg", href: "/workspace" },
-  { icon: Film, title: "AI Video", desc: "Runway, Kling, Veo 3, Wan 2.5 — text or image to video", bg: "/showcase/home-tool-video.jpg", href: "/video-studio" },
-  { icon: Music, title: "AI Songs & Audio", desc: "Generate songs, music videos, TTS, and sound effects", bg: "/showcase/home-tool-audio.jpg", href: "/tools/song-creator" },
-  { icon: Wand2, title: "100+ Creative Tools", desc: "Headshots, logos, pet portraits, tarot cards, movie posters, pixel art — pick your niche", bg: "/showcase/home-tool-img2vid.jpg", href: "/tools" },
-  { icon: ShoppingBag, title: "Marketplace", desc: "Buy and sell prompts, presets, and workflows", bg: "/showcase/home-tool-market.jpg", href: "/marketplace" },
-  { icon: Users, title: "Community Gallery", desc: "Discover and share AI-generated artwork", bg: "/showcase/home-tool-gallery.jpg", href: "/gallery" },
+  {
+    icon: Image,
+    title: "Text-to-Image",
+    desc: "30+ models — Flux, DALL-E 3, Gemini, Grok, Seedream",
+    href: "/workspace",
+  },
+  {
+    icon: Film,
+    title: "AI Video",
+    desc: "Runway, Kling, Veo 3, Wan 2.5 — text or image to video",
+    href: "/video-studio",
+  },
+  {
+    icon: Music,
+    title: "AI Songs & Audio",
+    desc: "Generate songs, music videos, TTS, and sound effects",
+    href: "/tools/song-creator",
+  },
+  {
+    icon: Wand2,
+    title: "100+ Creative Tools",
+    desc: "Headshots, logos, pet portraits, tarot cards, movie posters, pixel art — pick your niche",
+    href: "/tools",
+  },
+  {
+    icon: ShoppingBag,
+    title: "Marketplace",
+    desc: "Buy and sell prompts, presets, and workflows",
+    href: "/marketplace",
+  },
+  {
+    icon: Users,
+    title: "Community Gallery",
+    desc: "Discover and share AI-generated artwork",
+    href: "/gallery",
+  },
 ];
 
-/* External providers shown in the marquee. Kling is dropped at render time
+/* External providers shown in the expandable provider list. Kling is dropped at render time
    when /api/status/providers reports it unconfigured. */
 const marqueeProviders = [
-  "Grok (xAI)", "OpenAI", "Gemini", "Claude", "Stability AI",
-  "Replicate", "fal.ai", "Together AI", "Cloudflare AI", "Groq",
-  "Runway", "Kling", "Sync Labs",
+  "Grok (xAI)",
+  "OpenAI",
+  "Gemini",
+  "Claude",
+  "Stability AI",
+  "Replicate",
+  "fal.ai",
+  "Together AI",
+  "Cloudflare AI",
+  "Groq",
+  "Runway",
+  "Kling",
+  "Sync Labs",
 ];
 
 const pricingPlans = [
@@ -165,7 +163,12 @@ const pricingPlans = [
     name: "Explorer",
     price: "$0",
     period: "",
-    features: ["50 credits / day", "Free AI models", "Community gallery", "1024px images"],
+    features: [
+      "50 credits / day",
+      "Free AI models",
+      "Community gallery",
+      "1024px images",
+    ],
     cta: "Start Free",
     highlighted: false,
   },
@@ -173,7 +176,12 @@ const pricingPlans = [
     name: "Creator",
     price: "$9",
     period: "/mo",
-    features: ["3,000 credits / month", "Standard models", "No watermarks", "Commercial rights"],
+    features: [
+      "3,000 credits / month",
+      "Standard models",
+      "No watermarks",
+      "Commercial rights",
+    ],
     cta: "Go Creator",
     highlighted: false,
   },
@@ -181,7 +189,12 @@ const pricingPlans = [
     name: "Pro",
     price: "$19",
     period: "/mo",
-    features: ["10,000 credits / month", "Premium models", "1080p video", "Priority queue"],
+    features: [
+      "10,000 credits / month",
+      "Premium models",
+      "1080p video",
+      "Priority queue",
+    ],
     cta: "Go Pro",
     highlighted: true,
     badge: "Most Popular",
@@ -190,19 +203,15 @@ const pricingPlans = [
     name: "Studio",
     price: "$39",
     period: "/mo",
-    features: ["30,000 credits / month", "All models + Ultra", "4K video", "Marketplace selling"],
+    features: [
+      "30,000 credits / month",
+      "All models + Ultra",
+      "4K video",
+      "Marketplace selling",
+    ],
     cta: "Go Studio",
     highlighted: false,
   },
-];
-
-const showcaseItems = [
-  { src: "/showcase/gallery-13.jpg", label: "Fantasy Landscapes" },
-  { src: "/showcase/gallery-15.jpg", label: "Product Photography" },
-  { src: "/showcase/gallery-17.jpg", label: "Concept Art" },
-  { src: "/showcase/hero-characters-1.jpg", label: "Character Design" },
-  { src: "/showcase/hero-brandkit-1.jpg", label: "Brand Identity" },
-  { src: "/showcase/gallery-20.jpg", label: "Sci-Fi Worlds" },
 ];
 
 const statItems = [
@@ -212,18 +221,24 @@ const statItems = [
   { label: "Free to Start", target: 50, suffix: " cr/day" },
 ];
 
-const heroWords = ["Images", "Videos", "Songs", "Music Videos", "Logos", "Avatars", "Art"];
-
-/* ── Section divider component ── */
-function SectionDivider() {
-  return <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />;
-}
+const heroWords = [
+  "Images",
+  "Videos",
+  "Songs",
+  "Music Videos",
+  "Logos",
+  "Avatars",
+  "Art",
+];
 
 /* ── Animated word cycling ── */
 function CyclingWord() {
   const [index, setIndex] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setIndex((p) => (p + 1) % heroWords.length), 2500);
+    const timer = setInterval(
+      () => setIndex(p => (p + 1) % heroWords.length),
+      2500
+    );
     return () => clearInterval(timer);
   }, []);
   return (
@@ -253,12 +268,21 @@ function useCountUp(target: number) {
 }
 
 /* ── Stat item component ── */
-function StatItem({ label, target, suffix }: { label: string; target: number; suffix: string }) {
+function StatItem({
+  label,
+  target,
+  suffix,
+}: {
+  label: string;
+  target: number;
+  suffix: string;
+}) {
   const { value, ref } = useCountUp(target);
   return (
     <div ref={ref} className="flex flex-col items-center gap-1 px-6 py-4">
       <span className="text-3xl md:text-4xl font-bold gradient-text">
-        {value.toLocaleString()}{suffix}
+        {value.toLocaleString()}
+        {suffix}
       </span>
       <span className="text-sm text-white/60">{label}</span>
     </div>
@@ -274,27 +298,31 @@ export default function Home() {
   const [promptText, setPromptText] = useState("");
   /* Kling availability from /api/status/providers. undefined while loading or
      if the probe is unreachable — in that case we default to showing it. */
-  const [klingConfigured, setKlingConfigured] = useState<boolean | undefined>(undefined);
+  const [klingConfigured, setKlingConfigured] = useState<boolean | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     fetch("/api/status/providers")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body) => {
+      .then(r => (r.ok ? r.json() : null))
+      .then(body => {
         const kling = body?.checks?.find((c: any) => c.name === "kling");
-        if (typeof kling?.configured === "boolean") setKlingConfigured(kling.configured);
+        if (typeof kling?.configured === "boolean")
+          setKlingConfigured(kling.configured);
       })
       .catch(() => {});
   }, []);
 
   const showKling = klingConfigured !== false;
-  const visibleTools = (showKling
-    ? tools
-    : tools.map((t) =>
-        t.title === "AI Video"
-          ? { ...t, desc: "Runway, Veo 3, Wan 2.5 — text or image to video" }
-          : t
-      )
-  ).map((t) =>
+  const visibleTools = (
+    showKling
+      ? tools
+      : tools.map(t =>
+          t.title === "AI Video"
+            ? { ...t, desc: "Runway, Veo 3, Wan 2.5 — text or image to video" }
+            : t
+        )
+  ).map(t =>
     // Signed-out visitors clicking "Text-to-Image" used to land in the
     // sign-in-walled /workspace despite the hero's no-signup promise — send
     // them to the free demo instead. The video tile keeps /video-studio:
@@ -303,7 +331,9 @@ export default function Home() {
       ? { ...t, href: "/demo/text-to-image" as const }
       : t
   );
-  const visibleProviders = showKling ? marqueeProviders : marqueeProviders.filter((p) => p !== "Kling");
+  const visibleProviders = showKling
+    ? marqueeProviders
+    : marqueeProviders.filter(p => p !== "Kling");
 
   useEffect(() => {
     if (isAuthenticated && !onboardingDone) setShowOnboarding(true);
@@ -322,968 +352,417 @@ export default function Home() {
     <PageLayout>
       {showOnboarding && (
         <OnboardingWizard
-          onComplete={() => { markCompleted(); setShowOnboarding(false); }}
+          onComplete={() => {
+            markCompleted();
+            setShowOnboarding(false);
+          }}
           onDismiss={() => {
             markCompleted();
             setShowOnboarding(false);
-            window.location.href = "/demo/text-to-image?prompt=" + encodeURIComponent(
-              "A cyberpunk Tokyo street market in heavy rain, neon reflections",
-            );
+            window.location.href =
+              "/demo/text-to-image?prompt=" +
+              encodeURIComponent(
+                "A cyberpunk Tokyo street market in heavy rain, neon reflections"
+              );
           }}
         />
       )}
 
-      {/* ═══════ SECTION 1: HERO WITH VIDEO BACKGROUND ═══════ */}
-      <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        {/* Live Hero Video background with instant poster + img fallback */}
+      <section className="relative overflow-hidden border-b border-white/10">
         <video
           autoPlay
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           poster="/showcase/hero-forge.jpg"
-          className="absolute inset-0 w-full h-full object-cover"
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
         >
           <source src="/video/hero-bg.mp4?v=1080p" type="video/mp4" />
-          <img
-            src="/showcase/hero-forge.jpg"
-            alt=""
-            aria-hidden="true"
-            className="w-full h-full object-cover"
-          />
         </video>
-        {/* Balanced cinematic vignette + radial neon spotlights so the video shines through */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/35 to-black/90" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.20),transparent_60%)] pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.18),transparent_60%)] pointer-events-none" />
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-24 md:py-28 lg:py-32">
-          <div className="max-w-5xl mx-auto text-center">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/15 backdrop-blur-md border border-cyan-400/30 shadow-[0_0_24px_rgba(6,182,212,0.2)] mb-8"
-            >
-              <Sparkles className="h-4 w-4 text-cyan-300" />
-              <span className="text-sm font-semibold text-white">100+ AI Tools · 30+ Models · Self-Hosted GPU Fleet</span>
-            </motion.div>
-
-            <motion.h1
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={1}
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tighter mb-6 leading-[1.05] text-white"
-              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.85)' }}
-            >
-              Create Stunning <CyclingWord />
-            </motion.h1>
-
-            <motion.p
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={2}
-              className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl mx-auto drop-shadow"
-            >
-              The all-in-one AI creative studio. Photoreal images, cinema video, songs, music videos &amp; unfiltered pro tools — powered by 30+ AI models.
-            </motion.p>
-
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={3}
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
-            >
-              {isAuthenticated ? (
-                <Button asChild size="lg" className="font-medium gap-2 px-8 h-13 text-base glow-primary">
-                  <Link href="/workspace">
-                    <Sparkles className="h-5 w-5" />
-                    Start Creating
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  size="lg"
-                  className="font-medium gap-2 px-8 h-13 text-base glow-primary"
-                >
-                  <Link href="/demo/text-to-image">
-                    <Zap className="h-5 w-5" />
-                    Try It Free — No Signup
-                  </Link>
-                </Button>
-              )}
-              <Button
-                asChild
-                size="lg"
-                className="font-semibold gap-2 px-8 h-13 text-base bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/30"
-              >
-                <Link href="/uncensored?start=1">
-                  <Flame className="h-5 w-5" />
-                  Uncensored Studio (3 Free)
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="font-medium gap-2 px-8 h-13 text-base bg-black/35 backdrop-blur-md border-white/25 hover:bg-white/15">
-                <Link href="/gallery">
-                  <Eye className="h-5 w-5" />
-                  Explore Gallery
-                </Link>
-              </Button>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={4}
-              className="mt-7 mx-auto max-w-2xl"
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/65 to-black/95" />
+        <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-24 text-center sm:px-6 md:pb-14 md:pt-28">
+          <p className="mb-5 text-sm font-semibold text-cyan-200">
+            100+ AI Tools · 30+ Models · Self-Hosted GPU Fleet
+          </p>
+          <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-7xl">
+            Create Stunning <CyclingWord />
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-white/80 md:text-lg">
+            The all-in-one AI creative studio for images, video, songs, and
+            design.
+          </p>
+          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+            <Button
+              asChild
+              size="lg"
+              className="min-h-12 h-auto whitespace-normal px-6 py-3 glow-primary"
             >
               <Link
-                href="/uncensored?start=1"
-                className="group flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-rose-500/45 bg-gradient-to-r from-black/70 via-rose-950/60 to-black/70 px-5 py-3.5 text-left backdrop-blur-xl shadow-[0_8px_32px_rgba(244,63,94,0.2)] transition-all hover:border-rose-400 hover:shadow-[0_8px_36px_rgba(244,63,94,0.35)]"
+                href={isAuthenticated ? "/workspace" : "/demo/text-to-image"}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-md shadow-rose-500/30">
-                    <Flame className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <span>Private Uncensored AI Studio</span>
-                      <span className="rounded-full bg-rose-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-200">
-                        18+ · No Filter
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/75">
-                      Unfiltered Flux + Wan 2.2 Video · Character Face Lock · Outfit Swap · 4-View Sheets · Card/Apple Pay or Bitcoin
-                    </p>
-                  </div>
-                </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-rose-300 group-hover:translate-x-0.5 transition-transform">
-                  Try 3 Free Previews <ArrowRight className="h-3.5 w-3.5" />
-                </span>
+                <Zap className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+                {isAuthenticated ? "Start Creating" : "Try It Free — No Signup"}
               </Link>
-            </motion.div>
-
-            {/* 4-Card Live Studio Visual Showcase Dock */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              custom={5}
-              className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto text-left"
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              className="min-h-12 h-auto whitespace-normal bg-rose-600 px-6 py-3 text-white hover:bg-rose-500"
             >
-              {[
-                {
-                  title: "Photoreal Studio",
-                  sub: "Flux Pro · DALL-E 3 · Grok",
-                  img: "/showcase/gallery-9.jpg",
-                  href: isAuthenticated ? "/workspace" : "/demo/text-to-image",
-                  badge: "Image",
-                },
-                {
-                  title: "AI Video & Cinema",
-                  sub: "Veo 3 · Runway · Wan 2.5",
-                  img: "/showcase/tool-t2v.jpg",
-                  href: "/video-studio",
-                  badge: "Video",
-                },
-                {
-                  title: "Uncensored Pro",
-                  sub: "Face Lock · Outfit · 4-View",
-                  img: "/showcase/uncensored-char-aria-nordic.jpg",
-                  href: "/uncensored?start=1",
-                  badge: "18+ No Filter",
-                },
-                {
-                  title: "100+ Creative Tools",
-                  sub: "Try-On · Upscale · Audio",
-                  img: "/showcase/gallery-2.jpg",
-                  href: "/tools",
-                  badge: "Suite",
-                },
-              ].map((card) => (
-                <Link
-                  key={card.title}
-                  href={card.href}
-                  className="group relative h-28 sm:h-32 overflow-hidden rounded-2xl border border-white/15 bg-black/50 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-cyan-400/60 hover:shadow-[0_0_25px_rgba(6,182,212,0.25)]"
-                >
-                  <img
-                    src={card.img}
-                    alt={card.title}
-                    className="absolute inset-0 h-full w-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105 group-hover:opacity-85"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
-                  <span className="absolute top-2 right-2 rounded-full border border-white/20 bg-black/65 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
-                    {card.badge}
-                  </span>
-                  <div className="absolute inset-x-0 bottom-0 p-3">
-                    <div className="text-xs sm:text-sm font-bold text-white leading-tight">{card.title}</div>
-                    <div className="text-[10px] text-white/70 truncate mt-0.5">{card.sub}</div>
-                  </div>
-                </Link>
-              ))}
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 1 }}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-white/50"
-        >
-          <span className="text-[10px] uppercase tracking-widest">Scroll</span>
-          <ChevronDown className="h-4 w-4 animate-bounce" />
-        </motion.div>
-      </section>
-
-      {/* ═══════ SECTION 2: LIVE STATS BAR ═══════ */}
-      <section className="border-y border-white/10 bg-black/40 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-white/10">
-            {statItems.map((stat) => (
-              <StatItem key={stat.label} {...stat} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* AI Model Marquee — external providers (matches the "13 providers" stat) */}
-      <section className="py-6 overflow-hidden border-b border-white/5">
-        <p className="text-center text-[10px] text-white/30 uppercase tracking-[0.3em] mb-4">Powered by {visibleProviders.length} AI providers</p>
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 md:gap-x-12">
-          {visibleProviders.map((provider) => (
-            <span key={provider} className="text-sm font-medium text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
-              {provider}
-            </span>
-          ))}
-        </div>
-
-        {/* In-house self-hosted GPU fleet — genuine differentiator */}
-        <p className="text-center text-[10px] uppercase tracking-[0.3em] mt-6 mb-3 text-cyan-400/50">
-          + Self-hosted on DreamForge GPUs
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 md:gap-x-10">
-          {[
-            "Flux Pro/Dev/Schnell", "CogVideoX-5B", "MusicGen", "AudioGen",
-            "CatVTON", "Bark TTS", "Real-ESRGAN", "Exclusive LoRAs",
-          ].map((model) => (
-            <span key={model} className="text-sm font-medium text-cyan-400/40 hover:text-cyan-300/80 transition-colors whitespace-nowrap">
-              {model}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 2.5: WHAT'S NEW ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.03] via-transparent to-transparent pointer-events-none" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-            <div>
-              <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={0}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-                <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                  Just shipped
-                </span>
-              </motion.div>
-              <motion.h2
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={1}
-                className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white"
-              >
-                What's <span className="gradient-text">new this week</span>
-              </motion.h2>
-              <motion.p
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={2}
-                className="text-white/60 mt-3 max-w-xl"
-              >
-                Five new tools, exclusive LoRA styles, and self-hosted audio models — all live now.
-              </motion.p>
-            </div>
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={3}
-            >
-              <Button
-                asChild
-                variant="outline"
-                className="bg-transparent border-white/20 hover:bg-white/10 gap-2"
-              >
-                <Link href="/tools">
-                  Browse all 100+ tools <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </motion.div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {whatsNew.map((item, i) => (
-              <Link key={item.title} href={item.href}>
-                <motion.div
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  variants={scaleIn}
-                  custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[210px]"
-                >
-                  <div className="absolute inset-0">
-                    <img
-                      src={item.img}
-                      alt=""
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/showcase/hero-forge.jpg";
-                      }}
-                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/15" />
-                  </div>
-                  <div className="relative p-6 flex flex-col h-full min-h-[210px]">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                        <item.icon className="h-6 w-6 text-cyan-300" />
-                      </div>
-                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-black/70 backdrop-blur-md text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
-                        {item.tag}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{item.title}</h3>
-                    <p className="text-sm text-white/75 mb-4">{item.desc}</p>
-                    <div className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
-                      Try it now <ArrowRight className="h-4 w-4" />
-                    </div>
-                  </div>
-                </motion.div>
+              <Link href="/uncensored?start=1">
+                <Flame className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+                Uncensored Studio (3 Free) · 18+
               </Link>
-            ))}
+            </Button>
           </div>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 3: INTERACTIVE PROMPT DEMO ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
+          <form
+            action="/demo/text-to-image"
+            method="get"
+            onSubmit={event => {
+              event.preventDefault();
+              handleGenerate();
+            }}
+            className="mx-auto mt-6 max-w-2xl text-left"
           >
-            Try It Now
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-center text-white"
-          >
-            Type a Prompt and See the <span className="gradient-text">Magic</span>
-          </motion.h2>
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={2}
-            className="text-white/60 text-center mb-10 max-w-xl mx-auto"
-          >
-            Describe anything you can imagine and let AI bring it to life.
-          </motion.p>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={3}
-            className="max-w-3xl mx-auto mb-14"
-          >
-            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-2xl bg-white/5 border border-cyan-500/30 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)] backdrop-blur-sm">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Search className="h-5 w-5 text-white/40 ml-2 sm:ml-4 shrink-0" />
-                <input
-                  type="text"
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  placeholder="A mystical dragon perched on a crystal mountain..."
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/30 text-sm sm:text-base py-3 min-w-0"
-                />
-              </div>
-              <Button
-                size="lg"
-                className="font-medium gap-2 px-6 h-12 text-base glow-primary shrink-0 w-full sm:w-auto"
-                onClick={handleGenerate}
-              >
-                <Sparkles className="h-4 w-4" />
+            <label
+              htmlFor="home-prompt"
+              className="mb-2 block text-sm font-medium text-white/80"
+            >
+              Try your own prompt
+            </label>
+            <div className="flex flex-col gap-2 rounded-xl border border-cyan-400/40 bg-black/50 p-2 sm:flex-row">
+              <input
+                id="home-prompt"
+                name="prompt"
+                type="text"
+                value={promptText}
+                onChange={event => setPromptText(event.target.value)}
+                placeholder="A mystical dragon on a crystal mountain..."
+                className="min-w-0 flex-1 rounded-lg bg-transparent px-3 py-3 text-sm text-white placeholder:text-white/50 focus-visible:outline-2 focus-visible:outline-cyan-300"
+              />
+              <Button type="submit" className="min-h-11 h-auto px-5 py-3">
+                <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
                 Generate
               </Button>
             </div>
-          </motion.div>
+          </form>
+          <nav
+            aria-label="Homepage sections"
+            className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-cyan-200"
+          >
+            <a
+              href="#home-pricing"
+              className="py-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              View Pricing
+            </a>
+            <a
+              href="#home-tools"
+              className="py-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              Browse Tools
+            </a>
+            <Link
+              href="/gallery"
+              className="py-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              Explore Gallery
+            </Link>
+          </nav>
+        </div>
+      </section>
 
-          {/* Example results */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
-            {[
-              { src: "/showcase/gallery-5.jpg", prompt: "Android woman with clockwork face" },
-              { src: "/showcase/gallery-8.jpg", prompt: "Steampunk airship battle above London" },
-              { src: "/showcase/gallery-11.jpg", prompt: "Bioluminescent coral reef city" },
-              { src: "/showcase/gallery-6.jpg", prompt: "Alien landscape with geometric monuments" },
-            ].map((img, i) => (
-              <motion.div
-                key={img.src}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={scaleIn}
-                custom={i}
-                className="rounded-2xl overflow-hidden aspect-square"
+      <section
+        aria-label="Studio at a glance"
+        className="border-b border-white/10 bg-black/40"
+      >
+        <div className="mx-auto grid max-w-5xl grid-cols-2 px-4 md:grid-cols-4">
+          {statItems.map(stat => (
+            <StatItem
+              key={stat.label}
+              {...stat}
+              target={
+                stat.label === "AI Providers"
+                  ? visibleProviders.length
+                  : stat.target
+              }
+            />
+          ))}
+        </div>
+        <details className="mx-auto max-w-5xl px-4 pb-4 text-sm text-white/70">
+          <summary className="cursor-pointer rounded-lg py-3 text-center focus-visible:outline-2 focus-visible:outline-cyan-300">
+            Powered by {visibleProviders.length} AI providers and DreamForge
+            GPUs
+          </summary>
+          <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 py-3">
+            {visibleProviders.map(provider => (
+              <span key={provider}>{provider}</span>
+            ))}
+          </div>
+          <p className="text-center leading-relaxed text-cyan-200">
+            Self-hosted: Flux Pro/Dev/Schnell · CogVideoX-5B · MusicGen ·
+            AudioGen · CatVTON · Bark TTS · Real-ESRGAN · Exclusive LoRAs
+          </p>
+        </details>
+      </section>
+
+      <section aria-labelledby="home-gallery-title" className="py-10 md:py-14">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mb-2 text-sm font-medium text-cyan-300">
+                Made with DreamForgeX
+              </p>
+              <h2
+                id="home-gallery-title"
+                className="text-2xl font-bold text-white md:text-3xl"
               >
-                <img
-                  src={img.src}
-                  alt={img.prompt}
-                  loading="lazy"
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                />
-              </motion.div>
-            ))}
-          </div>
-          <p className="text-center text-xs text-white/30 mt-4">Example outputs generated by DreamForgeX</p>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 4: SHOWCASE GALLERY — FIX 5: fixed grid instead of masonry ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
-          >
-            Made with DreamForgeX
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
-          >
-            What Creators Are <span className="gradient-text">Building</span>
-          </motion.h2>
-
-          {/* Fixed grid — 8 images, consistent square aspect ratio */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {galleryImages.map((img, i) => (
-              <motion.div
-                key={img.src}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={scaleIn}
-                custom={i % 6}
-                className="group relative aspect-square overflow-hidden rounded-2xl"
-              >
-                <img
-                  src={img.src}
-                  alt={img.prompt}
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all duration-500 flex items-end">
-                  <div className="p-5 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                    <p className="text-sm text-white/90 font-medium leading-relaxed">
-                      &ldquo;{img.prompt}&rdquo;
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 5: BEFORE/AFTER TOOL DEMOS — FIX 2: bigger images ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
-          >
-            See Our Tools in Action
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
-          >
-            Transform Your Images with <span className="gradient-text">AI</span>
-          </motion.h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {beforeAfterDemos.map((demo, i) => (
-              <motion.div
-                key={demo.label}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className="space-y-4"
-              >
-                <h3 className="text-lg font-semibold text-center text-white">{demo.label}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Before */}
-                  <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
-                    <img src={demo.before} alt={`${demo.label} before`} loading="lazy" className="w-full h-full object-cover" />
-                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-black/70 text-white/80 backdrop-blur-sm">
-                      Before
-                    </span>
-                  </div>
-                  {/* After */}
-                  <div className="relative rounded-xl overflow-hidden aspect-[4/3]">
-                    <img src={demo.after} alt={`${demo.label} after`} loading="lazy" className="w-full h-full object-cover" />
-                    <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-500/80 text-white backdrop-blur-sm shadow-[0_0_10px_rgba(245,158,11,0.5)]">
-                      After
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm text-white/60 text-center">{demo.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 6: TOOLS GRID — FIX 3: better bg opacity + min height ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
-          >
-            Powerful Tools
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
-          >
-            Everything You Need to <span className="gradient-text">Create</span>
-          </motion.h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {visibleTools.map((tool, i) => (
-              <Link key={tool.title} href={tool.href}>
-                <motion.div
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  variants={scaleIn}
-                  custom={i}
-                  className="group relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-sm border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.28)] transition-all duration-500 cursor-pointer min-h-[200px]"
-                >
-                  <div className="absolute inset-0">
-                    <img
-                      src={tool.bg}
-                      alt={tool.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover opacity-55 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/15" />
-                  </div>
-                  <div className="relative p-6 flex flex-col h-full min-h-[200px]">
-                    <div className="w-12 h-12 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-400/40 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                      <tool.icon className="h-6 w-6 text-cyan-300" />
-                    </div>
-                    <h3 className="text-lg font-bold mb-1 text-white drop-shadow">{tool.title}</h3>
-                    <p className="text-sm text-white/75 mb-4">{tool.desc}</p>
-                    <div className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
-                      Open studio <ArrowRight className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </motion.div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 6B: UNCENSORED 18+ PRO STUDIO SPOTLIGHT ═══════ */}
-      <section className="py-16 md:py-20 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="relative rounded-3xl overflow-hidden border border-rose-500/35 bg-gradient-to-br from-rose-950/50 via-black/80 to-orange-950/35 p-6 sm:p-10 lg:p-12 shadow-[0_0_70px_-15px_rgba(244,63,94,0.3)] backdrop-blur-xl">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(244,63,94,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(249,115,22,0.18),transparent_60%)] pointer-events-none" />
-            <div className="relative z-10 grid lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-7 space-y-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 px-3 py-1 text-xs font-bold uppercase tracking-wider text-rose-200">
-                    <Flame className="h-3.5 w-3.5 text-rose-400" />
-                    18+ · Uncensored Pro Studio
-                  </span>
-                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-                    3 Free Previews Included
-                  </span>
-                  <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
-                    Visa / Mastercard / Apple Pay + Bitcoin
-                  </span>
-                </div>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
-                  Zero Content Filters.{" "}
-                  <span className="bg-gradient-to-r from-rose-400 via-orange-300 to-amber-300 bg-clip-text text-transparent">
-                    Total Creative Freedom.
-                  </span>
-                </h2>
-                <p className="text-white/75 text-sm sm:text-base max-w-2xl leading-relaxed">
-                  Generate photorealistic characters, lock faces across unlimited scenes, swap outfits, brush-inpaint details, and animate 5-second Wan 2.2 motion clips on dedicated private GPUs. Unlock instantly from <strong className="text-white">$4.99 (24h Day Pass)</strong> with any Credit Pack or anonymous Bitcoin.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Uncensored Text-to-Image",
-                    "Character Face Lock",
-                    "Virtual Outfit Swap",
-                    "Brush Inpaint",
-                    "4-View Character Sheet",
-                    "Uncensored Video (Wan 2.2)",
-                  ].map((pill) => (
-                    <span
-                      key={pill}
-                      className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-200"
-                    >
-                      {pill}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-3 pt-2">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 font-semibold shadow-lg shadow-rose-500/30"
-                  >
-                    <Link href="/uncensored?start=1">
-                      <Flame className="h-4 w-4" />
-                      Try 3 Free Previews
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="lg"
-                    className="border-white/20 bg-white/5 text-white hover:bg-white/10"
-                  >
-                    <Link href="/pricing#uncensored-passes">
-                      View Day / Week / 30-Day Passes
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="lg:col-span-5 grid grid-cols-2 gap-3">
-                {[
-                  { src: "/showcase/uncensored-char-aria-nordic.jpg", name: "Aria · Nordic Muse", tag: "Face Lock" },
-                  { src: "/showcase/uncensored-char-valentina-glam.jpg", name: "Valentina · Golden Hour", tag: "Photoreal" },
-                  { src: "/showcase/uncensored-char-sora-cyber.jpg", name: "Sora · Neo-Tokyo", tag: "Outfit Swap" },
-                  { src: "/showcase/uncensored-char-chloe-california.jpg", name: "Chloe · Sunset Editorial", tag: "4K Studio" },
-                ].map((char) => (
-                  <Link
-                    key={char.name}
-                    href="/uncensored?start=1"
-                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-rose-400/25 bg-black/60 shadow-xl"
-                  >
-                    <img
-                      src={char.src}
-                      alt={char.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                    <div className="absolute top-2.5 right-2.5">
-                      <span className="rounded-full bg-rose-500/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                        {char.tag}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-2.5 left-3 right-3">
-                      <p className="text-xs font-bold text-white">{char.name}</p>
-                      <p className="text-[10px] text-rose-300 group-hover:underline">Click to load preset →</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                What Creators Are Building
+              </h2>
             </div>
+            <Link
+              href="/gallery"
+              className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              Explore Gallery
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {galleryImages.slice(0, 6).map(image => (
+              <figure
+                key={image.src}
+                className="overflow-hidden rounded-xl border border-white/15 bg-white/5"
+              >
+                <img
+                  src={image.src}
+                  alt={image.prompt}
+                  loading="lazy"
+                  width={400}
+                  height={280}
+                  className="h-28 w-full object-cover sm:h-40 md:h-48"
+                />
+                <figcaption className="p-3 text-xs leading-relaxed text-white/80">
+                  {image.prompt}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </div>
       </section>
 
-      <SectionDivider />
-
-      {/* ═══════ SECTION 7: PRICING PREVIEW ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
-          >
-            Simple Pricing
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
-          >
-            Plans for Every <span className="gradient-text">Creator</span>
-          </motion.h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {pricingPlans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className={`relative rounded-2xl p-6 backdrop-blur-sm transition-all duration-300 ${
-                  plan.highlighted
-                    ? "bg-white/10 border-2 border-cyan-500/50 shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)]"
-                    : "bg-white/5 border border-white/10 hover:border-white/20"
-                }`}
+      <section
+        id="home-pricing"
+        aria-labelledby="home-pricing-title"
+        className="scroll-mt-24 border-y border-white/10 bg-white/[0.03] py-10 md:py-14"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mb-2 text-sm font-medium text-cyan-300">
+                Simple Pricing
+              </p>
+              <h2
+                id="home-pricing-title"
+                className="text-2xl font-bold text-white md:text-3xl"
               >
+                Plans for Every Creator
+              </h2>
+            </div>
+            <Link
+              href="/pricing"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              View All Plans
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4">
+            {pricingPlans.map(plan => (
+              <article
+                key={plan.name}
+                className={
+                  plan.highlighted
+                    ? "flex flex-col rounded-xl border border-cyan-400/60 bg-cyan-400/10 p-4"
+                    : "flex flex-col rounded-xl border border-white/15 bg-black/30 p-4"
+                }
+              >
+                <h3 className="text-base font-semibold text-white">
+                  {plan.name}
+                </h3>
+                <p className="mt-2 text-3xl font-bold text-white">
+                  {plan.price}
+                  <span className="text-sm font-normal text-white/70">
+                    {plan.period}
+                  </span>
+                </p>
                 {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white flex items-center gap-1">
-                      <Crown className="h-3 w-3" />
-                      {plan.badge}
-                    </span>
-                  </div>
+                  <p className="mt-2 text-xs font-semibold text-cyan-200">
+                    {plan.badge}
+                  </p>
                 )}
-                <h3 className="text-lg font-semibold mb-2 text-white">{plan.name}</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-white">{plan.price}</span>
-                  <span className="text-white/60">{plan.period}</span>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feat) => (
-                    <li key={feat} className="flex items-center gap-2 text-sm text-white/70">
-                      <Check className="h-4 w-4 text-cyan-400 shrink-0" />
-                      {feat}
+                <ul className="mb-4 mt-4 space-y-2 text-xs leading-5 text-white/80">
+                  {plan.features.map(feature => (
+                    <li key={feature} className="flex items-start gap-1.5">
+                      <Check
+                        className="mt-1 h-3 w-3 shrink-0 text-cyan-300"
+                        aria-hidden="true"
+                      />
+                      <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
                 <Button
                   asChild
-                  className={`w-full font-medium ${plan.highlighted ? "glow-primary" : ""}`}
                   variant={plan.highlighted ? "default" : "outline"}
+                  className="mt-auto min-h-11 h-auto w-full whitespace-normal px-2 py-2 text-sm"
                 >
                   <Link href="/pricing">{plan.cta}</Link>
                 </Button>
-              </motion.div>
+              </article>
             ))}
           </div>
+        </div>
+      </section>
 
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={5}
-            className="text-center mt-10"
-          >
-            <Link href="/pricing" className="text-sm text-cyan-400 hover:underline inline-flex items-center gap-1">
-              View All Plans <ArrowRight className="h-4 w-4" />
+      <section
+        id="home-tools"
+        aria-labelledby="home-tools-title"
+        className="scroll-mt-24 py-10 md:py-14"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <h2
+              id="home-tools-title"
+              className="text-2xl font-bold text-white md:text-3xl"
+            >
+              Your creative toolkit
+            </h2>
+            <Link
+              href="/tools"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              Browse all 100+ tools
             </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ═══════ SECTION 8: SHOWCASE ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="text-sm font-medium text-cyan-400 mb-4 uppercase tracking-[0.2em] text-center"
-          >
-            AI-Generated Showcase
-          </motion.p>
-          <motion.h2
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={1}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-16 text-center text-white"
-          >
-            What You Can <span className="gradient-text">Create</span>
-          </motion.h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {showcaseItems.map((item, i) => (
-              <motion.div
-                key={item.label}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className="rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm group"
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {visibleTools.map(tool => (
+              <Link
+                key={tool.title}
+                href={tool.href}
+                className="rounded-xl border border-white/15 bg-white/5 p-4 transition-colors hover:border-cyan-300/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
               >
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img src={item.src} alt={item.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                </div>
-                <div className="p-4 bg-white/5">
-                  <p className="text-sm font-semibold text-white">{item.label}</p>
-                </div>
-              </motion.div>
+                <tool.icon
+                  className="mb-3 h-5 w-5 text-cyan-300"
+                  aria-hidden="true"
+                />
+                <h3 className="text-sm font-bold leading-5 text-white">
+                  {tool.title}
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-white/75">
+                  {tool.desc}
+                </p>
+              </Link>
             ))}
           </div>
-
-          <motion.p
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={4}
-            className="text-center text-white/60 mt-12"
-          >
-            Every image above was generated with DreamForgeX — start creating for free today
-          </motion.p>
         </div>
       </section>
 
-      <SectionDivider />
+      <section
+        aria-labelledby="home-new-title"
+        className="border-y border-white/10 bg-white/[0.03] py-10 md:py-14"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mb-2 text-sm font-medium text-cyan-300">
+                Just shipped
+              </p>
+              <h2
+                id="home-new-title"
+                className="text-2xl font-bold text-white md:text-3xl"
+              >
+                What's new this week
+              </h2>
+            </div>
+            <Link
+              href="/whats-new"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              All updates
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {whatsNew.map(item => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="rounded-xl border border-white/15 bg-black/30 p-4 transition-colors hover:border-cyan-300/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              >
+                <item.icon
+                  className="mb-3 h-5 w-5 text-cyan-300"
+                  aria-hidden="true"
+                />
+                <h3 className="text-sm font-bold leading-5 text-white">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-white/75">
+                  {item.desc}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      {/* ═══════ SECTION 9: FINAL CTA ═══════ */}
-      <section className="py-16 md:py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/20 via-purple-900/10 to-black/80" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
-          <div className="max-w-3xl mx-auto text-center">
-            <motion.h2
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={0}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-white"
+      <section
+        aria-labelledby="home-uncensored-title"
+        className="py-10 md:py-14"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="rounded-2xl border border-rose-400/40 bg-rose-950/30 p-5 md:p-8">
+            <p className="mb-2 text-sm font-semibold text-rose-200">
+              18+ · Separate Uncensored Pro Studio
+            </p>
+            <h2
+              id="home-uncensored-title"
+              className="text-2xl font-bold text-white"
             >
-              Ready to Create Something <span className="gradient-text">Amazing</span>?
-            </motion.h2>
-            <motion.p
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={1}
-              className="text-lg text-white/60 mb-10"
-            >
-              Start for free — no credit card required.
-            </motion.p>
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              custom={2}
-              className="flex flex-col items-center gap-6"
-            >
-              {isAuthenticated ? (
-                <Button asChild size="lg" className="font-medium gap-2 px-10 h-14 text-lg glow-primary">
-                  <Link href="/workspace">
-                    <ArrowRight className="h-5 w-5" />
-                    Go to Studio
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  size="lg"
-                  className="font-medium gap-2 px-10 h-14 text-lg glow-primary"
-                  onClick={() => (window.location.href = getLoginUrl())}
-                >
-                  <ArrowRight className="h-5 w-5" />
-                  Get Started Free
-                </Button>
-              )}
-              {!isAuthenticated && (
-                <Link href="/demo/text-to-image" className="text-sm text-white/50 hover:text-white transition-colors">
-                  or try one image with no signup
+              Private Uncensored AI Studio
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/80">
+              Uncensored text-to-image, character face lock, outfit swap, brush
+              inpaint, 4-view character sheets, and Wan 2.2 video. Try 3 free
+              previews, or view Day, Week, and 30-Day passes from $4.99.
+            </p>
+            <p className="mt-2 text-xs leading-5 text-white/70">
+              Card / Apple Pay or Bitcoin. See the pricing page for full pass
+              details.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="min-h-11 h-auto whitespace-normal bg-rose-600 px-4 py-3 text-white hover:bg-rose-500"
+              >
+                <Link href="/uncensored?start=1">
+                  Try 3 Free Previews
+                  <ArrowRight
+                    className="ml-2 h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
                 </Link>
-              )}
-              <div className="flex items-center gap-6 text-sm text-white/60">
-                <Link href="/pricing" className="hover:text-white transition-colors">View Pricing</Link>
-                <span className="text-white/20">|</span>
-                <Link href="/gallery" className="hover:text-white transition-colors">Explore Gallery</Link>
-                <span className="text-white/20">|</span>
-                <Link href="/tools" className="hover:text-white transition-colors">Browse Tools</Link>
-              </div>
-            </motion.div>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="min-h-11 h-auto whitespace-normal border-white/25 px-4 py-3"
+              >
+                <Link href="/pricing#uncensored-passes">
+                  View Day / Week / 30-Day Passes
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
