@@ -25,18 +25,60 @@ export const CANONICAL_AUTH_ORIGIN = 'https://dreamforgex.ai';
 
 /** Production-config staging intentionally uses the existing AUTH_URL. */
 export function assertCanonicalSignIn(input, originalPath) {
+  assertExactSignIn(input, originalPath, CANONICAL_AUTH_ORIGIN);
+}
+
+/** Preview callbacks must remain on the exact source-verified smoke origin. */
+export function assertSmokeSignIn(input, originalPath, target, authOrigin = CANONICAL_AUTH_ORIGIN) {
+  const verified = smokeTarget(target.origin);
+  if (authOrigin === CANONICAL_AUTH_ORIGIN) return assertCanonicalSignIn(input, originalPath);
+  if (!verified.protectedTarget || authOrigin !== verified.origin) {
+    throw new Error('Preview auth expectation must equal the exact verified preview origin');
+  }
+  assertExactSignIn(input, originalPath, verified.origin);
+}
+
+function assertExactSignIn(input, originalPath, origin) {
   if (!gated.has(originalPath)) throw new Error('Unrecognized gated smoke path');
   const url = new URL(input);
-  if (url.origin !== CANONICAL_AUTH_ORIGIN || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
-    throw new Error('Sign-in must use the existing canonical auth origin and exact path');
+  if (url.origin !== origin || url.username || url.password || url.hash || url.pathname !== '/auth/signin') {
+    throw new Error('Sign-in must use the exact expected auth origin and path');
   }
   if ([...url.searchParams.keys()].length !== 1 || !url.searchParams.has('callbackUrl')) {
-    throw new Error('Sign-in must retain exactly the original canonical callback');
+    throw new Error('Sign-in must retain exactly the original callback');
   }
   const callback = new URL(url.searchParams.get('callbackUrl'));
-  if (callback.origin !== CANONICAL_AUTH_ORIGIN || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
-    throw new Error('Sign-in callback does not match the original canonical gated path');
+  if (callback.origin !== origin || callback.username || callback.password || callback.pathname !== originalPath || callback.search || callback.hash) {
+    throw new Error('Sign-in callback does not match the exact original gated path');
   }
+}
+
+/**
+ * Vercel's documented non-secret E2E header; never attach it to another origin.
+ * @returns {Record<string, string>}
+ */
+export function previewToolbarHeaders(target, requestUrl) {
+  const verified = smokeTarget(target.origin);
+  return verified.protectedTarget && new URL(requestUrl).origin === verified.origin
+    ? { 'x-vercel-skip-toolbar': '1' } : {};
+}
+
+// Exact observed engine messages from fresh preview smoke, not arbitrary CSP
+// errors or another script. Keep production's zero-console-error contract.
+const previewToolbarCspMessages = new Set([
+  `Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' https://connect.facebook.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.`,
+  'Refused to load https://vercel.live/_next-live/feedback/feedback.js because it does not appear in the script-src directive of the Content Security Policy.',
+]);
+
+export function isPreviewToolbarCspCollision(message, target, finalDocumentUrl) {
+  if (typeof message !== 'string') return false;
+  try {
+    const verified = smokeTarget(target.origin);
+    const documentUrl = new URL(finalDocumentUrl);
+    return verified.protectedTarget && documentUrl.origin === verified.origin
+      && !documentUrl.username && !documentUrl.password
+      && previewToolbarCspMessages.has(message);
+  } catch { return false; }
 }
 
 export function assertDeployedHealth(status, type, body, expected) {
@@ -56,7 +98,8 @@ export function workflowSmokeTarget(eventName, event, githubSha) {
     : (eventName === 'workflow_dispatch' ? event.inputs?.base_url || 'https://dreamforgex.ai' : 'https://dreamforgex.ai');
   const expected = deploymentEvent ? event.deployment?.sha : event.inputs?.expected_sha || githubSha;
   if (!deployedRevision(expected)) throw new Error('Expected deployment source must be an exact Git commit SHA');
-  return { ...smokeTarget(input), expected };
+  const target = smokeTarget(input);
+  return { ...target, expected, authOrigin: deploymentEvent && !production && target.protectedTarget ? target.origin : CANONICAL_AUTH_ORIGIN };
 }
 
 const gated = new Set(['/profile', '/credits', '/api-keys', '/notifications', '/admin']);

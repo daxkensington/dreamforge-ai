@@ -23,12 +23,13 @@ describe('deployed smoke target safety', () => {
   });
   it('uses exact preview URL but canonical public production and an exact source pin', () => {
     const event = { deployment: { environment:'Preview',sha }, deployment_status:{target_url:preview} };
-    expect(workflowSmokeTarget('deployment_status',event,'b'.repeat(40))).toEqual({origin:preview,protectedTarget:true,expected:sha});
-    expect(workflowSmokeTarget('deployment_status',{...event,deployment:{environment:'Production',sha}},'b'.repeat(40))).toEqual({origin:'https://dreamforgex.ai',protectedTarget:false,expected:sha});
+    expect(workflowSmokeTarget('deployment_status',event,'b'.repeat(40))).toEqual({origin:preview,protectedTarget:true,expected:sha,authOrigin:preview});
+    expect(workflowSmokeTarget('deployment_status',{...event,deployment:{environment:'Production',sha}},'b'.repeat(40))).toEqual({origin:'https://dreamforgex.ai',protectedTarget:false,expected:sha,authOrigin:'https://dreamforgex.ai'});
     expect(() => workflowSmokeTarget('schedule',{},'main')).toThrow(/exact/);
   });
   it('allows explicit dispatch replay source but does not interpolate URL input into shell', () => {
     expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).expected).toBe(sha);
+    expect(workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:preview,expected_sha:sha}},'b'.repeat(40)).authOrigin).toBe('https://dreamforgex.ai');
     expect(() => workflowSmokeTarget('workflow_dispatch',{inputs:{base_url:'https://dreamforgex.ai/$(command)'}},sha)).toThrow();
   });
 });

@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { isPreviewToolbarCspCollision, smokeTarget } from "../../shared/smoke-target.mjs";
 
 /**
  * Public-page smoke tests — verifies that the pages anyone can reach without
@@ -107,7 +108,7 @@ test("no broken images on homepage", async ({ page }) => {
   expect(broken, `broken images:\n${broken.join("\n")}`).toEqual([]);
 });
 
-test("no console errors on homepage", async ({ page }) => {
+test("no console errors on homepage", async ({ page, baseURL }) => {
   const errors: string[] = [];
   page.on("console", (msg) => {
     if (msg.type() === "error") {
@@ -118,7 +119,30 @@ test("no console errors on homepage", async ({ page }) => {
       errors.push(text);
     }
   });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const target = smokeTarget(baseURL || "https://dreamforgex.ai");
+  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2500);
-  expect(errors, `console errors:\n${errors.join("\n")}`).toEqual([]);
+  const unexpectedErrors = errors.filter(error => !isPreviewToolbarCspCollision(error, target, page.url()));
+  if (target.protectedTarget) {
+    // Historical cause diagnostics are retained separately. Keep only finite
+    // current DOM/status observations; response bodies can expire in WebKit.
+    const domScriptCount = await page.locator("script[src]").evaluateAll(scripts => scripts.filter(script => {
+      try {
+        const url = new URL(script.getAttribute("src") || "", location.href);
+        return url.origin === "https://vercel.live" && url.pathname === "/_next-live/feedback/feedback.js";
+      } catch { return false; }
+    }).length);
+    const feedbackCspCount = errors.filter(text => text.includes("https://vercel.live/_next-live/feedback/feedback.js")
+      && text.includes("Content Security Policy") && text.includes("script-src")).length;
+    console.log("Preview toolbar document diagnostics", JSON.stringify({
+      final_document_same_origin: new URL(page.url()).origin === target.origin
+        && !!response && new URL(response.url()).origin === target.origin,
+      final_document_http_status: response?.status() || 0,
+      feedback_script_dom_count: domScriptCount,
+      exact_feedback_csp_signature_count: feedbackCspCount,
+      classified_preview_toolbar_csp_count: errors.length - unexpectedErrors.length,
+      other_console_error_count: errors.length - feedbackCspCount,
+    }));
+  }
+  expect(unexpectedErrors, `console errors:\n${unexpectedErrors.join("\n")}`).toEqual([]);
 });
