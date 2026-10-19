@@ -86,6 +86,7 @@ jobs:
       - name: Run Playwright smoke tests
         env:
           BASE_URL: ${{ steps.base.outputs.url }}
+          EXPECTED_AUTH_ORIGIN: ${{ steps.base.outputs.auth_origin }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           CI: "true"
         run: |
