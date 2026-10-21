@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import ToolBarbieBox from "@/pages/ToolBarbieBox";
 
 export const metadata: Metadata = {
-  title: "AI Barbie Box Generator — Turn Yourself Into a Fashion Doll | DreamForgeX",
+  title: "Free AI Barbie Box & Action Figure Generator Online | DreamForgeX",
   description:
-    "Upload a photo and generate yourself as a collector-edition fashion doll in a pink window box with custom accessories and series name.",
+    "Upload a photo and generate yourself as a collector-edition fashion doll or action figure in a blister box with custom accessories — free online AI generator.",
   alternates: { canonical: "https://dreamforgex.ai/tools/barbie-box" },
   openGraph: {
-    title: "AI Barbie Box Generator | DreamForgeX",
-    description: "Upload a photo and become a collector-edition fashion doll.",
+    title: "Free AI Barbie Box & Action Figure Generator Online | DreamForgeX",
+    description:
+      "Upload a photo and generate yourself as a collector-edition fashion doll or action figure in a custom blister box.",
     url: "https://dreamforgex.ai/tools/barbie-box",
     siteName: "DreamForgeX",
   },

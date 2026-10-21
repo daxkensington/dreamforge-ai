@@ -121,7 +121,7 @@ export default function ToolUpscaler() {
   return (
     <ToolPageLayout
       title="AI Image Upscaler"
-      description="Magnific-quality upscaling with creative AI enhancement"
+      description="Real-ESRGAN 2x & 4x online AI upscaling with creative detail enhancement"
       icon={Maximize}
       gradient="from-blue-500 to-cyan-400"
     >
