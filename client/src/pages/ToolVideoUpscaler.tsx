@@ -161,13 +161,13 @@ export default function ToolVideoUpscaler() {
             </div>
           )}
 
-          {upscale.data && upscale.data.status === "failed" && (
+          {(upscale.isError || upscale.data?.status === "failed") && (
             <div className="text-center py-16 text-red-400">
-              <p>Upscaling failed. Please try again.</p>
+              <p>{upscale.isError ? upscale.error?.message || "Upscaling failed. Please try again." : "Upscaling failed. Please try again."}</p>
             </div>
           )}
 
-          {!upscale.data && !upscale.isPending && (
+          {!upscale.data && !upscale.isPending && !upscale.isError && (
             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground/40">
               <ArrowUpCircle className="w-16 h-16 mb-4" />
               <p className="text-sm">Upload a frame and choose settings to see the result</p>
