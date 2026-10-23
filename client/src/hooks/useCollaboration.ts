@@ -50,6 +50,9 @@ interface CollaborationState {
 
 export function useCollaboration(projectId: string | null) {
   const { user } = useAuth();
+  const sessionKey = JSON.stringify([user?.id ?? null, projectId]);
+  const sessionKeyRef = useRef(sessionKey);
+  sessionKeyRef.current = sessionKey;
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,6 +65,21 @@ export function useCollaboration(projectId: string | null) {
     clipLocks: {},
     conflicts: [],
   });
+
+  const resetCollaborationState = useCallback(() => {
+    setState({
+      connected: false,
+      presence: [],
+      chatMessages: [],
+      clipLocks: {},
+      conflicts: [],
+    });
+    reconnectAttemptRef.current = 0;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
 
   // ─── WebSocket URL ──────────────────────────────────────────────
 
@@ -180,6 +198,7 @@ export function useCollaboration(projectId: string | null) {
   // ─── Connect / Reconnect ───────────────────────────────────────
 
   const connect = useCallback(() => {
+    if (!mountedRef.current || sessionKeyRef.current !== sessionKey) return;
     if (!wsUrl || !projectId || !user) return;
 
     // Cancel any pending reconnect before replacing the socket
@@ -202,7 +221,7 @@ export function useCollaboration(projectId: string | null) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || sessionKeyRef.current !== sessionKey) return;
       if (wsRef.current !== ws) return;
       reconnectAttemptRef.current = 0;
       setState((s) => ({ ...s, connected: true }));
@@ -218,12 +237,13 @@ export function useCollaboration(projectId: string | null) {
     };
 
     ws.onmessage = (event) => {
+      if (!mountedRef.current || sessionKeyRef.current !== sessionKey) return;
       if (wsRef.current !== ws) return;
       handleMessage(event);
     };
 
     ws.onclose = (event) => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || sessionKeyRef.current !== sessionKey) return;
       if (wsRef.current !== ws) return;
       setState((s) => ({ ...s, connected: false }));
 
@@ -240,17 +260,23 @@ export function useCollaboration(projectId: string | null) {
       }
 
       reconnectTimerRef.current = setTimeout(() => {
+        if (!mountedRef.current || sessionKeyRef.current !== sessionKey) return;
+        if (wsRef.current !== ws) return;
         reconnectTimerRef.current = null;
-        if (mountedRef.current) connect();
+        connect();
       }, delay);
     };
 
     ws.onerror = () => {
       // onclose will handle reconnection
     };
-  }, [wsUrl, projectId, user, handleMessage]);
+  }, [wsUrl, projectId, user, handleMessage, sessionKey]);
 
   // ─── Lifecycle ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    resetCollaborationState();
+  }, [sessionKey, resetCollaborationState]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -263,8 +289,9 @@ export function useCollaboration(projectId: string | null) {
         reconnectTimerRef.current = null;
       }
       if (wsRef.current) {
-        wsRef.current.close(1000, "Component unmounted");
+        const ws = wsRef.current;
         wsRef.current = null;
+        ws.close(1000, "Component unmounted");
       }
     };
   }, [connect]);
