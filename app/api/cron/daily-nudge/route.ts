@@ -152,24 +152,29 @@ export async function GET(req: Request) {
 
   // ─── 4. Uncensored Free Previews Left Recovery (lifetime-once) ───────────
   const freeCandidates = await db.execute(sql`
-    SELECT
-      u.id,
-      u.email,
-      (
-        SELECT count(*)::int
-        FROM generations g
-        WHERE g."userId" = u.id
-          AND g.metadata->>'free' = 'true'
-          AND g.status <> 'failed'
-      ) AS "freeUsed"
-    FROM users u
-    WHERE u."ageConfirmedAt" IS NOT NULL
-      AND u."ageConfirmedAt" < now() - interval '6 hours'
-      AND (u."uncensoredUntil" IS NULL OR u."uncensoredUntil" <= now())
-      AND NOT EXISTS (
-        SELECT 1 FROM notifications n
-        WHERE n."userId" = u.id AND n.title = 'uncensored-free-reminder'
-      )
+    SELECT u.id, u.email, u."freeUsed"
+    FROM (
+      SELECT
+        u.id,
+        u.email,
+        (
+          SELECT count(*)::int
+          FROM generations g
+          WHERE g."userId" = u.id
+            AND g.metadata->>'free' = 'true'
+            AND g.status <> 'failed'
+        ) AS "freeUsed"
+      FROM users u
+      WHERE u."ageConfirmedAt" IS NOT NULL
+        AND u."ageConfirmedAt" < now() - interval '6 hours'
+        AND (u."uncensoredUntil" IS NULL OR u."uncensoredUntil" <= now())
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n
+          WHERE n."userId" = u.id AND n.title = 'uncensored-free-reminder'
+        )
+    ) u
+    WHERE u."freeUsed" < 3
+    ORDER BY u.id
     LIMIT ${BATCH_LIMIT}
   `);
 
