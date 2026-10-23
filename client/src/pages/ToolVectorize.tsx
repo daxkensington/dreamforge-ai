@@ -30,6 +30,8 @@ export default function ToolVectorize() {
   const [svgUrl, setSvgUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sourceRevisionRef = useRef(0);
+  const uploadingRef = useRef(false);
 
   const mutation = trpc.tools.vectorize.useMutation({
     onSuccess: (data) => {
@@ -44,23 +46,71 @@ export default function ToolVectorize() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Please select an image"); return; }
+    const revision = ++sourceRevisionRef.current;
+    let settled = false;
+    uploadingRef.current = true;
+    setImageUrl("");
+    setImagePreview(null);
     setUploading(true);
     try {
       const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
+      reader.onload = () => {
+        if (sourceRevisionRef.current === revision && !settled && typeof reader.result === "string") {
+          setImagePreview(reader.result);
+        }
+      };
       reader.readAsDataURL(file);
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) { const { url } = await res.json(); setImageUrl(url); }
-      else toast.info("Using local preview — enter an image URL for best results");
-    } catch { toast.error("Upload failed"); }
-    finally { setUploading(false); }
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      if (typeof url !== "string" || !url.trim()) throw new Error("Upload failed");
+      if (sourceRevisionRef.current !== revision) return;
+      settled = true;
+      setImageUrl(url);
+      setImagePreview(url);
+    } catch {
+      if (sourceRevisionRef.current !== revision) return;
+      settled = true;
+      setImageUrl("");
+      setImagePreview(null);
+      toast.error("Upload failed");
+    } finally {
+      settled = true;
+      if (sourceRevisionRef.current === revision) {
+        uploadingRef.current = false;
+        setUploading(false);
+      }
+    }
+  };
+
+  const handleSourceUrlChange = (url: string) => {
+    ++sourceRevisionRef.current;
+    uploadingRef.current = false;
+    setUploading(false);
+    setImageUrl(url);
+    setImagePreview(url || null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleReset = () => {
+    handleSourceUrlChange("");
+    setResultUrl(null);
+    setSvgUrl(null);
   };
 
   const isProcessing = mutation.isPending;
+
+  const handleVectorize = () => {
+    if (uploadingRef.current || uploading || !imageUrl.trim() || isProcessing) return;
+    setResultUrl(null);
+    setSvgUrl(null);
+    mutation.mutate({ imageUrl, style: style as any, colorCount });
+  };
 
   return (
     <ToolPageLayout title="Image Vectorizer" description="Convert raster images to clean vector-style output" icon={PenTool} gradient="from-rose-500 to-pink-400">
@@ -75,7 +125,7 @@ export default function ToolVectorize() {
               <CardContent className="p-6 space-y-5">
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Source Image</Label>
-                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="text-sm" />
+                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => handleSourceUrlChange(e.target.value)} className="text-sm" />
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                   <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                     {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
@@ -105,10 +155,10 @@ export default function ToolVectorize() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); setSvgUrl(null); mutation.mutate({ imageUrl, style: style as any, colorCount }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={handleVectorize} disabled={!imageUrl.trim() || uploading || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Vectorizing...</> : <><Sparkles className="h-4 w-4 mr-2" />Vectorize</>}
                   </Button>
-                  <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="lg" onClick={handleReset}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
             </Card>
