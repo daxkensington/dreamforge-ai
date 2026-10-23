@@ -239,6 +239,25 @@ const translations: Record<string, Record<string, string>> = {
 };
 
 /**
+ * Safari with storage blocked THROWS on property access, so `typeof
+ * localStorage` is not a usable guard — only try/catch is.
+ */
+function safeGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* private mode / blocked storage — preference is not persisted */
+  }
+}
+
+/**
  * Get a translated string. Falls back to English if not found.
  */
 export function t(key: string, lang: string = "en"): string {
@@ -250,7 +269,7 @@ export function t(key: string, lang: string = "en"): string {
  */
 export function getPreferredLanguage(): LangCode {
   if (typeof window === "undefined") return "en";
-  const saved = localStorage.getItem("dfx-lang");
+  const saved = safeGet("dfx-lang");
   if (saved && LANGUAGES.some((l) => l.code === saved)) return saved as LangCode;
   const browser = navigator.language?.split("-")[0];
   if (browser && LANGUAGES.some((l) => l.code === browser)) return browser as LangCode;
@@ -262,7 +281,7 @@ export function getPreferredLanguage(): LangCode {
  */
 export function setLanguage(lang: LangCode): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem("dfx-lang", lang);
+  safeSet("dfx-lang", lang);
   document.documentElement.lang = lang;
   // Set dir for RTL languages
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
