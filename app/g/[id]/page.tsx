@@ -57,7 +57,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${promptSnippet} — DreamForgeX`;
   const description = `${gen.mediaType === "video" ? "AI video" : "AI image"} created on DreamForgeX. Try this prompt yourself with 100+ AI tools.`;
   const url = `${SITE}/g/${gen.id}`;
-  const ogImage = gen.imageUrl ?? gen.thumbnailUrl ?? FALLBACK_OG;
+  // Videos should unfurl with their poster frame (or the brand fallback),
+  // never the video asset itself; images keep their imageUrl.
+  const ogImage =
+    gen.mediaType === "video"
+      ? gen.thumbnailUrl ?? FALLBACK_OG
+      : gen.imageUrl ?? FALLBACK_OG;
 
   return {
     title,
