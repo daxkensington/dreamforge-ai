@@ -85,7 +85,7 @@ export default function ToolHdrEnhance() {
               <CardContent className="p-6 space-y-5">
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Source Image</Label>
-                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="text-sm" />
+                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value.trim() || null); setResultUrl(null); }} className="text-sm" />
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                   <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                     {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
@@ -119,7 +119,7 @@ export default function ToolHdrEnhance() {
                     disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enhancing...</> : <><Sparkles className="h-4 w-4 mr-2" />Enhance Lighting</>}
                   </Button>
-                  <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setResultUrl(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
             </Card>
