@@ -36,10 +36,28 @@ const PROBES = [
   { path: "/uncensored/no-filter", expect: "filter", method: "GET", maxMs: 10000, critical: false },
   { path: "/explore", expect: null, method: "HEAD", maxMs: 8000, critical: false },
   { path: "/api/health", expect: '"ok":true', method: "GET", maxMs: 8000, critical: true },
-  { path: "/api/status/providers", expect: '"summary"', method: "GET", maxMs: 12000, critical: false },
   // IndexNow ownership key (SEO pipeline)
   { path: "/23c418b9ade7560f.txt", expect: "23c418b9ade7560f", method: "GET", maxMs: 5000, critical: false },
+  // RunPod serves every uncensored free preview (the conversion hook). RunPod
+  // pauses the endpoint (max_workers=0) the moment the prepaid balance hits $0,
+  // and 2026-10-09→14 that killed 106 previews for 25 users with no alert.
+  // Capacity-disabled or balance-low is therefore an outage; other providers
+  // degrading is logged only.
+  { path: "/api/status/providers", expect: '"summary"', method: "GET", maxMs: 12000, critical: true, inspect: inspectProviders },
 ];
+
+function inspectProviders(body) {
+  let report;
+  try { report = JSON.parse(body); } catch { return ["provider report is not JSON"]; }
+  const checks = Array.isArray(report?.checks) ? report.checks : [];
+  const reasons = checks
+    .filter((c) => (c.name === "runpod" || c.name === "runpod-balance") && c.configured && c.ok === false)
+    .map((c) => `${c.name}: ${c.error ?? "not ok"}${c.capacity ? ` (capacity ${c.capacity})` : ""}${c.balance ? ` (balance ${c.balance})` : ""}`);
+  const others = checks.filter((c) => c.name !== "runpod" && c.name !== "runpod-balance" && c.configured && c.ok === false).map((c) => c.name);
+  if (others.length) console.log(`  ℹ non-RunPod providers degraded (logged only): ${others.join(", ")}`);
+  return reasons;
+}
+
 
 async function probe(p) {
   const url = `${BASE_URL}${p.path}`;
@@ -61,11 +79,13 @@ async function probe(p) {
     const statusOk = res.status >= 200 && res.status < 400;
     const bodyOk = !p.expect || body.includes(p.expect);
     const latencyOk = ms <= p.maxMs;
-    const ok = statusOk && bodyOk && latencyOk;
+    const inspectReasons = statusOk && bodyOk && typeof p.inspect === "function" ? p.inspect(body) : [];
+    const ok = statusOk && bodyOk && latencyOk && inspectReasons.length === 0;
     const reasons = [];
     if (!statusOk) reasons.push(`status=${res.status}`);
     if (!bodyOk) reasons.push(`body missing "${p.expect}"`);
     if (!latencyOk) reasons.push(`slow ${ms}ms > ${p.maxMs}ms`);
+    reasons.push(...inspectReasons);
     return { ...p, status: res.status, ms, ok, reasons };
   } catch (err) {
     return {

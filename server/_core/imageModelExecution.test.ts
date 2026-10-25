@@ -117,9 +117,12 @@ describe("executable image registry", () => {
 
   it("reflects fal routes without requiring Replicate credentials", () => {
     mocks.env.falApiKey = "test-fal";
-    for (const id of ["flux-pro", "flux-schnell", "together-flux", "ultra", "musicgen"]) {
+    // minimax-video has executed on fal-ai/minimax/hailuo-02 since 2026-06-12;
+    // gating it on the (dead since June) Replicate token hid a working model.
+    for (const id of ["flux-pro", "flux-schnell", "together-flux", "ultra", "musicgen", "minimax-video"]) {
       expect(getModelById(id)?.isAvailable).toBe(true);
     }
+    mocks.env.falApiKey = "";
     expect(getModelById("minimax-video")?.isAvailable).toBe(false);
   });
 
