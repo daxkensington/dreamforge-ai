@@ -45,16 +45,25 @@ jobs:
       - name: Open or update incident issue
         if: steps.probe.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          PROBE_SUMMARY: ${{ steps.probe.outputs.summary }}
         with:
           script: |
             const title = "[uptime] dreamforgex.ai is DOWN";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // scripts/health-check.mjs writes the failed probes (path + reason)
+            // to GITHUB_OUTPUT so the issue says WHAT failed without a log dive.
+            // "runpod-balance: balance-low" means top up RunPod: the prepaid
+            // balance is about to pause the uncensored-preview endpoint.
+            const summary = (process.env.PROBE_SUMMARY || "").trim();
             const body = [
               `🚨 **Uptime probe failed at ${new Date().toISOString()}**`,
               ``,
+              summary ? `**Failed probes**\n${summary}` : `See workflow log for failure details.`,
+              ``,
               `Run: ${runUrl}`,
               ``,
-              `See workflow log for failure details. This issue will auto-close on the next healthy probe.`,
+              `This issue will auto-close on the next healthy probe.`,
             ].join("\n");
 
             // Look for an existing open incident.
