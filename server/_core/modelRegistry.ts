@@ -266,7 +266,8 @@ function minimaxVideo(): AIModel {
     capabilities: ["text-to-video"],
     maxResolution: { width: 1280, height: 720 },
     creditCost: { base: 40 },
-    isAvailable: !!ENV.replicateApiToken,
+    // Served by fal-ai/minimax/hailuo-02 since 2026-06-12; Replicate is only a failover.
+    isAvailable: !!ENV.falApiKey || !!ENV.replicateApiToken,
     modelTier: "standard",
     tier: "creator",
     description: "Minimax Video — high-quality short video generation from text prompts.",

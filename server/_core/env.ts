@@ -42,6 +42,11 @@ export const ENV = {
   // RunPod Self-Hosted
   get runpodApiKey() { return process.env.RUNPOD_API_KEY ?? ""; },
   get runpodFluxEndpointId() { return process.env.RUNPOD_FLUX_ENDPOINT_ID ?? ""; },
+  // Prepaid RunPod balance below this (USD) flips /api/status/providers to
+  // degraded so ohwista + the uptime workflow page before the endpoint pauses.
+  // 2026-10-09→14: balance hit $0, RunPod set max_workers=0, every uncensored
+  // free preview failed for six days and nobody was alerted.
+  get runpodLowBalanceUsd() { const n = Number(process.env.RUNPOD_LOW_BALANCE_USD ?? "25"); return Number.isFinite(n) && n >= 0 ? n : 25; },
   // Optional dedicated endpoint (bigger GPU) for Wan video. Falls back to the
   // flux endpoint if unset so a single-endpoint deploy still works.
   get runpodVideoEndpointId() { return process.env.RUNPOD_VIDEO_ENDPOINT_ID ?? ""; },

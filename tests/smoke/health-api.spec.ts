@@ -23,11 +23,17 @@ test("/api/status/providers returns provider list", async ({ request }) => {
   const body = await res.json();
   expect(body.mode).toBe("read-only-metadata");
   expect(body.generationReadiness).toBe("not-probed");
-  expect(body.checks.map((c: { name: string }) => c.name)).toEqual(["runpod", "replicate", "fal", "runway", "kling"]);
+  expect(body.checks.map((c: { name: string }) => c.name)).toEqual(["runpod", "runpod-balance", "replicate", "fal", "runway", "kling"]);
   for (const check of body.checks) {
     expect(typeof check.configured).toBe("boolean");
     expect(check.readiness).toBe("not-probed");
   }
   expect(body.checks.find((c: { name: string }) => c.name === "runpod").probe).toBe("control-plane-metadata");
-  expect(body.summary).not.toBe("all-healthy");
+  const balance = body.checks.find((c: { name: string }) => c.name === "runpod-balance");
+  expect(balance.probe).toBe("account-metadata");
+  // The dollar amount is never published; only the band relative to the floor.
+  expect(JSON.stringify(balance)).not.toMatch(/\d+\.\d{2,}/);
+  // "all-healthy" is the literal ohwista's synthetic check matches on; the
+  // aggregate is still metadata-only (generationReadiness stays not-probed).
+  expect(body.summary).toMatch(/^(all-healthy|unconfigured|degraded:[a-z-]+(,[a-z-]+)*)$/);
 });
