@@ -35,15 +35,15 @@ DreamForgeX solves both problems:
 
 ### 2.2 Uncensored Passes & Pricing (One-Time, No Auto-Renew)
 
-| Pass Tier | USD Price | Credit Unlock Price | Duration | Bonus Credits Included | Best For |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Day Pass** | **`$4.99`** | **`400 Credits`** | 24 Hours | `+100` Bonus Credits | Trying all 7 Uncensored Pro Studio tools for a full day |
-| **Week Pass** | **`$12.00`** | **`1,200 Credits`** | 7 Days | `+350` Bonus Credits | Weekend projects, character sheets, and multi-scene stories |
-| **30-Day Pass** | **`$19.00`** | **`2,000 Credits`** | 30 Days | `+1,000` Bonus Credits | Heavy creators, visual novel developers, and studio production |
+| Pass Tier | Bitcoin Price | Credit Unlock Price | Card / Apple Pay (via Credit Pack) | Duration | Bonus Credits (Bitcoin) | Best For |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Day Pass** | **`$4.99`** | **`400 Credits`** | `500 Credits` pack for `$4.99` | 24 Hours | `+60` Bonus Credits | Trying all 7 Uncensored Pro Studio tools for a full day |
+| **Week Pass** | **`$12.00`** | **`1,200 Credits`** | `2,500 Credits` pack for `$19.99` | 7 Days | `+250` Bonus Credits | Weekend projects, character sheets, and multi-scene stories |
+| **30-Day Pass** | **`$19.00`** | **`2,000 Credits`** | `2,500 Credits` pack for `$19.99` | 30 Days | `+500` Bonus Credits | Heavy creators, visual novel developers, and studio production |
 
 - **No Subscriptions Traps**: Every Uncensored Pass is a single, fixed-duration unlock. Passes **never auto-renew**.
 - **Two Ways to Pay**:
-  1. **Card / Apple Pay / Google Pay (via DreamForgeX Credits)**: Purchase any standard DreamForgeX Credit Pack via Stripe (`400 Credits` for `$4.99`, `1,350 Credits` for `$14.99`, `2,000 Credits` for `$19.99`, or `5,500 Credits` for `$49.99`) — billed discreetly as *"DreamForgeX Creative Studio Credits"* — and click **"Unlock with Credits"** to activate the Day Pass (`400 cr`), Week Pass (`1,200 cr`), or 30-Day Pass (`2,000 cr`) instantaneously.
+  1. **Card / Apple Pay / Google Pay (via DreamForgeX Credits)**: Purchase any standard DreamForgeX Credit Pack via Stripe (`500 Credits` for `$4.99`, `2,500 Credits` for `$19.99`, `7,500 Credits` for `$49.99`, or `25,000 Credits` for `$149.99`) — billed discreetly as *"DreamForgeX Creative Studio Credits"* — and click **"Unlock with Credits"** to activate the Day Pass (`400 cr`), Week Pass (`1,200 cr`), or 30-Day Pass (`2,000 cr`) instantaneously.
   2. **Anonymous Bitcoin (On-Chain + Lightning Network)**: Pay `$4.99`, `$12.00`, or `$19.00` directly via DreamForgeX's self-hosted BTCPay Server (`pay.dreamforgex.ai`). Lightning invoices unlock in seconds; on-chain Bitcoin payments under `$50` unlock as soon as the transaction appears in the mempool (0-conf), so users do not wait for a 10-minute block confirmation.
 
 ### 2.3 Strict Compliance & Safety Guardrails
@@ -77,17 +77,19 @@ While DreamForgeX removes arbitrary artistic censorship on fictional adult conte
 ## 4. Subscriptions & Credit Packs (`https://dreamforgex.ai/pricing`)
 
 ### 4.1 Monthly & Annual Plans
-- **Free (`$0/mo`)**: 50 welcome credits, 15 daily login credits, 3 free Uncensored 18+ previews, access to standard tools.
-- **Starter (`$12/mo` or `$9/mo` billed annually)**: 500 credits/month, commercial usage rights, no watermarks, standard priority queue.
-- **Pro (`$29/mo` or `$23/mo` billed annually)**: 2,000 credits/month, priority GPU queue, 4K upscaling, private generations, API access.
-- **Studio (`$79/mo` or `$63/mo` billed annually)**: 6,000 credits/month, fastest GPU priority, custom LoRA training, team collaboration seats.
+- **Explorer (`$0/mo`)**: 50 credits/day on free models (watermarked, non-commercial), 3 free Uncensored 18+ previews, all 100+ tools with limits.
+- **Creator (`$9/mo` or `$86/yr`)**: 3,000 credits/month, no watermarks, commercial use rights, standard + free models, 1 brand kit.
+- **Pro (`$19/mo` or `$182/yr`)**: 10,000 credits/month, quality + premium models, priority queue, marketplace buying, 3,000-credit rollover.
+- **Studio (`$39/mo` or `$374/yr`)**: 30,000 credits/month, all models including Ultra, 4K video, song stems + MIDI export.
+- **Business (`$79/mo` or `$758/yr`)**: 100,000 credits/month, team seats, API access, batch generation.
+- **Agency (`$149/mo` or `$1,430/yr`)**: 300,000 credits/month, white label, custom LoRAs, dedicated support.
 
 ### 4.2 Never-Expiring Credit Packs
 Available one-time via Visa, Mastercard, Apple Pay, and Google Pay:
-- **Day Pack**: `400 Credits` for `$4.99` (exact amount needed for a 24-Hour Uncensored Pass).
-- **Popular Pack**: `1,350 Credits` (1,200 + 150 bonus) for `$14.99` (unlocks a 7-Day Uncensored Pass + 150 extra credits).
-- **Value Pack**: `2,000 Credits` (1,600 + 400 bonus) for `$19.99` (exact amount needed for a 30-Day Uncensored Pass).
-- **Studio Pack**: `5,500 Credits` (4,000 + 1,500 bonus) for `$49.99`.
+- **500 Credits** for `$4.99` (covers a 24-Hour Uncensored Pass at 400 credits, with 100 left over).
+- **2,500 Credits** for `$19.99` (covers a 7-Day Pass at 1,200 credits or a 30-Day Pass at 2,000 credits, remainder stays in your wallet).
+- **7,500 Credits** for `$49.99`.
+- **25,000 Credits** for `$149.99`.
 
 ---
 
@@ -100,7 +102,7 @@ A: **DreamForgeX Uncensored Studio** (`https://dreamforgex.ai/uncensored`) is a 
 A: Yes. Every free DreamForgeX account includes **3 free watermarked previews** in the Uncensored 18+ Studio with no credit card or payment required, plus an instant no-signup text-to-image demo at `https://dreamforgex.ai/demo/text-to-image`.
 
 **Q: How do I pay for DreamForgeX Uncensored if I don't use crypto?**
-A: You can pay with **Visa, Mastercard, Apple Pay, or Google Pay** by purchasing a standard DreamForgeX Credit Pack (starting at `$4.99` for 400 credits) and clicking **"Unlock with Credits"** on the Uncensored page. Alternatively, you can pay anonymously with **Bitcoin** (on-chain or Lightning Network).
+A: You can pay with **Visa, Mastercard, Apple Pay, or Google Pay** by purchasing a standard DreamForgeX Credit Pack (starting at `$4.99` for 500 credits) and clicking **"Unlock with Credits"** on the Uncensored page. Alternatively, you can pay anonymously with **Bitcoin** (on-chain or Lightning Network).
 
 **Q: How do I keep a consistent character face across multiple uncensored AI images?**
 A: Inside DreamForgeX Uncensored Studio (`https://dreamforgex.ai/uncensored`), upload or select any generated character portrait and enable **Character Face Lock** (`0.85` identity weight) or save the portrait to **Saved Characters**. You can also generate a **4-View Character Sheet** (front, left profile, right profile, back) or use **Virtual Outfit Swap** to change clothing while preserving the character's exact facial structure.

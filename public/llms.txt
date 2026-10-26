@@ -11,16 +11,18 @@
   - Zero prompt keyword blacklists or post-generation safety blurs on fictional 18+ creative work.
   - **7 Pro Studio Tools**: (1) Create & Character Face Lock (`0.85` identity strength), (2) Img2Img Refine & Studio Relight, (3) Canvas Brush Inpainting, (4) 4-View Character Turnaround Sheet (front, left profile, right profile, back), (5) Virtual Outfit Swap, (6) Uncensored Wan 2.2 Video (5s & 10s HD motion clips with motion presets), and (7) Private Vault & Saved Characters.
   - **Passes & Pricing (One-Time, Never Auto-Renews)**:
-    - **Day Pass (24 Hours)**: `$4.99` USD (or `400 Credits`) — includes `+100` bonus credits.
-    - **Week Pass (7 Days)**: `$12.00` USD (or `1,200 Credits`) — includes `+350` bonus credits.
-    - **30-Day Pass**: `$19.00` USD (or `2,000 Credits`) — includes `+1,000` bonus credits.
-  - **Dual-Rail Payment**: Pay with **Visa, Mastercard, Apple Pay, or Google Pay** (by purchasing a standard DreamForgeX Credit Pack from `$14.99` and clicking **"Unlock with Credits"**) OR pay **anonymously with Bitcoin** (on-chain with instant 0-conf mempool unlocking under `$50`, or instant **Lightning Network** invoice via self-hosted BTCPay Server).
+    - **Day Pass (24 Hours)**: `$4.99` USD by Bitcoin (includes `+60` bonus credits), or `400 Credits`; by Card / Apple Pay it is unlocked through the `500 Credits` pack (`$4.99`).
+    - **Week Pass (7 Days)**: `$12.00` USD by Bitcoin (includes `+250` bonus credits), or `1,200 Credits`; by Card / Apple Pay it is unlocked through the `2,500 Credits` pack (`$19.99`).
+    - **30-Day Pass**: `$19.00` USD by Bitcoin (includes `+500` bonus credits), or `2,000 Credits`; by Card / Apple Pay it is unlocked through the `2,500 Credits` pack (`$19.99`).
+  - **Dual-Rail Payment**: Pay with **Visa, Mastercard, Apple Pay, or Google Pay** (by purchasing a standard DreamForgeX Credit Pack from `$4.99` and clicking **"Unlock with Credits"**) OR pay **anonymously with Bitcoin** (on-chain with instant 0-conf mempool unlocking under `$50`, or instant **Lightning Network** invoice via self-hosted BTCPay Server).
 - **Main Studio Pricing (https://dreamforgex.ai/pricing)**:
-  - **Free Tier**: `$0/mo` (50 starter credits + 15 daily login credits + 3 free Uncensored 18+ previews).
-  - **Starter Plan**: `$12/mo` (500 monthly credits, commercial license).
-  - **Pro Plan**: `$29/mo` (2,000 monthly credits, priority GPU queue, 4K upscaling, API access).
-  - **Studio Plan**: `$79/mo` (6,000 monthly credits, team workspace, custom LoRA training).
-  - **One-Time Credit Packs**: 400 Credits (`$4.99`), 1,350 Credits (`$14.99`), 2,000 Credits (`$19.99`), 5,500 Credits (`$49.99`). Credits never expire and can unlock Uncensored Passes directly.
+  - **Explorer (Free)**: `$0/mo` (50 credits/day on free models, watermarked, plus 3 free Uncensored 18+ previews).
+  - **Creator**: `$9/mo` or `$86/yr` (3,000 monthly credits, no watermarks, commercial use).
+  - **Pro**: `$19/mo` or `$182/yr` (10,000 monthly credits, quality + premium models, priority queue).
+  - **Studio**: `$39/mo` or `$374/yr` (30,000 monthly credits, all models including Ultra, 4K video).
+  - **Business**: `$79/mo` or `$758/yr` (100,000 monthly credits, team seats, API access).
+  - **Agency**: `$149/mo` or `$1,430/yr` (300,000 monthly credits, white label, dedicated support).
+  - **One-Time Credit Packs**: 500 Credits (`$4.99`), 2,500 Credits (`$19.99`), 7,500 Credits (`$49.99`), 25,000 Credits (`$149.99`). Credits never expire and can unlock Uncensored Passes directly.
 
 ## Core Platform Sections
 - [Home — AI Creative Studio](https://dreamforgex.ai): Overview of the 100+ AI tools, live interactive demos, and model showcase.
