@@ -147,7 +147,10 @@ const FALLBACK_PLANS = UNCENSORED_PLANS;
 
 export default function Uncensored() {
   const [ageChecked, setAgeChecked] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState("uncensored-30d");
+  // Default to the cheapest way in. 7/7 card checkouts in Oct 2026 expired
+  // unpaid; most were accounts under a minute old sent to a $19.99 page. The
+  // 30-day card still carries the "Best value" badge for people who want it.
+  const [selectedPlanId, setSelectedPlanId] = useState("uncensored-day");
 
   // Intent carried back through sign-in (see shared/returnTo.ts). Visitors used
   // to authenticate from this page and land in the SFW studio, losing the thing
@@ -318,6 +321,23 @@ export default function Uncensored() {
     previewHistory.find((img) => img.id === selectedPreviewId) ?? previewHistory[0] ?? null;
   const displayPreviewUrl = activePreviewItem?.imageUrl ?? freeResultUrl;
   const displayPreviewId = activePreviewItem?.id ?? selectedPreviewId;
+
+  // Ask for money only after they have seen the product. Until this visitor
+  // has rendered a free preview the pass card stays secondary (plans visible,
+  // buy buttons folded away) and the real offer sits under the finished image.
+  // Anyone who arrived specifically to buy (plan= link, Stripe/BTC round-trip,
+  // a Studio tool upsell) still gets the full card at once.
+  const hasPreviewed = active || !!freeResultUrl || previewHistory.length > 0 || freeRemaining < freeLimit;
+  const [showOfferEarly, setShowOfferEarly] = useState(false);
+  const offerPrimary =
+    hasPreviewed || showOfferEarly || returnIntent === "buy" || !!autoUnlockPlanId || !!inlineInvoice || !!studioIntent;
+  const entryPlan = plans.reduce((cheapest, p) => (p.priceUsd < cheapest.priceUsd ? p : cheapest), plans[0]);
+  const postPreviewOfferTracked = useRef(false);
+  useEffect(() => {
+    if (!displayPreviewUrl || active || postPreviewOfferTracked.current) return;
+    postPreviewOfferTracked.current = true;
+    track("paywall_viewed", { surface: "uncensored", placement: "post-preview" });
+  }, [displayPreviewUrl, active]);
 
   const triggerStudioUpsell = (tab: UncensoredStudioTab, label: string) => {
     setStudioIntent({ tab, focusId: displayPreviewId ?? null, label });
@@ -495,6 +515,46 @@ export default function Uncensored() {
     }
     unlockWithCredits.mutate({ planId: selectedPlanId });
   };
+
+  /** The Card / Apple Pay and Bitcoin buttons — one source, two placements. */
+  const renderUnlockButtons = (compact = false) => (
+    <div className={`${compact ? "mt-3" : "mt-5"} grid gap-3 sm:grid-cols-2`}>
+      <Button
+        onClick={handleUnlockWithCredits}
+        disabled={unlockWithCredits.isPending || purchaseCredits.isPending || confirmAge.isPending || meLoading}
+        size={compact ? "default" : "lg"}
+        className="w-full bg-gradient-to-r from-rose-500 to-orange-500 text-sm font-semibold hover:opacity-90"
+      >
+        {unlockWithCredits.isPending || confirmAge.isPending ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Unlocking…</>
+        ) : purchaseCredits.isPending ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening checkout…</>
+        ) : !isAuthed ? (
+          <><Lock className="mr-2 h-4 w-4" /> Sign in to unlock</>
+        ) : hasEnoughCredits ? (
+          <><Sparkles className="mr-2 h-4 w-4" /> Unlock with {requiredCredits} Credits (You have {creditBalance})</>
+        ) : (
+          <><Sparkles className="mr-2 h-4 w-4" /> Unlock w/ Card / Apple Pay · ${selectedPlan?.creditPackPriceUsd ?? 19.99}</>
+        )}
+      </Button>
+
+      <Button
+        onClick={handleStart}
+        disabled={checkout.isPending || confirmAge.isPending || meLoading || status?.available === false}
+        variant="outline"
+        size={compact ? "default" : "lg"}
+        className="w-full border-rose-500/40 bg-rose-500/10 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
+      >
+        {checkout.isPending || confirmAge.isPending ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating invoice…</>
+        ) : !isAuthed ? (
+          <><Bitcoin className="mr-2 h-4 w-4" /> Sign in for Bitcoin</>
+        ) : (
+          <><Bitcoin className="mr-2 h-4 w-4" /> Pay ${selectedPlan?.priceUsd ?? 19} BTC (+{selectedPlan?.bonusCredits ?? 500} cr)</>
+        )}
+      </Button>
+    </div>
+  );
 
   return (
     <PageLayout>
@@ -806,6 +866,38 @@ export default function Uncensored() {
                               <img src={item.imageUrl ?? ""} alt="" className="h-12 w-12 object-cover" />
                             </button>
                           ))}
+                        </div>
+                      )}
+                      {!active && (
+                        <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-rose-100">
+                              Like it? Unlock the full Studio — unwatermarked, unlimited renders, 5s video.
+                            </p>
+                            <span className="text-xs text-rose-200/80">
+                              {freeRemaining} free preview{freeRemaining === 1 ? "" : "s"} left
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {plans.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setSelectedPlanId(p.id)}
+                                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                  p.id === selectedPlanId
+                                    ? "border-rose-400 bg-rose-500/25 text-white"
+                                    : "border-rose-500/40 text-rose-200 hover:bg-rose-500/15"
+                                }`}
+                              >
+                                {p.label} · from ${Math.min(p.priceUsd, p.creditPackPriceUsd)}
+                              </button>
+                            ))}
+                          </div>
+                          {renderUnlockButtons(true)}
+                          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                            One-time pass, no auto-renew. Card / Apple Pay bills a DreamForgeX credit pack and unlocks the pass when you return.
+                          </p>
                         </div>
                       )}
                       <div className="mt-4">
@@ -1140,58 +1232,56 @@ export default function Uncensored() {
                 One-time pass, no auto-renew. Unlock in 1 click with Card / Apple Pay (via DreamForgeX credit pack — includes leftover Studio credits) or pay anonymously with Bitcoin for +{selectedPlan?.bonusCredits ?? 500} bonus credits.
               </p>
 
-              {!active && !ageConfirmed && (
-                <label className="mt-5 flex items-center justify-center gap-2 text-sm">
-                  <Checkbox checked={ageChecked} onCheckedChange={(v) => setAgeChecked(!!v)} />
-                  I confirm I am 18 years of age or older.
-                </label>
-              )}
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <Button
-                  onClick={handleUnlockWithCredits}
-                  disabled={unlockWithCredits.isPending || purchaseCredits.isPending || confirmAge.isPending || meLoading}
-                  size="lg"
-                  className="w-full bg-gradient-to-r from-rose-500 to-orange-500 text-sm font-semibold hover:opacity-90"
-                >
-                  {unlockWithCredits.isPending || confirmAge.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Unlocking…</>
-                  ) : purchaseCredits.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening checkout…</>
-                  ) : !isAuthed ? (
-                    <><Lock className="mr-2 h-4 w-4" /> Sign in to unlock</>
-                  ) : hasEnoughCredits ? (
-                    <><Sparkles className="mr-2 h-4 w-4" /> Unlock with {requiredCredits} Credits (You have {creditBalance})</>
-                  ) : (
-                    <><Sparkles className="mr-2 h-4 w-4" /> Unlock w/ Card / Apple Pay · ${selectedPlan?.creditPackPriceUsd ?? 19.99}</>
+              {offerPrimary ? (
+                <>
+                  {!active && !ageConfirmed && (
+                    <label className="mt-5 flex items-center justify-center gap-2 text-sm">
+                      <Checkbox checked={ageChecked} onCheckedChange={(v) => setAgeChecked(!!v)} />
+                      I confirm I am 18 years of age or older.
+                    </label>
                   )}
-                </Button>
-
-                <Button
-                  onClick={handleStart}
-                  disabled={checkout.isPending || confirmAge.isPending || meLoading || status?.available === false}
-                  variant="outline"
-                  size="lg"
-                  className="w-full border-rose-500/40 bg-rose-500/10 text-sm font-semibold text-rose-100 hover:bg-rose-500/20"
-                >
-                  {checkout.isPending || confirmAge.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating invoice…</>
-                  ) : !isAuthed ? (
-                    <><Bitcoin className="mr-2 h-4 w-4" /> Sign in for Bitcoin</>
-                  ) : (
-                    <><Bitcoin className="mr-2 h-4 w-4" /> Pay ${selectedPlan?.priceUsd ?? 19} BTC (+{selectedPlan?.bonusCredits ?? 500} cr)</>
+                  {renderUnlockButtons()}
+                  {status?.available === false && (
+                    <p className="mt-3 text-center text-xs text-amber-500">
+                      Crypto checkout is temporarily unavailable — use Credits above to unlock immediately.
+                    </p>
                   )}
-                </Button>
-              </div>
-
-              {status?.available === false && (
-                <p className="mt-3 text-center text-xs text-amber-500">
-                  Crypto checkout is temporarily unavailable — use Credits above to unlock immediately.
-                </p>
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    Credits unlock the Studio immediately. Bitcoin payments unlock as soon as seen on-chain or Lightning.
+                  </p>
+                </>
+              ) : (
+                <div className="mt-5 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Passes from ${entryPlan.priceUsd}. Your {freeLimit} free previews come first — the unlock offer
+                    appears under your first render.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+                    <Button
+                      onClick={() => {
+                        if (!isAuthed) {
+                          window.location.href = loginUrlKeepingIntent({ start: "1" });
+                          return;
+                        }
+                        conversionCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        window.setTimeout(() => freePromptRef.current?.focus(), 400);
+                      }}
+                      disabled={meLoading}
+                      className="bg-gradient-to-r from-rose-500 to-orange-500 font-semibold hover:opacity-90"
+                    >
+                      <Flame className="mr-2 h-4 w-4" />
+                      {isAuthed ? "Render a free preview first" : `Start with ${freeLimit} free previews`}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setShowOfferEarly(true)}
+                      className="text-xs text-rose-200/80 underline-offset-2 hover:text-white hover:underline"
+                    >
+                      I&apos;ve decided — show the unlock options
+                    </button>
+                  </div>
+                </div>
               )}
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                Credits unlock the Studio immediately. Bitcoin payments unlock as soon as seen on-chain or Lightning.
-              </p>
                 </>
               )}
             </div>
