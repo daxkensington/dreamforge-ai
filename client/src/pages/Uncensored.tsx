@@ -216,6 +216,7 @@ export default function Uncensored() {
   const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
     onSuccess: (res) => {
       if (res.url) {
+        track("checkout_redirected", { kind: "credit_pack", surface: "uncensored", plan: selectedPlanId });
         window.location.href = res.url;
       } else {
         toast.error("Couldn't open checkout. Please try again.");
@@ -365,6 +366,9 @@ export default function Uncensored() {
       if (params.get("credit_success") === "true") {
         track("checkout_completed", { kind: "credit_pack", surface: "uncensored" });
         toast.success("Credits added! Unlocking your Uncensored Pass…");
+      } else if (params.get("canceled") === "true") {
+        // Stripe's cancel_url: the buyer reached the hosted page and backed out.
+        track("checkout_canceled", { kind: "credit_pack", surface: "uncensored", plan: autoUnlock });
       }
     }
     // A prompt handed over from the Workspace or demo (see shared/adultRouting)

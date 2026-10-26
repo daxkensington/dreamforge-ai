@@ -235,6 +235,9 @@ export default function Pricing() {
       track("checkout_completed", { kind: "subscription" });
     } else if (params.get("credit_success") === "true") {
       track("checkout_completed", { kind: "credit_pack" });
+    } else if (params.get("canceled") === "true") {
+      // Stripe's cancel_url: the buyer reached the hosted page and backed out.
+      track("checkout_canceled", { surface: "pricing" });
     }
   }, []);
 
@@ -248,6 +251,7 @@ export default function Pricing() {
       toast.error("Stripe didn't return a checkout link. Please try again.");
       return;
     }
+    track("checkout_redirected", { surface: "pricing", target: pendingCheckout ?? undefined });
     window.location.href = res.url;
   };
 

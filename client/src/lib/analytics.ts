@@ -15,6 +15,12 @@ export type TrackedEvent =
   | "generation_completed"
   | "paywall_viewed"
   | "checkout_started"
+  // The tRPC call returned a Stripe URL and the browser was sent there. The gap
+  // checkout_started -> checkout_redirected is our side failing; the gap
+  // checkout_redirected -> checkout_completed is the buyer leaving Stripe.
+  | "checkout_redirected"
+  // Stripe sent the buyer back via cancel_url (the Back arrow on the hosted page).
+  | "checkout_canceled"
   | "checkout_completed";
 
 const ANON_KEY = "dfx_anon_id";
