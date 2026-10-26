@@ -24,29 +24,47 @@ export default function BlogWriter() {
 
   const generateMutation = trpc.video.generateStoryboard.useMutation({
     onSuccess: (data) => {
-      if (data.status === "completed" && data.scenes) {
+      if (data?.status === "completed" && data.scenes?.length) {
         const title = data.title || data.scenes[0]?.title || "Untitled Blog Post";
         const content = data.scenes.map((s: any) => `## ${s.title}\n\n${s.description}`).join("\n\n");
         const meta = data.synopsis || data.scenes[0]?.description?.slice(0, 160) || "";
         setResult({ title, content, meta });
         toast.success("Blog post generated!");
+      } else {
+        toast.error(data?.error || (data?.status ? `Blog generation ${data.status}` : "Blog generation did not return any content"));
       }
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const handleGenerate = () => {
+  const handleGenerate = (overrides?: { tone?: string; length?: string }) => {
     if (!topic.trim()) return;
-    const wordCount = length === "short" ? "500-800" : length === "long" ? "2000-3000" : "1000-1500";
+    const effTone = overrides?.tone ?? tone;
+    const effLength = overrides?.length ?? length;
+    const wordCount = effLength === "short" ? "500-800" : effLength === "long" ? "2000-3000" : "1000-1500";
     generateMutation.mutate({
-      concept: `Write a ${wordCount} word blog post about: ${topic}. Tone: ${tone}. ${keywords ? `SEO keywords: ${keywords}.` : ""}
+      concept: `Write a ${wordCount} word blog post about: ${topic}. Tone: ${effTone}. ${keywords ? `SEO keywords: ${keywords}.` : ""}
       Structure with clear H2 sections. Each scene = one section with a heading (title) and content (description).
       First scene should be the introduction. Last scene should be the conclusion with a call-to-action.
       Include practical examples, data points, and actionable takeaways.`,
-      sceneCount: length === "short" ? 4 : length === "long" ? 8 : 6,
+      sceneCount: effLength === "short" ? 4 : effLength === "long" ? 8 : 6,
       style: "cinematic",
       aspectRatio: "16:9",
     });
+  };
+
+  const stepLength = (l, dir) => {
+    const order = ["short", "medium", "long"];
+    const i = order.indexOf(l);
+    const base = i < 0 ? 1 : i;
+    return order[Math.min(order.length - 1, Math.max(0, base + dir))];
+  };
+
+  const adjustmentTones = {
+    "More Professional": "professional",
+    "More Casual": "conversational",
+    "More Technical": "technical",
+    "More Simple": "simple",
   };
 
   const copyAll = () => {
@@ -117,7 +135,7 @@ export default function BlogWriter() {
                   </div>
                 </div>
                 <Input placeholder="SEO keywords (optional, comma-separated)" value={keywords} onChange={(e) => setKeywords(e.target.value)} className="bg-white/5 border-white/10" />
-                <Button onClick={handleGenerate} disabled={!topic.trim() || generateMutation.isPending} className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white">
+                <Button onClick={() => handleGenerate()} disabled={!topic.trim() || generateMutation.isPending} className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white">
                   {generateMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Writing...</> : <><Sparkles className="h-4 w-4" /> Generate Blog Post</>}
                 </Button>
               </CardContent>
@@ -137,7 +155,14 @@ export default function BlogWriter() {
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">Adjust tone:</span>
               {["More Professional", "More Casual", "More Technical", "More Simple", "Shorter", "Longer"].map((adj) => (
                 <Button key={adj} variant="outline" size="sm" className="bg-transparent text-[10px] h-6 px-2"
-                  onClick={() => { setTone(adj.toLowerCase().replace("more ", "")); setResult(null); handleGenerate(); }}
+                  disabled={generateMutation.isPending}
+                  onClick={() => {
+                    const nextTone = adjustmentTones[adj] ?? tone;
+                    const nextLength = adj === "Shorter" ? stepLength(length, -1) : adj === "Longer" ? stepLength(length, 1) : length;
+                    setTone(nextTone);
+                    setLength(nextLength);
+                    handleGenerate({ tone: nextTone, length: nextLength });
+                  }}
                 >
                   {adj}
                 </Button>
