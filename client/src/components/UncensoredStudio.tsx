@@ -210,7 +210,7 @@ export default function UncensoredStudio({
                       <Sparkles className="h-3 w-3 text-amber-400" />
                     )}
                     +{plan.durationDays === 1 ? "24h" : `${plan.durationDays}d`} ({plan.label}) ·{" "}
-                    {hasEnough ? `${plan.creditPrice.toLocaleString()} cr` : `$${plan.priceUsd} Card/Pay`}
+                    {hasEnough ? `${plan.creditPrice.toLocaleString()} cr` : `$${plan.creditPackPriceUsd} Card/Pay`}
                   </button>
                 );
               })}
