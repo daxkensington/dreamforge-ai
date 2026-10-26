@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Flame, Wand2, Paintbrush, LayoutGrid, Shirt, Film, FolderHeart, Zap, Plus, Loader2, Clock, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 import UncensoredImageStudio from "./UncensoredImageStudio";
@@ -70,8 +71,10 @@ export default function UncensoredStudio({
   const { data: referralData } = trpc.referral.getMyReferral.useQuery();
   const purchaseCredits = trpc.pricing.purchaseCredits.useMutation({
     onSuccess: (res) => {
-      if (res.url) window.location.href = res.url;
-      else toast.error("Couldn't open checkout.");
+      if (res.url) {
+        track("checkout_redirected", { kind: "credit_pack", surface: "uncensored-studio" });
+        window.location.href = res.url;
+      } else toast.error("Couldn't open checkout.");
     },
     onError: (e) => toast.error(e.message),
   });

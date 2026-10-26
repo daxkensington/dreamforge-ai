@@ -17,6 +17,8 @@ export const TRACKED_EVENTS = [
   "generation_completed",
   "paywall_viewed",
   "checkout_started",
+  "checkout_redirected",
+  "checkout_canceled",
   "checkout_completed",
 ] as const;
 
