@@ -391,6 +391,16 @@ export default function Uncensored() {
         track("checkout_canceled", { kind: "credit_pack", surface: "uncensored", plan: autoUnlock });
       }
     }
+    if (params.has("auto_unlock") || params.has("credit_success")) {
+      params.delete("auto_unlock");
+      params.delete("credit_success");
+      const search = params.toString();
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`,
+      );
+    }
     // A prompt handed over from the Workspace or demo (see shared/adultRouting)
     // — carry it in so they don't retype what they already wrote.
     const carried = params.get("prompt");
@@ -401,7 +411,12 @@ export default function Uncensored() {
 
   // Automatically unlock or extend the pass once Stripe webhook settles the credit pack.
   useEffect(() => {
-    if (!autoUnlockPlanId || autoUnlockedRef.current || !isAuthed || !status) return;
+    if (!autoUnlockPlanId || !isAuthed || !status) return;
+    if (status.active) {
+      setAutoUnlockPlanId(null);
+      return;
+    }
+    if (autoUnlockedRef.current) return;
     if (!status.ageConfirmed) return;
     const targetPlan = plans.find((p) => p.id === autoUnlockPlanId);
     if (!targetPlan) return;
