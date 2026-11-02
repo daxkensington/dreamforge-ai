@@ -190,12 +190,12 @@ export default function DesignCanvas() {
         } else if (el.content) {
           const img = new window.Image();
           img.crossOrigin = "anonymous";
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => img.naturalWidth > 0 ? resolve() : reject(new Error("Source image is empty"));
+            img.onerror = () => reject(new Error("Source image could not be loaded"));
             img.src = el.content;
           });
-          if (img.naturalWidth) ctx.drawImage(img, el.x, el.y, el.width, el.height);
+          ctx.drawImage(img, el.x, el.y, el.width, el.height);
         }
       }
       const a = document.createElement("a");
