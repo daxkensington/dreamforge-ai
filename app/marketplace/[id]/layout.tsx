@@ -48,12 +48,13 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     maximumFractionDigits: 2,
   });
   const title = `${item.title} — DreamForgeX Marketplace`;
-  const description =
-    (item.description?.slice(0, 155) ?? "") +
-    `${item.description ? "… " : ""}${item.type} by ${sellerName ?? "a DreamForgeX creator"} — ${item.price === 0 ? "Free" : price}.`;
+  const desc = item.description?.trim() ?? "";
+  const snippet = desc ? desc.slice(0, 155) + (desc.length > 155 ? "…" : "") + " " : "";
+  const description = `${snippet}${item.type} by ${sellerName ?? "a DreamForgeX creator"} — ${item.price === 0 ? "Free" : price}.`;
   const url = `${SITE}/marketplace/${item.id}`;
   const previews = Array.isArray(item.previewImages) ? item.previewImages : [];
-  const ogImage = typeof previews[0] === "string" ? previews[0] : FALLBACK_OG;
+  const ogImage =
+    typeof previews[0] === "string" && previews[0].trim() ? previews[0] : FALLBACK_OG;
 
   return {
     title,
