@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import type { UseCase } from "../../../shared/useCaseData";
+import { USE_CASE_SLUGS, type UseCase } from "../../../shared/useCaseData";
 import { TOOL_SEO_COPY } from "../../../shared/toolSeoCopy";
 import { TOOL_SAMPLES } from "@/lib/toolSamples";
 
@@ -142,7 +142,7 @@ export default function UseCasePage({ useCase }: { useCase: UseCase }) {
           <span className="text-xs font-semibold uppercase tracking-wider text-foreground/50">Also serving</span>
         </div>
         <div className="flex flex-wrap gap-3">
-          {["etsy-sellers", "podcasters", "real-estate-agents", "cosplayers", "indie-devs", "authors", "restaurants", "tattoo-artists"]
+          {USE_CASE_SLUGS
             .filter((s) => s !== useCase.slug)
             .map((s) => (
               <Link key={s} href={`/for/${s}`}>
