@@ -9,6 +9,22 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+function safeReadDismissed(): string | null {
+  try {
+    return localStorage.getItem("pwa-install-dismissed");
+  } catch {
+    return null;
+  }
+}
+
+function safeWriteDismissed(timestamp: string): void {
+  try {
+    localStorage.setItem("pwa-install-dismissed", timestamp);
+  } catch {
+    // Dismissal still works when storage is unavailable.
+  }
+}
+
 /**
  * Shows an "Add to Home Screen" banner on mobile browsers when the app
  * is not yet installed. Uses the beforeinstallprompt event. The banner
@@ -30,21 +46,26 @@ export function PWAInstallPrompt() {
     if (!isPhone) return;
 
     // Check dismissal cooldown
-    const dismissed = localStorage.getItem("pwa-install-dismissed");
+    const dismissed = safeReadDismissed();
     if (dismissed) {
       const dismissedAt = parseInt(dismissed, 10);
       if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return;
     }
 
+    let showTimeout: ReturnType<typeof setTimeout> | undefined;
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       // Small delay so the page settles first
-      setTimeout(() => setVisible(true), 2000);
+      clearTimeout(showTimeout);
+      showTimeout = setTimeout(() => setVisible(true), 2000);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      clearTimeout(showTimeout);
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
   }, []);
 
   const handleInstall = useCallback(async () => {
@@ -61,7 +82,7 @@ export function PWAInstallPrompt() {
   const handleDismiss = useCallback(() => {
     setVisible(false);
     setDeferredPrompt(null);
-    localStorage.setItem("pwa-install-dismissed", Date.now().toString());
+    safeWriteDismissed(Date.now().toString());
   }, []);
 
   if (!visible) return null;
