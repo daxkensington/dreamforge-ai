@@ -16,13 +16,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ uploadId
     await enforceRateLimit(`media.parts:${user.id}`, 120, 60_000);
     const chunks: Uint8Array[] = []; let total = 0;
     const reader = req.body?.getReader();
-    if (!reader) throw new Error("Missing upload content.");
+    if (!reader) return NextResponse.json({ error: "Missing upload content." }, { status: 400 });
     try { while (true) { const item = await reader.read(); if (item.done) break; total += item.value.byteLength;
       if (total > MEDIA_CHUNK_SIZE) { await reader.cancel(); return NextResponse.json({ error: "Upload part is too large." }, { status: 413 }); }
       chunks.push(item.value); } } finally { reader.releaseLock(); }
     return NextResponse.json(await withStorageOwner(user.id, () => putMediaUploadPart(user.id, uploadId, Number(part), Buffer.concat(chunks))));
   } catch (error: any) {
-    const status = error?.code === "NOT_FOUND" ? 404 : error?.code === "CONFLICT" ? 409 : error?.code === "TOO_MANY_REQUESTS" ? 429 : 400;
+    const status = error?.code === "NOT_FOUND" ? 404 : error?.code === "CONFLICT" ? 409 : error?.code === "TOO_MANY_REQUESTS" ? 429 : !error?.code || error?.code === "INTERNAL_SERVER_ERROR" || error?.code === "SERVICE_UNAVAILABLE" ? 503 : 400;
     return NextResponse.json({ error: status === 429 ? "Upload rate limit reached. Try again shortly." : "Could not store this upload part. Retry the upload." }, { status });
   }
 }
