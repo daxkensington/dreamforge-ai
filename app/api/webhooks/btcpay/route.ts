@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "../../../../server/db";
-import { verifyBTCPayWebhook, getUncensoredPlanById } from "../../../../server/_core/btcpay";
-import { cryptoInvoices, creditBalances, creditTransactions, users } from "../../../../drizzle/schema";
+import { verifyBTCPayWebhook, UNCENSORED_PLANS } from "../../../../server/_core/btcpay";
+import { cryptoInvoices, creditBalances, creditTransactions, users, webhookEvents } from "../../../../drizzle/schema";
 import { sendPassActivatedEmail } from "../../../../server/_core/uncensoredEmail";
 import { and, eq, sql } from "drizzle-orm";
 import { walletRows } from "../../../../server/_core/walletAccounting";
@@ -53,7 +53,33 @@ export async function POST(req: NextRequest) {
   if (event.type !== "InvoiceSettled" && event.type !== "InvoiceInvalid") return NextResponse.json({ ok: true });
   const [saved] = await db.select().from(cryptoInvoices).where(eq(cryptoInvoices.invoiceId, event.invoiceId)).limit(1);
   if (!saved) return NextResponse.json({ ok: true, note: "unknown invoice" });
-  const plan = getUncensoredPlanById(saved.plan);
+  // Exact lookup: getUncensoredPlanById falls back to the 30-day anchor, which
+  // would grant or claw back the wrong duration/credits for an unknown plan.
+  const plan = UNCENSORED_PLANS.find((p) => p.id === saved.plan);
+
+  // Orphaned plan id (plan retired or row corrupted): BTCPay retries can't fix
+  // it, so log loudly, record it as handled for reconciliation and 200 — same
+  // convention as Stripe's orphaned-metadata handling. Invoice status is left
+  // untouched so the real payment state stays visible.
+  if (!plan) {
+    console.error(
+      `[BTCPay] Unknown plan id "${saved.plan}" on invoice ${event.invoiceId} (${event.type}, user ${saved.userId}) — no entitlement change`
+    );
+    try {
+      await db
+        .insert(webhookEvents)
+        .values({
+          eventId: `btcpay-unknown-plan:${event.invoiceId}:${event.type}`,
+          eventType: `btcpay.${event.type}`,
+          status: "ignored",
+          summary: `Unknown uncensored plan "${saved.plan}" on invoice ${event.invoiceId}; needs manual reconciliation`,
+        })
+        .onConflictDoNothing({ target: webhookEvents.eventId });
+    } catch (err: any) {
+      console.error(`[BTCPay] failed to record unknown-plan receipt: ${err?.message ?? err}`);
+    }
+    return NextResponse.json({ ok: true, note: "unknown plan" });
+  }
 
   if (event.type === "InvoiceInvalid") {
     const result = walletRows(await db.execute(sql`
