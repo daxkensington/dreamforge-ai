@@ -72,6 +72,8 @@ export default function Tool3DGenerator() {
       toast.error("Upload failed");
       failed = true;
       setImagePreview(null);
+      setImageUrl("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } finally {
       setUploading(false);
     }
@@ -172,7 +174,7 @@ export default function Tool3DGenerator() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" size="lg" onClick={handleReset}>
+              <Button variant="outline" size="lg" onClick={handleReset} aria-label="Reset">
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </div>

@@ -87,6 +87,8 @@ export default function ToolBackground() {
       toast.error("Upload failed");
       failed = true;
       setImagePreview(null);
+      setImageUrl("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } finally {
       setUploading(false);
     }
@@ -98,11 +100,15 @@ export default function ToolBackground() {
       toast.error("Please provide an image URL or upload an image");
       return;
     }
+    if (mode === "replace" && !replacementPrompt.trim()) {
+      toast.error("Please describe the new background");
+      return;
+    }
     setResultUrl(null);
     bgMutation.mutate({
       imageUrl,
       mode,
-      replacementPrompt: mode === "replace" ? replacementPrompt : undefined,
+      replacementPrompt: mode === "replace" ? replacementPrompt.trim() : undefined,
     });
   };
 
@@ -232,7 +238,7 @@ export default function ToolBackground() {
             <div className="flex gap-3">
               <Button
                 onClick={handleProcess}
-                disabled={!imageUrl || uploading || isProcessing || (mode === "replace" && !replacementPrompt)}
+                disabled={!imageUrl || uploading || isProcessing || (mode === "replace" && !replacementPrompt.trim())}
                 className="flex-1"
                 size="lg"
               >
@@ -248,7 +254,7 @@ export default function ToolBackground() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" size="lg" onClick={handleReset}>
+              <Button variant="outline" size="lg" onClick={handleReset} aria-label="Reset">
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
