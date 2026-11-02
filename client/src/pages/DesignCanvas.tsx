@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { SocialPublish } from "@/components/SocialPublish";
 import {
-  Layout, Type, Image, Square, Circle, Trash2, Download,
+  Layout, Type, Image as ImageIcon, Square, Circle, Trash2, Download,
   Plus, Sparkles, Move, ZoomIn, ZoomOut, Undo, Redo,
   AlignCenter, Layers, Palette, Upload, Loader2,
 } from "lucide-react";
@@ -188,14 +188,14 @@ export default function DesignCanvas() {
           }
           ctx.restore();
         } else if (el.content) {
-          const img = new Image();
+          const img = new window.Image();
           img.crossOrigin = "anonymous";
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => img.naturalWidth > 0 ? resolve() : reject(new Error("Source image is empty"));
+            img.onerror = () => reject(new Error("Source image could not be loaded"));
             img.src = el.content;
           });
-          if (img.naturalWidth) ctx.drawImage(img, el.x, el.y, el.width, el.height);
+          ctx.drawImage(img, el.x, el.y, el.width, el.height);
         }
       }
       const a = document.createElement("a");
@@ -361,7 +361,7 @@ export default function DesignCanvas() {
                   onClick={() => setSelectedId(el.id)}
                   className={`w-full flex items-center gap-2 p-1.5 rounded text-[10px] ${selectedId === el.id ? "bg-cyan-500/15 text-cyan-400" : "bg-white/5 text-muted-foreground hover:bg-white/10"}`}
                 >
-                  {el.type === "text" ? <Type className="h-2.5 w-2.5" /> : el.type === "shape" ? <Square className="h-2.5 w-2.5" /> : <Image className="h-2.5 w-2.5" />}
+                  {el.type === "text" ? <Type className="h-2.5 w-2.5" /> : el.type === "shape" ? <Square className="h-2.5 w-2.5" /> : <ImageIcon className="h-2.5 w-2.5" />}
                   <span className="truncate flex-1 text-left">{el.type === "text" ? el.content.slice(0, 20) : `${el.type} ${i + 1}`}</span>
                 </button>
               ))}

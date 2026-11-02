@@ -49,5 +49,8 @@ jobs:
       - name: Type check
         run: pnpm check
 
+      - name: Verify canvas PNG export behavior without network access
+        run: node scripts/terminal-export-behavior.mjs
+
       - name: Run tests
         run: pnpm test
