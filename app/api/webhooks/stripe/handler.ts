@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
 import { getDb } from "../../../../server/db";
 import { addCredits, CREDIT_PACKAGES } from "../../../../server/stripe";
+import { CREDIT_PACKS } from "../../../../shared/creditCosts";
 import { walletRows } from "../../../../server/_core/walletAccounting";
 import { createNotification } from "../../../../server/routersPhase15";
 import { hasPurchased, recordPurchase } from "../../../../server/dbMarketplace";
@@ -214,7 +215,8 @@ export async function processStripeEvent(
   if (!db) throw new Error("Database unavailable for payment processing; retry the same event.");
   const checkout = event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded"
     ? event.data.object as Stripe.Checkout.Session : null;
-  const recoverableCreditPack = !!checkout?.metadata?.package_id && checkout.metadata?.type !== "marketplace_purchase";
+  const recoverableCreditPack = !!(checkout?.metadata?.package_id || checkout?.metadata?.pack_id)
+    && checkout.metadata?.type !== "marketplace_purchase";
   const recoverableMarketplace = checkout?.metadata?.type === "marketplace_purchase";
   const recoverableClawback = ["charge.refunded", "charge.dispute.created", "charge.dispute.closed"].includes(event.type);
   // ─── Atomic idempotency claim ──────────────────────────────────
@@ -394,8 +396,16 @@ export async function processStripeEvent(
         // ─── Credit Purchase ─────────────────────────────────────
         const userId = parseInt(session.metadata?.user_id || "0");
         const credits = parseInt(session.metadata?.credits || "0");
-        const packageId = session.metadata?.package_id || "";
-        const pkg = CREDIT_PACKAGES.find(p => p.id === packageId);
+        // Two creators sell one-time credits and tag the session differently:
+        //   credits.createCheckout  (/credits)                      -> metadata.package_id, CREDIT_PACKAGES
+        //   pricing.purchaseCredits (/pricing, /uncensored, Studio) -> metadata.pack_id,    CREDIT_PACKS
+        // Reading only package_id made every pack_id checkout throw below:
+        // the buyer was charged and granted nothing.
+        const packKey = session.metadata?.package_id ? "package_id" : "pack_id";
+        const packageId = session.metadata?.[packKey] || "";
+        const pkg: { id: string; credits: number; price: number } | undefined = packKey === "package_id"
+          ? CREDIT_PACKAGES.find(p => p.id === packageId)
+          : CREDIT_PACKS.find(p => p.id === packageId);
         if (session.mode === "subscription") {
           await logWebhookEvent("processed", `Subscription checkout ${session.id}: awaiting verified invoice`);
           break;
@@ -412,7 +422,7 @@ export async function processStripeEvent(
         const discount = verified.total_details?.amount_discount ?? 0;
         if (verified.id !== session.id || verified.mode !== "payment" || verified.status !== "complete"
           || !(verified.payment_status === "paid" || verified.payment_status === "no_payment_required" && verified.amount_total === 0) || verified.currency !== "usd"
-          || verified.metadata?.user_id !== String(userId) || verified.metadata?.package_id !== pkg.id
+          || verified.metadata?.user_id !== String(userId) || verified.metadata?.[packKey] !== pkg.id
           || verified.metadata?.credits !== String(pkg.credits)
           || verified.line_items?.has_more || verified.line_items?.data.length !== 1 || line?.quantity !== 1
           || line.price?.unit_amount !== pkg.price || line.price.currency !== "usd"

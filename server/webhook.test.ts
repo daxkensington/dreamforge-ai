@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getTableName } from "drizzle-orm";
 const subscriptionsRetrieve = vi.hoisted(() => vi.fn());
-const checkoutRetrieve = vi.hoisted(() => vi.fn(async(id:string)=>({id,mode:"payment",status:"complete",payment_status:"paid",currency:"usd",amount_subtotal:499,amount_total:499,total_details:{amount_discount:0},payment_intent:"pi_new",metadata:{user_id:"7",package_id:"starter",credits:"100"},line_items:{has_more:false,data:[{quantity:1,price:{unit_amount:499,currency:"usd"}}]}})));
+const defaultCheckoutReceipt = vi.hoisted(() => async(id:string)=>({id,mode:"payment",status:"complete",payment_status:"paid",currency:"usd",amount_subtotal:499,amount_total:499,total_details:{amount_discount:0},payment_intent:"pi_new",metadata:{user_id:"7",package_id:"starter",credits:"100"},line_items:{has_more:false,data:[{quantity:1,price:{unit_amount:499,currency:"usd"}}]}}));
+const checkoutRetrieve = vi.hoisted(() => vi.fn(defaultCheckoutReceipt));
 vi.mock("stripe", () => ({ default: class StripeMock { subscriptions = { retrieve: subscriptionsRetrieve }; checkout = {sessions:{retrieve:checkoutRetrieve}}; } }));
 vi.mock("./_core/subscriptionBilling", () => ({
   allocatePaidSubscriptionInvoice: vi.fn(async () => "allocated"),
@@ -43,6 +44,7 @@ vi.mock("@sentry/nextjs", () => ({
 
 import { processStripeEvent } from "../app/api/webhooks/stripe/handler";
 import { addCredits } from "./stripe";
+import { CREDIT_PACKS, creditPackCheckoutMetadata } from "../shared/creditCosts";
 import { createNotification } from "./routersPhase15";
 import { activateSubscription, handleSubscriptionUpdated, handleMonthlyReset } from "./routers/pricing";
 import { allocatePaidSubscriptionInvoice, hasPaidSubscriptionInvoiceAllocation } from "./_core/subscriptionBilling";
@@ -170,6 +172,9 @@ describe("Stripe webhook — processStripeEvent", () => {
     vi.clearAllMocks();
     process.env.STRIPE_SECRET_KEY = "sk_test_mocked_webhook_only";
     subscriptionsRetrieve.mockReset();
+    // Also drops any queued once-receipt a test never consumed.
+    checkoutRetrieve.mockReset();
+    checkoutRetrieve.mockImplementation(defaultCheckoutReceipt);
     vi.mocked(hasPaidSubscriptionInvoiceAllocation).mockReset().mockResolvedValue(false);
   });
 
@@ -345,6 +350,81 @@ describe("Stripe webhook — processStripeEvent", () => {
       expect(createNotification).not.toHaveBeenCalled();
       const logUpdate = calls.updates.filter((u) => u.table === "webhookEvents").pop()!;
       expect(logUpdate.set.summary).toContain("already granted");
+    });
+  });
+
+  // ─── 1b. Pricing-page credit packs (metadata.pack_id) ─────────────────
+  // pricing.purchaseCredits is what the /pricing, /uncensored and Studio buy
+  // buttons call. On 2026-10-31 its first paying customer was charged $4.99
+  // and granted nothing because this handler only understood package_id.
+  describe("pricing-page credit packs (metadata.pack_id)", () => {
+    // `charged` is what Stripe's own receipt says the line cost; it defaults to
+    // the pack's real price.
+    const packEvent = (id: string, sessionId: string, pack: (typeof CREDIT_PACKS)[number], charged: number = pack.price) => {
+      const userId = 742;
+      const metadata = creditPackCheckoutMetadata(userId, pack);
+      checkoutRetrieve.mockResolvedValueOnce({
+        id: sessionId, mode: "payment", status: "complete", payment_status: "paid", currency: "usd",
+        amount_subtotal: charged, amount_total: charged, total_details: { amount_discount: 0 },
+        payment_intent: "pi_pack", metadata,
+        line_items: { has_more: false, data: [{ quantity: 1, price: { unit_amount: charged, currency: "usd" } }] },
+      });
+      return makeEvent(id, "checkout.session.completed", {
+        id: sessionId, payment_intent: "pi_pack", mode: "payment", payment_status: "paid",
+        currency: "usd", amount_total: pack.price, metadata,
+      });
+    };
+
+    it.each(CREDIT_PACKS.map((p) => [p.id, p] as const))(
+      "grants %s exactly as the checkout creator tagged it",
+      async (_id, pack) => {
+        const { db, calls } = makeDb({ selectRows: () => [] });
+        expect(await processStripeEvent(packEvent(`evt_${pack.id}`, `cs_${pack.id}`, pack), db)).toBe("processed");
+        expect(addCredits).toHaveBeenCalledTimes(1);
+        expect(addCredits).toHaveBeenCalledWith(
+          742, pack.credits, `Purchased ${pack.id} pack (${pack.credits} credits)`, `cs_${pack.id}`, "pi_pack",
+        );
+        expect(calls.updates.filter((u) => u.table === "webhookEvents").pop()!.set.status).toBe("processed");
+      },
+    );
+
+    it("re-drives an event whose first delivery failed (claim row already exists)", async () => {
+      const { db } = makeDb({ claimRows: [], selectRows: () => [] });
+      expect(await processStripeEvent(packEvent("evt_retry", "cs_retry", CREDIT_PACKS[0]), db)).toBe("processed");
+      expect(addCredits).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not re-grant a pack session that already has a purchase row", async () => {
+      const { db } = makeDb({ claimRows: [], selectRows: () => [{ id: 55 }] });
+      expect(await processStripeEvent(packEvent("evt_again", "cs_again", CREDIT_PACKS[0]), db)).toBe("processed");
+      expect(addCredits).not.toHaveBeenCalled();
+    });
+
+    it("refuses a pack_id session whose credits do not match the pack", async () => {
+      const { db } = makeDb();
+      const event = packEvent("evt_inflated", "cs_inflated", CREDIT_PACKS[0]);
+      event.data.object.metadata = { ...event.data.object.metadata, credits: "25000" };
+      await expect(processStripeEvent(event, db)).rejects.toThrow("valid USD package checkout");
+      expect(addCredits).not.toHaveBeenCalled();
+    });
+
+    it("refuses a pack_id session charged less than the pack price without a Stripe discount", async () => {
+      const { db } = makeDb();
+      const pack = CREDIT_PACKS[1];
+      const event = packEvent("evt_cheap", "cs_cheap", pack, 499);
+      event.data.object.amount_total = 499;
+      await expect(processStripeEvent(event, db)).rejects.toThrow("does not match");
+      expect(addCredits).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unknown pack id", async () => {
+      const { db } = makeDb();
+      const event = makeEvent("evt_unknown", "checkout.session.completed", {
+        id: "cs_unknown", payment_intent: "pi_x", mode: "payment", payment_status: "paid", currency: "usd",
+        amount_total: 499, metadata: { user_id: "742", pack_id: "pack-9999999", credits: "9999999", type: "credit_pack" },
+      });
+      await expect(processStripeEvent(event, db)).rejects.toThrow("valid USD package checkout");
+      expect(addCredits).not.toHaveBeenCalled();
     });
   });
 
