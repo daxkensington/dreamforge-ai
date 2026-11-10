@@ -1269,9 +1269,10 @@ export default function Uncensored() {
                         </span>
                       )}
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-2xl font-bold">${p.priceUsd}</span>
-                        <span className="text-xs font-medium text-rose-300">or {p.creditPrice} cr</span>
+                        <span className="text-2xl font-bold">${p.creditPackPriceUsd}</span>
+                        <span className="text-xs font-medium text-rose-300">or {p.creditPrice.toLocaleString()} cr</span>
                       </div>
+                      <div className="text-[11px] text-muted-foreground">by card · ${p.priceUsd} with Bitcoin</div>
                       <div className="mt-1 text-sm font-medium">{p.label}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {p.durationDays} day{p.durationDays > 1 ? "s" : ""} · +{p.bonusCredits} bonus cr w/ BTC

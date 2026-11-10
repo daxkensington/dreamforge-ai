@@ -66,7 +66,8 @@ describe("uncensored landing silo", () => {
   });
 
   it("only quotes prices that exist in the shared ladder", () => {
-    const valid = new Set(UNCENSORED_PLANS.map((p) => `$${p.priceUsd}`));
+    // Bitcoin price or card (credit pack) price — both are real checkout amounts.
+    const valid = new Set(UNCENSORED_PLANS.flatMap((p) => [`$${p.priceUsd}`, `$${p.creditPackPriceUsd}`]));
     for (const slug of UNCENSORED_LANDING_SLUGS) {
       const quoted = allCopy(slug).match(/\$\d+(?:\.\d{2})?/g) ?? [];
       for (const q of quoted) {

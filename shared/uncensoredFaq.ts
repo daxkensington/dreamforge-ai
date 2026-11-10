@@ -33,7 +33,7 @@ export const UNCENSORED_FAQ: UncensoredFaqItem[] = [
   },
   {
     q: "What do the passes include?",
-    a: "Every pass unlocks all 7 Uncensored Pro Studio tools (Image Studio + Face Lock, 5–10s Video, 4-View Character Sheet, Virtual Outfit Swap, Brush Inpaint, Refine & Relight, and Private Vault). Day Pass: 24 hours (400 credits / $4.99 card pack, or $4.99 BTC + 60 bonus credits). Week Pass: 7 days (1,200 credits / $14.99 card pack, or $12 BTC + 250 bonus credits). 30-Day Pass (best value): 30 days (2,000 credits / $19.99 card pack, or $19 BTC + 500 bonus credits). All passes are one-time with no auto-renew.",
+    a: "Every pass unlocks all 7 Uncensored Pro Studio tools (Image Studio + Face Lock, 5–10s Video, 4-View Character Sheet, Virtual Outfit Swap, Brush Inpaint, Refine & Relight, and Private Vault). Day Pass: 24 hours (400 credits / $4.99 card pack, or $4.99 BTC + 60 bonus credits). Week Pass: 7 days (1,200 credits / $19.99 card pack, or $12 BTC + 250 bonus credits). 30-Day Pass (best value): 30 days (2,000 credits / $19.99 card pack, or $19 BTC + 500 bonus credits). All passes are one-time with no auto-renew.",
   },
   {
     q: "Is any illegal content allowed?",
