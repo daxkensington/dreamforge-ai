@@ -82,6 +82,10 @@ describe("sendPassActivatedEmail", () => {
     expect(calls[0].url).toBe("https://api.resend.com/emails");
     expect(calls[0].auth).toBe("Bearer re_test");
     expect(calls[0].body).toMatchObject({ from: "DreamForgeX <noreply@dreamforgex.ai>", to: "buyer@example.com", subject: "Your Uncensored Pass is active" });
+    // The body says "reply to this email" and the sender is noreply@: the
+    // reply has to be routed to an inbox someone reads.
+    expect(calls[0].body.reply_to).toContain("support@dreamforgex.ai");
+    expect(calls[0].body.text).toContain("reply to this email");
     expect(calls[0].body.text).toContain("Week Pass");
     expect(calls[0].body.html).toContain("Week Pass");
   });
