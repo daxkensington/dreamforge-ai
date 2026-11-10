@@ -304,6 +304,22 @@ export const CREDIT_PACKS = [
 ] as const;
 
 export type CreditPackId = (typeof CREDIT_PACKS)[number]["id"];
+
+/**
+ * Stripe Checkout metadata for a one-time credit pack. The session creator
+ * (pricing.purchaseCredits) writes it and the Stripe webhook reads it back to
+ * decide what to grant, so both sides build/parse it from here. When they
+ * disagreed on the key name (pack_id vs package_id) a paid checkout granted
+ * nothing.
+ */
+export function creditPackCheckoutMetadata(userId: number, pack: (typeof CREDIT_PACKS)[number]) {
+  return {
+    user_id: userId.toString(),
+    pack_id: pack.id,
+    credits: pack.credits.toString(),
+    type: "credit_pack",
+  };
+}
 export type PlanName = (typeof SUBSCRIPTION_PLANS)[number]["name"];
 
 // ─── Helper: get credit cost for a model-based generation ──────────────────

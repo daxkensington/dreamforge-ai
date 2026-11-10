@@ -10,7 +10,7 @@ import {
 } from "../../drizzle/schema";
 import { eq, sql, desc, and } from "drizzle-orm";
 import { getOrCreateBalance, sanitizeRedirectOrigin, requestOriginFromCtx } from "../stripe";
-import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../../shared/creditCosts";
+import { SUBSCRIPTION_PLANS, CREDIT_PACKS, creditPackCheckoutMetadata } from "../../shared/creditCosts";
 import Stripe from "stripe";
 import { currentSubscriptionOrder } from "../_core/subscriptionSelection";
 import { getEffectiveSubscriptionTier } from "../../shared/subscriptionEntitlement";
@@ -476,12 +476,7 @@ export const pricingRouter = router({
             quantity: 1,
           },
         ],
-        metadata: {
-          user_id: ctx.user.id.toString(),
-          pack_id: pack.id,
-          credits: pack.credits.toString(),
-          type: "credit_pack",
-        },
+        metadata: creditPackCheckoutMetadata(ctx.user.id, pack),
         success_url: `${safeOrigin}${returnPathname}?credit_success=true&session_id={CHECKOUT_SESSION_ID}&value=${packValue}&currency=usd&credits=${pack.credits}${extraQuery}`,
         cancel_url: `${safeOrigin}${returnPathname}?canceled=true${extraQuery}`,
       });
