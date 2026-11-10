@@ -10,6 +10,7 @@ export const EXPECTED_HOMEPAGE_CSP = [
   "media-src 'self' https: blob:",
   "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://www.facebook.com https://graph.facebook.com",
   "font-src 'self' data:",
+  "frame-src 'self' https://btc.paymohawk.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
