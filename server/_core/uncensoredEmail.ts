@@ -23,6 +23,13 @@ function fromAddress(): string {
   return process.env.RESEND_FROM_ADDRESS || "DreamForgeX <noreply@dreamforgex.ai>";
 }
 
+/**
+ * Every email here ends "Questions: reply to this email", and the sender is
+ * noreply@. Without a Reply-To the buyer's answer went to an address nobody
+ * reads; this is the support address the site publishes everywhere else.
+ */
+export const SUPPORT_REPLY_TO = "DreamForgeX Support <support@dreamforgex.ai>";
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -161,7 +168,7 @@ async function sendResendMail(params: {
       // Resend sits behind Cloudflare, which 403s some default client UAs
       // (error 1010 seen with python-urllib). Name ourselves.
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "User-Agent": "dreamforgex-webhook/1.0" },
-      body: JSON.stringify({ from: fromAddress(), to: params.to, subject: params.subject, text: params.text, html: params.html }),
+      body: JSON.stringify({ from: fromAddress(), reply_to: SUPPORT_REPLY_TO, to: params.to, subject: params.subject, text: params.text, html: params.html }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
