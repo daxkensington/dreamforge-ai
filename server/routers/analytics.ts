@@ -19,6 +19,8 @@ export const TRACKED_EVENTS = [
   "checkout_started",
   "checkout_redirected",
   "checkout_canceled",
+  // The browser refused to render the inline BTC invoice frame.
+  "checkout_frame_blocked",
   "checkout_completed",
 ] as const;
 

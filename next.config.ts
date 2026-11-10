@@ -31,6 +31,12 @@ const contentSecurityPolicy = [
   "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://www.facebook.com https://graph.facebook.com",
   // next/font serves fonts from same-origin; data: for inline icon fonts.
   "font-src 'self' data:",
+  // The Uncensored page embeds the BTCPay invoice in an iframe
+  // (client/src/pages/Uncensored.tsx). Without this, default-src 'self'
+  // blocks the frame and the buyer sees an empty box — no Bitcoin payment
+  // completed from 2026-09-30 (CSP added) until this line. Must match the
+  // origin of BTCPAY_URL.
+  "frame-src 'self' https://btc.paymohawk.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

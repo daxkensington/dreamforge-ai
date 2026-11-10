@@ -21,6 +21,7 @@ export type TrackedEvent =
   | "checkout_redirected"
   // Stripe sent the buyer back via cancel_url (the Back arrow on the hosted page).
   | "checkout_canceled"
+  | "checkout_frame_blocked"
   | "checkout_completed";
 
 const ANON_KEY = "dfx_anon_id";

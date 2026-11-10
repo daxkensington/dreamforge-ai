@@ -196,6 +196,10 @@ export default function Uncensored() {
   // Inline embedded BTCPay invoice (iframe). Replaces the old new-tab
   // window.open flow — popup blockers ate it and mobile users lost the page.
   const [inlineInvoice, setInlineInvoice] = useState<{ checkoutLink: string; invoiceId: string } | null>(null);
+  // True when the browser refused to render the invoice iframe (our own CSP,
+  // an extension, a strict browser). The buyer must never be left looking at
+  // an empty box: swap the frame for a plain "open the invoice" button.
+  const [invoiceFrameBlocked, setInvoiceFrameBlocked] = useState(false);
 
   const checkout = trpc.uncensored.createCheckout.useMutation({
     onSuccess: (data) => {
@@ -227,6 +231,19 @@ export default function Uncensored() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // Listen from mount, not from when an invoice exists: the browser reports
+  // the refusal as soon as the iframe is inserted, which can be before an
+  // effect keyed on the invoice has run. This page has no other iframe.
+  useEffect(() => {
+    const onViolation = (ev: SecurityPolicyViolationEvent) => {
+      if (ev.effectiveDirective !== "frame-src") return;
+      setInvoiceFrameBlocked(true);
+      track("checkout_frame_blocked", { kind: "uncensored" });
+    };
+    document.addEventListener("securitypolicyviolation", onViolation);
+    return () => document.removeEventListener("securitypolicyviolation", onViolation);
+  }, []);
 
   // BTCPay's embedded checkout posts status messages to the parent window
   // (same protocol its official modal uses). Use them to refetch entitlement
@@ -1190,12 +1207,29 @@ export default function Uncensored() {
                       <X className="h-3.5 w-3.5" /> Back to plans
                     </button>
                   </div>
-                  <iframe
-                    src={inlineInvoice.checkoutLink}
-                    title="BTCPay crypto invoice"
-                    allow="clipboard-write"
-                    className="mt-4 h-[660px] w-full rounded-xl border border-border/60 bg-white"
-                  />
+                  {invoiceFrameBlocked ? (
+                    <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-6 text-center">
+                      <p className="text-sm">
+                        Your browser wouldn't show the invoice here. It is ready — open it in a new tab to pay.
+                      </p>
+                      <a
+                        href={inlineInvoice.checkoutLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-500"
+                      >
+                        Open your invoice
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  ) : (
+                    <iframe
+                      src={inlineInvoice.checkoutLink}
+                      title="BTCPay crypto invoice"
+                      allow="clipboard-write"
+                      className="mt-4 h-[660px] w-full rounded-xl border border-border/60 bg-white"
+                    />
+                  )}
                   <p className="mt-3 text-center text-xs text-muted-foreground">
                     Scan the QR or copy the Bitcoin address. The pass unlocks as soon as
                     the payment is seen — usually seconds after you send. Invoice stays

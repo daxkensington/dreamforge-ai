@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { assertHomepageCsp, classifyHomepageConsole, EXPECTED_HOMEPAGE_CSP } from '../tests/smoke/console-policy.mjs';
 
@@ -27,6 +28,22 @@ describe('deployed homepage enforcing CSP invariant', () => {
   ])('rejects absent, report-only, duplicate or changed enforcement %#', policy => {
     expect(() => assertHomepageCsp(policy)).toThrow(/enforcing/);
     expect(() => classifyHomepageConsole([chromiumBlock], { ...context(), policy })).toThrow(/enforcing/);
+  });
+});
+
+describe('the policy still lets the checkout work', () => {
+  // The Bitcoin invoice is an iframe on /uncensored. A policy with no
+  // frame-src falls back to default-src 'self' and blanks it: 19 invoices from
+  // 6 buyers, none payable, between 2026-09-30 and 2026-11-10.
+  it('allows framing the BTCPay invoice origin', () => {
+    const frameSrc = EXPECTED_HOMEPAGE_CSP.split('; ').find(d => d.startsWith('frame-src '));
+    expect(frameSrc?.split(' ')).toContain('https://btc.paymohawk.com');
+  });
+  it('is the policy next.config.ts actually sends', () => {
+    const source = readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
+    for (const directive of EXPECTED_HOMEPAGE_CSP.split('; ')) {
+      expect(source, `next.config.ts is missing the directive: ${directive}`).toContain(JSON.stringify(directive));
+    }
   });
 });
 
