@@ -306,11 +306,34 @@ export const CREDIT_PACKS = [
 export type CreditPackId = (typeof CREDIT_PACKS)[number]["id"];
 
 /**
- * Stripe Checkout metadata for a one-time credit pack. The session creator
- * (pricing.purchaseCredits) writes it and the Stripe webhook reads it back to
- * decide what to grant, so both sides build/parse it from here. When they
- * disagreed on the key name (pack_id vs package_id) a paid checkout granted
- * nothing.
+ * The table the /credits page sold until 2026-11-10: the same four prices as
+ * CREDIT_PACKS for a fifth of the credits, while /pricing and llms.txt
+ * advertised CREDIT_PACKS. Retired and frozen. It is kept for two things only:
+ *   - the Stripe webhook settles a checkout that was opened from the old page
+ *     (metadata.package_id) for exactly what that session promised;
+ *   - a tab still showing the old cards resolves to the pack with the same
+ *     price (`packId`), so its Buy button sells the current offer.
+ * Do not sell from it and do not add rows.
+ */
+export const LEGACY_CREDIT_PACKAGES = [
+  { id: "starter", credits: 100, price: 499, packId: "pack-500" },
+  { id: "creator", credits: 500, price: 1999, packId: "pack-2500" },
+  { id: "studio", credits: 1500, price: 4999, packId: "pack-7500" },
+  { id: "enterprise", credits: 5000, price: 14999, packId: "pack-25000" },
+] as const;
+
+/** The pack a buy button means: a CREDIT_PACKS id, or a retired /credits id. */
+export function resolveCreditPack(id: string): (typeof CREDIT_PACKS)[number] | undefined {
+  const packId = LEGACY_CREDIT_PACKAGES.find((p) => p.id === id)?.packId ?? id;
+  return CREDIT_PACKS.find((p) => p.id === packId);
+}
+
+/**
+ * Stripe Checkout metadata for a one-time credit pack. Every session creator
+ * (pricing.purchaseCredits, credits.createCheckout) writes it and the Stripe
+ * webhook reads it back to decide what to grant, so both sides build/parse it
+ * from here. When they disagreed on the key name (pack_id vs package_id) a
+ * paid checkout granted nothing.
  */
 export function creditPackCheckoutMetadata(userId: number, pack: (typeof CREDIT_PACKS)[number]) {
   return {

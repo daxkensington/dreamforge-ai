@@ -1282,7 +1282,24 @@ export default function Uncensored() {
                 })}
               </div>
               <p className="mt-4 text-center text-xs text-muted-foreground">
-                One-time pass, no auto-renew. Unlock in 1 click with Card / Apple Pay (via DreamForgeX credit pack — includes leftover Studio credits) or pay anonymously with Bitcoin for +{selectedPlan?.bonusCredits ?? 500} bonus credits.
+                One-time pass, no auto-renew.{" "}
+                {selectedPlan && hasEnoughCredits ? (
+                  <>
+                    You have {creditBalance.toLocaleString()} credits; the {selectedPlan.label} uses{" "}
+                    {selectedPlan.creditPrice.toLocaleString()} of them.
+                  </>
+                ) : selectedPlan ? (
+                  <>
+                    Card / Apple Pay: ${selectedPlan.creditPackPriceUsd} buys a{" "}
+                    {selectedPlan.creditPackTotalCredits.toLocaleString()}-credit pack. The {selectedPlan.label} uses{" "}
+                    {selectedPlan.creditPrice.toLocaleString()} and the other{" "}
+                    {(selectedPlan.creditPackTotalCredits - selectedPlan.creditPrice).toLocaleString()} stay in your
+                    balance for generations.
+                  </>
+                ) : (
+                  <>Card / Apple Pay buys a DreamForgeX credit pack; the pass is unlocked from it.</>
+                )}{" "}
+                Or pay ${selectedPlan?.priceUsd ?? 19} anonymously with Bitcoin and get +{selectedPlan?.bonusCredits ?? 500} bonus credits.
               </p>
 
               {offerPrimary ? (

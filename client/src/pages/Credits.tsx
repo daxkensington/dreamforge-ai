@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import {
   Coins,
   CreditCard,
@@ -1864,22 +1865,66 @@ export default function Credits() {
     enabled: !!user,
   });
 
+  const utils = trpc.useUtils();
+
+  // Stripe sends the buyer back here. Say so, and keep refreshing the balance
+  // until the webhook's grant shows up (it usually lands within a few seconds
+  // of the redirect, occasionally after it).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("canceled") === "true") {
+      track("checkout_canceled", { kind: "credit_pack", surface: "credits" });
+      return;
+    }
+    if (params.get("success") !== "true") return;
+    const bought = Number(params.get("credits"));
+    toast.success(
+      Number.isFinite(bought) && bought > 0
+        ? `Payment received — ${bought.toLocaleString()} credits are on their way to your balance.`
+        : "Payment received — your credits are on their way to your balance.",
+    );
+    // The query string is left in place for the ad-pixel purchase handler, so
+    // a reload lands here again: count the completion once per checkout.
+    const seenKey = `dfx_credit_purchase_${params.get("session_id") ?? ""}`;
+    let seen = false;
+    try {
+      seen = window.sessionStorage.getItem(seenKey) !== null;
+      window.sessionStorage.setItem(seenKey, "1");
+    } catch {
+      /* storage blocked — the event may repeat on reload, the page still works */
+    }
+    if (!seen) track("checkout_completed", { kind: "credit_pack", surface: "credits" });
+    const refresh = () => {
+      void utils.credits.getBalance.invalidate();
+      void utils.credits.getHistory.invalidate();
+      void utils.enhancedCredits.getBalanceWithWarning.invalidate();
+    };
+    const timers = [1500, 4000, 9000, 20000].map((ms) => window.setTimeout(refresh, ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [utils]);
+
   const checkout = trpc.credits.createCheckout.useMutation({
     onSuccess: (data) => {
-      if (data.url) {
-        toast.success("Redirecting to Stripe checkout...");
-        window.open(data.url, "_blank");
+      if (!data.url) {
+        setPurchasingId(null);
+        toast.error("Stripe didn't return a checkout link. Please try again.");
+        return;
       }
-      setPurchasingId(null);
+      track("checkout_redirected", { surface: "credits", target: purchasingId ?? undefined });
+      // Same tab, like /pricing. A new tab opened after the network round trip
+      // is not a user gesture any more, and Safari/Firefox silently block it —
+      // the buyer saw "Redirecting…" and nothing happened.
+      window.location.href = data.url;
     },
     onError: (err) => {
-      toast.error(err.message || "Checkout failed");
+      toast.error(err.message || "Couldn't open checkout. Please try again.");
       setPurchasingId(null);
     },
   });
 
   const handlePurchase = (packageId: string) => {
     if (!user) return;
+    track("checkout_started", { kind: "credit_pack", pack: packageId, surface: "credits" });
     setPurchasingId(packageId);
     checkout.mutate({
       packageId,
@@ -2081,7 +2126,7 @@ export default function Credits() {
                         <div className="flex items-center gap-2">
                           <CheckCircle className="w-4 h-4 text-green-500" />
                           <span>
-                            <strong>{pkg.credits}</strong> credits
+                            <strong>{pkg.credits.toLocaleString()}</strong> credits
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -2099,10 +2144,10 @@ export default function Credits() {
                         className="w-full"
                         variant={pkg.popular ? "default" : "outline"}
                         onClick={() => handlePurchase(pkg.id)}
-                        disabled={purchasingId === pkg.id}
+                        disabled={purchasingId !== null}
                       >
                         {purchasingId === pkg.id ? (
-                          "Processing..."
+                          "Opening checkout…"
                         ) : (
                           <>
                             Buy Now
@@ -2117,8 +2162,8 @@ export default function Credits() {
             </div>
 
             <p className="text-xs text-muted-foreground text-center mt-6">
-              Payments are processed securely via Stripe. Test with card number
-              4242 4242 4242 4242.
+              One-time purchase, no subscription. Payments are processed securely
+              via Stripe.
             </p>
           </TabsContent>
 

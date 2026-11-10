@@ -46,7 +46,7 @@ import { getDb } from "./db";
 import { addCredits, createCheckoutSession, getOrCreateBalance, sanitizeRedirectOrigin, CREDIT_PACKAGES, cancelStripeSubscriptionsForCustomer } from "./stripe";
 import { pricingRouter, activateSubscription, handleMonthlyReset, handleSubscriptionUpdated, handleSubscriptionDeleted } from "./routers/pricing";
 import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
-import { SUBSCRIPTION_PLANS, CREDIT_PACKS } from "../shared/creditCosts";
+import { SUBSCRIPTION_PLANS, CREDIT_PACKS, LEGACY_CREDIT_PACKAGES, creditPackCheckoutMetadata } from "../shared/creditCosts";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────
 
@@ -294,19 +294,70 @@ describe("checkout success_url attribution (P0.6a)", () => {
     expect(params.success_url).toContain("/pricing?credit_success=true");
   });
 
-  it("credits.createCheckoutSession embeds value/currency/credits and the placeholder", async () => {
+  // /credits used to sell its own table: the same four prices as CREDIT_PACKS
+  // for a fifth of the credits, while /pricing and llms.txt advertised
+  // CREDIT_PACKS. One table now; these pin it.
+  it("the /credits packages are CREDIT_PACKS: same ids, credits and prices", () => {
+    expect(CREDIT_PACKAGES.map((p) => ({ id: p.id, credits: p.credits, price: p.price })))
+      .toEqual(CREDIT_PACKS.map((p) => ({ id: p.id, credits: p.credits, price: p.price })));
+    for (const pkg of CREDIT_PACKAGES) {
+      expect(pkg.priceDisplay).toBe("$" + (pkg.price / 100).toFixed(2));
+      expect(pkg.name).toBeTruthy();
+      expect(pkg.description).toBeTruthy();
+    }
+    expect(CREDIT_PACKAGES.filter((p) => p.popular)).toHaveLength(1);
+  });
+
+  it.each(CREDIT_PACKS.map((p) => [p.id, p] as const))(
+    "credits.createCheckoutSession sells %s exactly as /pricing does",
+    async (_id, pack) => {
+      const { db } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
+      installDb(db);
+      stripeMocks.checkoutSessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.com/s" });
+
+      await createCheckoutSession(1, "test@dreamforge.ai", "Test User", pack.id, "http://localhost:3000");
+
+      const params = stripeMocks.checkoutSessionsCreate.mock.calls[0][0];
+      expect(params.line_items).toHaveLength(1);
+      expect(params.line_items[0].quantity).toBe(1);
+      expect(params.line_items[0].price_data.unit_amount).toBe(pack.price);
+      expect(params.line_items[0].price_data.currency).toBe("usd");
+      // The webhook grants from this metadata; it must be the shared format.
+      expect(params.metadata).toEqual(creditPackCheckoutMetadata(1, pack));
+      expect(params.success_url).toContain("/credits?success=true");
+      expect(params.success_url).toContain("session_id={CHECKOUT_SESSION_ID}");
+      expect(params.success_url).toContain(`value=${(pack.price / 100).toFixed(2)}`);
+      expect(params.success_url).toContain("currency=usd");
+      expect(params.success_url).toContain(`credits=${pack.credits}`);
+    },
+  );
+
+  it.each(LEGACY_CREDIT_PACKAGES.map((p) => [p.id, p] as const))(
+    "a stale /credits tab's \"%s\" button sells the current pack at the price it showed",
+    async (_id, legacy) => {
+      const { db } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
+      installDb(db);
+      stripeMocks.checkoutSessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.com/s" });
+
+      await createCheckoutSession(1, "test@dreamforge.ai", "Test User", legacy.id, "http://localhost:3000");
+
+      const pack = CREDIT_PACKS.find((p) => p.id === legacy.packId)!;
+      // Same money as the card they clicked, never fewer credits.
+      expect(pack.price).toBe(legacy.price);
+      expect(pack.credits).toBeGreaterThan(legacy.credits);
+      const params = stripeMocks.checkoutSessionsCreate.mock.calls[0][0];
+      expect(params.line_items[0].price_data.unit_amount).toBe(legacy.price);
+      expect(params.metadata).toEqual(creditPackCheckoutMetadata(1, pack));
+      expect(params.metadata).not.toHaveProperty("package_id");
+    },
+  );
+
+  it("credits.createCheckoutSession refuses an id that is not a pack", async () => {
     const { db } = makeDb({ selectQueue: [[balanceRow], [balanceRow]] });
     installDb(db);
-    stripeMocks.checkoutSessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.com/s" });
-
-    const pkg = CREDIT_PACKAGES.find((p) => p.id === "creator")!;
-    await createCheckoutSession(1, "test@dreamforge.ai", "Test User", "creator", "http://localhost:3000");
-
-    const params = stripeMocks.checkoutSessionsCreate.mock.calls[0][0];
-    expect(params.success_url).toContain("session_id={CHECKOUT_SESSION_ID}");
-    expect(params.success_url).toContain(`value=${(pkg.price / 100).toFixed(2)}`);
-    expect(params.success_url).toContain("currency=usd");
-    expect(params.success_url).toContain(`credits=${pkg.credits}`);
+    await expect(createCheckoutSession(1, "test@dreamforge.ai", "Test User", "pack-999999", "http://localhost:3000"))
+      .rejects.toThrow("Invalid package");
+    expect(stripeMocks.checkoutSessionsCreate).not.toHaveBeenCalled();
   });
 });
 

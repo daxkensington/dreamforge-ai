@@ -1,8 +1,8 @@
 import Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
 import { getDb } from "../../../../server/db";
-import { addCredits, CREDIT_PACKAGES } from "../../../../server/stripe";
-import { CREDIT_PACKS } from "../../../../shared/creditCosts";
+import { addCredits } from "../../../../server/stripe";
+import { CREDIT_PACKS, LEGACY_CREDIT_PACKAGES } from "../../../../shared/creditCosts";
 import { walletRows } from "../../../../server/_core/walletAccounting";
 import { createNotification } from "../../../../server/routersPhase15";
 import { hasPurchased, recordPurchase } from "../../../../server/dbMarketplace";
@@ -396,15 +396,16 @@ export async function processStripeEvent(
         // ─── Credit Purchase ─────────────────────────────────────
         const userId = parseInt(session.metadata?.user_id || "0");
         const credits = parseInt(session.metadata?.credits || "0");
-        // Two creators sell one-time credits and tag the session differently:
-        //   credits.createCheckout  (/credits)                      -> metadata.package_id, CREDIT_PACKAGES
-        //   pricing.purchaseCredits (/pricing, /uncensored, Studio) -> metadata.pack_id,    CREDIT_PACKS
-        // Reading only package_id made every pack_id checkout throw below:
+        // Every creator now tags the session metadata.pack_id (CREDIT_PACKS,
+        // via creditPackCheckoutMetadata). metadata.package_id is the retired
+        // /credits table: only a checkout opened before the tables were unified
+        // carries it, and it settles for exactly what that session promised.
+        // Reading only package_id once made every pack_id checkout throw below:
         // the buyer was charged and granted nothing.
         const packKey = session.metadata?.package_id ? "package_id" : "pack_id";
         const packageId = session.metadata?.[packKey] || "";
         const pkg: { id: string; credits: number; price: number } | undefined = packKey === "package_id"
-          ? CREDIT_PACKAGES.find(p => p.id === packageId)
+          ? LEGACY_CREDIT_PACKAGES.find(p => p.id === packageId)
           : CREDIT_PACKS.find(p => p.id === packageId);
         if (session.mode === "subscription") {
           await logWebhookEvent("processed", `Subscription checkout ${session.id}: awaiting verified invoice`);
