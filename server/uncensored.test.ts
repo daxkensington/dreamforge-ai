@@ -2,17 +2,30 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import crypto from "crypto";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
-const dbState: { user: any; inserted: any[]; updated: any[]; creditBalance: number } = {
+const dbState: { user: any; inserted: any[]; updated: any[]; creditBalance: number; failPassWrite: boolean } = {
   user: null,
   inserted: [],
   updated: [],
   creditBalance: 600,
+  failPassWrite: false,
 };
 
 vi.mock("./db", () => ({
   getDb: vi.fn(async () => ({
     select: () => ({ from: () => ({ where: () => ({ limit: async () => (dbState.user ? [dbState.user] : []) }) }) }),
-    update: () => ({ set: (s: any) => ({ where: async () => { dbState.updated.push(s); } }) }),
+    update: () => ({
+      set: (s: any) => ({
+        // Awaited directly by most callers; the pass unlock chains .returning().
+        where: () => ({
+          then: (resolve: any, reject: any) => { dbState.updated.push(s); return Promise.resolve().then(resolve, reject); },
+          returning: async () => {
+            if (dbState.failPassWrite) throw new Error("connection reset");
+            dbState.updated.push(s);
+            return [{ until: new Date(Date.now() + 864e5) }];
+          },
+        }),
+      }),
+    }),
     insert: () => ({ values: async (v: any) => { dbState.inserted.push(v); } }),
   })),
 }));
@@ -26,7 +39,7 @@ vi.mock("./stripe", () => ({
     dbState.creditBalance -= cost;
     return { success: true, balance: dbState.creditBalance, needed: cost };
   }),
-  refundCredits: vi.fn(async () => undefined),
+  refundCredits: vi.fn(async (_userId: number, amount: number) => { dbState.creditBalance += amount; }),
 }));
 
 vi.mock("./_core/btcpay", async (orig) => {
@@ -39,6 +52,7 @@ vi.mock("./_core/btcpay", async (orig) => {
 });
 
 import { uncensoredRouter } from "./routers/uncensored";
+import { refundCredits } from "./stripe";
 import { verifyBTCPayWebhook, UNCENSORED_PLAN } from "./_core/btcpay";
 import { isBtcpayConfigured } from "./_core/btcpay";
 
@@ -95,7 +109,7 @@ describe("uncensored.createCheckout", () => {
 });
 
 describe("uncensored.unlockWithCredits", () => {
-  beforeEach(() => { dbState.user = null; dbState.inserted = []; dbState.updated = []; dbState.creditBalance = 600; vi.clearAllMocks(); });
+  beforeEach(() => { dbState.user = null; dbState.inserted = []; dbState.updated = []; dbState.creditBalance = 600; dbState.failPassWrite = false; vi.clearAllMocks(); });
 
   it("blocks credit unlock until age is confirmed", async () => {
     dbState.user = { uncensoredUntil: null, ageConfirmedAt: null };
@@ -109,7 +123,24 @@ describe("uncensored.unlockWithCredits", () => {
     expect(res.ok).toBe(true);
     expect(res.creditsSpent).toBe(400);
     expect(res.creditsRemaining).toBe(200);
-    expect(dbState.updated[0].uncensoredUntil).toBeInstanceOf(Date);
+    expect(res.until).toBeInstanceOf(Date);
+    // The extension is written as SQL on the stored value, not a JS date
+    // computed from an earlier read.
+    expect(dbState.updated).toHaveLength(1);
+    expect(dbState.updated[0].uncensoredUntil).toBeDefined();
+    expect(dbState.updated[0].uncensoredUntil).not.toBeInstanceOf(Date);
+    expect(refundCredits).not.toHaveBeenCalled();
+  });
+
+  it("returns the credits when the pass cannot be written", async () => {
+    dbState.user = { uncensoredUntil: null, ageConfirmedAt: new Date() };
+    dbState.failPassWrite = true;
+    await expect(uncensoredRouter.createCaller(ctx()).unlockWithCredits({ planId: "uncensored-day" }))
+      .rejects.toThrow(/credits were returned/i);
+    expect(refundCredits).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(refundCredits).mock.calls[0].slice(0, 2)).toEqual([7, 400]);
+    expect(dbState.creditBalance).toBe(600);
+    expect(dbState.updated).toHaveLength(0);
   });
 
   it("rejects when user has insufficient credits", async () => {
