@@ -1901,7 +1901,9 @@ export default function Credits() {
     };
     const timers = [1500, 4000, 9000, 20000].map((ms) => window.setTimeout(refresh, ms));
     return () => timers.forEach((t) => window.clearTimeout(t));
-  }, [utils]);
+    // Once per page load: this reads the URL Stripe returned to, nothing else.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const checkout = trpc.credits.createCheckout.useMutation({
     onSuccess: (data) => {
