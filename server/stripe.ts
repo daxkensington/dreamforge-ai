@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions } from "../drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
-import { TOOL_CREDIT_COSTS } from "../shared/creditCosts";
+import { CREDIT_PACKS, TOOL_CREDIT_COSTS, creditPackCheckoutMetadata, resolveCreditPack, type CreditPackId } from "../shared/creditCosts";
 import { TIERS } from "../shared/tiers";
 import { debitWallet, grantWalletCredits, refundWallet } from "./_core/walletAccounting";
 import { refreshPaidSubscriptionAllowance } from "./_core/subscriptionBilling";
@@ -19,48 +19,25 @@ export function getStripeClient(): Stripe {
 }
 
 // ─── Credit Packages ────────────────────────────────────────────────────────
-export const CREDIT_PACKAGES = [
-  {
-    id: "starter",
-    name: "Starter Pack",
-    credits: 100,
-    price: 499, // $4.99
-    priceDisplay: "$4.99",
-    perCredit: "$0.05",
-    popular: false,
-    description: "Perfect for trying out DreamForgeX",
-  },
-  {
-    id: "creator",
-    name: "Creator Pack",
-    credits: 500,
-    price: 1999, // $19.99
-    priceDisplay: "$19.99",
-    perCredit: "$0.04",
-    popular: true,
-    description: "Best value for regular creators",
-  },
-  {
-    id: "studio",
-    name: "Studio Pack",
-    credits: 1500,
-    price: 4999, // $49.99
-    priceDisplay: "$49.99",
-    perCredit: "$0.03",
-    popular: false,
-    description: "For professional studios and teams",
-  },
-  {
-    id: "enterprise",
-    name: "Ultimate Pack",
-    credits: 5000,
-    price: 14999, // $149.99
-    priceDisplay: "$149.99",
-    perCredit: "$0.03",
-    popular: false,
-    description: "Maximum credits for large-scale production",
-  },
-] as const;
+// The /credits page sells the SAME one-time packs as /pricing, /uncensored and
+// llms.txt. Credits and prices come from CREDIT_PACKS; this adds only the copy
+// the /credits cards show. It used to be its own table, and sold a fifth of
+// the credits for the same four prices (see LEGACY_CREDIT_PACKAGES).
+const PACKAGE_COPY: Record<CreditPackId, { name: string; description: string; popular: boolean }> = {
+  "pack-500": { name: "Starter Pack", description: "Perfect for trying out DreamForgeX", popular: false },
+  "pack-2500": { name: "Creator Pack", description: "Best value for regular creators", popular: true },
+  "pack-7500": { name: "Studio Pack", description: "For professional studios and teams", popular: false },
+  "pack-25000": { name: "Ultimate Pack", description: "Maximum credits for large-scale production", popular: false },
+};
+
+export const CREDIT_PACKAGES = CREDIT_PACKS.map((pack) => ({
+  id: pack.id,
+  credits: pack.credits,
+  price: pack.price,
+  priceDisplay: `$${(pack.price / 100).toFixed(2)}`,
+  perCredit: pack.perCredit,
+  ...PACKAGE_COPY[pack.id],
+}));
 
 // ─── Credit Costs per Tool ──────────────────────────────────────────────────
 // Re-exported from shared/creditCosts.ts so server + client can't drift.
@@ -267,8 +244,11 @@ export async function createCheckoutSession(
   packageId: string,
   origin: string
 ) {
-  const pkg = CREDIT_PACKAGES.find((p) => p.id === packageId);
-  if (!pkg) throw new Error(`Invalid package: ${packageId}`);
+  // Accepts a CREDIT_PACKS id, or a retired /credits id from a tab that was
+  // open across the deploy (it resolves to the pack with the same price).
+  const pack = resolveCreditPack(packageId);
+  if (!pack) throw new Error(`Invalid package: ${packageId}`);
+  const pkg = CREDIT_PACKAGES.find((p) => p.id === pack.id)!;
   origin = sanitizeRedirectOrigin(origin);
 
   // Get or create Stripe customer
@@ -302,21 +282,16 @@ export async function createCheckoutSession(
           currency: "usd",
           product_data: {
             name: `DreamForgeX ${pkg.name}`,
-            description: `${pkg.credits} generation credits`,
-            metadata: { dreamforge_type: "credit_pack", package_id: pkg.id, credits: String(pkg.credits) },
+            description: `${pkg.credits.toLocaleString("en-US")} generation credits`,
+            metadata: { dreamforge_type: "credit_pack", pack_id: pack.id, credits: String(pack.credits) },
           },
           unit_amount: pkg.price,
         },
         quantity: 1,
       },
     ],
-    metadata: {
-      user_id: userId.toString(),
-      package_id: pkg.id,
-      credits: pkg.credits.toString(),
-      customer_email: userEmail,
-      customer_name: userName,
-    },
+    // Same metadata as pricing.purchaseCredits: one format, one webhook branch.
+    metadata: creditPackCheckoutMetadata(userId, pack),
     success_url: `${origin}/credits?success=true&session_id={CHECKOUT_SESSION_ID}&value=${(pkg.price / 100).toFixed(2)}&currency=usd&credits=${pkg.credits}`,
     cancel_url: `${origin}/credits?canceled=true`,
   });

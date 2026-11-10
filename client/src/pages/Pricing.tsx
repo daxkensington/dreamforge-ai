@@ -225,16 +225,33 @@ export default function Pricing() {
   const [billing, setBilling] = useState<BillingPeriod>("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+  // Set when Stripe returns a buyer here after paying. Without it the buyer
+  // landed back on a price list that gave no sign the payment had worked.
+  const [purchaseNotice, setPurchaseNotice] = useState<{ title: string; detail: string } | null>(null);
 
   useEffect(() => {
     track("paywall_viewed");
     // Stripe sends the buyer back here on success; record the completion so
     // checkout_started -> checkout_completed is a closed loop.
     const params = new URLSearchParams(window.location.search);
+    const bought = Number(params.get("credits"));
+    const boughtText = Number.isFinite(bought) && bought > 0 ? bought.toLocaleString() : null;
     if (params.get("success") === "true") {
       track("checkout_completed", { kind: "subscription" });
+      setPurchaseNotice({
+        title: "Payment received — your plan is active.",
+        detail: boughtText
+          ? `Your ${boughtText} monthly credits are being added to your balance now.`
+          : "Your monthly credits are being added to your balance now.",
+      });
     } else if (params.get("credit_success") === "true") {
       track("checkout_completed", { kind: "credit_pack" });
+      setPurchaseNotice({
+        title: "Payment received — thank you.",
+        detail: boughtText
+          ? `${boughtText} credits are being added to your balance now. They never expire.`
+          : "Your credits are being added to your balance now. They never expire.",
+      });
     } else if (params.get("canceled") === "true") {
       // Stripe's cancel_url: the buyer reached the hosted page and backed out.
       track("checkout_canceled", { surface: "pricing" });
@@ -307,6 +324,24 @@ export default function Pricing() {
         <div className="absolute bottom-0 right-[10%] w-80 h-80 bg-cyan-500/8 rounded-full blur-[110px] animate-[pulse_5s_ease-in-out_infinite]" />
         <div className="absolute top-1/3 right-[30%] w-48 h-48 bg-fuchsia-500/8 rounded-full blur-[80px] animate-[pulse_7s_ease-in-out_infinite]" />
         <div className="container relative text-center">
+          {purchaseNotice && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mx-auto mb-8 flex max-w-2xl flex-col items-center gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-4 sm:flex-row sm:text-left"
+            >
+              <Check className="h-6 w-6 shrink-0 text-emerald-400" />
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">{purchaseNotice.title}</p>
+                <p className="text-sm text-muted-foreground">{purchaseNotice.detail}</p>
+              </div>
+              <Button asChild size="sm">
+                <Link href="/workspace">
+                  Start creating <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          )}
           <motion.div
             initial="hidden"
             animate="visible"

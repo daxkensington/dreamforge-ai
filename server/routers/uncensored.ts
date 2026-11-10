@@ -1892,13 +1892,32 @@ export const uncensoredRouter = router({
           message: `Not enough credits — the ${plan.label} requires ${cost} credits and you have ${debit.balance}. Top up a credit pack to unlock instantly.`,
         });
       }
-      const db = await requireDb();
-      const baseMs = ent.until && ent.until.getTime() > Date.now() ? ent.until.getTime() : Date.now();
-      const newUntil = new Date(baseMs + plan.durationDays * 24 * 60 * 60 * 1000);
-      await db
-        .update(users)
-        .set({ uncensoredUntil: newUntil })
-        .where(eq(users.id, ctx.user.id));
+      // The credits are spent; from here the buyer either gets the pass or
+      // gets the credits back. The extension is computed inside the UPDATE
+      // (same expression as the Bitcoin settlement), not from the entitlement
+      // read above: two unlocks that both paid must each add their days.
+      let newUntil: Date;
+      try {
+        const db = await requireDb();
+        const [row] = await db
+          .update(users)
+          .set({
+            uncensoredUntil: sql`GREATEST(COALESCE(${users.uncensoredUntil}, now()), now()) + make_interval(days => ${plan.durationDays})`,
+          })
+          .where(eq(users.id, ctx.user.id))
+          .returning({ until: users.uncensoredUntil });
+        if (!row?.until) throw new Error("pass entitlement was not written");
+        newUntil = new Date(row.until);
+      } catch (err: any) {
+        console.error(`[Uncensored] credit unlock failed after debit for user ${ctx.user.id}: ${err?.message ?? err}`);
+        await refundCredits(ctx.user.id, cost, `Uncensored ${plan.label} unlock failed`, {
+          purchasedCredits: Math.min(cost, (debit as { purchasedCreditsDebited?: number }).purchasedCreditsDebited ?? 0),
+        });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "We couldn't activate your pass, so your credits were returned. Please try again.",
+        });
+      }
       if (ctx.user.email) {
         void sendPassActivatedEmail({ to: ctx.user.email, plan, until: newUntil });
       }
