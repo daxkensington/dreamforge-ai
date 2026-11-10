@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 const lowPrice = Math.min(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
-const highPrice = Math.max(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
+const highPrice = Math.max(...UNCENSORED_PLANS.flatMap((p) => [p.priceUsd, p.creditPackPriceUsd])).toFixed(2);
 
 export default async function Page({ params }: PageProps) {
   const { slug } = await params;

@@ -26,13 +26,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "AI Image Generator No Filter — 3 Free Previews, Card or Crypto | DreamForgeX",
     "metaDescription": "An AI image generator with no content filter. 3 free previews (no card). Prompts other tools reject render on our GPUs. Unlock from $4.99 via Card/Apple Pay or Bitcoin. 18+.",
     "h1": "The AI Image Generator With No Content Filter",
-    "intro": "If you have ever pasted a prompt into Midjourney, DALL-E, or Adobe Firefly and gotten slapped with \"this request violates our content policy,\" you already know the problem. The big platforms run aggressive filters that reject not just genuinely off-limits material but a huge swath of legitimate creative work: mature themes, edgy concept art, bold figure studies, gritty editorial scenes. DreamForgeX is built for everyone tired of fighting that wall. There is no content filter standing between your prompt and your image.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there is no third-party acceptable-use policy quietly overruling what you generate. Your prompts are processed exactly as written, with no silent rewrites and no refusals. Every free account includes 3 free previews before spending a cent, and everything you make is private by default. When you are ready for full access to all 7 Pro Studio tools, Uncensored Passes start at $4.99 for a day pass ($12 for 7 days, $19 for 30 days) — payable with Card / Apple Pay via DreamForgeX Credit Packs or anonymously with Bitcoin (on-chain or Lightning). All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
+    "intro": "If you have ever pasted a prompt into Midjourney, DALL-E, or Adobe Firefly and gotten slapped with \"this request violates our content policy,\" you already know the problem. The big platforms run aggressive filters that reject not just genuinely off-limits material but a huge swath of legitimate creative work: mature themes, edgy concept art, bold figure studies, gritty editorial scenes. DreamForgeX is built for everyone tired of fighting that wall. There is no content filter standing between your prompt and your image.\n\nWe run uncensored open-source Flux models on our own self-hosted GPUs, so there is no third-party acceptable-use policy quietly overruling what you generate. Your prompts are processed exactly as written, with no silent rewrites and no refusals. Every free account includes 3 free previews before spending a cent, and everything you make is private by default. When you are ready for full access to all 7 Pro Studio tools, Uncensored Passes start at $4.99 for a day pass ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) — payable with Card / Apple Pay via DreamForgeX Credit Packs or anonymously with Bitcoin (on-chain or Lightning). All output is 100% AI-generated, depicts fictional characters only, and is intended for adults 18 and over.",
     "bullets": [
       "No content filter, period. Prompts that trip a policy-violation error elsewhere are processed exactly as you wrote them, with no silent rewrites and no refusals.",
       "Start with 3 free previews on any free account — test the real unfiltered Flux pipeline before spending a cent.",
       "Runs on our own self-hosted GPUs instead of a rented API, so there is no third-party acceptable-use policy that can ban your account or override your prompt mid-render.",
       "Private by default: every image is yours alone, never published to a public feed, never used as training data, never shared.",
-      "Flexible checkout: unlock passes from $4.99 for a day ($12 for 7 days, $19 for 30 days) using Card / Apple Pay (via DreamForgeX Credit Packs) or anonymously with Bitcoin (on-chain and Lightning)."
+      "Flexible checkout: unlock passes from $4.99 for a day ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) using Card / Apple Pay (via DreamForgeX Credit Packs) or anonymously with Bitcoin (on-chain and Lightning)."
     ],
     "sampleConcepts": [
       "A film-noir detective lit only by neon through venetian blinds, cigarette smoke curling",
@@ -57,7 +57,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can I use a card or stay anonymous with Bitcoin?",
-        "a": "Every free account starts with 3 free previews. When you want a pass ($4.99 for 24 hours, $12 for 7 days, or $19 for 30 days), you can pay with Visa, Mastercard, or Apple Pay by grabbing a standard DreamForgeX Credit Pack and clicking 'Unlock with Credits', or pay anonymously with Bitcoin (on-chain or Lightning) with no card or billing name."
+        "a": "Every free account starts with 3 free previews. When you want a pass ($4.99 for 24 hours; $12 for 7 days or $19 for 30 days with Bitcoin, $19.99 for either by card), you can pay with Visa, Mastercard, or Apple Pay by grabbing a standard DreamForgeX Credit Pack and clicking 'Unlock with Credits', or pay anonymously with Bitcoin (on-chain or Lightning) with no card or billing name."
       }
     ]
   },
@@ -66,13 +66,13 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Unfiltered AI Image Generator — 3 Free Previews | DreamForgeX",
     "metaDescription": "An unfiltered AI image generator with the safety checker off. 3 free previews, open-source Flux & Wan 2.2 GPUs, private by default. Pay with Card/Apple Pay or Bitcoin. 18+.",
     "h1": "The Unfiltered AI Image Generator That Doesn't Reject Your Prompt",
-    "intro": "Most AI art tools run a hidden safety checker that silently rewrites or rejects anything mature, edgy, or artistically risky. DreamForgeX takes a different path: we run raw open-source Flux models with the safety checker switched off, so the prompt that triggered a \"this request violates our policy\" wall elsewhere simply renders here. No prompt-laundering, no euphemisms, no guessing which word tripped the filter. You describe the image you actually want, and the model generates it.\n\nThis is genuinely unfiltered generation, not a relaxed setting. Because we own and operate the GPUs, there's no third-party provider waiting to ban your account over its acceptable-use policy. Every free account gets 3 free previews, everything you create is private by default, and you can unlock an Uncensored Pass from $4.99 a day ($12 for 7 days, $19 for 30 days) using Card / Apple Pay via DreamForgeX Credit Packs or anonymously with Bitcoin (on-chain and Lightning). One compliance note: every image is 100% AI-generated, strictly 18+, and depicts fictional characters only. We do not allow content involving real, identifiable individuals or any illegal subject matter, full stop.",
+    "intro": "Most AI art tools run a hidden safety checker that silently rewrites or rejects anything mature, edgy, or artistically risky. DreamForgeX takes a different path: we run raw open-source Flux models with the safety checker switched off, so the prompt that triggered a \"this request violates our policy\" wall elsewhere simply renders here. No prompt-laundering, no euphemisms, no guessing which word tripped the filter. You describe the image you actually want, and the model generates it.\n\nThis is genuinely unfiltered generation, not a relaxed setting. Because we own and operate the GPUs, there's no third-party provider waiting to ban your account over its acceptable-use policy. Every free account gets 3 free previews, everything you create is private by default, and you can unlock an Uncensored Pass from $4.99 a day ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) using Card / Apple Pay via DreamForgeX Credit Packs or anonymously with Bitcoin (on-chain and Lightning). One compliance note: every image is 100% AI-generated, strictly 18+, and depicts fictional characters only. We do not allow content involving real, identifiable individuals or any illegal subject matter, full stop.",
     "bullets": [
       "Safety checker OFF on raw open-source Flux models, the censorship layer most platforms hard-wire is simply not in the pipeline here",
       "Try 3 free previews on a free account with no credit card required before unlocking a pass",
       "Prompts that get rejected, blurred, or auto-rewritten on Midjourney, DALL-E, and Adobe just work, no keyword games required",
       "Private by default: your generations are never posted to a public feed, gallery, or 'explore' page, ever",
-      "Dual checkout: unlock from $4.99 for a day pass ($12 for 7 days, $19 for 30 days) with Card / Apple Pay (via Credit Packs) or anonymous Bitcoin (on-chain and Lightning)"
+      "Dual checkout: unlock from $4.99 for a day pass ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) with Card / Apple Pay (via Credit Packs) or anonymous Bitcoin (on-chain and Lightning)"
     ],
     "sampleConcepts": [
       "a moody chiaroscuro figure study lit by a single candle, oil-painting texture",
@@ -97,7 +97,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How private is this, and how can I pay?",
-        "a": "Your generations are private by default and are never published to any public gallery or feed. You get 3 free previews first, and then an Uncensored Pass (from $4.99 a day, $12 for 7 days, or $19 for 30 days) can be unlocked with Card / Apple Pay via standard DreamForgeX Credit Packs or purchased anonymously with Bitcoin (on-chain or Lightning)."
+        "a": "Your generations are private by default and are never published to any public gallery or feed. You get 3 free previews first, and then an Uncensored Pass (from $4.99 a day; $12 for 7 days or $19 for 30 days with Bitcoin, $19.99 for either by card) can be unlocked with Card / Apple Pay via standard DreamForgeX Credit Packs or purchased anonymously with Bitcoin (on-chain or Lightning)."
       }
     ]
   },
@@ -112,7 +112,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       "3 free previews included on every free account with no credit card required upfront",
       "Unfiltered open-source Flux models run raw on GPUs we own — no third-party cloud AUP to suspend your account or kill your prompt mid-render",
       "Private by default: every image is yours alone, never posted to a public feed, gallery, or training set",
-      "Pay your way — Uncensored Passes from $4.99 a day ($12 for 7 days, $19 for 30 days) unlock instantly via Card / Apple Pay Credit Packs or anonymous Bitcoin (on-chain and Lightning)"
+      "Pay your way — Uncensored Passes from $4.99 a day ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) unlock instantly via Card / Apple Pay Credit Packs or anonymous Bitcoin (on-chain and Lightning)"
     ],
     "sampleConcepts": [
       "a sword-and-sorcery battlefield at dusk, blood-red sky, fallen banners",
@@ -137,7 +137,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Is it private, and how do I pay?",
-        "a": "Yes. Every image you generate is private by default — never shown in a public feed, gallery, or shared dataset. After your 3 free previews, Uncensored Passes start at $4.99 for a day pass ($12 for 7 days, $19 for 30 days) and can be unlocked with Card / Apple Pay via DreamForgeX Credit Packs or paid anonymously with Bitcoin (on-chain or Lightning)."
+        "a": "Yes. Every image you generate is private by default — never shown in a public feed, gallery, or shared dataset. After your 3 free previews, Uncensored Passes start at $4.99 for a day pass ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) and can be unlocked with Card / Apple Pay via DreamForgeX Credit Packs or paid anonymously with Bitcoin (on-chain or Lightning)."
       }
     ]
   },
@@ -622,7 +622,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours; a week is $12 and 30 days $19 with Bitcoin ($19.99 for either by card). They are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -665,7 +665,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours; a week is $12 and 30 days $19 with Bitcoin ($19.99 for either by card). They are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -708,7 +708,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours; a week is $12 and 30 days $19 with Bitcoin ($19.99 for either by card). They are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -751,7 +751,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay, and can it stay private?",
-        "a": "Passes start at $4.99 for 24 hours, $12 for a week, or $19 for 30 days, and are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
+        "a": "Passes start at $4.99 for 24 hours; a week is $12 and 30 days $19 with Bitcoin ($19.99 for either by card). They are payable via Card / Apple Pay (Credit Packs) or anonymously in Bitcoin (on-chain and Lightning) through BTCPay, on-chain or by Lightning — so there is no card number and no real name attached to a billing statement. Before you pay anything you get 3 free previews."
       },
       {
         "q": "Will anyone see what I make?",
@@ -794,7 +794,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "How do I pay — can I use a card or stay anonymous with crypto?",
-        "a": "Both. You can unlock a pass starting at $4.99 for 24 hours ($12 for 7 days, $19 for 30 days) using standard DreamForgeX credit packs bought with Visa, Mastercard, Apple Pay, or Google Pay via Stripe, or pay anonymously with Bitcoin through BTCPay (on-chain or Lightning). You also get 3 free previews before paying anything."
+        "a": "Both. You can unlock a pass starting at $4.99 for 24 hours ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) using standard DreamForgeX credit packs bought with Visa, Mastercard, Apple Pay, or Google Pay via Stripe, or pay anonymously with Bitcoin through BTCPay (on-chain or Lightning). You also get 3 free previews before paying anything."
       },
       {
         "q": "What is the 4-View Character Sheet tool?",
@@ -807,7 +807,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Uncensored AI Outfit Changer — Virtual Wardrobe Swap | DreamForgeX",
     "metaDescription": "Swap outfits on any AI character with our uncensored AI outfit changer. 10 one-click wardrobe presets, custom fabric prompts, before/after slider. 18+.",
     "h1": "Uncensored AI Outfit Changer — Virtual Wardrobe Studio",
-    "intro": "Once you have a character and pose you love, regenerating from scratch just to change their wardrobe usually ruins the face, lighting, or composition. The DreamForgeX Uncensored AI Outfit Changer uses img2img conditioning and IP-Adapter identity preservation on our self-hosted GPUs to swap clothing, fabrics, and styling while keeping the character's face, pose, and scene intact.\n\nChoose from 10 one-click wardrobe presets — including Evening Gown, Silk Robe, Lace Bodysuit,Latex Catsuit, Cyberpunk Armor, Leather Corset, Bikini / Swim, Tailored Suit, Sheer Drape, and Fine-Art Figure Study — or describe any custom outfit and material in your own words. Compare the original and new look with a built-in interactive Before / After split curtain slider. Start with 3 free previews; passes begin at $4.99 for 24 hours ($12 for 7 days, $19 for 30 days) via Card / Apple Pay credit packs or Bitcoin (on-chain and Lightning). All output is 100% AI-generated, fictional, and for adults 18+.",
+    "intro": "Once you have a character and pose you love, regenerating from scratch just to change their wardrobe usually ruins the face, lighting, or composition. The DreamForgeX Uncensored AI Outfit Changer uses img2img conditioning and IP-Adapter identity preservation on our self-hosted GPUs to swap clothing, fabrics, and styling while keeping the character's face, pose, and scene intact.\n\nChoose from 10 one-click wardrobe presets — including Evening Gown, Silk Robe, Lace Bodysuit,Latex Catsuit, Cyberpunk Armor, Leather Corset, Bikini / Swim, Tailored Suit, Sheer Drape, and Fine-Art Figure Study — or describe any custom outfit and material in your own words. Compare the original and new look with a built-in interactive Before / After split curtain slider. Start with 3 free previews; passes begin at $4.99 for 24 hours ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) via Card / Apple Pay credit packs or Bitcoin (on-chain and Lightning). All output is 100% AI-generated, fictional, and for adults 18+.",
     "bullets": [
       "10 one-click wardrobe presets plus custom outfit and fabric description prompts with zero content filter.",
       "Preserves your character's facial identity, pose, and lighting while transforming attire.",
@@ -868,7 +868,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "What are the payment options and compliance rules?",
-        "a": "You get 3 free previews on sign-up. Passes start at $4.99 for 24 hours ($12 for 7 days, $19 for 30 days) via Card / Apple Pay credit packs or Bitcoin (on-chain and Lightning via BTCPay). All imagery is 100% AI-generated, fictional, and strictly 18+."
+        "a": "You get 3 free previews on sign-up. Passes start at $4.99 for 24 hours ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) via Card / Apple Pay credit packs or Bitcoin (on-chain and Lightning via BTCPay). All imagery is 100% AI-generated, fictional, and strictly 18+."
       }
     ]
   },
@@ -877,7 +877,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
     "title": "Promptchan AI Alternative — Uncensored Flux, Face Lock & 4-View Sheets | DreamForgeX",
     "metaDescription": "Looking for a cleaner, higher-resolution Promptchan AI alternative? Uncensored Flux + Wan 2.2 Video, Face Lock, 4-View Sheets, and Card or Bitcoin checkout. 18+.",
     "h1": "Promptchan AI Alternative — Higher Fidelity, Zero Clutter",
-    "intro": "If you have used Promptchan AI, Candy AI, or SoulGen, you already know the frustrations: cluttered token walls, aggressive upsell pop-ups, dated SD 1.5 textures, and public community feeds mixed right into your workspace. DreamForgeX is built as a true pro-grade Uncensored Studio for creators who want cinema-quality open-source Flux imagery and Wan 2.2 video in a fast, private, ad-free environment.\n\nInstead of juggling separate mini-apps, DreamForgeX gives you a unified 7-tab studio: Create (with 8 Studio Character Archetypes and 8 Scene Recipes), Refine & Relight, Brush Inpaint, 4-View Character Turnaround Sheets, Virtual Outfit Swap, Uncensored Wan 2.2 Video Animation (with 6 camera moves), and a Private Vault with bulk actions and side-by-side comparison. Every generation is private by default. Try 3 free previews with no card required; passes start at $4.99 for 24 hours ($12 for 7 days, $19 for 30 days) via Card / Apple Pay credit packs or anonymous Bitcoin (on-chain and Lightning). All output is 100% AI-generated, fictional, and for adults 18+.",
+    "intro": "If you have used Promptchan AI, Candy AI, or SoulGen, you already know the frustrations: cluttered token walls, aggressive upsell pop-ups, dated SD 1.5 textures, and public community feeds mixed right into your workspace. DreamForgeX is built as a true pro-grade Uncensored Studio for creators who want cinema-quality open-source Flux imagery and Wan 2.2 video in a fast, private, ad-free environment.\n\nInstead of juggling separate mini-apps, DreamForgeX gives you a unified 7-tab studio: Create (with 8 Studio Character Archetypes and 8 Scene Recipes), Refine & Relight, Brush Inpaint, 4-View Character Turnaround Sheets, Virtual Outfit Swap, Uncensored Wan 2.2 Video Animation (with 6 camera moves), and a Private Vault with bulk actions and side-by-side comparison. Every generation is private by default. Try 3 free previews with no card required; passes start at $4.99 for 24 hours ($12 for 7 days or $19 for 30 days with Bitcoin; $19.99 for either by card) via Card / Apple Pay credit packs or anonymous Bitcoin (on-chain and Lightning). All output is 100% AI-generated, fictional, and for adults 18+.",
     "bullets": [
       "Runs on modern uncensored Flux + realism LoRAs and Wan 2.2 video on dedicated GPUs — no dated SD 1.5 blur.",
       "Complete 7-tab pro studio: Create, Refine & Relight, Brush Inpaint, 4-View Sheet, Outfit Swap, Video, and Vault.",
@@ -899,7 +899,7 @@ export const UNCENSORED_LANDINGS: Record<string, UncensoredLanding> = {
       },
       {
         "q": "Can I pay with Visa, Mastercard, or Apple Pay as well as Bitcoin?",
-        "a": "Yes. You can purchase standard DreamForgeX credit packs with Visa, Mastercard, Apple Pay, or Google Pay via Stripe and unlock your Uncensored Pass in 1 click (starting at $4.99 for 24 hours, $12 for 7 days, or $19 for 30 days), or pay directly in Bitcoin via BTCPay (on-chain or Lightning)."
+        "a": "Yes. You can purchase standard DreamForgeX credit packs with Visa, Mastercard, Apple Pay, or Google Pay via Stripe and unlock your Uncensored Pass in 1 click (starting at $4.99 for 24 hours; $12 for 7 days or $19 for 30 days with Bitcoin, $19.99 for either by card), or pay directly in Bitcoin via BTCPay (on-chain or Lightning)."
       },
       {
         "q": "Are my generations ever shown in a public feed?",

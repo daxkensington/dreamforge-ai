@@ -30,6 +30,41 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { CREDIT_PACKS } from "@shared/creditCosts";
+import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
+
+/** Marketing copy for the pass cards; every number comes from UNCENSORED_PLANS. */
+const PASS_COPY: Record<string, { name: string; badge: string; perks: string[] }> = {
+  "uncensored-day": {
+    name: "24-Hour Day Pass",
+    badge: "Impulse Try-Out",
+    perks: [
+      "Unlimited unfiltered Flux & Pony XL renders",
+      "Character Face Lock & 8 quick-pick personas",
+      "Brush Inpaint & Virtual Outfit Swap",
+      "100% private encrypted vault",
+    ],
+  },
+  "uncensored-week": {
+    name: "7-Day Week Pass",
+    badge: "Creator Sprint",
+    perks: [
+      "Full 7 days of unfiltered studio access",
+      "Uncensored Image-to-Video (Wan 2.2 Motion)",
+      "4-View Character Turnaround Sheets",
+      "Zero watermarks & commercial rights",
+    ],
+  },
+  "uncensored-30d": {
+    name: "30-Day Pro Access",
+    badge: "Best Value · Most Popular",
+    perks: [
+      "30 full days of unlimited Uncensored Studio",
+      "Priority dedicated GPU queue (fastest renders)",
+      "All 7 unfiltered image, edit & video tools",
+      "Stackable pass timer + private vault",
+    ],
+  },
+};
 import { getTierConfig } from "@shared/tiers";
 import { CreditCalculator } from "@/components/CreditCalculator";
 
@@ -737,59 +772,26 @@ export default function Pricing() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-5">
-              {[
-                {
-                  id: "uncensored-day",
-                  name: "24-Hour Day Pass",
-                  badge: "Impulse Try-Out",
-                  cardPrice: "$4.99",
-                  btcPrice: "$5 BTC",
-                  creditsCost: "400 credits",
-                  packId: "pack-500",
-                  bonusText: "Includes 500-cr pack (+100 bonus studio credits)",
-                  perks: [
-                    "Unlimited unfiltered Flux & Pony XL renders",
-                    "Character Face Lock & 8 quick-pick personas",
-                    "Brush Inpaint & Virtual Outfit Swap",
-                    "100% private encrypted vault",
-                  ],
-                  popular: false,
-                },
-                {
-                  id: "uncensored-7d",
-                  name: "7-Day Week Pass",
-                  badge: "Creator Sprint",
-                  cardPrice: "$12.00",
-                  btcPrice: "$12 BTC",
-                  creditsCost: "1,000 credits",
-                  packId: "pack-2500",
-                  bonusText: "Card unlocks via $19.99 pack (+1,500 bonus credits)",
-                  perks: [
-                    "Full 7 days of unfiltered studio access",
-                    "Uncensored Image-to-Video (Wan 2.2 Motion)",
-                    "4-View Character Turnaround Sheets",
-                    "Zero watermarks & commercial rights",
-                  ],
-                  popular: false,
-                },
-                {
-                  id: "uncensored-30d",
-                  name: "30-Day Pro Access",
-                  badge: "Best Value · Most Popular",
-                  cardPrice: "$19.99",
-                  btcPrice: "$19 BTC",
-                  creditsCost: "2,000 credits",
-                  packId: "pack-2500",
-                  bonusText: "Includes 2,500-cr pack (+500 bonus studio credits)",
-                  perks: [
-                    "30 full days of unlimited Uncensored Studio",
-                    "Priority dedicated GPU queue (fastest renders)",
-                    "All 7 unfiltered image, edit & video tools",
-                    "Stackable pass timer + private vault",
-                  ],
-                  popular: true,
-                },
-              ].map((pass) => (
+              {UNCENSORED_PLANS.map((plan) => {
+                // Prices, credits and ids come from the plan table the checkout
+                // and webhook use. This list was hand-written once and drifted:
+                // "$12" by card for a pass that bills the $19.99 pack, and a
+                // plan id ("uncensored-7d") that auto-unlock did not recognise.
+                const copy = PASS_COPY[plan.id] ?? PASS_COPY["uncensored-30d"];
+                const leftover = plan.creditPackTotalCredits - plan.creditPrice;
+                return {
+                  id: plan.id,
+                  name: copy.name,
+                  badge: copy.badge,
+                  cardPrice: `$${plan.creditPackPriceUsd.toFixed(2)}`,
+                  btcPrice: `$${plan.priceUsd % 1 ? plan.priceUsd.toFixed(2) : plan.priceUsd} BTC`,
+                  creditsCost: `${plan.creditPrice.toLocaleString("en-US")} credits`,
+                  packId: plan.creditPackId,
+                  bonusText: `Card: ${plan.creditPackTotalCredits.toLocaleString("en-US")}-credit pack, ${leftover.toLocaleString("en-US")} left after the pass · Bitcoin: +${plan.bonusCredits} bonus credits`,
+                  perks: copy.perks,
+                  popular: !!plan.highlight,
+                };
+              }).map((pass) => (
                 <div
                   key={pass.id}
                   className={`relative rounded-2xl p-5 flex flex-col justify-between border transition-all ${
@@ -813,8 +815,9 @@ export default function Pricing() {
                     </div>
                     <div className="flex items-baseline gap-2 mb-1">
                       <span className="text-3xl font-extrabold text-white">{pass.cardPrice}</span>
+                      <span className="text-xs text-white/60">by card</span>
                       <span className="text-xs text-rose-300 font-medium">
-                        ({pass.creditsCost} or {pass.btcPrice})
+                        · {pass.btcPrice} · or {pass.creditsCost}
                       </span>
                     </div>
                     <p className="text-[11px] text-emerald-300/90 mb-4">{pass.bonusText}</p>

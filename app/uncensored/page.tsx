@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 // Product + FAQPage + BreadcrumbList structured data. Pricing ladder → AggregateOffer so rich
 // results show the full $4.99–$19 range, not just the 30-day anchor.
 const lowPrice = Math.min(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
-const highPrice = Math.max(...UNCENSORED_PLANS.map((p) => p.priceUsd)).toFixed(2);
+const highPrice = Math.max(...UNCENSORED_PLANS.flatMap((p) => [p.priceUsd, p.creditPackPriceUsd])).toFixed(2);
 
 const jsonLd = {
   "@context": "https://schema.org",
