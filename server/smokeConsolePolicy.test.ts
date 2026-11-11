@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { assertHomepageCsp, classifyHomepageConsole, EXPECTED_HOMEPAGE_CSP } from '../tests/smoke/console-policy.mjs';
+import {
+  assertHomepageCsp,
+  classifyHomepageConsole,
+  EXPECTED_HOMEPAGE_CSP,
+  EXPECTED_HOMEPAGE_CSP_WITH_GA4,
+} from '../tests/smoke/console-policy.mjs';
 
 const preview = 'https://dreamforgex-example-englandsfinest.vercel.app';
 const chromiumBlock = `Loading the script 'https://vercel.live/_next-live/feedback/feedback.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-inline' https://connect.facebook.net". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.`;
@@ -44,6 +49,10 @@ describe('the policy still lets the checkout work', () => {
     for (const directive of EXPECTED_HOMEPAGE_CSP.split('; ')) {
       expect(source, `next.config.ts is missing the directive: ${directive}`).toContain(JSON.stringify(directive));
     }
+    for (const directive of EXPECTED_HOMEPAGE_CSP_WITH_GA4.split('; ')) {
+      expect(source, `next.config.ts is missing the GA4 directive: ${directive}`).toContain(JSON.stringify(directive));
+    }
+    expect(() => assertHomepageCsp({ enforced: [EXPECTED_HOMEPAGE_CSP_WITH_GA4], reportOnly: [] })).not.toThrow();
   });
 });
 
