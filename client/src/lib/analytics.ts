@@ -26,6 +26,108 @@ export type TrackedEvent =
 
 const ANON_KEY = "dfx_anon_id";
 const ATTR_KEY = "dfx_first_touch";
+const GA_ID_PATTERN = /^G-[A-Z0-9]+$/;
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+    __dfxGaConfiguredId?: string;
+  }
+}
+
+export function validGaMeasurementId(raw: string | undefined | null): string | null {
+  const trimmed = raw?.trim() ?? "";
+  return GA_ID_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+export type GaEventPayload = {
+  name: "page_view" | "sign_up" | "begin_checkout" | "purchase";
+  params: Record<string, string | number>;
+};
+
+/**
+ * Maps internal funnel events to GA4 standard events while stripping PII/userIds
+ * and query strings. Exported for unit testing.
+ */
+export function buildGa4Event(
+  event: TrackedEvent,
+  props?: Record<string, unknown>,
+  loc?: { origin?: string; pathname?: string; search?: string },
+): GaEventPayload | null {
+  if (event === "page_view") {
+    const pathname = (loc?.pathname || "/").slice(0, 512);
+    const origin = loc?.origin || "";
+    return {
+      name: "page_view",
+      params: {
+        page_path: pathname,
+        ...(origin ? { page_location: `${origin}${pathname}` } : {}),
+      },
+    };
+  }
+  if (event === "signup_completed") {
+    // Deliberately omit props.userId so internal account IDs never go to GA4.
+    return { name: "sign_up", params: {} };
+  }
+  if (event === "checkout_started") {
+    const params: Record<string, string | number> = {};
+    if (typeof props?.kind === "string" && /^[a-z0-9_-]{1,32}$/i.test(props.kind)) {
+      params.item_category = props.kind;
+    }
+    if (typeof props?.surface === "string" && /^[a-z0-9_-]{1,32}$/i.test(props.surface)) {
+      params.surface = props.surface;
+    }
+    return { name: "begin_checkout", params };
+  }
+  if (event === "checkout_completed") {
+    const searchParams = new URLSearchParams(loc?.search ?? "");
+    const rawValue = typeof props?.value === "number" ? props.value : Number(searchParams.get("value") ?? "NaN");
+    const value = Number.isFinite(rawValue) && rawValue >= 0 ? rawValue : 0;
+    const rawCurrency =
+      typeof props?.currency === "string" ? props.currency : (searchParams.get("currency") ?? "USD");
+    const currency = /^[a-z]{3}$/i.test(rawCurrency) ? rawCurrency.toUpperCase() : "USD";
+    const rawSessionId =
+      typeof props?.transactionId === "string" ? props.transactionId : (searchParams.get("session_id") ?? "");
+    const params: Record<string, string | number> = { value, currency };
+    if (/^[A-Za-z0-9_-]{4,128}$/.test(rawSessionId)) {
+      params.transaction_id = rawSessionId;
+    }
+    if (typeof props?.kind === "string" && /^[a-z0-9_-]{1,32}$/i.test(props.kind)) {
+      params.item_category = props.kind;
+    }
+    if (typeof props?.surface === "string" && /^[a-z0-9_-]{1,32}$/i.test(props.surface)) {
+      params.surface = props.surface;
+    }
+    return { name: "purchase", params };
+  }
+  return null;
+}
+
+function forwardToGa4(event: TrackedEvent, props?: Record<string, unknown>): void {
+  const gaId = validGaMeasurementId(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID);
+  if (!gaId || typeof window === "undefined") return;
+  const mapped = buildGa4Event(event, props, window.location);
+  if (!mapped) return;
+  if (mapped.name === "purchase" && typeof mapped.params.transaction_id === "string") {
+    const dedupeKey = `dfx_ga4_purchase_${mapped.params.transaction_id}`;
+    if (safeGet(dedupeKey) !== null) return;
+    safeSet(dedupeKey, "1");
+  }
+  window.dataLayer = window.dataLayer || [];
+  if (typeof window.gtag !== "function") {
+    window.gtag = function gtag() {
+      // eslint-disable-next-line prefer-rest-params
+      window.dataLayer!.push(arguments);
+    };
+  }
+  if (window.__dfxGaConfiguredId !== gaId) {
+    window.gtag("js", new Date());
+    window.gtag("config", gaId, { send_page_view: false });
+    window.__dfxGaConfiguredId = gaId;
+  }
+  window.gtag("event", mapped.name, mapped.params);
+}
 
 /**
  * Safari with storage blocked THROWS on property access, so `typeof
@@ -101,6 +203,11 @@ export function getFirstTouch(): FirstTouch {
 /** Fire-and-forget. Never rejects, never blocks rendering. */
 export function track(event: TrackedEvent, props?: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
+  try {
+    forwardToGa4(event, props);
+  } catch {
+    /* never let GA4 forwarding break first-party measurement or the page */
+  }
   try {
     const touch = getFirstTouch();
     const body = JSON.stringify({
