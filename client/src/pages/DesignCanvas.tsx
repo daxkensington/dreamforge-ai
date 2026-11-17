@@ -49,11 +49,48 @@ const CANVAS_SIZES = [
   { label: "Custom", width: 1920, height: 1080, aspect: "custom" },
 ];
 
+const IMAGE_LOAD_TIMEOUT_MS = 15_000;
+
+class CanvasExportError extends Error {}
+
+const canvasDimension = (value: string) => {
+  const dimension = Number(value);
+  return Number.isFinite(dimension) ? Math.max(1, dimension) : 1;
+};
+
+function loadCanvasImage(source: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.crossOrigin = "anonymous";
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      image.onload = null;
+      image.onerror = null;
+      if (error) reject(error);
+      else resolve(image);
+    };
+    const timeout = setTimeout(() => {
+      finish(new CanvasExportError("A source image took too long to load. Try uploading it again."));
+      image.src = "";
+    }, IMAGE_LOAD_TIMEOUT_MS);
+    image.onload = () => finish(image.naturalWidth > 0
+      ? undefined : new CanvasExportError("A source image is empty. Try uploading it again."));
+    image.onerror = () => finish(new CanvasExportError("A source image could not be loaded. Try uploading it again."));
+    try {
+      image.src = source;
+    } catch {
+      finish(new CanvasExportError("A source image could not be loaded. Try uploading it again."));
+    }
+  });
+}
+
 export default function DesignCanvas() {
   const { user } = useAuth();
   const requestIdentity = useGenerationRequestIdentity(user?.id, "design-canvas");
   const [canvasSize, setCanvasSize] = useState(CANVAS_SIZES[0]);
   const [elements, setElements] = useState<CanvasElement[]>([]);
+  const elementsRef = useRef(elements);
+  const nextElementIdRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [aiPrompt, setAiPrompt] = useState("");
   const [zoom, setZoom] = useState(0.5);
@@ -65,6 +102,7 @@ export default function DesignCanvas() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const exportingRef = useRef(false);
 
   const syncHistoryFlags = () => {
     setCanUndo(historyIndexRef.current > 0);
@@ -74,20 +112,30 @@ export default function DesignCanvas() {
   const cloneEls = (els: CanvasElement[]) =>
     els.map((el) => ({ ...el, style: el.style ? { ...el.style } : undefined }));
 
-  const commit = (next: CanvasElement[]) => {
+  // Async file readers must append to the current canvas, including edits made
+  // while the file was being read. Keep history work outside React updaters.
+  const updateElements = (next: CanvasElement[] | ((current: CanvasElement[]) => CanvasElement[])) => {
+    const resolved = typeof next === "function" ? next(elementsRef.current) : next;
+    elementsRef.current = resolved;
+    setElements(resolved);
+  };
+
+  const commit = (next: CanvasElement[] | ((current: CanvasElement[]) => CanvasElement[])) => {
     const idx = historyIndexRef.current;
     historyRef.current = historyRef.current.slice(0, idx + 1);
-    historyRef.current.push(cloneEls(next));
+    historyRef.current[idx] = cloneEls(elementsRef.current);
+    const resolved = typeof next === "function" ? next(elementsRef.current) : next;
+    historyRef.current.push(cloneEls(resolved));
     if (historyRef.current.length > 50) historyRef.current.shift();
     historyIndexRef.current = historyRef.current.length - 1;
-    setElements(next);
+    updateElements(resolved);
     syncHistoryFlags();
   };
 
   const snapshot = () => {
     const idx = historyIndexRef.current;
     historyRef.current = historyRef.current.slice(0, idx + 1);
-    historyRef.current.push(cloneEls(elements));
+    historyRef.current.push(cloneEls(elementsRef.current));
     if (historyRef.current.length > 50) historyRef.current.shift();
     historyIndexRef.current = historyRef.current.length - 1;
     syncHistoryFlags();
@@ -95,15 +143,18 @@ export default function DesignCanvas() {
 
   const undo = useCallback(() => {
     if (historyIndexRef.current <= 0) return;
+    // Drag, text and size edits update the active canvas between commits.
+    // Save that exact state so Redo can restore it after Undo.
+    historyRef.current[historyIndexRef.current] = cloneEls(elementsRef.current);
     historyIndexRef.current -= 1;
-    setElements(cloneEls(historyRef.current[historyIndexRef.current]));
+    updateElements(cloneEls(historyRef.current[historyIndexRef.current]));
     syncHistoryFlags();
   }, []);
 
   const redo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
-    setElements(cloneEls(historyRef.current[historyIndexRef.current]));
+    updateElements(cloneEls(historyRef.current[historyIndexRef.current]));
     syncHistoryFlags();
   }, []);
 
@@ -126,7 +177,7 @@ export default function DesignCanvas() {
   });
 
   const addElement = (type: CanvasElement["type"], content: string = "") => {
-    const id = `el-${Date.now()}`;
+    const id = `el-${Date.now()}-${++nextElementIdRef.current}`;
     const defaults: Record<string, Partial<CanvasElement>> = {
       text: { width: 300, height: 60, content: "Double-click to edit", style: { fontSize: 24, fontWeight: "bold", color: "#ffffff" } },
       image: { width: 200, height: 200, content },
@@ -134,7 +185,7 @@ export default function DesignCanvas() {
       shape: { width: 150, height: 150, content: "rectangle", style: { backgroundColor: "#3b82f6", borderRadius: 0, opacity: 0.8 } },
     };
     const def = defaults[type] || {};
-    const next = [...elements, {
+    commit((current) => [...current, {
       id, type,
       x: 100 + Math.random() * 200,
       y: 100 + Math.random() * 200,
@@ -142,29 +193,32 @@ export default function DesignCanvas() {
       height: def.height || 200,
       content: content || def.content || "",
       style: def.style,
-    }];
-    commit(next);
+    }]);
     setSelectedId(id);
   };
 
   const deleteSelected = () => {
     if (!selectedId) return;
-    commit(elements.filter((el) => el.id !== selectedId));
+    commit((current) => current.filter((el) => el.id !== selectedId));
     setSelectedId(null);
   };
 
   const exportPng = async () => {
-    if (exporting) return;
+    if (exportingRef.current) return;
+    exportingRef.current = true;
     setExporting(true);
     try {
       const canvas = document.createElement("canvas");
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas unsupported");
+      if (!ctx) throw new CanvasExportError("This browser does not support canvas export.");
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      for (const el of elements) {
+      for (const el of elementsRef.current) {
+        if (![el.x, el.y, el.width, el.height].every(Number.isFinite) || el.width < 1 || el.height < 1) {
+          throw new CanvasExportError("An element has an invalid size or position. Set its width and height to at least 1 before exporting.");
+        }
         if (el.type === "text") {
           ctx.save();
           ctx.fillStyle = el.style?.color || "#ffffff";
@@ -188,13 +242,7 @@ export default function DesignCanvas() {
           }
           ctx.restore();
         } else if (el.content) {
-          const img = new window.Image();
-          img.crossOrigin = "anonymous";
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => img.naturalWidth > 0 ? resolve() : reject(new Error("Source image is empty"));
-            img.onerror = () => reject(new Error("Source image could not be loaded"));
-            img.src = el.content;
-          });
+          const img = await loadCanvasImage(el.content);
           ctx.drawImage(img, el.x, el.y, el.width, el.height);
         }
       }
@@ -204,8 +252,13 @@ export default function DesignCanvas() {
       a.click();
       toast.success("PNG exported");
     } catch (err) {
-      toast.error("Export failed — a source image may block canvas export (CORS). Try uploading images instead of hotlinking.");
+      const message = err instanceof CanvasExportError ? err.message
+        : err?.name === "SecurityError"
+          ? "A source image blocks canvas export (CORS). Try uploading it instead of hotlinking."
+          : "PNG export failed. Please try again.";
+      toast.error(message);
     } finally {
+      exportingRef.current = false;
       setExporting(false);
     }
   };
@@ -335,11 +388,11 @@ export default function DesignCanvas() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-muted-foreground">Width</label>
-                    <Input type="number" value={selectedElement.width} onChange={(e) => setElements((prev) => prev.map((el) => el.id === selectedId ? { ...el, width: Number(e.target.value) } : el))} className="h-7 text-xs bg-white/5 border-white/10" />
+                    <Input type="number" min={1} value={selectedElement.width} onChange={(e) => updateElements((prev) => prev.map((el) => el.id === selectedId ? { ...el, width: canvasDimension(e.target.value) } : el))} className="h-7 text-xs bg-white/5 border-white/10" />
                   </div>
                   <div>
                     <label className="text-[10px] text-muted-foreground">Height</label>
-                    <Input type="number" value={selectedElement.height} onChange={(e) => setElements((prev) => prev.map((el) => el.id === selectedId ? { ...el, height: Number(e.target.value) } : el))} className="h-7 text-xs bg-white/5 border-white/10" />
+                    <Input type="number" min={1} value={selectedElement.height} onChange={(e) => updateElements((prev) => prev.map((el) => el.id === selectedId ? { ...el, height: canvasDimension(e.target.value) } : el))} className="h-7 text-xs bg-white/5 border-white/10" />
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="w-full gap-1 bg-transparent text-xs text-destructive" onClick={deleteSelected}>
@@ -412,7 +465,7 @@ export default function DesignCanvas() {
                   const onMove = (ev: PointerEvent) => {
                     const dx = (ev.clientX - startX) / zoom;
                     const dy = (ev.clientY - startY) / zoom;
-                    setElements((prev) => prev.map((item) =>
+                    updateElements((prev) => prev.map((item) =>
                       item.id === el.id ? { ...item, x: origX + dx, y: origY + dy } : item
                     ));
                   };
@@ -437,7 +490,7 @@ export default function DesignCanvas() {
                       color: el.style?.color || "#ffffff",
                     }}
                     onBlur={(e) => {
-                      setElements((prev) => prev.map((item) =>
+                      updateElements((prev) => prev.map((item) =>
                         item.id === el.id ? { ...item, content: e.currentTarget.textContent || "" } : item
                       ));
                     }}
