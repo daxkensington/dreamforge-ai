@@ -43,6 +43,7 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  htmlLimitedBots: /.*/,
   // tRPC needs server actions or API routes
   serverExternalPackages: ["@neondatabase/serverless"],
   // Baseline image optimization: serve AVIF/WebP from next/image where it's

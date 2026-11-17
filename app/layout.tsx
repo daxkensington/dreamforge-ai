@@ -21,9 +21,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "DreamForgeX — AI Image & Video Generation Studio (100+ Tools & Uncensored 18+ Studio)",
+  title: "DreamForgeX — AI Image, Video & Uncensored 18+ Studio",
   description:
-    "Create stunning AI images, cinematic videos, songs, and consistent characters with 100+ AI tools and 30+ models (FLUX, Veo 3, Runway Gen-4, Wan 2.2) — plus an Uncensored 18+ Pro Studio with 3 free previews.",
+    "Create AI images, videos, songs & characters with 100+ tools and 30+ models (FLUX, Veo 3, Wan 2.2), plus an Uncensored 18+ Studio with 3 free previews.",
   openGraph: {
     title: "DreamForgeX — AI Creative Studio (100+ AI Tools & 30+ Models)",
     description:
