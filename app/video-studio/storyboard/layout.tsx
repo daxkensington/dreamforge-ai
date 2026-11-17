@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Storyboard Generator — Visual Panels from a Concept | DreamForgeX",
+  title: "AI Storyboard Generator — Concept to Panels | DreamForgeX",
   description: "Describe your video concept and get a shot-by-shot storyboard: visual panels, scene synopses, and pacing notes ready for production.",
   alternates: { canonical: "https://dreamforgex.ai/video-studio/storyboard" },
   openGraph: {

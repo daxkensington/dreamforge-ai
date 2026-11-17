@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Authors — Book Covers, Headshots, Bookmarks, Launch Kits | DreamForgeX",
+  title: "AI Tools for Authors — Covers & Headshots | DreamForgeX",
   description: "Self-publish like a traditional house. Professional covers, author photos, bookmarks, launch-party invitations, BookTok promos — the whole launch kit.",
   alternates: { canonical: "https://dreamforgex.ai/for/authors" },
   openGraph: {

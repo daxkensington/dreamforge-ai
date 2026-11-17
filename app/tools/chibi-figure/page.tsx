@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolChibiFigure from "@/pages/ToolChibiFigure";
 
 export const metadata: Metadata = {
-  title: "AI Chibi Figure Generator — Turn Photos Into Cute Anime Figures | DreamForgeX",
+  title: "AI Chibi Figure Generator — Photo to Anime | DreamForgeX",
   description:
     "Upload a photo and create an adorable 3D anime chibi-style collectible figure with oversized head, big sparkly eyes, and pastel colors.",
   alternates: { canonical: "https://dreamforgex.ai/tools/chibi-figure" },

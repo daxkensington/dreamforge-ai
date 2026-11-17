@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "Video Style Transfer — Cinematic AI Looks for Footage | DreamForgeX",
+  title: "AI Video Style Transfer & Cinematic Looks | DreamForgeX",
   description: "Apply cinematic artistic styles to your video frames with AI style transfer — regrade footage to match a reference look or art style.",
   alternates: { canonical: "https://dreamforgex.ai/video-studio/style-transfer" },
   openGraph: {

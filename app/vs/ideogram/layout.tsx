@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Ideogram — Text-in-Image + Video, Audio, 100+ Tools | DreamForgeX",
+  title: "DreamForgeX vs Ideogram — Typography, Video & 100+ Tools",
   description:
-    "Looking for an Ideogram alternative? DreamForgeX routes text-heavy prompts through specialist models AND adds video, audio, virtual try-on, and 100+ named tools.",
+    "Looking for an Ideogram alternative? DreamForgeX pairs Ideogram-grade typography with 30+ models, AI video, audio, virtual try-on, and 100+ tools.",
   alternates: { canonical: "https://dreamforgex.ai/vs/ideogram" },
   openGraph: {
     title: "DreamForgeX vs Ideogram — Compare features and pricing",

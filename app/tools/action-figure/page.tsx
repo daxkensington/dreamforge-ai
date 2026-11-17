@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolActionFigure from "@/pages/ToolActionFigure";
 
 export const metadata: Metadata = {
-  title: "AI Action Figure Generator — Turn Yourself Into a Boxed Toy | DreamForgeX",
+  title: "AI Action Figure Generator — Boxed Toy Art | DreamForgeX",
   description:
     "Upload a photo and generate a custom action figure inside collectible blister-pack toy packaging. The viral 2026 trend, in seconds.",
   alternates: { canonical: "https://dreamforgex.ai/tools/action-figure" },

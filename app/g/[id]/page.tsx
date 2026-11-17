@@ -16,6 +16,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getGenerationById } from "../../../server/db";
 import { ShareGenerationView } from "../../../client/src/components/ShareGenerationView";
+import { formatSeoDescription, formatSeoTitle } from "../../../shared/seoMeta";
 
 const SITE = "https://dreamforgex.ai";
 const FALLBACK_OG = `${SITE}/showcase/gallery-4.jpg`;
@@ -54,8 +55,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const promptSnippet = gen.prompt.slice(0, 140) + (gen.prompt.length > 140 ? "…" : "");
-  const title = `${promptSnippet} — DreamForgeX`;
-  const description = `${gen.mediaType === "video" ? "AI video" : "AI image"} created on DreamForgeX. Try this prompt yourself with 100+ AI tools.`;
+  const title = formatSeoTitle(gen.prompt, " | DreamForgeX");
+  const description = formatSeoDescription(
+    `${gen.mediaType === "video" ? "AI video" : "AI image"} created on DreamForgeX. Try this prompt yourself with 100+ AI tools.`,
+  );
   const url = `${SITE}/g/${gen.id}`;
   // Videos must not use gen.imageUrl (a video file) as the social preview;
   // prefer a non-empty thumbnail (blank/whitespace counts as empty).

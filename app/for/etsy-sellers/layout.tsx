@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Etsy Sellers — Listing Photos, Mockups, Stickers | DreamForgeX",
+  title: "AI Tools for Etsy Sellers — Mockups & Photos | DreamForgeX",
   description: "Every creator tool an Etsy seller needs in one subscription — listing photos, mockups, sticker packs, printables, logos, brand kits. Commercial use included.",
   alternates: { canonical: "https://dreamforgex.ai/for/etsy-sellers" },
   openGraph: {

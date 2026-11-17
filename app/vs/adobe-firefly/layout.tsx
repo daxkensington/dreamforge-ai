@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Adobe Firefly — 10× Cheaper API + 100+ Tools | DreamForgeX",
+  title: "DreamForgeX vs Adobe Firefly — API, Video & 100+ AI Tools",
   description:
-    "Looking for an Adobe Firefly alternative? DreamForgeX offers API from $9/mo (Firefly gates API to $200 Premium), 100+ named workflow tools, and full audio + video gen.",
+    "Looking for an Adobe Firefly alternative? DreamForgeX offers REST API access from $9/mo, 100+ AI workflow tools, and full video + audio generation.",
   alternates: { canonical: "https://dreamforgex.ai/vs/adobe-firefly" },
   openGraph: {
     title: "DreamForgeX vs Adobe Firefly — Compare features and pricing",

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Leonardo.Ai — Public API, Audio & Video Bundled | DreamForgeX",
+  title: "DreamForgeX vs Leonardo.Ai — Video, Audio & Public API",
   description:
-    "Looking for a Leonardo.Ai alternative? DreamForgeX matches the multi-model breadth and adds full audio gen, niche workflow tools, and a public REST API — starting at $9/mo.",
+    "Looking for a Leonardo.Ai alternative? DreamForgeX bundles 30+ models, AI video, audio, 100+ workflow tools, and a public REST API from $9/mo.",
   alternates: { canonical: "https://dreamforgex.ai/vs/leonardo" },
   openGraph: {
     title: "DreamForgeX vs Leonardo.Ai — Compare features and pricing",

@@ -32,7 +32,7 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     slug: "best-free-ai-image-generators-2026",
     title: "Best Free AI Image Generators in 2026",
-    metaTitle: "Best Free AI Image Generators in 2026 (No Watermark) | DreamForgeX",
+    metaTitle: "Best Free AI Image Generators in 2026 | DreamForgeX",
     description:
       "Compare genuinely free AI image generators in 2026 (DreamForgeX, Gemini, Leonardo, Ideogram): daily refilling credits, no watermarks & commercial rights.",
     published: "2026-09-12",
@@ -154,7 +154,7 @@ export const BLOG_POSTS: BlogPost[] = [
     title: "Midjourney vs DreamForgeX: Which Should You Use?",
     metaTitle: "Midjourney vs DreamForgeX (2026) — An Honest Comparison",
     description:
-      "Midjourney has the best house style in AI art. DreamForgeX routes thirteen providers through one account. A practical comparison of price, control, and when each one wins.",
+      "Midjourney leads on signature style; DreamForgeX routes 30+ image, video & audio models in one account. Compare price, control, and when each tool wins.",
     published: "2026-09-12",
     readingMinutes: 9,
     tags: ["Midjourney", "Comparison", "AI art"],
@@ -263,7 +263,7 @@ export const BLOG_POSTS: BlogPost[] = [
     title: "How to Create an AI Music Video, Start to Finish",
     metaTitle: "How to Create AI Music Videos in 2026 — A Full Workflow",
     description:
-      "A practical walkthrough for making a music video with AI: generating the track, producing clips that match, keeping characters consistent, and assembling the cut.",
+      "Step-by-step workflow for making an AI music video: generating the song, producing beat-matched video clips, locking character consistency, and editing.",
     published: "2026-09-12",
     readingMinutes: 11,
     tags: ["AI video", "Music video", "Tutorial"],

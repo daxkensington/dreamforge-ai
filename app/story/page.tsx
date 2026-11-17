@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import StoryStudio from "@/pages/StoryStudio";
 
 export const metadata: Metadata = {
-  title: "One-Click Story — AI Storyboard + Music in Seconds | DreamForgeX",
+  title: "One-Click AI Storyboard & Soundtrack Maker | DreamForgeX",
   description:
-    "Type one idea, get a 4-6 scene illustrated story with custom soundtrack. Optionally bring your own character for visual consistency. Powered by 30+ AI models.",
+    "Type one idea and generate a 4–6 scene illustrated story with a custom AI soundtrack and consistent characters in seconds, powered by 30+ AI models.",
   alternates: { canonical: "https://dreamforgex.ai/story" },
   openGraph: {
     title: "One-Click Story — AI Storyboard + Music | DreamForgeX",

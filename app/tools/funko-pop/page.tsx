@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolFunkoPop from "@/pages/ToolFunkoPop";
 
 export const metadata: Metadata = {
-  title: "AI Funko Pop Generator — Turn Yourself Into a Vinyl Figure | DreamForgeX",
+  title: "AI Funko Pop Generator — Photo to Vinyl Toy | DreamForgeX",
   description:
     "Upload a photo and generate yourself as a Funko Pop! window-box vinyl figure with custom name, accessories, and packaging.",
   alternates: { canonical: "https://dreamforgex.ai/tools/funko-pop" },

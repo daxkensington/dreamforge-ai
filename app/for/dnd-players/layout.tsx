@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Art for D&D & Tabletop RPGs — Character Portraits, Item Cards | DreamForgeX",
+  title: "AI Art for D&D & Tabletop RPGs — Portraits | DreamForgeX",
   description: "Generate D&D and tabletop RPG art on demand: character portraits, monster and item cards, NPC faces, and dungeon concept art for your next session.",
   alternates: { canonical: "https://dreamforgex.ai/for/dnd-players" },
   openGraph: {

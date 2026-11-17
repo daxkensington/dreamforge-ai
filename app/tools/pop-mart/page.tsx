@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolPopMart from "@/pages/ToolPopMart";
 
 export const metadata: Metadata = {
-  title: "AI POP Mart Blind Box Generator — Turn Yourself Into a Designer Art Toy | DreamForgeX",
+  title: "AI POP Mart Blind Box Designer Toy Generator | DreamForgeX",
   description:
     "Upload a photo and generate a designer-toy vinyl figure in the POP Mart / Labubu aesthetic, complete with illustrated blind-box packaging.",
   alternates: { canonical: "https://dreamforgex.ai/tools/pop-mart" },

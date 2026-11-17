@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Tattoo Artists — Stencil + Color Designs, Flash, Merch | DreamForgeX",
+  title: "AI Tools for Tattoo Artists — Stencils & Art | DreamForgeX",
   description: "Faster consult-to-stencil workflow. Stencil and full-color variants in 10 styles, flash sheets, shop branding, merch — all in one place.",
   alternates: { canonical: "https://dreamforgex.ai/for/tattoo-artists" },
   openGraph: {

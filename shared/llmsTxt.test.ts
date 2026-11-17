@@ -60,4 +60,16 @@ describe.each(Object.entries(files))("%s matches the billing tables", (_name, te
       expect(text, `stale plan copy "${stale}" is back`).not.toContain(stale);
     }
   });
+
+  it("links every core commercial and discovery surface", () => {
+    for (const requiredUrl of [
+      "https://dreamforgex.ai/marketplace",
+      "https://dreamforgex.ai/explore",
+      "https://dreamforgex.ai/pricing",
+      "https://dreamforgex.ai/tools",
+      "https://dreamforgex.ai/uncensored",
+    ]) {
+      expect(text).toContain(requiredUrl);
+    }
+  });
 });

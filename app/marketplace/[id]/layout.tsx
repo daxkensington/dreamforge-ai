@@ -8,6 +8,7 @@
  */
 import type { Metadata } from "next";
 import { getListingById } from "../../../server/dbMarketplace";
+import { formatSeoDescription, formatSeoTitle } from "../../../shared/seoMeta";
 
 const SITE = "https://dreamforgex.ai";
 const FALLBACK_OG = `${SITE}/showcase/home-tool-market.jpg`;
@@ -47,12 +48,11 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     currency: "USD",
     maximumFractionDigits: 2,
   });
-  const title = `${item.title} — DreamForgeX Marketplace`;
+  const title = formatSeoTitle(`${item.title} | DreamForgeX`);
   const desc = item.description?.trim() ?? "";
   const suffix = `${item.type} by ${sellerName ?? "a DreamForgeX creator"} — ${item.price === 0 ? "Free" : price}.`;
-  // Only show the ellipsis when the description was actually truncated.
-  const description =
-    desc.length > 155 ? `${desc.slice(0, 155)}… ${suffix}` : desc ? `${desc} — ${suffix}` : suffix;
+  const rawDescription = desc ? `${suffix} ${desc}` : suffix;
+  const description = formatSeoDescription(rawDescription);
   const url = `${SITE}/marketplace/${item.id}`;
   const previews = Array.isArray(item.previewImages) ? item.previewImages : [];
   const ogImage = typeof previews[0] === "string" ? previews[0] : FALLBACK_OG;
