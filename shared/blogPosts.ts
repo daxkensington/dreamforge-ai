@@ -32,9 +32,9 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     slug: "best-free-ai-image-generators-2026",
     title: "Best Free AI Image Generators in 2026",
-    metaTitle: "Best Free AI Image Generators in 2026 (No Signup, Daily Credits & No Watermark Compared)",
+    metaTitle: "Best Free AI Image Generators in 2026 (No Watermark) | DreamForgeX",
     description:
-      "Compare the best genuinely free AI image generators in 2026 (DreamForgeX, Gemini, Copilot, Leonardo, Ideogram): daily free credits, no-watermark exports, and commercial rights.",
+      "Compare genuinely free AI image generators in 2026 (DreamForgeX, Gemini, Leonardo, Ideogram): daily refilling credits, no watermarks & commercial rights.",
     published: "2026-09-12",
     readingMinutes: 8,
     tags: ["AI image generation", "Free tools", "Comparison"],
