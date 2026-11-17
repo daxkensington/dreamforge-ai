@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolJellycatPlush from "@/pages/ToolJellycatPlush";
 
 export const metadata: Metadata = {
-  title: "AI Jellycat Plush Generator — Turn Photos Into Soft Plush Toys | DreamForgeX",
+  title: "AI Jellycat Plush Generator — Photo to Plush | DreamForgeX",
   description:
     "Upload a photo and generate an adorable ultra-soft Jellycat-style plush toy with pastel fur, embroidered features, and signature Jellycat aesthetic.",
   alternates: { canonical: "https://dreamforgex.ai/tools/jellycat-plush" },

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Musicians — Album Covers, Music Videos, Posters | DreamForgeX",
+  title: "AI Tools for Musicians — Covers & Music Video | DreamForgeX",
   description: "Package and promote your music without a label's budget: album covers, lyric and music videos, gig posters, and matching social art in one place.",
   alternates: { canonical: "https://dreamforgex.ai/for/musicians" },
   openGraph: {

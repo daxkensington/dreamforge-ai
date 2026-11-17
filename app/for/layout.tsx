@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "AI Tools for Your Work — Use-Case Guides | DreamForgeX",
-  description: "Curated AI tool guides by profession — Etsy sellers, musicians, teachers, podcasters, D&D players, fitness coaches, weddings and more. The right tools for your work.",
+  description: "Curated AI tool guides by profession — Etsy sellers, musicians, teachers, podcasters, D&D players, fitness coaches, and creators.",
   // NOTE: deliberately no `alternates.canonical` here. A canonical on this
   // shared /for layout would be INHERITED by every /for/<slug> page that
   // doesn't set its own (the 12 original audience pages don't), pointing them

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Krea.ai — Multi-Model Breadth + Audio Stack | DreamForgeX",
+  title: "DreamForgeX vs Krea.ai — 30+ Models, Audio & REST API",
   description:
-    "Looking for a Krea.ai alternative? DreamForgeX matches the multi-model breadth (30+ models across image, video, and audio) and adds full audio gen, niche tools, and a public REST API.",
+    "Looking for a Krea.ai alternative? DreamForgeX matches 30+ image & video models and adds full AI audio generation, 100+ workflow tools, and a REST API.",
   alternates: { canonical: "https://dreamforgex.ai/vs/krea" },
   openGraph: {
     title: "DreamForgeX vs Krea.ai — Compare features and pricing",

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Teachers — Worksheets, Certificates, Slides | DreamForgeX",
+  title: "AI Tools for Teachers — Worksheets & Slides | DreamForgeX",
   description: "Make classroom materials in minutes: printable coloring pages, named award certificates, flashcards, and lesson slides. One tool, classroom-ready.",
   alternates: { canonical: "https://dreamforgex.ai/for/teachers" },
   openGraph: {

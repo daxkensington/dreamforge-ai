@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Midjourney — Free Tier, Public API, Video & Audio | DreamForgeX",
+  title: "DreamForgeX vs Midjourney — Free Credits, Video & API",
   description:
-    "Looking for a Midjourney alternative? DreamForgeX gives you Flux + Imagen + DALL-E, video gen, audio, 100+ tools, and a public REST API — starting at $9/mo with a free tier and try-without-signup.",
+    "Looking for a Midjourney alternative? DreamForgeX gives you FLUX, Imagen 4, AI video, audio, 100+ tools, and 50 free daily credits — paid plans from $9/mo.",
   alternates: { canonical: "https://dreamforgex.ai/vs/midjourney" },
   openGraph: {
     title: "DreamForgeX vs Midjourney — Compare features and pricing",

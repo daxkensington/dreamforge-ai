@@ -36,7 +36,7 @@ export default function robots(): MetadataRoute.Robots {
           "DuckAssistBot",
           "YouBot",
         ],
-        allow: ["/", "/llms.txt", "/llms-full.txt", "/uncensored", "/tools", "/pricing", "/video-studio", "/blog"],
+        allow: ["/", "/llms.txt", "/llms-full.txt", "/uncensored", "/tools", "/pricing", "/marketplace", "/explore", "/video-studio", "/blog"],
         disallow: privateRoutes,
       },
       {

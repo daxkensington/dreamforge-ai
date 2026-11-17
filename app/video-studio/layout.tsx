@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Video Studio — Text-to-Video, Image-to-Video & Storyboards | DreamForgeX",
+  title: "AI Video Studio — Veo 3, Runway Gen-4 & Wan | DreamForgeX",
   description:
-    "Multi-scene AI video production studio powered by Google Veo 3, Runway Gen-4, Kling 2.0, Luma Ray 2, and self-hosted Wan 2.2. Storyboards, scene direction, scripts, soundtracks, and 4K upscaling.",
+    "Multi-scene AI video studio powered by Google Veo 3, Runway Gen-4, Kling 2.0, and Wan 2.2. Create storyboards, scripts, soundtracks, and 4K upscaled video.",
   alternates: { canonical: "https://dreamforgex.ai/video-studio" },
   openGraph: {
     title: "AI Video Studio — Veo 3, Runway Gen-4, Kling 2.0 & Wan 2.2 | DreamForgeX",

@@ -4,9 +4,9 @@ import { UNCENSORED_FAQ } from "@shared/uncensoredFaq";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
 
 export const metadata: Metadata = {
-  title: "Uncensored AI Image & Video Studio — No Filter, Card or Crypto | DreamForgeX",
+  title: "Uncensored AI Image & Video Studio: No Filter | DreamForgeX",
   description:
-    "Generate uncensored AI images & 5–10s videos with no content filter. 3 free previews (no card). Unlock all 7 Pro Studio tools from $4.99 with Card / Apple Pay (Credits) or Bitcoin. 18+ only.",
+    "Generate uncensored AI images & 5–10s videos with no filter. 3 free previews (no card). Unlock 7 Pro tools from $4.99 via Card, Apple Pay or Bitcoin. 18+.",
   alternates: { canonical: "https://dreamforgex.ai/uncensored" },
   openGraph: {
     title: "Uncensored AI Image & Video Studio — No Filter | DreamForgeX",

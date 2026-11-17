@@ -31,6 +31,8 @@
 - [100+ AI Tools Directory](https://dreamforgex.ai/tools): Complete catalog of image, video, audio, music, design, and writing tools.
 - [AI Video Studio](https://dreamforgex.ai/video-studio): Multi-scene AI video production with storyboards, scene direction, soundtracks, and upscaling.
 - [Pricing & Credit Packs](https://dreamforgex.ai/pricing): Subscriptions, never-expiring credit packs, and Uncensored 18+ pass comparison.
+- [Creator Marketplace](https://dreamforgex.ai/marketplace): Buy and sell AI prompts, Flux & SDXL LoRAs, presets, asset packs, and multi-step workflows (up to 90% creator revenue share).
+- [Explore AI Creations](https://dreamforgex.ai/explore): Server-rendered feed of recent community AI images and videos with exact prompts and shareable generation pages.
 - [Community Gallery](https://dreamforgex.ai/gallery): Curated showcase of AI images and videos with exact prompts and one-click remixing.
 - [Blog & Guides](https://dreamforgex.ai/blog): Tutorials, prompt engineering guides, and model benchmarks.
 

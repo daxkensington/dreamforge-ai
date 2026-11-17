@@ -72,6 +72,10 @@ While DreamForgeX removes arbitrary artistic censorship on fictional adult conte
 - **Image Editing**: Background Remover, Object Eraser, AI Inpainting, Outpainting / Uncrop, 4K Upscaler, Face Swap, Face Restoration, Photo Colorizer, and Virtual Try-On.
 - **Design & Marketing**: Product Photography Studio, Ad Copy Generator, Social Media Carousel Builder, Logo Maker, Packaging Mockups, and AI Presentation Deck Creator.
 
+### 3.4 Creator Marketplace & Community Discovery
+- **Creator Marketplace (`https://dreamforgex.ai/marketplace`)**: Buy and sell curated AI prompts, Flux & SDXL LoRAs, style presets, asset packs, and multi-step creative workflows. Studio, Business, and Agency tiers can publish listings and retain 85%–90% creator revenue share.
+- **Explore Feed (`https://dreamforgex.ai/explore`) & Community Gallery (`https://dreamforgex.ai/gallery`)**: Browse real AI images and videos created across 100+ tools and 30+ models, inspect prompts, and open dedicated generation pages (`https://dreamforgex.ai/g/<id>`). Uncensored 18+ studio renders are strictly private and never appear in `/explore` or `/gallery`.
+
 ---
 
 ## 4. Subscriptions & Credit Packs (`https://dreamforgex.ai/pricing`)

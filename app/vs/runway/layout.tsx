@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Runway — Image, Video & Audio in One Pool | DreamForgeX",
+  title: "DreamForgeX vs Runway — Image, Video & Audio Studio",
   description:
     "Looking for a Runway alternative? DreamForgeX bundles image, video, and audio generation in one credit pool, with a public REST API from the $9 tier.",
   alternates: { canonical: "https://dreamforgex.ai/vs/runway" },

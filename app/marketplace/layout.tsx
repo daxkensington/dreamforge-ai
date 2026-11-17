@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Marketplace — DreamForgeX",
-  description: "Buy and sell AI-generated prompts, presets, workflows, asset packs, and LoRAs from the DreamForgeX creator community.",
+  title: "AI Prompts, LoRAs & Workflows Marketplace | DreamForgeX",
+  description:
+    "Buy and sell curated AI prompts, Flux & SDXL LoRAs, style presets, asset packs, and multi-step workflows from creators on the DreamForgeX Marketplace.",
   openGraph: {
-    title: "Creator Marketplace — DreamForgeX",
-    description: "Discover premium AI prompts, presets, and workflows from talented creators.",
+    title: "AI Prompts, LoRAs & Workflows Marketplace | DreamForgeX",
+    description: "Buy and sell curated AI prompts, LoRAs, presets, and workflows from DreamForgeX creators.",
     images: ["/showcase/home-tool-market.jpg"],
   },
 };

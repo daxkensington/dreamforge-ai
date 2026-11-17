@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolLegoMini from "@/pages/ToolLegoMini";
 
 export const metadata: Metadata = {
-  title: "AI LEGO Minifigure Generator — Turn Yourself Into a LEGO Mini | DreamForgeX",
+  title: "AI LEGO Minifigure Generator from Any Photo | DreamForgeX",
   description:
     "Upload a photo and generate yourself as a classic LEGO minifigure with custom outfit and accessories.",
   alternates: { canonical: "https://dreamforgex.ai/tools/lego-mini" },

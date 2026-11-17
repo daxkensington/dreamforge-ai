@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Community Gallery — DreamForgeX",
+  title: "AI Art & Video Community Gallery — Prompts | DreamForgeX",
   description: "Explore AI-generated images, videos, and art from the DreamForgeX community. Browse, like, comment, and remix prompts.",
   openGraph: {
     title: "Community Gallery — DreamForgeX",

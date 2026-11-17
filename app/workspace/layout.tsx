@@ -3,8 +3,9 @@ import { GlobalToolStatusBanner } from "@/components/GlobalToolStatusBanner";
 
 export const metadata: Metadata = {
   alternates: { canonical: "https://dreamforgex.ai/workspace" },
-  title: "Studio — DreamForgeX",
-  description: "Generate AI images and videos with 100+ tools. Text-to-image, style transfer, upscaling, and more — powered by Grok, DALL-E 3, Gemini, and Claude.",
+  title: "AI Image & Video Studio Workspace | DreamForgeX",
+  description:
+    "Create AI images, videos, songs, and characters in one studio workspace with 100+ tools and 30+ models including FLUX, Imagen 4, Veo 3, and Runway Gen-4.",
   openGraph: {
     title: "AI Studio — DreamForgeX",
     description: "Create stunning AI-generated images and videos with 100+ creative tools.",

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs NightCafe — Production Tools + Marketplace | DreamForgeX",
+  title: "DreamForgeX vs NightCafe — Video, Audio & Marketplace",
   description:
     "Looking for a NightCafe alternative? DreamForgeX adds full video + audio gen, 100+ named workflow tools, a marketplace (85% revenue share), and a public API.",
   alternates: { canonical: "https://dreamforgex.ai/vs/nightcafe" },

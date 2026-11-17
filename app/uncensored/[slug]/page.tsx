@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import UncensoredLanding from "@/pages/UncensoredLanding";
 import { UNCENSORED_LANDINGS, UNCENSORED_LANDING_SLUGS } from "@shared/uncensoredLanding";
 import { UNCENSORED_PLANS } from "@shared/uncensoredPlans";
+import { formatSeoDescription, formatSeoTitle } from "@shared/seoMeta";
 
 const SITE = "https://dreamforgex.ai";
 
@@ -21,13 +22,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Not found — DreamForgeX", robots: { index: false, follow: true } };
   }
   const url = `${SITE}/uncensored/${slug}`;
+  const title = formatSeoTitle(page.title);
+  const description = formatSeoDescription(page.metaDescription);
   return {
-    title: page.title,
-    description: page.metaDescription,
+    title,
+    description,
     alternates: { canonical: url },
     openGraph: {
-      title: page.title,
-      description: page.metaDescription,
+      title,
+      description,
       url,
       siteName: "DreamForgeX",
       type: "website",

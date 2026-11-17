@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Tools for Small Business Owners — Marketing, Ads, Brand, Photos | DreamForgeX",
-  description: "Marketing assets your budget doesn't cover: pro product photos, logo + brand kit, flyers, menus, social carousels. One $9-19/month line-item replaces $400-800 of freelancer spend.",
+  title: "AI Tools for Small Business — Ads & Branding | DreamForgeX",
+  description: "Studio product photos, logos, brand kits, flyers, menus, and social carousels in one AI studio — replace $400–800 of freelancer spend from $9/mo.",
   alternates: { canonical: "https://dreamforgex.ai/for/small-business" },
   openGraph: {
     title: "AI Tools for Small Business Owners — DreamForgeX",

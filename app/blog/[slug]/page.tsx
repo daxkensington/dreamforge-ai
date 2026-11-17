@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BLOG_POSTS, getBlogPost } from "../../../shared/blogPosts";
+import { formatSeoDescription, formatSeoTitle } from "../../../shared/seoMeta";
 import { BlogShell } from "../BlogShell";
 
 /**
@@ -25,13 +26,15 @@ export async function generateMetadata({
   if (!post) return { title: "Not found | DreamForgeX" };
 
   const url = `https://dreamforgex.ai/blog/${post.slug}`;
+  const title = formatSeoTitle(post.metaTitle);
+  const description = formatSeoDescription(post.description);
   return {
-    title: post.metaTitle,
-    description: post.description,
+    title,
+    description,
     alternates: { canonical: url },
     openGraph: {
-      title: post.metaTitle,
-      description: post.description,
+      title,
+      description,
       url,
       siteName: "DreamForgeX",
       type: "article",

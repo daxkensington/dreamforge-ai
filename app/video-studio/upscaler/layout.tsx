@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "AI Video Upscaler — Resolution Enhancement & Denoising | DreamForgeX",
+  title: "AI Video Upscaler — HD & 4K Denoising | DreamForgeX",
   description: "Enhance video frame resolution with AI-powered upscaling and denoising — turn low-res footage into crisp, high-definition frames.",
   alternates: { canonical: "https://dreamforgex.ai/video-studio/upscaler" },
   openGraph: {

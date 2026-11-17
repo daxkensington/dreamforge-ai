@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "DreamForgeX vs Canva Magic Studio — AI-First Workflow + Public API | DreamForgeX",
+  title: "DreamForgeX vs Canva Magic Studio — 100+ AI Tools & API",
   description:
-    "Looking for a Canva Magic Studio alternative? DreamForgeX is AI-first: 100+ named tools, full video + audio gen, character consistency, and a public REST API from $9/mo.",
+    "Looking for a Canva Magic Studio alternative? DreamForgeX is AI-first: 100+ tools, full video + audio generation, character lock, and REST API from $9/mo.",
   alternates: { canonical: "https://dreamforgex.ai/vs/canva-ai" },
   openGraph: {
     title: "DreamForgeX vs Canva Magic Studio — Compare features and pricing",
