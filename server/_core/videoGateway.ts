@@ -16,6 +16,16 @@ const DURATIONS: Record<string, readonly number[]> = {
   "fal-wan-video": [5],
 };
 
+const SUPPORTED_ASPECT_RATIOS: Record<
+  string,
+  readonly VideoCreationPlan["aspectRatio"][]
+> = {
+  "runway-gen4.5": ["16:9", "9:16"],
+  "kling-2.0": ["16:9", "9:16", "1:1"],
+  "kling-1.6": ["16:9", "9:16", "1:1"],
+  "fal-wan-video": ["16:9", "9:16", "1:1"],
+};
+
 export function listVideoCreationModels() {
   return listModels({ type: "video" })
     .filter(model => Object.hasOwn(DURATIONS, model.id) && model.capabilities.includes("text-to-video"))
@@ -29,6 +39,8 @@ export function listVideoCreationModels() {
       isConfigured: model.id === "minimax-video" ? !!ENV.falApiKey : model.isAvailable,
       maxResolution: { ...model.maxResolution },
       supportedDurations: [...DURATIONS[model.id]!],
+      // An empty list means the executor does not honor a template aspect ratio.
+      supportedAspectRatios: [...(SUPPORTED_ASPECT_RATIOS[model.id] ?? [])],
       outputInfo: model.id === "cogvideo"
         ? "About 6 seconds, fixed 720 × 480 landscape output. Image size controls do not change this model's output."
         : model.id === "fal-wan-video"

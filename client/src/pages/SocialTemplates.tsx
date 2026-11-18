@@ -1,19 +1,16 @@
-// @ts-nocheck
 import { useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import {
+  VIDEO_TEMPLATE_WORKSPACE_PATH,
+  saveVideoTemplateDraft,
+} from "@/lib/videoTemplateHandoff";
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
-  Smartphone, Film, Loader2, Play, Download, Upload, Sparkles,
+  Smartphone, Film, Sparkles,
   TrendingUp, ShoppingBag, MessageSquare, Music, Timer, Camera,
   Zap, ArrowRight, Video,
 } from "lucide-react";
@@ -22,7 +19,7 @@ const TEMPLATES = [
   {
     id: "dance-trend",
     name: "Dance Trend",
-    desc: "Trending dance video with your photo",
+    desc: "High-energy dance clip with dynamic camera angles",
     icon: Music,
     color: "from-pink-500 to-rose-500",
     platform: "TikTok",
@@ -72,7 +69,7 @@ const TEMPLATES = [
   {
     id: "aesthetic-montage",
     name: "Aesthetic Montage",
-    desc: "Dreamy montage with music sync",
+    desc: "Dreamy montage with smooth transitions",
     icon: Camera,
     color: "from-blue-500 to-indigo-500",
     platform: "Reels",
@@ -100,7 +97,7 @@ const TEMPLATES = [
     prompt: "Epic cinematic intro, dramatic music, lens flares, dark moody atmosphere, text reveal with particles, movie trailer quality",
   },
   // ─── Business & Marketing ──────────────
-  { id: "startup-pitch", name: "Startup Pitch", desc: "60-second startup pitch video", icon: Zap, color: "from-blue-600 to-cyan-500", platform: "LinkedIn", aspect: "16:9", prompt: "Professional startup pitch video, clean office background, confident presenter, key metrics and growth charts, investor-ready" },
+  { id: "startup-pitch", name: "Startup Pitch", desc: "Professional pitch-style clip", icon: Zap, color: "from-blue-600 to-cyan-500", platform: "LinkedIn", aspect: "16:9", prompt: "Professional startup pitch video, clean office background, confident presenter, key metrics and growth charts, investor-ready" },
   { id: "testimonial", name: "Customer Testimonial", desc: "Authentic customer review style", icon: MessageSquare, color: "from-emerald-500 to-green-500", platform: "Reels", aspect: "9:16", prompt: "Authentic customer testimonial, natural setting, genuine emotion, positive review, trust-building social proof" },
   { id: "sale-announcement", name: "Flash Sale", desc: "Urgent limited-time offer promo", icon: Timer, color: "from-red-500 to-orange-500", platform: "Stories", aspect: "9:16", prompt: "Urgent flash sale announcement, bold countdown timer, exciting deal reveal, scarcity urgency, vibrant colors, call to action" },
   { id: "brand-story", name: "Brand Story", desc: "Tell your brand origin story", icon: Film, color: "from-purple-600 to-indigo-500", platform: "YouTube", aspect: "16:9", prompt: "Emotional brand story video, founder journey, humble beginnings to success, cinematic storytelling, inspiring music" },
@@ -153,14 +150,19 @@ const TEMPLATES = [
   { id: "meme-reaction", name: "Meme Reaction", desc: "Trending meme format video", icon: Sparkles, color: "from-yellow-500 to-green-500", platform: "TikTok", aspect: "9:16", prompt: "Viral meme format, unexpected twist ending, relatable scenario, comedic timing, trending sound sync" },
   { id: "storytime", name: "Storytime", desc: "Dramatic personal story format", icon: MessageSquare, color: "from-purple-600 to-pink-500", platform: "TikTok", aspect: "9:16", prompt: "Dramatic storytime, engaging narrator, suspenseful pacing, emotional reveals, captivating hook opening" },
   { id: "get-ready", name: "Get Ready With Me", desc: "GRWM preparation montage", icon: Camera, color: "from-pink-400 to-rose-500", platform: "TikTok", aspect: "9:16", prompt: "Get ready with me, morning prep routine, skincare to outfit, mirror shots, aesthetic transitions, chatty vibe" },
-];
+] as const;
+
+const CUSTOM_DETAILS_PREFIX = ". Additional details: ";
+const MAX_CUSTOM_DETAILS_LENGTH =
+  2_000 -
+  CUSTOM_DETAILS_PREFIX.length -
+  Math.max(...TEMPLATES.map(template => template.prompt.length));
 
 export default function SocialTemplates() {
-  const { user } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [resultUrl, setResultUrl] = useState("");
+  const [handoffError, setHandoffError] = useState(false);
 
   const categories = [
     { value: "all", label: "All Templates" },
@@ -199,30 +201,18 @@ export default function SocialTemplates() {
 
   const template = TEMPLATES.find((t) => t.id === selectedTemplate);
 
-  const videoMutation = trpc.tools.textToVideo.useMutation({
-    onSuccess: (data) => {
-      if (data.videoUrl) {
-        setResultUrl(data.videoUrl);
-        toast.success("Video generated!");
-      } else {
-        toast.error(data.error || "Generation failed");
-      }
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const handleGenerate = () => {
+  const openWorkspace = () => {
     if (!template) return;
-    const prompt = customPrompt
-      ? `${template.prompt}. Additional details: ${customPrompt}`
+    const details = customPrompt.trim();
+    const prompt = details
+      ? `${template.prompt}${CUSTOM_DETAILS_PREFIX}${details}`
       : template.prompt;
 
-    videoMutation.mutate({
-      prompt,
-      duration: "8",
-      aspectRatio: template.aspect as any,
-      style: "cinematic",
-    });
+    if (!saveVideoTemplateDraft({ prompt, aspectRatio: template.aspect, duration: 8 })) {
+      setHandoffError(true);
+      return;
+    }
+    window.location.assign(VIDEO_TEMPLATE_WORKSPACE_PATH);
   };
 
 
@@ -244,19 +234,21 @@ export default function SocialTemplates() {
             </span>
           </h1>
           <p className="text-muted-foreground max-w-md">
-            50+ one-click video templates for TikTok, Reels, Shorts, LinkedIn, and more. Pick a category, customize, generate.
+            Start with a prompt template for TikTok, Reels, Shorts, or LinkedIn. Add your details, then review the video settings and credit cost in Workspace.
           </p>
         </div>
       </div>
 
       <div className="container py-8 max-w-6xl">
-        {!selectedTemplate ? (
+        {!template ? (
           <>
           {/* Category Filter */}
           <div className="flex flex-wrap gap-2 mb-6">
             {categories.map((cat) => (
               <button
+                type="button"
                 key={cat.value}
+                aria-pressed={selectedCategory === cat.value}
                 onClick={() => setSelectedCategory(cat.value)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   selectedCategory === cat.value
@@ -279,7 +271,11 @@ export default function SocialTemplates() {
                 transition={{ delay: i * 0.05, duration: 0.3 }}
               >
                 <button
-                  onClick={() => setSelectedTemplate(t.id)}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTemplate(t.id);
+                    setHandoffError(false);
+                  }}
                   className="w-full text-left group"
                 >
                   <Card className="bg-white/5 border-white/10 hover:border-cyan-500/30 transition-all duration-300 overflow-hidden">
@@ -302,7 +298,7 @@ export default function SocialTemplates() {
         ) : (
           /* Template Editor */
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto space-y-6">
-            <Button variant="outline" className="bg-transparent gap-2" onClick={() => { setSelectedTemplate(null); setResultUrl(""); }}>
+            <Button variant="outline" className="bg-transparent gap-2" onClick={() => setSelectedTemplate(null)}>
               <ArrowRight className="h-4 w-4 rotate-180" /> Back to Templates
             </Button>
 
@@ -310,58 +306,49 @@ export default function SocialTemplates() {
               <CardContent className="p-6 space-y-6">
                 {/* Template header */}
                 <div className="flex items-center gap-4">
-                  <div className={`h-14 w-14 rounded-xl bg-gradient-to-br ${template?.color} flex items-center justify-center`}>
-                    {template && <template.icon className="h-7 w-7 text-white" />}
+                  <div className={`h-14 w-14 rounded-xl bg-gradient-to-br ${template.color} flex items-center justify-center`}>
+                    <template.icon className="h-7 w-7 text-white" aria-hidden="true" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold">{template?.name}</h2>
+                    <h2 className="text-xl font-bold">{template.name}</h2>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge className="bg-white/10 border-0 text-xs">{template?.platform}</Badge>
-                      <Badge className="bg-white/10 border-0 text-xs">{template?.aspect}</Badge>
+                      <Badge className="bg-white/10 border-0 text-xs">{template.platform}</Badge>
+                      <Badge className="bg-white/10 border-0 text-xs">{template.aspect}</Badge>
                     </div>
                   </div>
                 </div>
 
                 {/* Custom prompt */}
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Customize (Optional)</label>
+                  <label htmlFor="social-template-details" className="text-xs font-medium text-muted-foreground mb-2 block">Customize (optional)</label>
                   <Textarea
+                    id="social-template-details"
                     placeholder="Add custom details... e.g. 'Use neon lighting and a city background'"
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     rows={3}
+                    maxLength={MAX_CUSTOM_DETAILS_LENGTH}
                     className="bg-white/5 border-white/10"
                   />
                 </div>
 
-                {/* Generate */}
-                <Button
-                  onClick={handleGenerate}
-                  disabled={videoMutation.isPending}
-                  className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
-                >
-                  {videoMutation.isPending ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Generating Video...</>
-                  ) : (
-                    <><Video className="h-4 w-4" /> Generate {template?.name} Video</>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Workspace carries over this prompt and the {template.aspect} format request. It selects 8 seconds when the model supports it. Review the output settings and credit cost before generating.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={openWorkspace}
+                    className="w-full gap-2 bg-[#dafa64] text-[#1a210a] hover:bg-[#eeffa7]"
+                  >
+                    <Video className="h-4 w-4" aria-hidden="true" /> Open in Video Workspace
+                  </Button>
+                  {handoffError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      This browser couldn’t save the template draft. Allow site storage and try again.
+                    </p>
                   )}
-                </Button>
-
-                {/* Result */}
-                {resultUrl && (
-                  <div className="space-y-4 pt-4 border-t border-white/10">
-                    <div className={`rounded-xl overflow-hidden bg-black ${template?.aspect === "9:16" ? "aspect-[9/16] max-w-[280px] mx-auto" : template?.aspect === "1:1" ? "aspect-square max-w-[400px] mx-auto" : "aspect-video"}`}>
-                      <video src={resultUrl} controls className="w-full h-full object-contain" />
-                    </div>
-                    <div className="flex gap-2 justify-center">
-                      <Button variant="outline" className="gap-2 bg-transparent" asChild>
-                        <a href={resultUrl} download={`${template?.id}-video.mp4`}>
-                          <Download className="h-4 w-4" /> Download
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </motion.div>

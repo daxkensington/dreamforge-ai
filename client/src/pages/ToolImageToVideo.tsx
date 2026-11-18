@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import ToolPageLayout from "@/components/ToolPageLayout";
@@ -9,7 +9,11 @@ import { uploadOwnedMedia } from "@/lib/mediaUpload";
 import { IMAGE_ANIMATION_POLICY } from "@shared/imageAnimation";
 import { Film, Loader2, Upload } from "lucide-react";
 
-export default function ToolImageToVideo() {
+export default function ToolImageToVideo({
+  logo,
+}: {
+  logo?: { controls: ReactNode; motionPrompt: string };
+} = {}) {
   const { user, loading } = useAuth();
   const owner = useRef(user?.id);
   owner.current = user?.id;
@@ -57,6 +61,7 @@ export default function ToolImageToVideo() {
       !["image/png", "image/jpeg", "image/webp", "image/avif"].includes(
         file.type
       ) ||
+      file.size === 0 ||
       file.size > 10 * 1024 * 1024
     ) {
       setError("Choose a PNG, JPEG, WebP or AVIF image up to 10 MB.");
@@ -104,8 +109,12 @@ export default function ToolImageToVideo() {
   };
   return (
     <ToolPageLayout
-      title="Image-to-Video"
-      description="Create a real five-second animated video from an uploaded image or your generation history."
+      title={logo ? "Logo Animator" : "Image-to-Video"}
+      description={
+        logo
+          ? "Turn your logo into a five-second animated intro. Choose a style and review the quote before generating."
+          : "Create a real five-second animated video from an uploaded image or your generation history."
+      }
       icon={Film}
       gradient="from-cyan-500 to-blue-600"
       costCredits={policy.data?.creditCost ?? IMAGE_ANIMATION_POLICY.creditCost}
@@ -114,7 +123,11 @@ export default function ToolImageToVideo() {
         <p>Loading your account…</p>
       ) : !user ? (
         <Button asChild>
-          <a href={getLoginUrl()}>Sign in to animate an image</a>
+          <a href={getLoginUrl()}>
+            {logo
+              ? "Sign in to animate your logo"
+              : "Sign in to animate an image"}
+          </a>
         </Button>
       ) : (
         <div className="space-y-6">
@@ -123,12 +136,19 @@ export default function ToolImageToVideo() {
               ? `${policy.data.creditCost.toLocaleString()} credits per five-second 480p video · Creator or higher. Uploading and selecting images is free.`
               : "Loading the current animation quote…"}
           </p>
+          {logo?.controls}
+          {logo && (
+            <p className="text-sm text-muted-foreground">
+              Upload a PNG, JPEG, WebP or AVIF logo up to 10 MiB. Export SVG
+              logos as PNG first.
+            </p>
+          )}
           <input
             ref={input}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/avif"
             className="sr-only"
-            aria-label="Upload animation source"
+            aria-label={logo ? "Upload logo source" : "Upload animation source"}
             onChange={event => {
               void upload(event.target.files?.[0]);
             }}
@@ -144,7 +164,9 @@ export default function ToolImageToVideo() {
             )}
             {progress !== null
               ? `Uploading ${Math.round(progress * 100)}%`
-              : "Upload image"}
+              : logo
+                ? "Upload logo"
+                : "Upload image"}
           </Button>
           <Button variant="outline" onClick={() => setOpen(true)}>
             Check unfinished animation
@@ -249,6 +271,7 @@ export default function ToolImageToVideo() {
         sourceUrl={
           selected?.userId === user?.id ? selected?.imageUrl : undefined
         }
+        initialMotionPrompt={logo?.motionPrompt}
         onComplete={() => {
           void history.refetch();
         }}
