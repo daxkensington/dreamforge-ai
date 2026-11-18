@@ -116,6 +116,10 @@ export default function MusicVideoStudio() {
       </div>
 
       <div className="container py-8 max-w-5xl">
+        <div role="status" className="mb-6 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm">
+          Automatic music video generation is temporarily unavailable. Open the workspace, select Video, and review its credit price. Then import the video and upload your audio in the timeline editor to make a music video manually.
+          <div className="mt-3 flex flex-wrap gap-2"><Link href="/workspace"><Button>Open workspace</Button></Link><Link href="/timeline/new"><Button variant="outline">Open timeline editor</Button></Link></div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Inputs */}
           <div className="space-y-6">
@@ -255,7 +259,7 @@ export default function MusicVideoStudio() {
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={!songUrl || !concept.trim() || videoMutation.isPending}
+                  disabled
                   className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
                 >
                   {videoMutation.isPending ? (

@@ -1099,23 +1099,23 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
   },
   "mockup": {
     title: `AI Mockup Generator`,
-    intro: `Mockup enables designers and e-commerce sellers to place their artwork on realistic product visuals, like t-shirts or phone cases. Upload your design, choose the item type, and adjust angles or lighting for lifelike presentations. It's useful for portfolios or sales pages, generating high-res images in PNG format up to 4000x4000 pixels within 15 seconds. Small-business owners appreciate how it elevates product listings without photography setups.`,
+    intro: `Mockup helps designers and e-commerce sellers place artwork on AI-generated product visuals, such as t-shirts or phone cases. Upload a design or provide an image URL, choose a product type, and optionally specify a color. Use the result to explore ideas for portfolios and product presentations.`,
     howItWorks: [
-      `Upload your design file or generate one in the tool.`,
-      `Pick a product mockup scene, like apparel or devices.`,
-      `Position and scale the design, then generate and download the result.`,
+      `Upload your design file or enter an image URL.`,
+      `Choose a product type and optionally specify a color.`,
+      `Generate the mockup and open the result to download it.`,
     ],
     useCases: [
       `Showcasing t-shirt designs on Etsy product pages`,
       `Creating portfolio visuals for freelance graphic clients`,
       `Presenting logo mockups on business cards for pitches`,
-      `Visualizing sticker placements for merchandise stores`,
+      `Visualizing designs on tote bags for merchandise stores`,
       `Demonstrating app icons on device screens for developers`,
     ],
     faq: [
-      { q: `What is the output quality?`, a: `Mockups render at up to 4000x4000 pixels in PNG, providing sharp details for web or print use without quality loss.` },
-      { q: `Are mockups free to use commercially?`, a: `Yes, generated mockups are yours for business purposes, including sales listings. No licensing fees apply.` },
-      { q: `Any limits on generations?`, a: `Free users can create 10 mockups daily; premium removes limits and adds more scene options for varied presentations.` },
+      { q: `What is the output quality?`, a: `Output dimensions and format depend on the image provider. Check the generated file before using it for print or other size-sensitive work.` },
+      { q: `Can I use mockups commercially?`, a: `Commercial rights are included with Creator and higher plans. The free Explorer plan is for non-commercial use; see the pricing page for current plan terms.` },
+      { q: `How are mockups charged?`, a: `Each mockup generation uses credits. Available credits depend on your plan and any credit packs you purchase; see the pricing page for current allowances.` },
     ],
   },
   "movie-poster": {
@@ -1164,12 +1164,12 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
   },
   "music-video": {
     title: `Music Video Creator`,
-    intro: `The Music Video Creator builds short videos synced to your uploaded audio tracks, using AI to add visuals, effects, and transitions. Content creators and small business owners use it for social media clips or promo reels without video editing expertise. It outputs MP4 files in 1080p resolution within 2-5 minutes, streamlining production for quick online sharing.`,
+    intro: `Automatic music video generation is temporarily unavailable. You can generate a video in the workspace, then add your own audio and export a combined video in the timeline editor.`,
     howItWorks: [
-      `Upload your music file or generate one in-tool.`,
-      `Select a visual style like abstract, narrative, or lyric-based.`,
-      `Let the AI sync animations and effects to the beat.`,
-      `Preview and tweak, then download the MP4 video.`,
+      `Create a video in the workspace after reviewing its model and credit price.`,
+      `Open the timeline editor and import the video.`,
+      `Upload your audio and arrange both tracks.`,
+      `Preview and export the combined video in your browser.`,
     ],
     useCases: [
       `Make engaging clips for TikTok song covers or remixes.`,
@@ -1179,9 +1179,9 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
       `Build event highlight videos synced to live performance audio.`,
     ],
     faq: [
-      { q: `What video quality do outputs have?`, a: `Videos are in 1080p HD, suitable for social platforms and websites. Processing takes 2-5 minutes per clip. Higher resolutions are available on premium plans.` },
-      { q: `Are there limits on file uploads?`, a: `Free uploads support up to 3-minute tracks; premium allows longer. Supported formats include MP3 and WAV. Exceeding limits requires upgrading.` },
-      { q: `Can I use these videos commercially?`, a: `Yes, full commercial rights are granted for downloaded videos. Ensure your uploaded music complies with copyrights. Edits are yours to make post-generation.` },
+      { q: `How do I add music to a video?`, a: `Import a video and upload your audio in the timeline editor, arrange the tracks, and export in your browser.` },
+      { q: `What format does the timeline export?`, a: `The timeline exports at 720p and 30 frames per second as WebM or MP4, depending on browser support.` },
+      { q: `Can I use these videos commercially?`, a: `Commercial rights depend on your plan. Ensure you have the rights to any uploaded audio and other media.` },
     ],
   },
   "nl-edit": {
@@ -1860,12 +1860,12 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
   },
   "text-to-video": {
     title: `AI Text to Video`,
-    intro: `DreamForgeX's Text To Video tool turns descriptive text prompts into short video clips, assisting creators in producing marketing or social media content quickly. Freelancers and small-business owners find it useful for visualizing ideas without filming, generating 10-30 second videos in MP4 format at 1080p resolution. This approach cuts production time, enabling rapid iteration on visuals for ads or tutorials.`,
+    intro: `Create short video clips from text in the DreamForgeX workspace. Choose an available video model, review its requirements and credit price, and describe the scene you want to create.`,
     howItWorks: [
-      `Describe your video concept in a detailed text prompt, including scenes and style.`,
-      `Choose duration, aspect ratio, and any music or voiceover options.`,
-      `AI processes the prompt to create the video sequence.`,
-      `Review, edit clips if needed, and download the final MP4 file.`,
+      `Open the workspace and select Video.`,
+      `Choose an available model and a supported duration.`,
+      `Review the credit price and submit your text prompt.`,
+      `Review your completed clip and download or edit it.`,
     ],
     useCases: [
       `Generating promo videos for freelance photographers' portfolio showcases.`,
@@ -1875,9 +1875,9 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
       `Designing product unboxing videos from text descriptions for online stores.`,
     ],
     faq: [
-      { q: `What video lengths and resolutions are available?`, a: `Videos range from 5 to 60 seconds, with standard 1080p HD output. File sizes average 10-50 MB for quick sharing. Higher resolutions may require premium access.` },
-      { q: `Is there a fee for video generation?`, a: `Free tier allows 3 videos per week; subscriptions from $9/month unlock unlimited. Generation time is 1-5 minutes per clip. Costs scale with length and complexity.` },
-      { q: `Can I use these videos for commercial purposes?`, a: `Yes, you own full rights to commercially exploit the videos. They are original AI creations suitable for ads or sales. Avoid prompts infringing on existing copyrights.` },
+      { q: `What video lengths and resolutions are available?`, a: `Duration and output size depend on the model. The workspace shows supported options before generation.` },
+      { q: `How are videos charged?`, a: `Video generation uses credits. The workspace displays the current model price and plan requirements before you submit.` },
+      { q: `Can I use these videos for commercial purposes?`, a: `Commercial rights depend on your plan. Make sure you have the necessary rights to any media you include.` },
     ],
   },
   "texture": {
@@ -1948,24 +1948,23 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
   },
   "train-model": {
     title: `Train Custom AI Model`,
-    intro: `The Train Custom Model tool lets creators and small-business owners fine-tune AI models with their own data for tailored creative outputs. Suited for freelancers building personalized tools, it processes datasets to improve results in image or text generation, typically completing in 10-30 minutes depending on size. This approach helps achieve more relevant designs without starting from scratch, outputting a deployable model file under 500MB.`,
+    intro: `Train a custom image model using your own reference images for a face, style, product, or object. Training availability and credit cost are shown before you submit a job.`,
     howItWorks: [
-      `Upload your dataset, such as images or text files.`,
-      `Select a base model and training parameters.`,
+      `Upload 5 to 20 reference images.`,
+      `Choose a training type and step count.`,
       `Start the training process and monitor progress.`,
-      `Download the fine-tuned model for use in other tools.`,
+      `Use the completed model in DreamForgeX or download it.`,
     ],
     useCases: [
       `Fine-tuning for brand-specific logo variations`,
-      `Customizing text generators for niche blog content`,
       `Training image styles for freelance illustrators`,
-      `Personalizing recommendation models for e-commerce shops`,
+      `Creating product images for e-commerce shops`,
       `Adapting models for consistent character designs in comics`,
     ],
     faq: [
-      { q: `What is the quality of trained models?`, a: `Trained models perform based on dataset quality and size, often improving accuracy by 20-30% on custom tasks. Test runs help verify results before full use. Outputs integrate seamlessly with DreamForgeX tools.` },
-      { q: `Is training free, and are there limits?`, a: `Initial training is free for datasets under 100MB; larger ones require a pro plan at $19/month. Sessions are limited to 1 hour of compute time per day for free users. No refunds on incomplete trainings.` },
-      { q: `Can I use the trained model commercially?`, a: `Yes, you own the model and can use it in commercial projects. Share or sell access if desired, but protect your dataset privacy.` },
+      { q: `What affects model quality?`, a: `Results depend on the quality and consistency of your reference images. Try different prompts to evaluate the finished model.` },
+      { q: `What does training cost?`, a: `Custom model training requires an eligible Agency plan and uses credits. The training page shows the current quote and availability before submission.` },
+      { q: `Can I use the results commercially?`, a: `Commercial rights are included with Creator and higher plans. Check the terms for your content and make sure you have the necessary rights to your training images.` },
     ],
   },
   "transparent-png": {

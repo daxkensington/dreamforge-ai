@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -39,12 +39,6 @@ export default function JoinProject() {
     },
   });
 
-  useEffect(() => {
-    if (user && params.token && !joined && !acceptLink.isPending && !acceptLink.isError) {
-      acceptLink.mutate({ token: params.token });
-    }
-  }, [user, params.token]);
-
   if (!user) {
     return (
       <PageLayout>
@@ -74,6 +68,22 @@ export default function JoinProject() {
   return (
     <PageLayout>
       <div className="container max-w-md py-20 text-center">
+        {!joined && !acceptLink.isPending && !acceptLink.isError && (
+          <>
+            <Users className="w-12 h-12 text-violet-400 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-foreground mb-2">You've Been Invited</h1>
+            <p className="text-sm text-muted-foreground mb-6">
+              Join this video project using this share link.
+            </p>
+            <Button
+              disabled={!params.token}
+              onClick={() => acceptLink.mutate({ token: params.token })}
+              className="bg-gradient-to-r from-violet-600 to-purple-600"
+            >
+              Join Project
+            </Button>
+          </>
+        )}
         {acceptLink.isPending && (
           <>
             <Loader2 className="w-12 h-12 animate-spin text-violet-500 mx-auto mb-4" />

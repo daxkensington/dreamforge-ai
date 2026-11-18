@@ -4,7 +4,8 @@
  * Character lock has the same ownership gate as Refine: it may only img2img
  * the caller's own uncensored generations. A hole here becomes a nudify tool.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import sharp from "sharp";
 
 const state: {
   user: any;
@@ -15,6 +16,7 @@ const state: {
   genCalls: number;
   refineCalls: number;
   created: any[];
+  completionError?: boolean;
 } = { user: null, generation: null, characters: [], debited: 0, refunded: 0, genCalls: 0, refineCalls: 0, created: [] };
 
 function rowsFor(table: any) {
@@ -38,7 +40,13 @@ vi.mock("./db", () => ({
     select: () => ({
       from: (table: any) => query(rowsFor(table)),
     }),
-    update: () => ({ set: () => ({ where: async () => undefined }) }),
+    update: () => ({ set: () => ({ where: () => ({
+      returning: async () => {
+        if (state.completionError) { state.completionError = false; throw new Error("lost completion acknowledgement"); }
+        return [{ id: 1 }];
+      },
+      then: (resolve: any, reject: any) => Promise.resolve(undefined).then(resolve, reject),
+    }) }) }),
     insert: (table: any) => ({
       values: (v: any) => {
         if (table && "styleNotes" in table) {
@@ -67,7 +75,7 @@ vi.mock("./_core/generationBatchBilling", () => ({
   claimGenerationBatch: vi.fn(async (input:any) => { state.debited += input.credits; return {kind:"owned",id:1,token:"11111111-1111-4111-8111-111111111111",balance:500,purchasedCreditsDebited:0}; }),
   beginGenerationBatch: vi.fn(async()=>true), completeGenerationBatch: vi.fn(async()=>true),
 }));
-vi.mock("./_core/walletAccounting", () => ({ failLegacyJobAndRefund: vi.fn(async(input:any)=>{
+vi.mock("./_core/walletAccounting", () => ({ hasWalletRefundReceipt: vi.fn(async () => false), failLegacyJobAndRefund: vi.fn(async(input:any)=>{
   await refundCredits(input.userId,input.amount,input.reason);
   return true;
 }) }));
@@ -75,10 +83,11 @@ vi.mock("./stripe", () => ({
   getOrCreateBalance: vi.fn(async()=>({balance:500})),
   deductCredits: vi.fn(async (_u: number, amount: number) => {
     state.debited += amount;
-    return { success: true, balance: 500, needed: amount };
+    return { success: true, balance: 500, needed: amount, transactionId: 123, purchasedCreditsDebited: 0 };
   }),
   refundCredits: vi.fn(async (_u: number, amount: number) => {
     state.refunded += amount;
+    return { success: true, refunded: amount };
   }),
 }));
 
@@ -129,11 +138,13 @@ vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) 
 
 import { uncensoredRouter } from "./routers/uncensored";
 import { uncensoredCharacterRef } from "../shared/uncensoredStudio";
-import { submitUncensoredVideoJob } from "./_core/videoGenerationUncensored";
+import { submitUncensoredVideoJob, fetchAsBase64 } from "./_core/videoGenerationUncensored";
 import { refineUnfiltered } from "./_core/imageGeneration";
-import { updateGeneration } from "./db";
+import { createGeneration, getGenerationById, updateGeneration } from "./db";
 import { refundCredits } from "./stripe";
 import { runpodRemoveBackground, runpodTryOn } from "./_core/runpod";
+import { storagePut } from "./storage";
+import { failLegacyJobAndRefund } from "./_core/walletAccounting";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -156,6 +167,50 @@ function ownUncensoredImage(overrides?: Record<string, unknown>) {
   };
 }
 
+const editCases = [
+  { name: "upscale", invoke: () => uncensoredRouter.createCaller(ctx()).upscale({ sourceGenerationId: 42, scale: "2x" }), cost: 8 },
+  { name: "cutout", invoke: () => uncensoredRouter.createCaller(ctx()).removeBackground({ sourceGenerationId: 42 }), cost: 5 },
+  { name: "outfit", invoke: () => uncensoredRouter.createCaller(ctx()).outfit({ personGenerationId: 42, garmentGenerationId: 43 }), cost: 10 },
+  { name: "relight", invoke: () => uncensoredRouter.createCaller(ctx()).relight({ sourceGenerationId: 42, lighting: "neon" }), cost: 8 },
+];
+describe.each(editCases)("$name edit settlement", ({ invoke, cost }) => {
+  beforeEach(() => {
+    vi.clearAllMocks(); state.user = null; state.generation = ownUncensoredImage(); state.created = [];
+    state.debited = 0; state.refunded = 0; state.completionError = false; withActivePass();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer })));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it("uses an atomic job refund for a confirmed failure after row creation", async () => {
+    vi.mocked(storagePut).mockRejectedValueOnce(new Error("storage unavailable"));
+    await expect(invoke()).rejects.toThrow(/credits were returned/i);
+    expect(failLegacyJobAndRefund).toHaveBeenCalledWith(expect.objectContaining({ userId: OWNER, amount: cost, purchasedCredits: 0 }));
+    expect(state.created[0].metadata).toMatchObject({ cost, purchasedCreditsDebited: 0, walletDebitTransactionId: 123 });
+    expect(state.refunded).toBe(cost);
+  });
+  it("does not refund a generation insert with an unknown acknowledgement", async () => {
+    vi.mocked(createGeneration).mockRejectedValueOnce(new Error("insert acknowledgement lost"));
+    await expect(invoke()).rejects.toThrow(/contact support/i);
+    expect(failLegacyJobAndRefund).not.toHaveBeenCalled();
+    expect(state.refunded).toBe(0);
+  });
+});
+
+describe("inpaint edit settlement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks(); state.user = null; state.generation = ownUncensoredImage(); state.created = [];
+    state.debited = 0; state.refunded = 0; state.completionError = false; withActivePass();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer })));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it("atomically refunds when the paid image cannot be rendered", async () => {
+    const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: "white" } }).png().toBuffer();
+    const maskDataUrl = `data:image/png;base64,${png.toString("base64")}`;
+    await expect(uncensoredRouter.createCaller(ctx()).inpaint({ sourceGenerationId: 42, prompt: "red dress", maskDataUrl })).rejects.toThrow(/credits were returned/i);
+    expect(failLegacyJobAndRefund).toHaveBeenCalledWith(expect.objectContaining({ userId: OWNER, amount: 10, purchasedCredits: 0 }));
+    expect(state.created[0].metadata).toMatchObject({ cost: 10, purchasedCreditsDebited: 0, walletDebitTransactionId: 123 });
+  });
+});
+
 describe("uncensored.generate — paid studio", () => {
   beforeEach(() => {
     state.user = null;
@@ -166,6 +221,7 @@ describe("uncensored.generate — paid studio", () => {
     state.genCalls = 0;
     state.refineCalls = 0;
     state.created = [];
+    state.completionError = false;
     vi.clearAllMocks();
   });
 
@@ -720,6 +776,61 @@ describe("uncensored.characterSheet", () => {
     expect(res.images).toHaveLength(4);
     expect(state.refineCalls).toBe(4);
     expect(state.debited).toBe(32);
+  });
+
+  it("does not charge when the source cannot be loaded", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(fetchAsBase64).mockRejectedValueOnce(new Error("source unavailable"));
+    await expect(uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 })).rejects.toThrow("source unavailable");
+    expect(state.debited).toBe(0);
+  });
+
+  it("returns the surviving views and refunds a failed generation record", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(refineUnfiltered).mockRejectedValueOnce(new Error("provider failure"));
+    const res = await uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 });
+    expect(res.images).toHaveLength(3);
+    expect(state.refunded).toBe(8);
+    expect(res.billingWarning).toBeNull();
+  });
+
+  it("returns partial views with a warning if refund cannot be verified", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(refineUnfiltered).mockRejectedValueOnce(new Error("provider failure"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    const res = await uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 });
+    expect(res.images).toHaveLength(3);
+    expect(res.billingWarning).toMatch(/contact support/i);
+  });
+
+  it("refunds the full debit when no view can be created", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(refineUnfiltered).mockRejectedValueOnce(new Error("provider failure"))
+      .mockRejectedValueOnce(new Error("provider failure"))
+      .mockRejectedValueOnce(new Error("provider failure"))
+      .mockRejectedValueOnce(new Error("provider failure"));
+    await expect(uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 })).rejects.toThrow(/credits were returned/i);
+    expect(state.refunded).toBe(32);
+  });
+
+  it("does not refund a view whose generation-record insert is ambiguous", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(createGeneration).mockRejectedValueOnce(new Error("lost acknowledgement"));
+    const res = await uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 });
+    expect(res.images).toHaveLength(3);
+    expect(state.refunded).toBe(0);
+    expect(res.billingWarning).toMatch(/contact support/i);
+  });
+
+  it("retains a completed view when its update acknowledgement is lost", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    state.completionError = true;
+    vi.mocked(getGenerationById).mockResolvedValueOnce(state.generation)
+      .mockResolvedValueOnce({ userId: OWNER, status: "completed", imageUrl: "https://dreamforgex.ai/img/generations/char.png" } as any);
+    const res = await uncensoredRouter.createCaller(ctx()).characterSheet({ characterGenerationId: 42 });
+    expect(res.images).toHaveLength(4);
+    expect(state.refunded).toBe(0);
+    expect(res.billingWarning).toBeNull();
   });
 
   it("requires a character lock", async () => {

@@ -13,7 +13,8 @@ vi.mock("./_core/llm", () => ({
 }));
 // Mock credit deduction (always succeeds in tests)
 vi.mock('./stripe', () => ({
-  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99 }),
+  deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99, transactionId: 700, purchasedCreditsDebited: 0 }),
+  refundCredits: vi.fn().mockImplementation(async (_user: number, amount: number) => ({ success: true, refunded: amount })),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
     'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,

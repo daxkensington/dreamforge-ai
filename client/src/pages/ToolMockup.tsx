@@ -32,31 +32,42 @@ export default function ToolMockup() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadInProgress = useRef(false);
+  const generationInProgress = useRef(false);
 
   const mutation = trpc.tools.mockup.useMutation({
     onSuccess: (data) => {
+      generationInProgress.current = false;
       if (data.status === "completed" && data.url) { setResultUrl(data.url); toast.success("Mockup generated!"); }
       else toast.error(data.error || "Generation failed");
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => { generationInProgress.current = false; toast.error(err.message); },
   });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Please select an image"); return; }
+    if (uploadInProgress.current || generationInProgress.current) return;
+    uploadInProgress.current = true;
     setUploading(true);
+    // A replacement is not usable until its upload succeeds. Never keep an
+    // earlier URL behind a preview of the newly selected design.
+    setImageUrl("");
+    setImagePreview(null);
+    setResultUrl(null);
     try {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) { const { url } = await res.json(); setImageUrl(url); }
-      else toast.info("Using local preview — enter an image URL for best results");
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      if (typeof url !== "string" || !url) throw new Error("Upload failed");
+      setImageUrl(url);
+      setImagePreview(url);
     } catch { toast.error("Upload failed"); }
-    finally { setUploading(false); }
+    finally { uploadInProgress.current = false; setUploading(false); }
   };
 
   const isProcessing = mutation.isPending;
@@ -74,10 +85,10 @@ export default function ToolMockup() {
             <Card className="border-border/50">
               <CardContent className="p-6 space-y-5">
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Design Image</Label>
-                  <Input placeholder="Paste image URL..." value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="text-sm" />
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  <Label htmlFor="mockup-image-url" className="text-sm font-medium">Design Image</Label>
+                  <Input id="mockup-image-url" placeholder="Paste image URL..." value={imageUrl} disabled={uploading || isProcessing} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); setResultUrl(null); }} className="text-sm" />
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} disabled={uploading || isProcessing} className="hidden" />
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading || isProcessing}>
                     {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
                     {uploading ? "Uploading..." : "Upload Design"}
                   </Button>
@@ -87,7 +98,7 @@ export default function ToolMockup() {
                   <Label className="text-sm font-medium">Mockup Type</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {mockupTypes.map((t) => (
-                      <button key={t.value} onClick={() => setMockupType(t.value)}
+                      <button key={t.value} disabled={isProcessing} onClick={() => setMockupType(t.value)}
                         className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all text-left ${mockupType === t.value ? "border-primary bg-primary/5" : "border-border/50 hover:border-border"}`}>
                         <span className="text-sm">{t.icon}</span>
                         <span className="text-xs font-medium">{t.label}</span>
@@ -97,15 +108,15 @@ export default function ToolMockup() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Product Color (optional)</Label>
-                  <Input placeholder="e.g., black, white, navy blue..." value={color} onChange={(e) => setColor(e.target.value)} className="text-sm" />
+                  <Label htmlFor="mockup-color" className="text-sm font-medium">Product Color (optional)</Label>
+                  <Input id="mockup-color" placeholder="e.g., black, white, navy blue..." value={color} disabled={isProcessing} onChange={(e) => setColor(e.target.value)} className="text-sm" />
                 </div>
 
                 <div className="flex gap-3">
-                  <Button onClick={() => { setResultUrl(null); mutation.mutate({ imageUrl, mockupType: mockupType as any, color: color || undefined }); }} disabled={!imageUrl || isProcessing} className="flex-1" size="lg">
+                  <Button onClick={() => { if (uploadInProgress.current || generationInProgress.current || !imageUrl) return; generationInProgress.current = true; setResultUrl(null); mutation.mutate({ imageUrl, mockupType: mockupType as any, color: color || undefined }); }} disabled={!imageUrl || uploading || isProcessing} className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Mockup</>}
                   </Button>
-                  <Button variant="outline" size="lg" onClick={() => { setImageUrl(""); setImagePreview(null); setColor(""); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="lg" aria-label="Reset mockup" disabled={uploading || isProcessing} onClick={() => { setImageUrl(""); setImagePreview(null); setColor(""); setResultUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
             </Card>

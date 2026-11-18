@@ -172,6 +172,11 @@ describe("executable image registry", () => {
 });
 
 describe("successful image execution provenance", () => {
+  it.each([undefined, ""])("rejects a missing storage URL instead of reporting successful generation", async (url) => {
+    mocks.runpodAvailable = true;
+    mocks.store.mockResolvedValue({ url });
+    await expect(generateImage({ prompt: "A lighthouse", model: "runpod-flux-dev", userTier: "pro" })).rejects.toThrow("Image storage returned no usable URL");
+  });
   it.each(["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "grok-imagine-image-2.0"] as const)("routes explicit %s through one pinned POST and stores real PNG with direct provenance", async (modelId) => {
     Object.assign(mocks.env, { openaiApiKey: "fixture-openai", openaiImage25Enabled: true, grokApiKey: "fixture-grok", falApiKey: "fixture-fal", replicateApiToken: "fixture-replicate", cfAiToken: "fixture-cf", cfAccountId: "fixture-account" });
     const providerModel = DIRECT_IMAGE_MODELS[modelId].model;

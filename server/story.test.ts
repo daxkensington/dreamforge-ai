@@ -39,12 +39,17 @@ vi.mock("./dbExtended", () => ({
   getCharacter: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock("./_core/walletAccounting", () => ({
+  hasWalletRefundReceipt: vi.fn().mockResolvedValue(false),
+  failLegacyJobAndRefund: vi.fn(),
+}));
+
 vi.mock("./stripe", async () => {
   const actual = await vi.importActual<any>("./stripe");
   return {
     ...actual,
-    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 500, needed: 31 }),
-    refundCredits: vi.fn().mockResolvedValue(undefined),
+    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 500, needed: 31, transactionId: 123, purchasedCreditsDebited: 0 }),
+    refundCredits: vi.fn(async (_user: number, amount: number) => ({ success: true, refunded: amount })),
   };
 });
 
@@ -73,6 +78,7 @@ import { deductCredits, refundCredits } from "./stripe";
 import { requireToolActive } from "./_core/toolStatus";
 import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
+import { getDb } from "./db";
 
 const authCtx = { user: { id: 7, email: "a@b" } as any, session: null, ip: "1.2.3.4" };
 
@@ -161,6 +167,36 @@ describe("story.create", () => {
     expect(refundCredits).toHaveBeenCalledWith(7, 5, expect.stringContaining("Refund"), expect.any(Object));
   });
 
+  it("preserves partial scenes and warns if their refund cannot be verified", async () => {
+    vi.mocked(generateImage).mockRejectedValueOnce(new Error("scene render failed"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    const res = await storyRouter.createCaller(authCtx).create({ idea: "A story with a broken scene.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: false });
+    expect(res.scenes).toHaveLength(4);
+    expect(res.billingWarning).toMatch(/contact support/i);
+  });
+
+  it("signals support rather than an unverified full refund", async () => {
+    vi.mocked(invokeLLM).mockRejectedValueOnce(new Error("LLM down"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    await expect(storyRouter.createCaller(authCtx).create({ idea: "A story with no storyboard.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: false })).rejects.toThrow(/contact support/i);
+  });
+
+  it("rejects malformed storyboard scenes and refunds before image work", async () => {
+    vi.mocked(invokeLLM).mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ scenes: "not an array" }) } }] } as any);
+    await expect(storyRouter.createCaller(authCtx).create({ idea: "A malformed storyboard test.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: false })).rejects.toThrow("Storyboard generation failed");
+    expect(generateImage).not.toHaveBeenCalled();
+    expect(refundCredits).toHaveBeenCalledWith(7, 25, expect.any(String), expect.objectContaining({ operationKey: expect.stringContaining("story-refund:123:25:") }));
+  });
+
+  it("does not refund ambiguously acknowledged music insertion", async () => {
+    const db = await getDb();
+    vi.mocked(db!.insert).mockImplementationOnce(() => { throw new Error("lost insert acknowledgement"); });
+    const res = await storyRouter.createCaller(authCtx).create({ idea: "A story with an uncertain soundtrack.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: true });
+    expect(res.scenes).toHaveLength(4);
+    expect(res.billingWarning).toMatch(/contact support/i);
+    expect(refundCredits).not.toHaveBeenCalled();
+  });
+
   it("does not refund when every scene renders", async () => {
     const caller = storyRouter.createCaller(authCtx);
     const res = await caller.create({
@@ -173,5 +209,27 @@ describe("story.create", () => {
     expect(res.status).toBe("completed");
     expect(res.scenes.every((s: any) => s.imageUrl !== null)).toBe(true);
     expect(refundCredits).not.toHaveBeenCalled();
+  });
+
+  it("limits provider work to the number of scenes the user paid for", async () => {
+    const res = await storyRouter.createCaller(authCtx).create({ idea: "A short three scene story.", sceneCount: 3, style: "anime", aspectRatio: "16:9", withMusic: false });
+    expect(res.scenes).toHaveLength(3);
+    expect(generateImage).toHaveBeenCalledTimes(3);
+  });
+
+  it("refunds music setup failure without discarding the completed story", async () => {
+    vi.mocked(getDb).mockResolvedValueOnce(null);
+    const res = await storyRouter.createCaller(authCtx).create({ idea: "A story whose soundtrack cannot start.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: true });
+    expect(res.scenes).toHaveLength(4);
+    expect(res.audioGenerationId).toBeNull();
+    expect(refundCredits).toHaveBeenCalledWith(7, 6, expect.stringContaining("music could not be started"), expect.objectContaining({ operationKey: expect.stringContaining("story-refund:123:6:") }));
+  });
+
+  it("retains the completed story and warns if a music refund is unverified", async () => {
+    vi.mocked(getDb).mockResolvedValueOnce(null);
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    const res = await storyRouter.createCaller(authCtx).create({ idea: "A story whose soundtrack cannot start.", sceneCount: 4, style: "noir", aspectRatio: "16:9", withMusic: true });
+    expect(res.scenes).toHaveLength(4);
+    expect(res.billingWarning).toMatch(/contact support/i);
   });
 });

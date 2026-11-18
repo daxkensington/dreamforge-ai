@@ -17,6 +17,7 @@
     "check:health": "node scripts/health-check.mjs",
     "test:smoke": "playwright test",
     "test:smoke:ui": "playwright test --ui",
+    "test:ui:local": "playwright test -c playwright.local-ui.config.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
@@ -76,7 +77,7 @@
     "jszip": "^3.10.2",
     "lucide-react": "^0.453.0",
     "nanoid": "^5.1.16",
-    "next": "15.5.27",
+    "next": "15.5.29",
     "next-auth": "5.0.0-beta.32",
     "next-themes": "^0.4.6",
     "postgres": "^3.4.9",
@@ -96,7 +97,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "ws": "^8.22.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -127,7 +128,10 @@
       "mysql2@>=3.0.0 <3.24.4": "3.24.4",
       "postcss@>=8.0.0 <8.5.23": "8.5.28",
       "katex@>=0.11.0 <0.18.2": "0.18.2",
-      "source-map-js@>=1.0.0 <1.2.2": "1.2.2"
+      "source-map-js@>=1.0.0 <1.2.2": "1.2.2",
+      "dompurify@>=3.0.0 <3.4.17": "3.4.18",
+      "follow-redirects@>=1.0.0 <1.16.2": "1.16.3",
+      "fast-uri@>=3.0.0 <3.1.9": "3.1.9"
     }
   }
 }

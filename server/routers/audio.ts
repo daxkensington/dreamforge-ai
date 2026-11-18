@@ -12,8 +12,10 @@ import {
 import { SyncLabsProvider } from "../_core/providers/synclabs";
 import { getDb } from "../db";
 import { audioGenerations, audioPresets, videoProjects } from "../../drizzle/schema";
-import { deductCredits, refundCredits, CREDIT_COSTS } from "../stripe";
+import { deductCredits, CREDIT_COSTS } from "../stripe";
 import { requireToolActive } from "../_core/toolStatus";
+import { refundFailedLegacyTool } from "../_core/legacyToolRefund";
+import { assertSafeImageUrl } from "../_core/imageUrlGuard";
 
 // ─── Credit costs for audio tools ───────────────────────────────────────────
 
@@ -369,7 +371,6 @@ export const audioRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      const mergeDeduction = await tryDeductAudioCredits(ctx.user.id, "audio-merge", "Merge audio + video");
       // Verify audio ownership and completion
       const [audio] = await db
         .select()
@@ -388,17 +389,23 @@ export const audioRouter = router({
         });
       }
 
+      // Reject non-public URL forms before any debit or external provider call.
+      try {
+        assertSafeImageUrl(input.videoUrl);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Use a public HTTPS video URL without credentials." });
+      }
+      const mergeDeduction = await tryDeductAudioCredits(ctx.user.id, "audio-merge", "Merge audio + video");
+
       // Merge in background
       let mergedUrl: string | null = null;
       try {
         mergedUrl = await syncAudioToVideo(audio.audioUrl, input.videoUrl);
+        if (!mergedUrl) throw new Error("Merge returned no video");
       } catch (error: any) {
-        // The merge produced nothing — refund the merge charge.
-        try {
-          await refundCredits(ctx.user.id, mergeDeduction.cost, `Refund: audio merge failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: mergeDeduction.purchasedCreditsDebited ?? 0, operationKey: mergeDeduction.transactionId ? `usage-refund:${mergeDeduction.transactionId}` : undefined });
-        } catch (refundErr) {
-          console.error("[audio.mergeAudioVideo] Credit refund failed:", refundErr);
-        }
+        // A customer receives no output here; only report a refund once its
+        // matching ledger and receipt are confirmed.
+        await refundFailedLegacyTool(ctx.user.id, mergeDeduction, "audio merge", "usage-refund");
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Merge failed: ${error.message}`,
@@ -420,24 +427,26 @@ export const audioRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceRateLimit(`audio.lipSync:user:${ctx.user.id}`, 5, 60_000, "Lip sync rate limit exceeded — max 5 per minute.");
 
-      const lipSyncDeduction = await tryDeductAudioCredits(
-        ctx.user.id,
-        "video-lipsync",
-        `Lip sync: ${input.model}`
-      );
-
       const provider = new SyncLabsProvider();
       if (!provider.isAvailable) {
-        try {
-          await refundCredits(ctx.user.id, lipSyncDeduction.cost, "Refund: lip sync failed — Sync Labs is not configured", { purchasedCredits: lipSyncDeduction.purchasedCreditsDebited ?? 0, operationKey: lipSyncDeduction.transactionId ? `usage-refund:${lipSyncDeduction.transactionId}` : undefined });
-        } catch (refundErr) {
-          console.error("[audio.lipSync] Credit refund failed:", refundErr);
-        }
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Sync Labs is not configured. Lip sync is temporarily unavailable.",
         });
       }
+
+      try {
+        assertSafeImageUrl(input.videoUrl);
+        assertSafeImageUrl(input.audioUrl);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Use public HTTPS audio and video URLs without credentials." });
+      }
+
+      const lipSyncDeduction = await tryDeductAudioCredits(
+        ctx.user.id,
+        "video-lipsync",
+        `Lip sync: ${input.model}`
+      );
 
       let result;
       try {
@@ -449,13 +458,10 @@ export const audioRouter = router({
             audioUrl: input.audioUrl,
           },
         });
+        if (!result.url) throw new Error("Lip sync returned no video");
       } catch (error: any) {
-        // Lip sync produced nothing — refund the charge.
-        try {
-          await refundCredits(ctx.user.id, lipSyncDeduction.cost, `Refund: lip sync failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: lipSyncDeduction.purchasedCreditsDebited ?? 0, operationKey: lipSyncDeduction.transactionId ? `usage-refund:${lipSyncDeduction.transactionId}` : undefined });
-        } catch (refundErr) {
-          console.error("[audio.lipSync] Credit refund failed:", refundErr);
-        }
+        // Preserve the existing ledger key and surface an unverified refund.
+        await refundFailedLegacyTool(ctx.user.id, lipSyncDeduction, "lip sync", "usage-refund");
         throw error;
       }
 

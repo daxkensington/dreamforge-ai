@@ -26,7 +26,8 @@ vi.mock("../_core/btcpay", () => ({ verifyBTCPayWebhook: () => true, getUncensor
 vi.mock("../_core/uncensoredEmail", () => ({ sendPassActivatedEmail: vi.fn(async () => true) }));
 import { addCredits, deductCredits, getOrCreateBalance } from "../stripe";
 import { allocatePaidSubscriptionInvoice, refreshPaidSubscriptionAllowance } from "./subscriptionBilling";
-import { failLegacyJobAndRefund } from "./walletAccounting";
+import { failLegacyJobAndRefund, hasWalletRefundReceipt, refundWallet } from "./walletAccounting";
+import { refundFailedLegacyTool } from "./legacyToolRefund";
 import { claimGenerationBatch, beginGenerationBatch, sweepGenerationBatches } from "./generationBatchBilling";
 import { processStripeEvent } from "../../app/api/webhooks/stripe/handler";
 import { POST as btcpay } from "../../app/api/webhooks/btcpay/route";
@@ -79,6 +80,57 @@ suite("wallet and payment regression on isolated PostgreSQL", () => {
     await pg`INSERT INTO "userSubscriptions" ("userId","planId","stripeSubscriptionId","subStatus","currentPeriodStart","currentPeriodEnd") VALUES (1,1,'sub_fixture','active',${periodStart.toISOString()},${periodEnd.toISOString()})`;
   }
   async function wallet() { return (await pg`SELECT balance,"bonusCredits","lifetimeSpent","walletAccountingVersion" FROM "creditBalances" WHERE "userId"=1`)[0]; }
+  it("proves matching refund receipts and never mistakes an absent refund for a replay", async () => {
+    await pg`UPDATE "creditBalances" SET balance=10,"bonusCredits"=5`;
+    const debit = await deductCredits(1, 5, "fixture spend");
+    if (!debit.success) throw new Error("Expected fixture debit");
+    const key = `legacy-tool-refund:${debit.transactionId}`;
+    expect(await hasWalletRefundReceipt(1, 5, debit.purchasedCreditsDebited, key)).toBe(false);
+    expect(await refundWallet(1, 5, "fixture refund", { purchasedCredits: debit.purchasedCreditsDebited, operationKey: key })).toMatchObject({ refunded: 5 });
+    expect(await refundWallet(1, 5, "fixture refund", { purchasedCredits: debit.purchasedCreditsDebited, operationKey: key })).toMatchObject({ refunded: 0 });
+    expect(await hasWalletRefundReceipt(1, 5, debit.purchasedCreditsDebited, key)).toBe(true);
+    expect(await hasWalletRefundReceipt(1, 4, debit.purchasedCreditsDebited, key)).toBe(false);
+    expect(await hasWalletRefundReceipt(1, 5, debit.purchasedCreditsDebited + 1, key)).toBe(false);
+    expect(await hasWalletRefundReceipt(2, 5, debit.purchasedCreditsDebited, key)).toBe(false);
+    expect(await refundWallet(2, 5, "missing wallet", { purchasedCredits: 0, operationKey: "legacy-tool-refund:missing" })).toMatchObject({ refunded: 0 });
+    expect(await hasWalletRefundReceipt(2, 5, 0, "legacy-tool-refund:missing")).toBe(false);
+    expect(await wallet()).toMatchObject({ balance: 10, bonusCredits: 5, lifetimeSpent: 0 });
+    await pg`DELETE FROM "webhookEvents" WHERE "eventId"=${key}`;
+    expect(await hasWalletRefundReceipt(1, 5, debit.purchasedCreditsDebited, key)).toBe(false);
+  });
+  it("refunds only a failed batch item once, preserving its purchased provenance", async () => {
+    await pg`UPDATE "creditBalances" SET balance=10,"bonusCredits"=7`;
+    const debit = await deductCredits(1, 10, "fixture batch");
+    if (!debit.success) throw new Error("Expected fixture debit");
+    expect(debit.purchasedCreditsDebited).toBe(7);
+    // The first five-credit item spends three allowance credits and two purchased.
+    const item = { cost: 5, transactionId: debit.transactionId, purchasedCreditsDebited: 2 };
+    await refundFailedLegacyTool(1, item, "batch prompt", "legacy-tool-refund", 0);
+    await refundFailedLegacyTool(1, item, "batch prompt", "legacy-tool-refund", 0);
+    expect(await wallet()).toMatchObject({ balance: 5, bonusCredits: 2, lifetimeSpent: 5 });
+    expect(await hasWalletRefundReceipt(1, 5, 2, `legacy-tool-refund:${debit.transactionId}:0`)).toBe(true);
+    expect(Number((await pg`SELECT count(*) AS n FROM "creditTransactions" WHERE "txType"='refund'`)[0].n)).toBe(1);
+  });
+  it("completion and stale-job refund cannot both claim an uncensored edit", async () => {
+    await pg`UPDATE "creditBalances" SET balance=10,"bonusCredits"=7`;
+    const debit = await deductCredits(1, 5, "fixture edit");
+    if (!debit.success) throw new Error("Expected fixture debit");
+    const [g] = await pg`INSERT INTO generations ("userId",prompt,"mediaType",status,metadata) VALUES (1,'edit','image','generating',${JSON.stringify({uncensored:true,cost:5,purchasedCreditsDebited:debit.purchasedCreditsDebited})}::jsonb) RETURNING id`;
+    const refunded = await failLegacyJobAndRefund({ table: "generations", id: Number(g.id), userId: 1, amount: 5, purchasedCredits: debit.purchasedCreditsDebited, reason: "Recovery failed job" });
+    expect(refunded).toBe(true);
+    const completion = await pg`UPDATE generations SET status='completed',"imageUrl"='https://fixture.invalid/result.png' WHERE id=${g.id} AND "userId"=1 AND status='generating' RETURNING id`;
+    expect(completion).toHaveLength(0);
+    expect(await hasWalletRefundReceipt(1, 5, debit.purchasedCreditsDebited, `job-refund:generations:${g.id}`, "internal.job_refund")).toBe(true);
+    expect(await wallet()).toMatchObject({balance:10,bonusCredits:7,lifetimeSpent:0});
+
+    const second = await deductCredits(1, 5, "fixture completed edit");
+    if (!second.success) throw new Error("Expected second fixture debit");
+    const [completed] = await pg`INSERT INTO generations ("userId",prompt,"mediaType",status,metadata) VALUES (1,'edit2','image','generating','{}') RETURNING id`;
+    const saved = await pg`UPDATE generations SET status='completed',"imageUrl"='https://fixture.invalid/ready.png' WHERE id=${completed.id} AND "userId"=1 AND status='generating' RETURNING id`;
+    expect(saved).toHaveLength(1);
+    expect(await failLegacyJobAndRefund({ table: "generations", id: Number(completed.id), userId: 1, amount: 5, purchasedCredits: second.purchasedCreditsDebited, reason: "Recovery tried after completion" })).toBe(false);
+    expect(await hasWalletRefundReceipt(1, 5, second.purchasedCreditsDebited, `job-refund:generations:${completed.id}`, "internal.job_refund")).toBe(false);
+  });
   it("concurrent duplicate credit pack grants commit one wallet/ledger/receipt", async () => {
     await paid();
     const results = await Promise.all(Array.from({length:8}, () => addCredits(1,100,"pack", "cs_same", "pi_same")));

@@ -11,6 +11,7 @@ import { Video, Loader2, Download, Sparkles, RotateCcw, Camera } from "lucide-re
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import NextImage from "next/image";
+import { Link } from "wouter";
 
 const cameraPresets = [
   { value: "static", label: "Static", desc: "Locked camera, no movement" },
@@ -73,8 +74,12 @@ export default function ToolTextToVideo() {
   }, [isProcessing]);
 
   return (
-    <ToolPageLayout title="Text-to-Video" description="Generate video clips from text with Google Veo 2" icon={Video} gradient="from-cyan-500 to-blue-500">
+    <ToolPageLayout title="Text-to-Video" description="Create video clips from text" icon={Video} gradient="from-cyan-500 to-blue-500" toolKey="video-creator-unavailable">
       <div className="max-w-5xl mx-auto">
+        <div role="status" className="mb-6 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm">
+          This older video tool is temporarily unavailable. Open the workspace and select Video to choose an available model and review its credit price before generating.
+          <div className="mt-3"><Link href="/workspace"><Button>Open workspace</Button></Link></div>
+        </div>
         <div className="mb-8 p-4 rounded-xl bg-white/5 border border-white/10">
           <p className="text-xs text-muted-foreground mb-3">Example output:</p>
           <NextImage src="/showcase/example-video-1.jpg" alt="AI generated video frames" className="w-full rounded-lg" width={1408} height={768} />
@@ -149,12 +154,12 @@ export default function ToolTextToVideo() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                  <p className="text-xs text-cyan-300">Powered by Google Veo 2 — generation takes 1-3 minutes</p>
+                  <p className="text-xs text-cyan-300">This form is temporarily unavailable; use the workspace above.</p>
                 </div>
 
                 <div className="flex gap-3">
                   <Button onClick={() => { setVideoUrl(null); const fullPrompt = cameraMovement !== "static" ? `Camera: ${cameraMovement} movement. ${prompt}` : prompt; mutation.mutate({ prompt: fullPrompt, duration: duration as any, aspectRatio: aspectRatio as any, style: style as any }); }}
-                    disabled={!prompt.trim() || isProcessing} className="flex-1" size="lg">
+                    disabled className="flex-1" size="lg">
                     {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating... {Math.round(progress)}%</> : <><Sparkles className="h-4 w-4 mr-2" />Generate Video</>}
                   </Button>
                   <Button variant="outline" size="lg" onClick={() => { setPrompt(""); setVideoUrl(null); }}><RotateCcw className="h-4 w-4" /></Button>

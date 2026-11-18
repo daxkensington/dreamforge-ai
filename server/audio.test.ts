@@ -37,15 +37,15 @@ vi.mock("./_core/toolStatus", () => ({
 }));
 
 // Mock the credit ledger
-vi.mock("./_core/walletAccounting", () => ({ failLegacyJobAndRefund: vi.fn(async (input:any)=>{
+vi.mock("./_core/walletAccounting", () => ({ hasWalletRefundReceipt: vi.fn().mockResolvedValue(false), failLegacyJobAndRefund: vi.fn(async (input:any)=>{
   await refundCredits(input.userId,input.amount,input.reason,{purchasedCredits:input.purchasedCredits}); return true;
 }) }));
 vi.mock("./stripe", async () => {
   const actual = await vi.importActual<any>("./stripe");
   return {
     ...actual,
-    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 100, needed: 2 }),
-    refundCredits: vi.fn().mockResolvedValue(undefined),
+    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 100, needed: 2, transactionId: 123, purchasedCreditsDebited: 0 }),
+    refundCredits: vi.fn().mockResolvedValue({ success: true, refunded: 2 }),
   };
 });
 
@@ -72,6 +72,7 @@ vi.mock("./db", () => {
 import { audioRouter } from "./routers/audio";
 import { deductCredits, refundCredits } from "./stripe";
 import { generateAudio, syncAudioToVideo } from "./_core/audioGeneration";
+import { getDb } from "./db";
 
 const authCtx = { user: { id: 9, email: "audio@test" } as any, session: null, ip: "1.2.3.4" };
 
@@ -128,7 +129,7 @@ describe("audio.mergeAudioVideo", () => {
     // "audio-merge" = 2 credits — refund exactly that, exactly once.
     expect(deductCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Merge"));
     expect(refundCredits).toHaveBeenCalledTimes(1);
-    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"), expect.any(Object));
+    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.stringContaining("Refund"), { purchasedCredits: 0, operationKey: "usage-refund:123" });
   });
 
   it("does not refund when the merge succeeds", async () => {
@@ -140,12 +141,51 @@ describe("audio.mergeAudioVideo", () => {
     expect(res.status).toBe("complete");
     expect(refundCredits).not.toHaveBeenCalled();
   });
+
+  it("does not debit when the audio is missing or not owned", async () => {
+    const db = await getDb();
+    (db as any).where.mockResolvedValueOnce([]);
+    const caller = audioRouter.createCaller(authCtx);
+    await expect(caller.mergeAudioVideo({ audioId: 7, videoUrl: "https://cdn.example.com/clip.mp4" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(deductCredits).not.toHaveBeenCalled();
+    expect(syncAudioToVideo).not.toHaveBeenCalled();
+  });
+
+  it("does not debit when the audio is not complete", async () => {
+    const db = await getDb();
+    (db as any).where.mockResolvedValueOnce([{ id: 7, status: "generating", audioUrl: null }]);
+    const caller = audioRouter.createCaller(authCtx);
+    await expect(caller.mergeAudioVideo({ audioId: 7, videoUrl: "https://cdn.example.com/clip.mp4" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(deductCredits).not.toHaveBeenCalled();
+  });
+
+  it("rejects private video URLs before debit or provider invocation", async () => {
+    const caller = audioRouter.createCaller(authCtx);
+    await expect(caller.mergeAudioVideo({ audioId: 7, videoUrl: "http://127.0.0.1/clip.mp4" })).rejects.toThrow();
+    expect(deductCredits).not.toHaveBeenCalled();
+    expect(syncAudioToVideo).not.toHaveBeenCalled();
+  });
+
+  it("does not claim a refund succeeded when it cannot be verified", async () => {
+    vi.mocked(syncAudioToVideo).mockRejectedValueOnce(new Error("merge failed"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("database unavailable"));
+    const caller = audioRouter.createCaller(authCtx);
+    await expect(caller.mergeAudioVideo({ audioId: 7, videoUrl: "https://cdn.example.com/clip.mp4" })).rejects.toThrow("contact support");
+  });
+
+  it("refunds a response with no merged video", async () => {
+    vi.mocked(syncAudioToVideo).mockResolvedValueOnce("");
+    const caller = audioRouter.createCaller(authCtx);
+    await expect(caller.mergeAudioVideo({ audioId: 7, videoUrl: "https://cdn.example.com/clip.mp4" })).rejects.toThrow("Merge failed");
+    expect(refundCredits).toHaveBeenCalledWith(9, 2, expect.any(String), { purchasedCredits: 0, operationKey: "usage-refund:123" });
+  });
 });
 
 describe("audio.lipSync", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("refunds the lip-sync charge when the provider fails", async () => {
+    vi.mocked(refundCredits).mockResolvedValueOnce({ success: true, refunded: 50 });
     const { SyncLabsProvider } = await import("./_core/providers/synclabs");
     const original = SyncLabsProvider.prototype.generate;
     SyncLabsProvider.prototype.generate = vi.fn().mockRejectedValueOnce(new Error("sync failed")) as any;
@@ -160,9 +200,44 @@ describe("audio.lipSync", () => {
       // "video-lipsync" = 50 credits.
       expect(deductCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Lip sync"));
       expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Refund"), expect.any(Object));
+      expect(refundCredits).toHaveBeenCalledWith(9, 50, expect.stringContaining("Refund"), { purchasedCredits: 0, operationKey: "usage-refund:123" });
     } finally {
       SyncLabsProvider.prototype.generate = original;
     }
+  });
+
+  it("does not debit when the provider is unavailable", async () => {
+    const { SyncLabsProvider } = await import("./_core/providers/synclabs");
+    const available = vi.spyOn(SyncLabsProvider.prototype, "isAvailable", "get").mockReturnValue(false);
+    try {
+      await expect(audioRouter.createCaller(authCtx).lipSync({ videoUrl: "https://cdn.example.com/clip.mp4", audioUrl: "https://cdn.example.com/audio.wav" })).rejects.toThrow("not configured");
+      expect(deductCredits).not.toHaveBeenCalled();
+      expect(refundCredits).not.toHaveBeenCalled();
+    } finally { available.mockRestore(); }
+  });
+
+  it("rejects private URL forms before debit", async () => {
+    await expect(audioRouter.createCaller(authCtx).lipSync({ videoUrl: "https://127.0.0.1/clip.mp4", audioUrl: "https://cdn.example.com/audio.wav" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(deductCredits).not.toHaveBeenCalled();
+  });
+
+  it("directs the user to support if a failed refund cannot be verified", async () => {
+    const { SyncLabsProvider } = await import("./_core/providers/synclabs");
+    const generate = vi.spyOn(SyncLabsProvider.prototype, "generate").mockRejectedValueOnce(new Error("sync failed"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("database unavailable"));
+    try {
+      await expect(audioRouter.createCaller(authCtx).lipSync({ videoUrl: "https://cdn.example.com/clip.mp4", audioUrl: "https://cdn.example.com/audio.wav" })).rejects.toThrow("contact support");
+      expect(refundCredits).toHaveBeenCalledWith(9, 50, expect.any(String), { purchasedCredits: 0, operationKey: "usage-refund:123" });
+    } finally { generate.mockRestore(); }
+  });
+
+  it("refunds when the provider returns no output URL", async () => {
+    const { SyncLabsProvider } = await import("./_core/providers/synclabs");
+    const generate = vi.spyOn(SyncLabsProvider.prototype, "generate").mockResolvedValueOnce({ url: "" } as any);
+    vi.mocked(refundCredits).mockResolvedValueOnce({ success: true, refunded: 50 });
+    try {
+      await expect(audioRouter.createCaller(authCtx).lipSync({ videoUrl: "https://cdn.example.com/clip.mp4", audioUrl: "https://cdn.example.com/audio.wav" })).rejects.toThrow("no video");
+      expect(refundCredits).toHaveBeenCalledTimes(1);
+    } finally { generate.mockRestore(); }
   });
 });

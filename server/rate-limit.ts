@@ -12,10 +12,8 @@
  * A lock inside the same CTE would retain a stale snapshot while waiting and
  * still allow parallel requests through the cap.
  *
- * Failure mode: if the DB is unavailable, the limiter fails OPEN (allows
- * the request) and logs a warning. The reasoning is that rejecting legit
- * traffic during a brief DB hiccup hurts more than letting through a few
- * extra requests during the same window.
+ * By default failures are open for availability. Cost- or abuse-sensitive
+ * callers can opt into failing closed when storage is unavailable.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -36,19 +34,13 @@ export async function enforceRateLimit(
   key: string,
   maxHits: number,
   windowMs: number,
-  message?: string
+  message?: string,
+  options?: { failClosed?: boolean }
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    // No DB → fail open. Caller continues. Logged once per call so it's
-    // visible during outages without spamming.
-    console.warn("[rate-limit] DB unavailable, failing open for key:", key);
-    return;
-  }
-
-  const intervalSeconds = Math.max(1, Math.ceil(windowMs / 1000));
-
   try {
+    const db = await getDb();
+    if (!db) throw new Error("Rate limiter storage unavailable");
+    const intervalSeconds = Math.max(1, Math.ceil(windowMs / 1000));
     const [, , result]: any = await db.batch([
       db.execute(sql`SET TRANSACTION ISOLATION LEVEL READ COMMITTED`),
       db.execute(
@@ -88,8 +80,12 @@ export async function enforceRateLimit(
     }
   } catch (err) {
     if (err instanceof TRPCError) throw err;
-    // DB error → fail open + log. Don't block legit users on infra blips.
-    console.warn("[rate-limit] DB error, failing open for key:", key, err);
+    // Neither the key nor the DB error is logged: both can contain email
+    // addresses, IPs, or SQL parameters supplied by the caller.
+    console.warn(`[rate-limit] Storage unavailable; failing ${options?.failClosed ? "closed" : "open"}`);
+    if (options?.failClosed) {
+      throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "This service is temporarily unavailable. Please try again later." });
+    }
   }
 }
 
@@ -120,12 +116,14 @@ export async function enforceIpRateLimit(
   ip: string,
   maxHits: number,
   windowMs: number,
-  message?: string
+  message?: string,
+  options?: { failClosed?: boolean }
 ): Promise<void> {
   return enforceRateLimit(
     `${procedureName}:ip:${ip}`,
     maxHits,
     windowMs,
-    message
+    message,
+    options
   );
 }

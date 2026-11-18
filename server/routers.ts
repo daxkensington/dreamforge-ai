@@ -52,10 +52,9 @@ import {
   deleteVideoProject,
   createShareToken,
   getShareToken,
-  incrementShareTokenUse,
+  acceptProjectShareToken,
   deactivateShareToken,
   listShareTokens,
-  addCollaborator,
   listCollaborators,
   removeCollaborator,
   listSharedWithMe,
@@ -131,7 +130,8 @@ import { presentationRouter } from "./routers/presentation";
 import { timelineRouter } from "./routers/timeline";
 import { trainingRouter } from "./routers/training";
 import { animationRouter } from "./routers/animation";
-import { deductCredits, refundCredits, CREDIT_COSTS } from "./stripe";
+import { deductCredits, CREDIT_COSTS } from "./stripe";
+import { refundFailedLegacyTool } from "./_core/legacyToolRefund";
 import { getDb } from "./db";
 import { userSubscriptions, subscriptionPlans } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -187,6 +187,14 @@ async function getUserTier(userId: number): Promise<string> {
   } catch {
     return "free";
   }
+}
+
+/** Legacy video endpoints do not bind an accepted quote to model execution.
+ * Until they use the quoted workspace gateway, fail before any wallet or
+ * provider call rather than route a 50-credit request to premium models.
+ */
+function requireQuotedVideoWorkspace(): void {
+  throw new TRPCError({ code: "PRECONDITION_FAILED", message: "This video tool is temporarily unavailable. Use the workspace video creator to select a model and review its credit quote. No credits charged." });
 }
 
 // ─── Credit Deduction Helper ────────────────────────────────────────────────
@@ -1144,12 +1152,13 @@ export const appRouter = router({
             }).catch(() => {});
             // Refund credits for this failed batch item
             const itemCost = plan.creditCost;
+            let itemError = error.message;
             try {
-              await refundCredits(ctx.user.id, itemCost, `Refund: batch item failed — ${(error.message || "unknown error").slice(0, 100)}`, { purchasedCredits: itemPurchased, operationKey: `batch-refund:${batchResult.transactionId}:${itemIndex}` });
-            } catch (refundErr) {
-              console.error("[generation.batchCreate] Credit refund failed:", refundErr);
+              await refundFailedLegacyTool(ctx.user.id, { cost: itemCost, transactionId: batchResult.transactionId, purchasedCreditsDebited: itemPurchased }, "batch generation", "batch-refund", itemIndex);
+            } catch {
+              itemError = "Generation failed. Please contact support to review your credits.";
             }
-            results.push({ id: genId ?? 0, status: "failed", prompt: item.prompt, error: error.message });
+            results.push({ id: genId ?? 0, status: "failed", prompt: item.prompt, error: itemError });
           }
         }
 
@@ -1285,7 +1294,7 @@ export const appRouter = router({
         // SSRF guard: imageUrl is fetched server-side below. Reject non-https
         // or private/loopback/metadata hosts before any credits are spent.
         assertSafeImageUrl(input.imageUrl);
-        await tryDeductCredits(ctx.user.id, "super-resolution", "Image upscale");
+        const deduction = await tryDeductCredits(ctx.user.id, "super-resolution", "Image upscale");
         try {
           // Try RunPod Real-ESRGAN first (true pixel-level upscaling, 90% cheaper)
           const { isRunPodAvailable, runpodUpscale } = await import("./_core/runpod");
@@ -1328,6 +1337,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "super-resolution");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1357,7 +1367,7 @@ export const appRouter = router({
         // generateImage which fetches it server-side — validate before the
         // credit spend so a blocked host fails fast and free.
         assertSafeImageUrl(input.imageUrl);
-        await tryDeductCredits(ctx.user.id, "style-transfer", `Style transfer: ${input.style}`);
+        const deduction = await tryDeductCredits(ctx.user.id, "style-transfer", `Style transfer: ${input.style}`);
         const styleDescriptions: Record<string, string> = {
           "oil-painting": "rich oil painting with visible brushstrokes, thick impasto texture, classical fine art",
           "watercolor": "delicate watercolor painting with soft washes, bleeding edges, translucent layers on textured paper",
@@ -1382,6 +1392,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const, style: input.style };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "style-transfer");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1399,7 +1410,7 @@ export const appRouter = router({
         // SSRF guard: imageUrl is fetched server-side below. Reject non-https
         // or private/loopback/metadata hosts before any credits are spent.
         assertSafeImageUrl(input.imageUrl);
-        await tryDeductCredits(ctx.user.id, "background-edit", "Background edit");
+        const deduction = await tryDeductCredits(ctx.user.id, "background-edit", "Background edit");
         try {
           // For "remove" mode, try RunPod RMBG-2.0 first (true segmentation, 95% cheaper)
           if (input.mode === "remove") {
@@ -1446,6 +1457,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const, mode: input.mode };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "background-edit");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1471,7 +1483,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "background-edit", "Batch background process");
+        const deduction = await tryDeductCredits(ctx.user.id, "background-edit", "Batch background process");
         const results: Array<{ imageUrl: string; resultUrl: string | null; status: string; error?: string }> = [];
 
         for (const imageUrl of input.images) {
@@ -1516,7 +1528,9 @@ export const appRouter = router({
           }
         }
 
-        return { results, total: input.images.length, completed: results.filter(r => r.status === "completed").length };
+        const completed = results.filter(r => r.status === "completed").length;
+        if (completed === 0) await refundFailedLegacyTool(ctx.user.id, deduction, "batch background process");
+        return { results, total: input.images.length, completed };
       }),
 
     // Smart Prompt Builder — LLM constructs an optimized prompt from structured inputs
@@ -1683,7 +1697,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-image", "Generate variations");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-image", "Generate variations");
         const variationDescriptions: Record<string, string[]> = {
           "subtle": [
             "slightly different color temperature, warmer tones",
@@ -1735,7 +1749,9 @@ export const appRouter = router({
           }
         }
 
-        return { results, total: input.count, completed: results.filter(r => r.status === "completed").length };
+        const completed = results.filter(r => r.status === "completed").length;
+        if (completed === 0) await refundFailedLegacyTool(ctx.user.id, deduction, "generate variations");
+        return { results, total: input.count, completed };
       }),
 
     // Inpainting Editor — edit specific regions of an image via text prompt
@@ -1750,7 +1766,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-image", "Inpaint");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-image", "Inpaint");
         try {
           const styleNote = input.preserveStyle ? " Maintain the exact same artistic style, lighting, and color palette as the original." : "";
           const regionNote = input.regionDescription ? ` Focus the edit on: ${input.regionDescription}.` : "";
@@ -1767,6 +1783,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1781,7 +1798,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "face-enhance", "Enhance face");
+        const deduction = await tryDeductCredits(ctx.user.id, "face-enhance", "Enhance face");
         const levelDescriptions: Record<string, string> = {
           "light": "subtle enhancement with minor sharpening, gentle skin smoothing, and slight detail improvement",
           "moderate": "balanced enhancement with clear sharpening, skin texture improvement, eye detail enhancement, and lighting correction",
@@ -1799,6 +1816,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const, enhancementLevel: input.enhancementLevel };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "face-enhance");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1814,7 +1832,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-image", "Outpaint");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-image", "Outpaint");
         const directionPrompts: Record<string, string> = {
           "up": "Extend the top of this image upward, seamlessly continuing the scene above",
           "down": "Extend the bottom of this image downward, seamlessly continuing the scene below",
@@ -1836,6 +1854,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, direction: input.direction };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1850,7 +1869,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "object-remove", "Erase object");
+        const deduction = await tryDeductCredits(ctx.user.id, "object-remove", "Erase object");
         const fillMethods: Record<string, string> = {
           "auto": "Fill the removed area with contextually appropriate content that blends seamlessly with the surrounding scene",
           "blur": "Fill the removed area with a smooth blurred version of the surrounding colors",
@@ -1863,6 +1882,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "object-remove");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1878,7 +1898,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-image", "Text effects");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-image", "Text effects");
         const effectDescriptions: Record<string, string> = {
           "fire": "blazing fire and flames, burning embers, orange and red glow, smoke wisps",
           "water": "flowing water and liquid, ocean waves, blue translucent, water droplets, reflections",
@@ -1910,6 +1930,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, text: input.text, effect: input.effectStyle };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1925,7 +1946,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "image-merge", "Blend images");
+        const deduction = await tryDeductCredits(ctx.user.id, "image-merge", "Blend images");
         const blendDescriptions: Record<string, string> = {
           "merge": "Seamlessly merge these two images into a single cohesive composition, blending elements from both naturally",
           "double-exposure": "Create a cinematic double-exposure effect combining these two images, with one image overlaid transparently on the other like a film photography technique",
@@ -1944,6 +1965,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, blendMode: input.blendMode };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "image-merge");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1959,7 +1981,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "sketch-to-image", "Sketch to image");
+        const deduction = await tryDeductCredits(ctx.user.id, "sketch-to-image", "Sketch to image");
         const styleDescriptions: Record<string, string> = {
           "realistic": "photorealistic rendering, lifelike details, natural lighting, high-resolution photography quality",
           "digital-art": "polished digital art, clean lines, vibrant colors, professional illustration quality",
@@ -1981,6 +2003,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, style: input.outputStyle };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "sketch-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -1995,7 +2018,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "sketch-to-image", "Live canvas render");
+        const deduction = await tryDeductCredits(ctx.user.id, "sketch-to-image", "Live canvas render");
         const styleDescriptions: Record<string, string> = {
           "realistic": "photorealistic rendering, lifelike details, natural studio lighting",
           "digital-art": "polished digital concept art, vibrant colors, crisp lines",
@@ -2021,6 +2044,7 @@ export const appRouter = router({
           });
           return { url: url ?? null, status: "completed" as const, style: input.outputStyle };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "sketch-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2035,7 +2059,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "color-grade", "Color grade");
+        const deduction = await tryDeductCredits(ctx.user.id, "color-grade", "Color grade");
         const gradeDescriptions: Record<string, string> = {
           "cinematic": "cinematic color grading with rich contrast, teal shadows and warm highlights, Hollywood blockbuster look",
           "vintage": "vintage film look with faded colors, warm amber tones, slight grain, 1970s photography feel",
@@ -2056,6 +2080,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, grade: input.grade };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "color-grade");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2137,7 +2162,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "photo-restore", "Photo restoration");
+        const deduction = await tryDeductCredits(ctx.user.id, "photo-restore", "Photo restoration");
         try {
           const restoreDescriptions: Record<string, string> = {
             "old-photo": "Restore this old photograph to modern quality. Fix yellowing, grain, scratches, and aging artifacts while preserving the original composition and subjects. Make it look like it was taken with a modern camera.",
@@ -2154,6 +2179,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const, restoreType: input.restoreType };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "photo-restore");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2169,7 +2195,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "headshot", "AI headshot");
+        const deduction = await tryDeductCredits(ctx.user.id, "headshot", "AI headshot");
         try {
           const styleDescriptions: Record<string, string> = {
             "corporate": "professional corporate headshot, business attire, confident expression, executive portrait",
@@ -2202,6 +2228,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "headshot");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2219,7 +2246,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "logo-maker", "Logo generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "logo-maker", "Logo generation");
         try {
           const styleDescriptions: Record<string, string> = {
             "minimal": "minimalist, clean lines, simple shapes, lots of whitespace, modern sans-serif",
@@ -2245,6 +2272,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "logo-maker");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2259,7 +2287,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "wallpaper", "Wallpaper generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "wallpaper", "Wallpaper generation");
         try {
           const resolutionSizes: Record<string, string> = {
             "phone": "vertical portrait 9:16 mobile wallpaper",
@@ -2275,6 +2303,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "wallpaper");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2289,7 +2318,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "qr-art", "QR code art");
+        const deduction = await tryDeductCredits(ctx.user.id, "qr-art", "QR code art");
         try {
           const styleDescriptions: Record<string, string> = {
             "cyberpunk": "neon cyberpunk cityscape, glowing circuits, holographic elements",
@@ -2312,6 +2341,7 @@ export const appRouter = router({
 
           return { url: resultUrl, status: "completed" as const, qrData: input.url };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "qr-art");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2326,7 +2356,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "vectorize", "Image vectorization");
+        const deduction = await tryDeductCredits(ctx.user.id, "vectorize", "Image vectorization");
         try {
           const styleDescriptions: Record<string, string> = {
             "flat": "flat vector illustration with solid color fills, clean edges, no gradients",
@@ -2377,6 +2407,7 @@ export const appRouter = router({
 
           return { url, svgUrl, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "vectorize");
           return { url: null, svgUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2390,7 +2421,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "nl-edit", "Natural language edit");
+        const deduction = await tryDeductCredits(ctx.user.id, "nl-edit", "Natural language edit");
         try {
           const { url } = await generateImage({
             prompt: `Edit this image following these instructions exactly: ${input.instruction}. Make the edit look completely natural and seamless. Preserve everything else in the image unchanged. Professional quality result.`,
@@ -2399,6 +2430,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "nl-edit");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2414,7 +2446,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "avatar", "Avatar generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "avatar", "Avatar generation");
         try {
           const styleDescriptions: Record<string, string> = {
             "3d-render": "high-quality 3D rendered avatar, Pixar-style, smooth shading, professional lighting",
@@ -2445,6 +2477,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "avatar");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2459,7 +2492,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "product-photo", "Product photo");
+        const deduction = await tryDeductCredits(ctx.user.id, "product-photo", "Product photo");
         try {
           const sceneDescriptions: Record<string, string> = {
             "studio-white": "clean white studio background, professional product photography, soft shadows",
@@ -2488,6 +2521,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "product-photo");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2503,7 +2537,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "image-caption", "Image caption");
+        const deduction = await tryDeductCredits(ctx.user.id, "image-caption", "Image caption");
         try {
           const typeInstructions: Record<string, string> = {
             "alt-text": "Write concise, descriptive alt text for accessibility. Be specific about what's in the image. 1-2 sentences max.",
@@ -2535,6 +2569,7 @@ export const appRouter = router({
 
           return { caption, status: "completed" as const, type: input.type };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "image-caption");
           return { caption: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2550,7 +2585,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-speech", "Text-to-speech");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-speech", "Text-to-speech");
         try {
           let audioBuffer: Buffer;
 
@@ -2593,6 +2628,7 @@ export const appRouter = router({
 
           return { audioUrl, status: "completed" as const, voice: input.voice, duration: Math.ceil(input.text.length / 15) };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-speech");
           return { audioUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2606,7 +2642,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "audio-enhance", "Audio enhancement");
+        const deduction = await tryDeductCredits(ctx.user.id, "audio-enhance", "Audio enhancement");
         try {
           const enhanceDescriptions: Record<string, string> = {
             "noise-removal": "Remove background noise while preserving voice clarity",
@@ -2637,6 +2673,7 @@ export const appRouter = router({
 
           return { recommendations, status: "completed" as const, enhancement: input.enhancement };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "audio-enhance");
           return { recommendations: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2651,7 +2688,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "sound-effects", "Sound effect generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "sound-effects", "Sound effect generation");
         try {
           const durationSeconds = { short: 2, medium: 5, long: 10 };
           const openaiKey = process.env.OPENAI_API_KEY;
@@ -2708,6 +2745,7 @@ export const appRouter = router({
 
           return { ...sfx, status: "completed" as const, category: input.category, duration: input.duration };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "sound-effects");
           return { name: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2723,7 +2761,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "texture-gen", "Texture generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "texture-gen", "Texture generation");
         try {
           const tilingNote = input.tiling ? "Seamless tileable pattern that repeats perfectly in all directions with no visible seams." : "";
           const categoryNote = input.category !== "custom" ? `${input.category} material texture.` : "";
@@ -2734,6 +2772,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "texture-gen");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2748,7 +2787,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "panorama", "Panorama generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "panorama", "Panorama generation");
         try {
           const directionDescriptions: Record<string, string> = {
             "horizontal": `Extend this image horizontally to create a wide panoramic view (${input.expansionFactor} wider). Seamlessly continue the scene, landscape, and atmosphere in both directions. Maintain consistent lighting, perspective, and style.`,
@@ -2763,6 +2802,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "panorama");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2777,7 +2817,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "color-grade", "HDR enhancement");
+        const deduction = await tryDeductCredits(ctx.user.id, "color-grade", "HDR enhancement");
         try {
           const effectDescriptions: Record<string, string> = {
             "hdr": "Apply HDR (High Dynamic Range) enhancement — boost shadow details, highlight details, vivid colors, expanded tonal range, professional HDR photography",
@@ -2829,6 +2869,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "color-grade");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2842,7 +2883,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "background-edit", "Transparent PNG");
+        const deduction = await tryDeductCredits(ctx.user.id, "background-edit", "Transparent PNG");
         try {
           const modeDescriptions: Record<string, string> = {
             "remove-bg": "Remove the background completely, leaving only the main subject on a pure transparent/white background. Perfectly clean edges, no artifacts.",
@@ -2857,6 +2898,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "background-edit");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2872,7 +2914,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-image", "Icon generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-image", "Icon generation");
         try {
           const styleDescriptions: Record<string, string> = {
             "flat": "flat design icon, solid colors, no shadows, clean minimal shapes",
@@ -2895,6 +2937,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-image");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -2928,13 +2971,23 @@ export const appRouter = router({
         }
         const results: Array<{ prompt: string; url: string | null; status: string; error?: string }> = [];
 
-        for (const prompt of input.prompts) {
+        let subscriptionRemaining = totalCost - batchResult.purchasedCreditsDebited;
+        for (const [itemIndex, prompt] of input.prompts.entries()) {
+          const itemPurchased = Math.max(0, perImageCost - subscriptionRemaining);
+          subscriptionRemaining = Math.max(0, subscriptionRemaining - perImageCost);
           try {
             const enhancedPrompt = input.style ? `${prompt}. Style: ${input.style}. Professional quality.` : `${prompt}. Professional quality.`;
             const { url } = await generateImage({ prompt: enhancedPrompt, quality: input.quality });
             results.push({ prompt, url: url ?? null, status: "completed" });
           } catch (error: any) {
-            results.push({ prompt, url: null, status: "failed", error: error.message });
+            let message = error.message;
+            try {
+              await refundFailedLegacyTool(ctx.user.id, { cost: perImageCost, transactionId: batchResult.transactionId, purchasedCreditsDebited: itemPurchased }, "batch prompt", "legacy-tool-refund", itemIndex);
+            } catch {
+              // Preserve other delivered results even if this item's refund needs support.
+              message = "Generation failed. Please contact support to review your credits.";
+            }
+            results.push({ prompt, url: null, status: "failed", error: message });
           }
         }
 
@@ -2953,7 +3006,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "music-gen", "Music generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "music-gen", "Music generation");
         try {
           const result = await invokeLLM({
             messages: [
@@ -2994,6 +3047,7 @@ export const appRouter = router({
           if (!composition) throw new Error("Failed to generate composition");
           return { ...composition, status: "completed" as const, genre: input.genre, mood: input.mood };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "music-gen");
           return { title: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3008,7 +3062,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "mockup", "Mockup generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "mockup", "Mockup generation");
         try {
           const mockupDescriptions: Record<string, string> = {
             "tshirt": "a premium quality t-shirt being worn by a model, professional product photography, lifestyle setting",
@@ -3029,6 +3083,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, mockupType: input.mockupType };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "mockup");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3042,7 +3097,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "social-resize", "Social media resize");
+        const deduction = await tryDeductCredits(ctx.user.id, "social-resize", "Social media resize");
         try {
           const platformSpecs: Record<string, { ratio: string; desc: string }> = {
             "instagram-post": { ratio: "1:1", desc: "square Instagram post, 1080x1080" },
@@ -3061,6 +3116,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, platform: input.platform };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "social resize");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3074,7 +3130,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "depth-map", "Depth map generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "depth-map", "Depth map generation");
         try {
           // Real path: Depth Anything V2 on the self-hosted worker — true
           // monocular depth, and a true normal map derived from the depth
@@ -3109,6 +3165,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, style: input.style, engine: "vision-model" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "depth-map");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3123,7 +3180,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "character-sheet", "Character sheet");
+        const deduction = await tryDeductCredits(ctx.user.id, "character-sheet", "Character sheet");
         try {
           const viewDescriptions: Record<string, string> = {
             "turnaround": "character turnaround sheet showing front view, 3/4 view, side view, and back view, all consistent design, white background, reference sheet layout",
@@ -3136,6 +3193,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "character-sheet");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3149,7 +3207,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "meme", "Meme generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "meme", "Meme generation");
         try {
           // First generate the meme text via LLM
           const textResult = await invokeLLM({
@@ -3175,6 +3233,7 @@ export const appRouter = router({
 
           return { url, ...memeContent, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "meme");
           return { url: null, topText: null, bottomText: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3190,7 +3249,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "interior-design", "Interior redesign");
+        const deduction = await tryDeductCredits(ctx.user.id, "interior-design", "Interior redesign");
         try {
           const styleDescriptions: Record<string, string> = {
             "modern": "modern contemporary interior, clean lines, neutral palette, statement lighting, open feel",
@@ -3211,6 +3270,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "interior-design");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3226,7 +3286,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "thumbnail", "Thumbnail generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "thumbnail", "Thumbnail generation");
         try {
           const platformSpecs: Record<string, string> = {
             "youtube": "YouTube thumbnail, 16:9, extremely eye-catching, high contrast, clickable",
@@ -3255,6 +3315,7 @@ export const appRouter = router({
           const { url } = await generateImage(generateOptions);
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "thumbnail");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3269,7 +3330,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "collage", "Collage creation");
+        const deduction = await tryDeductCredits(ctx.user.id, "collage", "Collage creation");
         try {
           const layoutDescriptions: Record<string, string> = {
             "grid": "clean grid collage layout with equal-sized cells, thin white borders between images",
@@ -3289,6 +3350,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const, layout: input.layout };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "collage");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3302,7 +3364,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "film-grain", "Film effect");
+        const deduction = await tryDeductCredits(ctx.user.id, "film-grain", "Film effect");
         try {
           const effectDescriptions: Record<string, string> = {
             "35mm-grain": "authentic 35mm film grain, natural film texture, slightly warm tones, classic analog photography feel",
@@ -3322,6 +3384,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, effect: input.effect };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "film-grain");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3337,7 +3400,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
+        const deduction = await tryDeductCredits(ctx.user.id, "virtual-tryon", "Virtual try-on");
         try {
           const { isRunPodAvailable, runpodTryOn } = await import("./_core/runpod");
           if (isRunPodAvailable()) {
@@ -3390,6 +3453,7 @@ export const appRouter = router({
 
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "virtual-tryon");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3404,7 +3468,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "relight", "AI relighting");
+        const deduction = await tryDeductCredits(ctx.user.id, "relight", "AI relighting");
         try {
           const { ENV } = await import("./_core/env");
           const FAL_QUEUE_BASE = "https://queue.fal.run";
@@ -3470,6 +3534,7 @@ export const appRouter = router({
               provider: "fal+flux",
               userId: ctx.user.id,
             });
+            await refundFailedLegacyTool(ctx.user.id, deduction, "relight");
             return { url: null, status: "failed" as const, error: `Relighting failed: ${error.message}` };
           }
         }
@@ -3483,7 +3548,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "3d-generate", "3D model generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "3d-generate", "3D model generation");
         try {
           const { ENV } = await import("./_core/env");
           const FAL_QUEUE_BASE = "https://queue.fal.run";
@@ -3590,6 +3655,7 @@ export const appRouter = router({
                 provider: "fal+replicate",
                 userId: ctx.user.id,
               });
+              await refundFailedLegacyTool(ctx.user.id, deduction, "3d-generate");
               return { modelUrl: null, previewUrl: null, status: "failed" as const, error: `3D generation failed: ${error.message}` };
             }
           }
@@ -3600,6 +3666,7 @@ export const appRouter = router({
             provider: "fal-ai/trellis",
             userId: ctx.user.id,
           });
+          await refundFailedLegacyTool(ctx.user.id, deduction, "3d-generate");
           return { modelUrl: null, previewUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3614,7 +3681,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "comic-strip", "Comic strip generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "comic-strip", "Comic strip generation");
         try {
           // Step 1: Generate panel descriptions via LLM
           const llmResponse = await invokeLLM({
@@ -3646,6 +3713,7 @@ export const appRouter = router({
 
           return { panels, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "comic-strip");
           return { panels: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -3660,12 +3728,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "tshirt-design", "T-shirt design");
+        const deduction = await tryDeductCredits(ctx.user.id, "tshirt-design", "T-shirt design");
         try {
           const prompt = `T-shirt print design, ${input.style} style, ${input.concept}. ${input.colorScheme} palette. Centered composition on transparent/white background, print-ready, high contrast, no background scene, isolated design suitable for DTG printing. Professional merchandise artwork.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
           return { url, status: "completed" as const, style: input.style };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "tshirt-design");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3681,12 +3750,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "pixel-art", "Pixel art generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "pixel-art", "Pixel art generation");
         try {
           const prompt = `${input.bitStyle} pixel art ${input.subject}: ${input.concept}. ${input.palette} palette, crisp pixel edges, no anti-aliasing, game-ready sprite style, transparent background, centered composition, high contrast, retro video game aesthetic.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "pixel-art");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3701,7 +3771,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "coloring-book", "Coloring book page");
+        const deduction = await tryDeductCredits(ctx.user.id, "coloring-book", "Coloring book page");
         try {
           const detailMap: Record<string, string> = {
             easy: "thick bold outlines, simple shapes, large open areas, minimal detail, suitable for children 4-8",
@@ -3712,6 +3782,7 @@ export const appRouter = router({
           const { url } = await generateImage({ prompt, width: 1024, height: 1280 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "coloring-book");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3727,7 +3798,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "tattoo-design", "Tattoo design");
+        const deduction = await tryDeductCredits(ctx.user.id, "tattoo-design", "Tattoo design");
         try {
           const baseDesc = `${input.style} tattoo design: ${input.concept}. Sized for ${input.placement} placement, clean composition on white background, professional tattoo flash artwork.`;
           const results: { type: string; url: string }[] = [];
@@ -3741,6 +3812,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "tattoo-design");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -3758,7 +3830,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "cover-maker", "Cover art");
+        const deduction = await tryDeductCredits(ctx.user.id, "cover-maker", "Cover art");
         try {
           const dims = input.coverType === "album" ? { w: 1024, h: 1024 } : { w: 1024, h: 1536 };
           const typographyNote = input.coverType === "album"
@@ -3768,6 +3840,7 @@ export const appRouter = router({
           const { url } = await generateImage({ prompt, width: dims.w, height: dims.h });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "cover-maker");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3782,7 +3855,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "pose-turnaround", "Character turnaround");
+        const deduction = await tryDeductCredits(ctx.user.id, "pose-turnaround", "Character turnaround");
         try {
           const viewLabels = ["front view", "3/4 side view", "side profile view", "back view"].slice(0, input.views);
           const results: { view: string; url: string }[] = [];
@@ -3793,6 +3866,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "pose-turnaround");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -3807,7 +3881,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "photo-colorize", "Photo colorization");
+        const deduction = await tryDeductCredits(ctx.user.id, "photo-colorize", "Photo colorization");
         try {
           const eraNote = input.era === "auto" ? "Infer the era from visual cues and use historically accurate colors for the period." : `Era: ${input.era}. Use historically accurate clothing, skin tone, and environment colors appropriate to the ${input.era} period.`;
           const intensityNote: Record<string, string> = {
@@ -3821,6 +3895,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "photo-colorize");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3837,13 +3912,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "podcast-cover", "Podcast cover art");
+        const deduction = await tryDeductCredits(ctx.user.id, "podcast-cover", "Podcast cover art");
         try {
           const title = `"${input.podcastName}"${input.tagline ? ` (tagline: ${input.tagline})` : ""}${input.hostName ? ` hosted by ${input.hostName}` : ""}`;
           const prompt = `Podcast cover art, square 1:1 composition, ${input.vibe} ${input.genre} aesthetic. Large readable title typography: ${title}. Eye-catching icon or illustration element, genre-appropriate color palette, legible when displayed small in Spotify/Apple Podcasts grid, commercial-quality design, no microphone clichés unless requested.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "podcast-cover");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3858,7 +3934,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "listing-photos", "Etsy listing photo pack");
+        const deduction = await tryDeductCredits(ctx.user.id, "listing-photos", "Etsy listing photo pack");
         try {
           const angles = [
             `Hero shot: ${input.productName} centered, ${input.style} context, perfect studio lighting, primary listing photo.`,
@@ -3877,6 +3953,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "listing-photos");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -3891,7 +3968,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "real-estate-twilight", "Real estate twilight");
+        const deduction = await tryDeductCredits(ctx.user.id, "real-estate-twilight", "Real estate twilight");
         try {
           const modeNote: Record<string, string> = {
             "golden-hour": "Warm golden hour lighting, sun low on the horizon, long soft shadows, honey-toned light on the facade.",
@@ -3908,6 +3985,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "real-estate-twilight");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3923,7 +4001,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "fashion-lookbook", "Fashion lookbook");
+        const deduction = await tryDeductCredits(ctx.user.id, "fashion-lookbook", "Fashion lookbook");
         try {
           const sceneTemplates = [
             "urban street scene, natural candid pose, mid-day light",
@@ -3941,6 +4019,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "fashion-lookbook");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -3954,7 +4033,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "meme-template", "Meme template fill");
+        const deduction = await tryDeductCredits(ctx.user.id, "meme-template", "Meme template fill");
         try {
           const templateDesc: Record<string, string> = {
             "drake": `Classic Drake meme format, two stacked panels: top panel shows Drake rejecting with hand up (reject/disapproval pose) with caption "${input.captions[0] ?? ""}", bottom panel shows Drake approving with pointing gesture with caption "${input.captions[1] ?? ""}". Impact font, white text on colored panel backgrounds.`,
@@ -3971,6 +4050,7 @@ export const appRouter = router({
           const { url } = await generateImage({ prompt: templateDesc[input.template] + " Classic internet meme composition, shareable, square format.", width: 1024, height: 1024 });
           return { url, template: input.template, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "meme-template");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -3985,7 +4065,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "yt-thumbnails", "YouTube chapter thumbnails");
+        const deduction = await tryDeductCredits(ctx.user.id, "yt-thumbnails", "YouTube chapter thumbnails");
         try {
           const styleNote: Record<string, string> = {
             "bold-face": "bold shocked facial expression, massive contrast, saturated colors, MrBeast-style thumbnail",
@@ -4004,6 +4084,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "yt-thumbnails");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4019,7 +4100,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "ig-carousel", "Instagram carousel");
+        const deduction = await tryDeductCredits(ctx.user.id, "ig-carousel", "Instagram carousel");
         try {
           const outline = await invokeLLM({
             messages: [
@@ -4067,6 +4148,7 @@ export const appRouter = router({
           }
           return { slides, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "ig-carousel");
           return { slides: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4081,7 +4163,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "sticker-pack", "Sticker pack");
+        const deduction = await tryDeductCredits(ctx.user.id, "sticker-pack", "Sticker pack");
         try {
           const outline = await invokeLLM({
             messages: [
@@ -4115,6 +4197,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "sticker-pack");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4131,13 +4214,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "recipe-card", "Recipe card");
+        const deduction = await tryDeductCredits(ctx.user.id, "recipe-card", "Recipe card");
         try {
           const cuisineNote = input.cuisine ? `${input.cuisine} cuisine, ` : "";
           const prompt = `Pinterest-ready recipe card, 2:3 portrait format, ${input.style} design. Dish: "${input.dishName}". ${cuisineNote}Include a hero food photograph at top (styled shot of the finished dish), title typography "${input.dishName}" in ${input.style} font, ingredients list section with these items: ${input.ingredients.slice(0, 300)}, step-by-step instructions section summarizing: ${input.steps.slice(0, 400)}. Food blog aesthetic, print-ready, shareable. Clear readable hierarchy.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "recipe-card");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4153,12 +4237,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "invitation", "Event invitation");
+        const deduction = await tryDeductCredits(ctx.user.id, "invitation", "Event invitation");
         try {
           const prompt = `${input.eventType} invitation card, 5x7 portrait print-ready format, ${input.style} design. Headline typography: "${input.headline}". Supporting details section reads: "${input.details.slice(0, 300)}". Beautiful typography hierarchy, appropriate decorative motifs for ${input.eventType}, refined paper stock feel, professional stationery design, print-safe bleed composition.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "invitation");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4175,7 +4260,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "business-card", "Business card");
+        const deduction = await tryDeductCredits(ctx.user.id, "business-card", "Business card");
         try {
           const companyLine = input.company ? `Company: "${input.company}". ` : "";
           const frontPrompt = `Business card front, 3.5x2 inch landscape print-ready, ${input.style} design. ${companyLine}Large readable name: "${input.name}". Title below: "${input.title}". Contact block: "${input.contact}". Clean typography hierarchy, logo/mark space, premium cardstock feel, professional brand aesthetic, high-end stationery.`;
@@ -4186,6 +4271,7 @@ export const appRouter = router({
           ]);
           return { frontUrl, backUrl, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "business-card");
           return { frontUrl: null, backUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4201,7 +4287,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "pet-portrait", "Pet portrait");
+        const deduction = await tryDeductCredits(ctx.user.id, "pet-portrait", "Pet portrait");
         try {
           const styleDesc: Record<string, string> = {
             "royal-renaissance": "Regal Renaissance oil painting, ermine robes, ornate throne, dramatic chiaroscuro lighting, museum-quality brushwork",
@@ -4220,6 +4306,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "pet-portrait");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4235,13 +4322,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "tarot-card", "Tarot card design");
+        const deduction = await tryDeductCredits(ctx.user.id, "tarot-card", "Tarot card design");
         try {
           const numeralNote = input.romanNumeral ? `Roman numeral "${input.romanNumeral}" at the top. ` : "";
           const prompt = `Tarot card design, 2.75x4.75 inch portrait format with decorative border, ${input.style} style. Card title: "${input.cardName}" in ornate serif at bottom. ${numeralNote}Central illustration depicting: ${input.symbolism}. Rich symbolic imagery, intricate decorative frame, arcane mystical atmosphere, deck-ready composition, high-contrast readability, spiritual/divinatory aesthetic.`;
           const { url } = await generateImage({ prompt, width: 768, height: 1344 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "tarot-card");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4258,7 +4346,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "movie-poster", "Movie poster");
+        const deduction = await tryDeductCredits(ctx.user.id, "movie-poster", "Movie poster");
         try {
           const taglineNote = input.tagline ? `Tagline above title: "${input.tagline}". ` : "";
           const creditsNote = input.credits ? `Billing block at the bottom: "${input.credits}". ` : "Small cast/crew billing block at the bottom.";
@@ -4266,6 +4354,7 @@ export const appRouter = router({
           const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "movie-poster");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4283,12 +4372,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "trading-card", "Trading card");
+        const deduction = await tryDeductCredits(ctx.user.id, "trading-card", "Trading card");
         try {
           const prompt = `Trading card game (TCG) card, 2.5x3.5 inch portrait format, ${input.theme} theme, ${input.rarity} rarity. Card name at top: "${input.name}". ${input.cardType} type indicator. Central hero art depicting: ${input.artDescription}. Stats/abilities block at the bottom reads: "${input.stats}". Ornate frame appropriate to rarity (${input.rarity === "legendary" || input.rarity === "mythic" ? "foil-effect premium border with gemstone accents" : "clean printed border"}), Magic/Pokemon/Hearthstone-level production quality, collectible game aesthetic, readable typography hierarchy.`;
           const { url } = await generateImage({ prompt, width: 768, height: 1080 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "trading-card");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4305,13 +4395,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "menu-design", "Menu design");
+        const deduction = await tryDeductCredits(ctx.user.id, "menu-design", "Menu design");
         try {
           const dims = input.format === "tri-fold" ? { w: 1536, h: 1024 } : { w: 1024, h: 1536 };
           const prompt = `Restaurant menu, ${input.format} print layout, ${input.style} design aesthetic. Restaurant name masthead: "${input.restaurantName}", ${input.cuisine} cuisine subtitle. Menu sections with pricing, laid out as: ${input.sections.slice(0, 1500)}. Elegant typography hierarchy, appropriate spacing and dividers, print-ready composition, professional restaurant stationery quality.`;
           const { url } = await generateImage({ prompt, width: dims.w, height: dims.h });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "menu-design");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4327,7 +4418,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "greeting-card", "Greeting card");
+        const deduction = await tryDeductCredits(ctx.user.id, "greeting-card", "Greeting card");
         try {
           const recipientNote = input.recipient ? `for "${input.recipient}"` : "";
           const frontPrompt = `${input.occasion} greeting card FRONT, 5x7 portrait print-ready, ${input.tone} tone. Cover visual appropriate to ${input.occasion} ${recipientNote}, minimal headline text. Professional stationery design, premium card quality, inviting composition.`;
@@ -4339,6 +4430,7 @@ export const appRouter = router({
           ]);
           return { frontUrl, insideUrl, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "greeting-card");
           return { frontUrl: null, insideUrl: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4353,7 +4445,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "emoji-creator", "Emoji creation");
+        const deduction = await tryDeductCredits(ctx.user.id, "emoji-creator", "Emoji creation");
         try {
           const styleDesc: Record<string, string> = {
             apple: "Apple emoji style, glossy 3D look, rich gradients, rounded forms",
@@ -4369,6 +4461,7 @@ export const appRouter = router({
           const { url } = await generateImage({ prompt, width: 1024, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "emoji-creator");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4384,13 +4477,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "brand-style-guide", "Brand style guide");
+        const deduction = await tryDeductCredits(ctx.user.id, "brand-style-guide", "Brand style guide");
         try {
           const taglineNote = input.tagline ? `Tagline: "${input.tagline}". ` : "";
           const prompt = `Brand style guide reference sheet for "${input.brandName}" (${input.industry}), ${input.vibe} aesthetic. ${taglineNote}One-page layout showing: primary logo mark (centered top, prominent), color palette swatches with hex codes (5-6 colors), typography pairings (headline + body font samples), logo variations (horizontal, stacked, monochrome), brand pattern/texture element. Professional design system reference, print-ready, designer portfolio quality.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "brand-style-guide");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4406,12 +4500,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "event-flyer", "Event flyer");
+        const deduction = await tryDeductCredits(ctx.user.id, "event-flyer", "Event flyer");
         try {
           const prompt = `${input.eventType} event flyer, 8.5x11 portrait print-ready, ${input.style} design. Large headline: "${input.eventName}". Key details: "${input.details.slice(0, 350)}". Hero visual appropriate to ${input.eventType}, strong typographic hierarchy, eye-catching from across a room, QR-code-ready empty space. Professional promotional design, social-share-ready.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1344 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "event-flyer");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4428,13 +4523,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "certificate", "Certificate");
+        const deduction = await tryDeductCredits(ctx.user.id, "certificate", "Certificate");
         try {
           const dateNote = input.issueDate ? `Date: "${input.issueDate}". ` : "";
           const prompt = `Certificate of achievement, 11x8.5 landscape print-ready, ${input.style} design. Large ornate title "Certificate of Achievement" or similar. Awarded to: "${input.recipientName}" (large elegant script). For: "${input.awardTitle}". Issued by: "${input.issuer}". ${dateNote}Decorative border and seal appropriate to ${input.style} style, signature lines at bottom, professional diploma/award aesthetic.`;
           const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "certificate");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4449,13 +4545,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "bookmark", "Bookmark design");
+        const deduction = await tryDeductCredits(ctx.user.id, "bookmark", "Bookmark design");
         try {
           const quoteNote = input.includeQuote ? `Features a quote or short phrase: "${input.content}" rendered beautifully as typography.` : `Hero visual inspired by: "${input.content}".`;
           const prompt = `Bookmark design, 2x6 inch portrait print-ready with ribbon tassel hole at top, ${input.theme} theme. ${quoteNote} Both sides designed as a matching set (front with visual, back with complementary pattern). Etsy-seller quality print-ready design, readable typography, collectible aesthetic.`;
           const { url } = await generateImage({ prompt, width: 512, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "bookmark");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4470,7 +4567,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "zine-spread", "Zine spread");
+        const deduction = await tryDeductCredits(ctx.user.id, "zine-spread", "Zine spread");
         try {
           const outline = await invokeLLM({
             messages: [
@@ -4512,6 +4609,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "zine-spread");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4527,12 +4625,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "concert-poster", "Concert poster");
+        const deduction = await tryDeductCredits(ctx.user.id, "concert-poster", "Concert poster");
         try {
           const prompt = `Concert / gig poster, 11x17 portrait print-ready, ${input.genre} music, ${input.style} design aesthetic. Massive artist typography: "${input.artist}". Tour/show details: "${input.details.slice(0, 300)}". Iconic hero visual or typography-driven composition, silkscreen-style print-ready artwork, collectible merch-quality design, live music poster tradition.`;
           const { url } = await generateImage({ prompt, width: 1024, height: 1536 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "concert-poster");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4548,12 +4647,13 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "architecture-concept", "Architecture concept");
+        const deduction = await tryDeductCredits(ctx.user.id, "architecture-concept", "Architecture concept");
         try {
           const prompt = `Architectural concept rendering, photorealistic 3D visualization quality, ${input.buildingType} in ${input.style} style. Setting: ${input.setting}. View: ${input.view.replace(/-/g, " ")}. Professional architectural rendering with natural lighting, landscaping detail, human-scale references, portfolio-quality composition, Archdaily magazine level, material realism.`;
           const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "architecture-concept");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4568,7 +4668,7 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "cosplay-reference", "Cosplay reference");
+        const deduction = await tryDeductCredits(ctx.user.id, "cosplay-reference", "Cosplay reference");
         try {
           const viewLabels = ["front view", "3/4 side view", "side profile", "back view"].slice(0, input.views);
           const focusNote: Record<string, string> = {
@@ -4585,6 +4685,7 @@ export const appRouter = router({
           }
           return { results, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "cosplay-reference");
           return { results: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4600,13 +4701,14 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "travel-postcard", "Travel postcard");
+        const deduction = await tryDeductCredits(ctx.user.id, "travel-postcard", "Travel postcard");
         try {
           const taglineNote = input.tagline ? `Tagline or "Greetings from" style text: "${input.tagline}". ` : `Classic "Greetings from ${input.location}" headline text. `;
           const prompt = `Vintage travel postcard, 6x4 landscape format, ${input.era} era ${input.style} aesthetic. Location: ${input.location}. ${taglineNote}Iconic landmark or scene of the location prominently featured, vintage color palette appropriate to ${input.era}, authentic period typography, printed-postcard feel with slight vignette and paper texture, collectible travel memorabilia.`;
           const { url } = await generateImage({ prompt, width: 1536, height: 1024 });
           return { url, status: "completed" as const };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "travel-postcard");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4625,7 +4727,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "storyboard", "Generate storyboard");
+        const deduction = await tryDeductCredits(ctx.user.id, "storyboard", "Generate storyboard");
         try {
           const storyboardResult = await invokeLLM({
             messages: [
@@ -4694,6 +4796,7 @@ export const appRouter = router({
 
           return { ...storyboard, status: "completed" as const, style: input.style };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "storyboard");
           return { title: "", synopsis: "", totalDuration: 0, scenes: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4709,7 +4812,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "scene-director", "Direct scene");
+        const deduction = await tryDeductCredits(ctx.user.id, "scene-director", "Direct scene");
         try {
           const directorResult = await invokeLLM({
             messages: [
@@ -4774,6 +4877,7 @@ export const appRouter = router({
 
           return { ...direction, status: "completed" as const, cameraStyle: input.cameraStyle, mood: input.mood };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "scene-director");
           return { sceneTitle: "", overallDirection: "", keyframes: [], status: "failed" as const, error: error.message };
         }
       }),
@@ -4788,7 +4892,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "video-style-transfer", "Video style transfer");
+        const deduction = await tryDeductCredits(ctx.user.id, "video-style-transfer", "Video style transfer");
         const styleDescriptions: Record<string, string> = {
           "anime": "Japanese anime style, cel-shaded, vibrant colors, clean lines, Studio Ghibli quality",
           "noir": "film noir style, high contrast black and white, dramatic shadows, 1940s detective film",
@@ -4808,6 +4912,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, style: input.videoStyle };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "video-style-transfer");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4823,7 +4928,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "video-upscaler", "Video upscale");
+        const deduction = await tryDeductCredits(ctx.user.id, "video-upscaler", "Video upscale");
         const denoiseDesc: Record<string, string> = {
           "none": "",
           "light": " Apply light denoising to clean up minor artifacts.",
@@ -4838,6 +4943,7 @@ export const appRouter = router({
           });
           return { url, status: "completed" as const, scaleFactor: input.scaleFactor };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "video-upscaler");
           return { url: null, status: "failed" as const, error: error.message };
         }
       }),
@@ -4852,7 +4958,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "soundtrack-suggest", "Suggest soundtrack");
+        const deduction = await tryDeductCredits(ctx.user.id, "soundtrack-suggest", "Suggest soundtrack");
         try {
           const result = await invokeLLM({
             messages: [
@@ -4905,6 +5011,7 @@ export const appRouter = router({
 
           return { ...suggestion, status: "completed" as const, mood: input.mood, duration: input.duration };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "soundtrack-suggest");
           return {
             primaryGenre: "", subGenres: [], tempo: "", keyInstruments: [], moodProgression: "",
             description: "Unable to generate suggestion", referenceTracks: [], soundEffects: [], licensingNotes: "",
@@ -4924,7 +5031,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "text-to-video-script", "Generate script");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-video-script", "Generate script");
         try {
           const result = await invokeLLM({
             messages: [
@@ -4982,6 +5089,7 @@ export const appRouter = router({
 
           return { ...script, status: "completed" as const, tone: input.tone };
         } catch (error: any) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-video-script");
           return {
             title: "", logline: "", targetDuration: 0, format: "", scenes: [],
             productionBudget: "", equipmentNeeded: [],
@@ -5002,6 +5110,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        requireQuotedVideoWorkspace();
         // Rate limit: 10 video requests per minute per user
         await enforceRateLimit(`video.textToVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
         const deduction = await tryDeductCredits(ctx.user.id, "text-to-video", "Text-to-video generation");
@@ -5185,12 +5294,8 @@ export const appRouter = router({
 
         throw new Error(`All video providers failed:\n${errors.join("\n")}`);
         } catch (error: any) {
-          // Refund credits on generation failure — the user received no video.
-          try {
-            await refundCredits(ctx.user.id, deduction.cost, `Refund: text-to-video generation failed — ${(error?.message || "unknown error").slice(0, 100)}`, { purchasedCredits: deduction.purchasedCreditsDebited, operationKey: `legacy-refund:${deduction.transactionId}` });
-          } catch (refundErr) {
-            console.error("[video.textToVideo] Credit refund failed:", refundErr);
-          }
+          // Keep the existing refund-key namespace for replay compatibility.
+          await refundFailedLegacyTool(ctx.user.id, deduction, "text-to-video", "legacy-refund");
           return { videoUrl: null, status: "failed" as const, error: error?.message || "Video generation failed" };
         }
       }),
@@ -5400,27 +5505,24 @@ export const appRouter = router({
         if (project) {
           return { projectId: shareToken.projectId, role: "owner" as const, alreadyOwner: true };
         }
-        const { action } = await addCollaborator({
-          projectId: shareToken.projectId,
-          userId: ctx.user.id,
-          role: shareToken.permission,
-          invitedBy: shareToken.createdBy,
-        });
-        await incrementShareTokenUse(shareToken.id);
+        const accepted = await acceptProjectShareToken(input.token, ctx.user.id);
+        if (!accepted) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired share link" });
+        }
         // Notify project owner that someone joined
         try {
           await createNotification(
-            shareToken.createdBy,
+            accepted.createdBy,
             "collaboration",
             "New Collaborator",
-            `Someone joined your project via share link as ${shareToken.permission}`,
-            { projectId: shareToken.projectId }
+            `Someone joined your project via share link as ${accepted.permission}`,
+            { projectId: accepted.projectId }
           );
         } catch (err) {
           // Best-effort owner notification — log sanitized, never fail accepting the link.
           console.warn("[videoProject.acceptShareLink] owner notification failed:", safeErrorMessage(err, "videoProject.acceptShareLink"));
         }
-        return { projectId: shareToken.projectId, role: shareToken.permission, action };
+        return { projectId: accepted.projectId, role: accepted.permission, action: accepted.action };
       }),
 
     listCollaborators: protectedProcedure
@@ -5538,7 +5640,6 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await tryDeductCredits(ctx.user.id, "ai-refine", `Refine project #${input.projectId}`);
         const project = await getVideoProject(input.projectId, ctx.user.id);
         const collabRole = project ? null : await getUserCollaboratorRole(input.projectId, ctx.user.id);
         if (!project && collabRole !== "editor") {
@@ -5567,6 +5668,7 @@ export const appRouter = router({
           ? `You are a professional storyboard consultant. You will receive a storyboard as JSON and user feedback. Return an IMPROVED version of the storyboard as JSON with the same structure. Improve the storyboard based on the feedback while maintaining the overall concept. ${focusAreasStr}`
           : `You are a professional video production consultant. You will receive project data as JSON and user feedback. Return an IMPROVED version as JSON with the same structure. ${focusAreasStr}`;
 
+        const deduction = await tryDeductCredits(ctx.user.id, "ai-refine", `Refine project #${input.projectId}`);
         try {
           const response = await invokeLLM({
             messages: [
@@ -5590,6 +5692,7 @@ export const appRouter = router({
             projectType: projectData.type,
           };
         } catch (err) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "ai-refine");
           return {
             status: "failed" as const,
             originalData: projectData.data,
@@ -5765,10 +5868,16 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         await enforceRateLimit(`song.generateSong:user:${ctx.user.id}`, 10, 60_000, "Song generation rate limit exceeded — max 10 per minute.");
-        await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
-        const { generateSong } = await import("./_core/songGeneration");
-        const result = await generateSong(input);
-        return { ...result, title: input.title || "Untitled" };
+        const deduction = await tryDeductCredits(ctx.user.id, "music-gen", "AI Song generation");
+        try {
+          const { generateSong } = await import("./_core/songGeneration");
+          const result = await generateSong(input);
+          if (!result.songUrl) throw new Error("Song generation returned no audio");
+          return { ...result, title: input.title || "Untitled" };
+        } catch (error) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "song generation");
+          throw error;
+        }
       }),
 
     generateMusicVideo: protectedProcedure
@@ -5782,10 +5891,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        requireQuotedVideoWorkspace();
         // Rate limit: 10 video requests per minute per user
         await enforceRateLimit(`song.generateMusicVideo:user:${ctx.user.id}`, 10, 60_000, "Video generation rate limit exceeded — max 10 per minute.");
-        await tryDeductCredits(ctx.user.id, "text-to-video", "Music video generation");
+        const deduction = await tryDeductCredits(ctx.user.id, "text-to-video", "Music video generation");
 
+        try {
         // Generate video scenes based on the concept + photo
         const scenePrompt = input.photoUrl
           ? `Music video scene: ${input.concept}. Style: ${input.style}. The subject from the reference photo should appear prominently. Cinematic, high production value, synced to music.`
@@ -5797,6 +5908,7 @@ export const appRouter = router({
           aspectRatio: input.aspectRatio,
           durationSeconds: 8,
         });
+        if (!videoUrl) throw new Error("Music video generation returned no video");
 
         return {
           videoUrl,
@@ -5805,6 +5917,10 @@ export const appRouter = router({
           style: input.style,
           aspectRatio: input.aspectRatio,
         };
+        } catch (error) {
+          await refundFailedLegacyTool(ctx.user.id, deduction, "music video generation");
+          throw error;
+        }
       }),
   }),
 });

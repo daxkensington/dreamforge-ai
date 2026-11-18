@@ -3,7 +3,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 // Mock credit deduction
 vi.mock('./stripe', () => ({
   deductCredits: vi.fn().mockResolvedValue({ success: true, remaining: 99, transactionId: 900, purchasedCreditsDebited: 0 }),
-  refundCredits: vi.fn().mockResolvedValue(undefined),
+  refundCredits: vi.fn().mockImplementation(async (_user: number, amount: number) => ({ success: true, refunded: amount })),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
     'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,
@@ -211,6 +211,16 @@ describe("generation.batchCreate", () => {
     expect(result.completed).toBe(1);
     expect(deductCredits).toHaveBeenCalledWith(1, namedCost + 5, expect.any(String));
     expect(refundCredits).toHaveBeenCalledExactlyOnceWith(1, namedCost, expect.stringContaining("Refund"), { purchasedCredits: namedCost, operationKey: "batch-refund:901:1" });
+  });
+
+  it("preserves completed items and identifies an unverified failed-item refund", async () => {
+    const { ctx } = createAuthContext();
+    vi.mocked(generateImage).mockResolvedValueOnce({ url: "https://fixture.example/automatic.png" }).mockRejectedValueOnce(new Error("Synthetic terminal render failure"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    const result = await caller(ctx).generation.batchCreate({ prompts: [{ prompt: "A fictional first image" }, { prompt: "A fictional second image" }] });
+    expect(result.completed).toBe(1);
+    expect(result.results[0].imageUrl).toBe("https://fixture.example/automatic.png");
+    expect(result.results[1].error).toContain("contact support");
   });
 
   it("validates width and height bounds", async () => {
