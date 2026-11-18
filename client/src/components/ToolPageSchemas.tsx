@@ -18,6 +18,7 @@ export function ToolPageSchemas() {
   if (!entry) return null;
 
   const url = `${BASE}/tools/${slug}`;
+  const usesVideoQuote = ["text-to-video", "logo-animator", "social-templates"].includes(slug);
 
   const softwareApp = {
     "@context": "https://schema.org",
@@ -28,7 +29,7 @@ export function ToolPageSchemas() {
     url,
     applicationCategory: "MultimediaApplication",
     operatingSystem: "Any (web)",
-    offers: slug === "text-to-video" ? {
+    offers: usesVideoQuote ? {
       "@type": "Offer",
       priceCurrency: "USD",
       description: "Video generation requires an eligible plan and credits; model prices are shown before generation.",
@@ -40,7 +41,7 @@ export function ToolPageSchemas() {
       description: "Free tier available; credits unlock higher-quality models",
     },
     creator: { "@type": "Organization", name: "DreamForgeX", url: BASE },
-    isAccessibleForFree: slug !== "text-to-video",
+    isAccessibleForFree: !usesVideoQuote,
   };
 
   const faqPage =

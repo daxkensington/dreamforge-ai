@@ -76,6 +76,7 @@ export function AnimationDialog({
   onOpenChange,
   generationId,
   sourceUrl,
+  initialMotionPrompt,
   onComplete,
   onVideoReady,
   beforeNewRequest,
@@ -84,6 +85,7 @@ export function AnimationDialog({
   onOpenChange: (open: boolean) => void;
   generationId: number | null;
   sourceUrl?: string | null;
+  initialMotionPrompt?: string;
   onComplete: () => void;
   onVideoReady?: (videoUrl: string) => void;
   beforeNewRequest?: () => string | null;
@@ -114,6 +116,14 @@ export function AnimationDialog({
     setResultUrl(undefined);
     setMessage("");
   }, [user?.id]);
+  useEffect(() => {
+    if (!open || !generationId || !initialMotionPrompt || attemptRef.current)
+      return;
+    setMotion("smooth-pan");
+    setPrompt(initialMotionPrompt);
+    setResultUrl(undefined);
+    setMessage("");
+  }, [open, generationId, initialMotionPrompt, user?.id]);
   const accept = (data: any, requestId: string) => {
     const current = attemptRef.current;
     if (
@@ -268,18 +278,25 @@ export function AnimationDialog({
         <div className="space-y-2">
           <Label>Camera movement</Label>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(motions).map(([id, option]) => (
-              <Button
-                key={id}
-                type="button"
-                variant={motion === id ? "default" : "outline"}
-                disabled={Boolean(attempt) || busy}
-                aria-pressed={motion === id}
-                onClick={() => { setMotion(id as Motion); setPrompt(option.prompt); }}
-              >
-                {option.label}
-              </Button>
-            ))}
+            {Object.entries(motions).map(([id, option]) => {
+              const selected =
+                motion === id && (!initialMotionPrompt || prompt === option.prompt);
+              return (
+                <Button
+                  key={id}
+                  type="button"
+                  variant={selected ? "default" : "outline"}
+                  disabled={Boolean(attempt) || busy}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setMotion(id as Motion);
+                    setPrompt(option.prompt);
+                  }}
+                >
+                  {option.label}
+                </Button>
+              );
+            })}
           </div>
         </div>
         <div className="space-y-2">

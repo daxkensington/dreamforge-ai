@@ -57,6 +57,10 @@ import {
 import { useState, useMemo, useEffect, useRef } from "react";
 import { track } from "@/lib/analytics";
 import { takeDemoImagePrompt } from "@/lib/demoImageHandoff";
+import {
+  takeVideoTemplateDraft,
+  videoTemplateDimensions,
+} from "@/lib/videoTemplateHandoff";
 import { WorkspaceEntry, WorkspaceMasthead } from "@/components/WorkspaceEntry";
 import { getTrainingImageCredits } from "@shared/training";
 import { motion, AnimatePresence } from "framer-motion";
@@ -159,6 +163,10 @@ const VIDEO_PRESETS = [
   "Abstract paint strokes flowing and morphing into cosmic nebula patterns, dreamlike motion",
 ];
 
+function preferredVideoDuration(supported: readonly number[], preferred: number | null) {
+  return preferred !== null && supported.includes(preferred) ? preferred : supported[0];
+}
+
 /** Survives React Strict Mode remount so onboarding autogen cannot double-fire. */
 let workspaceAutogenArmed = false;
 
@@ -200,6 +208,7 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
   const [height, setHeight] = useState(768);
   const [mediaType, setMediaType] = useState<"image" | "video">(initialMediaType);
   const [duration, setDuration] = useState(4);
+  const [templateDuration, setTemplateDuration] = useState<number | null>(null);
   const [modelVersion, setModelVersion] = useState(initialMediaType === "video" ? "" : WORKSPACE_AUTO_IMAGE_MODEL);
   const [trainedModelId, setTrainedModelId] = useState<number | undefined>();
   useEffect(() => {
@@ -326,31 +335,65 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
   const selectedImageModel = imageModelsQuery.data?.find(
     model => model.id === modelVersion
   );
-  const selectedVideoModel = videoModelsQuery.data?.find(
+  const currentVideoAspect = width === height ? "1:1" : width > height ? "16:9" : "9:16";
+  const videoCatalog = useMemo(
+    () =>
+      templateDuration === null
+        ? videoModelsQuery.data
+        : videoModelsQuery.data?.filter(model =>
+            model.supportedAspectRatios?.includes(currentVideoAspect)
+          ),
+    [videoModelsQuery.data, templateDuration, currentVideoAspect]
+  );
+  const selectedVideoModel = videoCatalog?.find(
     model => model.id === modelVersion
   );
   const videoCatalogReady =
     videoModelsQuery.isSuccess && !videoModelsQuery.isFetching;
+  const defaultVideoModel = initialWorkspaceVideoModel(videoCatalog, userTier);
   // The dedicated text-to-video route opens this same quoted workspace in
   // video mode. Choose only after the current catalog and plan have loaded;
   // a missing eligible model leaves generation disabled with an explanation.
   useEffect(() => {
-    if (mediaType !== "video" || modelVersion || !videoCatalogReady || !planReady) return;
-    const model = initialWorkspaceVideoModel(videoModelsQuery.data, userTier);
+    if (mediaType !== "video" || !videoCatalogReady || !planReady) return;
+    if (modelVersion && (templateDuration === null || selectedVideoModel)) return;
+    const model = defaultVideoModel;
     if (model) {
       setModelVersion(model.id);
-      setDuration(model.supportedDurations[0]);
+      setDuration(preferredVideoDuration(model.supportedDurations, templateDuration));
+    } else if (modelVersion) {
+      setModelVersion("");
     }
-  }, [mediaType, modelVersion, videoCatalogReady, planReady, videoModelsQuery.data, userTier]);
+  }, [mediaType, modelVersion, videoCatalogReady, planReady, defaultVideoModel, selectedVideoModel, templateDuration]);
+  useEffect(() => {
+    if (!isAuthenticated || initialMediaType !== "video") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("from") !== "template") return;
+
+    const draft = takeVideoTemplateDraft();
+    if (draft) {
+      const [w, h] = videoTemplateDimensions[draft.aspectRatio];
+      setPrompt(draft.prompt);
+      setWidth(w);
+      setHeight(h);
+      setAspectPreset(draft.aspectRatio);
+      setTemplateDuration(draft.duration);
+      setModelVersion("");
+    }
+    url.searchParams.delete("from");
+    window.history.replaceState(window.history.state, "", url);
+  }, [initialMediaType, isAuthenticated]);
   const selectVideoModel = (id: string) => {
     setModelVersion(id);
-    const model = videoModelsQuery.data?.find(item => item.id === id);
-    if (model) setDuration(model.supportedDurations[0]);
+    const model = videoCatalog?.find(item => item.id === id);
+    if (model) setDuration(preferredVideoDuration(model.supportedDurations, templateDuration));
   };
   const getCurrentImageSelectionError = (tier = userTier) =>
     mediaType === "video"
-      ? workspaceVideoSelectionError({
-          catalog: videoModelsQuery.data,
+      ? templateDuration !== null && planReady && videoCatalogReady && !modelVersion && !defaultVideoModel
+        ? `No available video model on your plan supports ${currentVideoAspect}. Choose another aspect ratio to continue.`
+        : workspaceVideoSelectionError({
+          catalog: videoCatalog,
           catalogReady: videoCatalogReady,
           planReady,
           userTier: tier,
@@ -639,9 +682,9 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
     setTrainedModelId(undefined);
     // Auto-select appropriate model
     if (type === "video") {
-      const model = initialWorkspaceVideoModel(videoModelsQuery.data, userTier);
+      const model = defaultVideoModel;
       setModelVersion(model?.id ?? "");
-      if (model) setDuration(model.supportedDurations[0]);
+      if (model) setDuration(preferredVideoDuration(model.supportedDurations, templateDuration));
     } else {
       setModelVersion(WORKSPACE_AUTO_IMAGE_MODEL);
     }
@@ -960,6 +1003,12 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
                       <Film className="h-3 w-3" />
                       Creates a {duration}-second animated video clip
                     </p>
+                    {templateDuration !== null && selectedVideoModel &&
+                      !selectedVideoModel.supportedDurations.includes(templateDuration) && (
+                        <p className="text-xs text-muted-foreground">
+                          The template requests {templateDuration}s. This model uses its supported durations.
+                        </p>
+                      )}
                   </div>
                 )}
               </CardContent>
@@ -1086,7 +1135,7 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
                         </SelectGroup>
                       </>
                     ) : (
-                      videoModelsQuery.data?.map(model => (
+                      videoCatalog?.map(model => (
                         <SelectItem
                           key={model.id}
                           value={model.id}
@@ -1306,9 +1355,10 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
                       { label: "16:9", w: 1024, h: 576, icon: "▬▬" },
                       { label: "3:4", w: 768, h: 1024, icon: "▮" },
                       { label: "9:16", w: 576, h: 1024, icon: "▮▮" },
-                    ].map(ar => (
+                    ].filter(ar => templateDuration === null || mediaType !== "video" || Object.hasOwn(videoTemplateDimensions, ar.label)).map(ar => (
                       <button
                         key={ar.label}
+                        aria-pressed={aspectPreset === ar.label}
                         onClick={() => {
                           setAspectPreset(ar.label);
                           setWidth(ar.w);
