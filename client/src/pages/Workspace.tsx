@@ -1,6 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import PageLayout from "@/components/PageLayout";
+import { ToolSEOBlock } from "@/components/ToolSEOBlock";
+import { ToolPageSchemas } from "@/components/ToolPageSchemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -159,7 +161,7 @@ const VIDEO_PRESETS = [
 /** Survives React Strict Mode remount so onboarding autogen cannot double-fire. */
 let workspaceAutogenArmed = false;
 
-export default function Workspace() {
+export default function Workspace({ initialMediaType = "image" }: { initialMediaType?: "image" | "video" } = {}) {
   useEffect(() => {
     track("studio_opened");
   }, []);
@@ -173,18 +175,19 @@ export default function Workspace() {
     const params = new URLSearchParams(window.location.search);
     const wizardPrompt = params.get("prompt");
     if (wizardPrompt) setPrompt(wizardPrompt);
-    if (params.get("autogen") === "1" && wizardPrompt)
+    if (initialMediaType === "video") workspaceAutogenArmed = false;
+    else if (params.get("autogen") === "1" && wizardPrompt)
       workspaceAutogenArmed = true;
     if (wizardPrompt || params.get("autogen")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, []);
+  }, [initialMediaType]);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(768);
   const [height, setHeight] = useState(768);
-  const [mediaType, setMediaType] = useState<"image" | "video">("image");
+  const [mediaType, setMediaType] = useState<"image" | "video">(initialMediaType);
   const [duration, setDuration] = useState(4);
-  const [modelVersion, setModelVersion] = useState(WORKSPACE_AUTO_IMAGE_MODEL);
+  const [modelVersion, setModelVersion] = useState(initialMediaType === "video" ? "" : WORKSPACE_AUTO_IMAGE_MODEL);
   const [trainedModelId, setTrainedModelId] = useState<number | undefined>();
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get("trainedModelId"));
@@ -315,6 +318,17 @@ export default function Workspace() {
   );
   const videoCatalogReady =
     videoModelsQuery.isSuccess && !videoModelsQuery.isFetching;
+  // The dedicated text-to-video route opens this same quoted workspace in
+  // video mode. Choose only after the current catalog and plan have loaded;
+  // a missing eligible model leaves generation disabled with an explanation.
+  useEffect(() => {
+    if (mediaType !== "video" || modelVersion || !videoCatalogReady || !planReady) return;
+    const model = initialWorkspaceVideoModel(videoModelsQuery.data, userTier);
+    if (model) {
+      setModelVersion(model.id);
+      setDuration(model.supportedDurations[0]);
+    }
+  }, [mediaType, modelVersion, videoCatalogReady, planReady, videoModelsQuery.data, userTier]);
   const selectVideoModel = (id: string) => {
     setModelVersion(id);
     const model = videoModelsQuery.data?.find(item => item.id === id);
@@ -765,6 +779,8 @@ export default function Workspace() {
     };
   }, [generations]);
 
+  const videoToolDetails = initialMediaType === "video" ? <><ToolSEOBlock /><ToolPageSchemas /></> : null;
+
   if (authLoading) {
     return (
       <PageLayout>
@@ -786,6 +802,7 @@ export default function Workspace() {
             </div>
           </div>
         </div>
+        {videoToolDetails}
       </PageLayout>
     );
   }
@@ -814,6 +831,7 @@ export default function Workspace() {
             </Button>
           </div>
         </div>
+        {videoToolDetails}
       </PageLayout>
     );
   }
@@ -1952,6 +1970,7 @@ export default function Workspace() {
           void refetchGens();
         }}
       />
+      {videoToolDetails}
     </PageLayout>
   );
 }

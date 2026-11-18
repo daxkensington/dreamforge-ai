@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       # Wait for Vercel to finish deploying the push that triggered us.
       # Skip the wait on manual / scheduled runs.

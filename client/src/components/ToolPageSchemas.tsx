@@ -28,7 +28,11 @@ export function ToolPageSchemas() {
     url,
     applicationCategory: "MultimediaApplication",
     operatingSystem: "Any (web)",
-    offers: {
+    offers: slug === "text-to-video" ? {
+      "@type": "Offer",
+      priceCurrency: "USD",
+      description: "Video generation requires an eligible plan and credits; model prices are shown before generation.",
+    } : {
       "@type": "Offer",
       price: "0",
       priceCurrency: "USD",
@@ -36,7 +40,7 @@ export function ToolPageSchemas() {
       description: "Free tier available; credits unlock higher-quality models",
     },
     creator: { "@type": "Organization", name: "DreamForgeX", url: BASE },
-    isAccessibleForFree: true,
+    isAccessibleForFree: slug !== "text-to-video",
   };
 
   const faqPage =
