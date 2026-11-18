@@ -1,7 +1,6 @@
 import PageLayout from "@/components/PageLayout";
-import { Button } from "@/components/ui/button";
 import {
-  Maximize, Palette, Scissors, Wand2, ArrowRight, Sparkles,
+  Maximize, Palette, Scissors, Wand2, ArrowRight, ArrowDown, Search, X, Sparkles,
   PenTool, Smile, Expand, Eraser, Type, Blend, PenLine,
   SunMedium, Pipette, Image, Video, ImagePlus, User, Hexagon,
   Monitor, QrCode, MessageSquare, CircleUser, ShoppingBag,
@@ -16,15 +15,11 @@ import {
 } from "lucide-react";
 // lucide Sparkles/Cat/Gem already imported above — reused for Barbie/Jellycat/POP Mart.
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { useRef, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import type { LucideIcon } from "lucide-react";
 import NextImage from "next/image";
-
-const fadeUp = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0 } };
-const scaleIn = { hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1 } };
-
+import styles from "./Tools.module.css";
 interface GridTool {
   title: string;
   desc: string;
@@ -32,6 +27,14 @@ interface GridTool {
   href: string;
   img: string;
   badge?: string;
+}
+
+interface FeaturedTool {
+  title: string;
+  desc: string;
+  img: string;
+  href: string;
+  signedInHref?: string;
 }
 
 // ─── Viral Trend Tools (Phase 39 Tier 2 — TikTok/IG-driven) ─────────────────
@@ -178,45 +181,84 @@ const uncensoredTools: GridTool[] = [
   { title: "Uncensored Video Motion", desc: "Animate any portrait into 5-second Wan 2.2 video", icon: Video, href: "/uncensored?start=1&tab=video", img: "/showcase/uncensored-char-mei-noir.jpg", badge: "18+ Pro" },
 ];
 
-const allToolCount = uncensoredTools.length + viralTools.length + imageTools.length + creativeTools.length + videoTools.length + workflowTools.length + utilityTools.length + audioTools.length;
+const toolGroups = [
+  { id: "creative", name: "Create images", tools: creativeTools },
+  { id: "editing", name: "Edit images", tools: imageTools },
+  { id: "video", name: "Video", tools: videoTools },
+  { id: "audio", name: "Music & audio", tools: audioTools },
+  { id: "workflow", name: "Design & workflow", tools: workflowTools },
+  { id: "utilities", name: "Utilities", tools: utilityTools },
+  { id: "effects", name: "Viral effects", tools: viralTools },
+  { id: "18-plus", name: "Uncensored 18+", tools: uncensoredTools },
+] as const;
 
-function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
+const featuredTools: FeaturedTool[] = [
+  {
+    title: "Text-to-Image",
+    desc: "Turn a prompt into an image.",
+    img: "/showcase/forge-image.webp",
+    href: "/demo/text-to-image",
+    signedInHref: "/workspace",
+  },
+  {
+    title: "Video Studio",
+    desc: "Take an idea from storyboard to motion.",
+    img: "/showcase/forge-preview.webp",
+    href: "/video-studio",
+  },
+  {
+    title: "Song Creator",
+    desc: "Compose full songs with vocals.",
+    img: "/showcase/forge-audio.webp",
+    href: "/tools/song-creator",
+  },
+  {
+    title: "Design Canvas",
+    desc: "Build and edit a design in layers.",
+    img: "/showcase/tool-canvas.jpg",
+    href: "/tools/design-canvas",
+  },
+];
+
+type ToolGroup = (typeof toolGroups)[number];
+type Category = "all" | ToolGroup["id"];
+
+function toolMatches(tool: GridTool, categoryName: string, terms: string[]) {
+  const words = [
+    tool.title,
+    tool.desc,
+    categoryName,
+    tool.href.replace(/[-/]/g, " "),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((term) => words.includes(term));
+}
+
+function ToolGrid({ tools }: { tools: GridTool[] }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {tools.map((tool, i) => (
-        <motion.div
-          key={tool.title}
-          variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          transition={{ duration: 0.4, delay: delay + i * 0.04 }}
-        >
-          <Link href={tool.href}>
-            <div className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 hover:border-cyan-400/50 cursor-pointer hover:scale-[1.03] transition-all duration-300 shadow-lg">
-              <img
-                src={tool.img} alt={tool.title}
-                className="absolute inset-0 w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-              {tool.badge && (
-                <div className="absolute top-3 right-3">
-                  <span className={`px-2.5 py-0.5 rounded-full text-white text-[10px] font-bold uppercase tracking-wider ${
-                    tool.badge.includes("18+")
-                      ? "bg-gradient-to-r from-rose-500 to-orange-500 shadow-md shadow-rose-500/30"
-                      : "bg-cyan-500/90"
-                  }`}>
-                    {tool.badge}
-                  </span>
-                </div>
-              )}
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="h-8 w-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center mb-2">
-                  <tool.icon className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="text-white font-semibold text-sm">{tool.title}</h3>
-                <p className="text-white/70 text-xs mt-0.5">{tool.desc}</p>
-              </div>
+    <div className={styles.grid}>
+      {tools.map((tool) => (
+        <Link href={tool.href} className={styles.card} key={tool.title}>
+          <img
+            src={tool.img}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className={styles.cardImage}
+          />
+          <div className={styles.cardBody}>
+            <div className={styles.cardTitle}>
+              <tool.icon size={18} aria-hidden="true" />
+              <h4>{tool.title}</h4>
+              <ArrowRight size={16} aria-hidden="true" />
             </div>
-          </Link>
-        </motion.div>
+            <p>{tool.desc}</p>
+            {tool.badge?.includes("18+") && (
+              <span className={styles.badge}>{tool.badge}</span>
+            )}
+          </div>
+        </Link>
       ))}
     </div>
   );
@@ -224,289 +266,177 @@ function ToolGrid({ tools, delay = 0 }: { tools: GridTool[]; delay?: number }) {
 
 export default function Tools() {
   const { isAuthenticated } = useAuth();
+  const imageHref = isAuthenticated ? "/workspace" : "/demo/text-to-image";
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<Category>("all");
+  const searchInput = useRef<HTMLInputElement>(null);
+  const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const groups = toolGroups
+    .filter((group) => category === "all" || group.id === category)
+    .map((group) => ({
+      ...group,
+      tools: group.tools.filter((tool) => toolMatches(tool, group.name, terms)),
+    }))
+    .filter((group) => group.tools.length > 0);
+  const resultCount = groups.reduce((count, group) => count + group.tools.length, 0);
 
-  const cta = (href: string, label: string) =>
-    isAuthenticated ? (
-      <Link href={href}>
-        <Button size="lg" className="font-semibold gap-2">
-          {label} <ArrowRight className="h-4 w-4" />
-        </Button>
-      </Link>
-    ) : (
-      <Button size="lg" className="font-semibold" onClick={() => (window.location.href = getLoginUrl())}>
-        Sign in to Start
-      </Button>
-    );
+  function clearSearch() {
+    setQuery("");
+    searchInput.current?.focus();
+  }
+
+  function resetFilters() {
+    setCategory("all");
+    clearSearch();
+  }
 
   return (
     <PageLayout>
-      <div className="min-h-screen">
-        {/* Hero */}
-        <section className="relative h-[520px] flex items-center justify-center overflow-hidden border-b border-white/10">
-          <NextImage src="/showcase/gallery-4.jpg" alt="AI generated showcase" className="absolute inset-0 w-full h-full object-cover opacity-75" width={1408} height={768} />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/40 to-black/90" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.20),transparent_60%)]" />
-          <motion.div
-            variants={fadeUp} initial="hidden" animate="visible"
-            transition={{ duration: 0.7 }}
-            className="relative text-center px-4 max-w-3xl"
-          >
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/15 text-cyan-300 text-sm font-medium mb-6 backdrop-blur-md">
-              <Sparkles className="h-4 w-4" /> AI-Powered Creative Suite
-            </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4">
-              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-500 bg-clip-text text-transparent">
-                {allToolCount}+ Professional Tools
-              </span>
-            </h1>
-            <p className="text-lg md:text-xl text-white/80 mb-8">
-              Photorealistic image generation, Uncensored 18+ Studio, cinema video, and audio production — all in one platform
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {cta("/workspace", "Start Creating")}
-              <Link href="/uncensored?start=1">
-                <Button size="lg" className="font-semibold gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90 shadow-lg shadow-rose-500/25">
-                  <Flame className="h-4 w-4" /> Uncensored Studio (3 Free)
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-        </section>
-
-        {/* Featured Tools */}
-        <section className="container max-w-6xl py-16 space-y-8">
-          {/* Text-to-Image */}
-          <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5 }}>
-            <Link href="/workspace">
-              <div className="group grid md:grid-cols-2 rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-cyan-500/30 transition-all duration-300 hover:scale-[1.01]">
-                <div className="aspect-[16/10] md:aspect-auto overflow-hidden">
-                  <NextImage src="/showcase/gallery-2.jpg" alt="Text to Image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" width={1408} height={768} />
-                </div>
-                <div className="flex flex-col justify-center p-8 lg:p-12">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                      <Image className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Flagship</span>
-                  </div>
-                  <h3 className="text-2xl lg:text-3xl font-bold mb-3">Text-to-Image Generation</h3>
-                  <p className="text-foreground/60 mb-2">Generate any scene from a text prompt with photorealistic quality.</p>
-                  <p className="text-foreground/50 text-sm mb-6">Choose from 30+ AI models across 13 providers</p>
-                  <Button variant="outline" className="w-fit gap-2 group-hover:border-cyan-500/50">
-                    Try It <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-
-          {/* NL Edit + Headshots row */}
-          <div className="grid md:grid-cols-2 gap-8">
-            <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}>
-              <Link href="/tools/nl-edit">
-                <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                  <NextImage src="/showcase/tool-nl-edit.jpg" alt="NL Edit" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" width={1408} height={768} />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-                  <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-green-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
-                  <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                        <MessageSquare className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-green-400">AI Edit</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Natural Language Editor</h3>
-                    <p className="text-white/70 text-sm">Just describe what to change — "remove the car", "add snow"</p>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-
-            <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
-              <Link href="/tools/headshot">
-                <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                  <NextImage src="/showcase/tool-headshot.jpg" alt="Headshots" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" width={896} height={1280} />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-                  <div className="absolute top-4 right-4"><span className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold uppercase">New</span></div>
-                  <div className="relative h-full flex flex-col justify-center p-8 max-w-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                        <User className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Portrait</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">AI Headshot Generator</h3>
-                    <p className="text-white/70 text-sm">Professional headshots from any photo — corporate, creative, LinkedIn</p>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
+      <div className={styles.page}>
+        <section aria-labelledby="tools-title" className={styles.hero}>
+          <div className={styles.heroArt} aria-hidden="true">
+            <NextImage
+              src="/showcase/forge-ring.webp"
+              alt=""
+              fill
+              sizes="(max-width: 688px) 100vw, 75vw"
+              priority
+            />
           </div>
-
-          {/* AI Video */}
-          <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
-            <Link href="/video-studio">
-              <div className="group relative rounded-2xl overflow-hidden h-72 hover:scale-[1.01] transition-all duration-300">
-                <NextImage src="/showcase/tool-video.jpg" alt="AI Video" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" width={1408} height={768} />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-                <div className="relative h-full flex flex-col justify-center p-8 lg:p-12 max-w-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                      <Video className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">Motion</span>
-                  </div>
-                  <h3 className="text-2xl lg:text-3xl font-bold text-white mb-3">AI Video Studio</h3>
-                  <p className="text-white/70 mb-6">Storyboards, scripts, scene direction, style transfer — full video pipeline</p>
-                  <Button variant="outline" className="w-fit gap-2 border-white/20 text-white hover:bg-white/10">
-                    Try It <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
+          <div className={styles.heroInner}>
+            <div className={styles.heroCopy}>
+              <p className={styles.eyebrow}>DreamForgeX Creative Studio</p>
+              <h1 id="tools-title">
+                AI tools for <em>whatever you make.</em>
+              </h1>
+              <p>
+                Generate images, edit photos, make videos, compose music, and
+                design on a canvas.
+              </p>
+              <div className={styles.heroActions}>
+                <a href="#tool-directory" className={styles.primary}>
+                  Find a tool <ArrowDown size={17} aria-hidden="true" />
+                </a>
+                <Link className={styles.secondary} href={imageHref}>
+                  {isAuthenticated ? "Open Workspace" : "Try Image Generation"}
+                  <ArrowRight size={17} aria-hidden="true" />
+                </Link>
               </div>
-            </Link>
-          </motion.div>
-
-          {/* Uncensored Pro Studio (18+) */}
-          <motion.div variants={scaleIn} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.25 }}>
-            <Link href="/uncensored">
-              <div className="group relative rounded-2xl overflow-hidden border border-rose-500/30 bg-gradient-to-r from-rose-950/60 via-zinc-950/90 to-orange-950/40 p-8 lg:p-10 hover:border-rose-500/60 hover:scale-[1.01] transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="max-w-2xl">
-                    <div className="flex flex-wrap items-center gap-2.5 mb-3">
-                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center shadow-lg shadow-rose-500/25">
-                        <Flame className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold uppercase tracking-wider">
-                        18+ · Unfiltered Suite
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                        3 Free Previews
-                      </span>
-                    </div>
-                    <h3 className="text-2xl lg:text-3xl font-bold text-white mb-2">Uncensored Pro Studio</h3>
-                    <p className="text-white/75 text-sm sm:text-base mb-4">
-                      7 unfiltered creative tools on dedicated GPUs — Create & Face Lock, Refine & Relight, Brush Inpaint, 4-View Character Sheet, Virtual Outfit Swap, and Uncensored Video (Wan 2.1).
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 text-[11px] text-rose-200/80">
-                      {["Create & Face Lock", "Refine & Relight", "Brush Inpaint", "4-View Sheet", "Outfit Swap", "Uncensored Video", "100% Private Library"].map((chip) => (
-                        <span key={chip} className="rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-0.5">
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
-                    <Button className="gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90">
-                      <Flame className="h-4 w-4" />
-                      Try 3 Free Previews <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                    <span className="text-[11px] text-center text-white/50">
-                      From $4.99 Day Pass · Credits or Bitcoin
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-        </section>
-
-        {/* Uncensored 18+ Studio Tools Grid */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-rose-400 mb-2 block">18+ · Zero Content Filter</span>
-              <h2 className="text-3xl md:text-4xl font-bold">Uncensored Pro Studio Suite</h2>
-              <p className="text-foreground/60 mt-2">Dedicated unfiltered models with Character Face Lock, Outfit Swap, Brush Inpaint &amp; Wan 2.2 Video</p>
             </div>
-            <Link href="/uncensored?start=1">
-              <Button variant="outline" size="sm" className="gap-1.5 border-rose-500/40 text-rose-300 hover:bg-rose-500/15">
-                <Flame className="h-3.5 w-3.5 text-rose-400" /> Open Full Uncensored Studio <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </motion.div>
-          <ToolGrid tools={uncensoredTools} />
+          </div>
         </section>
 
-        {/* Viral Trend Tools — placed first because they're the highest-intent traffic */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2 block">🔥 Trending Now</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Viral AI Effects</h2>
-            <p className="text-foreground/50 mt-2">The transformations breaking TikTok and Instagram in 2026</p>
-          </motion.div>
-          <ToolGrid tools={viralTools} />
+        <section aria-labelledby="featured-tools" className={styles.featured}>
+          <div className={styles.container}>
+            <h2 id="featured-tools">Featured tools</h2>
+            <div className={styles.featuredGrid}>
+              {featuredTools.map((tool) => (
+                <Link
+                  key={tool.title}
+                  href={(isAuthenticated && tool.signedInHref) || tool.href}
+                  className={styles.featuredCard}
+                >
+                  <img
+                    src={tool.img}
+                    alt=""
+                    decoding="async"
+                    className={styles.featuredImage}
+                  />
+                  <div className={styles.featuredCopy}>
+                    <span className={styles.featuredTitle}>
+                      {tool.title}
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </span>
+                    <p>{tool.desc}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </section>
 
-        {/* Video Generation */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-2 block">Video Generation</span>
-            <h2 className="text-3xl md:text-4xl font-bold">AI Video</h2>
-            <p className="text-foreground/50 mt-2">Generate and animate video clips with Google Veo 2</p>
-          </motion.div>
-          <ToolGrid tools={videoTools} />
-        </section>
-
-        {/* Image Editing Tools */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-2 block">Image Editing</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Edit & Enhance</h2>
-            <p className="text-foreground/50 mt-2">Professional image editing powered by multi-model AI</p>
-          </motion.div>
-          <ToolGrid tools={imageTools} />
-        </section>
-
-        {/* Creative Generation Tools */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-2 block">Creative Generation</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Create & Generate</h2>
-            <p className="text-foreground/50 mt-2">Generate logos, avatars, wallpapers, product shots and more</p>
-          </motion.div>
-          <ToolGrid tools={creativeTools} delay={0.1} />
-        </section>
-
-        {/* Utility Tools */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-400 mb-2 block">AI Utilities</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Analyze & Optimize</h2>
-            <p className="text-foreground/50 mt-2">Smart tools for prompts, captions, colors and analysis</p>
-          </motion.div>
-          <ToolGrid tools={utilityTools} delay={0.2} />
-        </section>
-
-        {/* Workflow Tools */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-2 block">Workflow</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Batch & Automation</h2>
-            <p className="text-foreground/50 mt-2">Scale your creative output with bulk processing</p>
-          </motion.div>
-          <ToolGrid tools={workflowTools} delay={0.25} />
-        </section>
-
-        {/* Audio Tools */}
-        <section className="container max-w-6xl pb-16">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-8">
-            <span className="text-xs font-semibold uppercase tracking-wider text-rose-400 mb-2 block">Audio Production</span>
-            <h2 className="text-3xl md:text-4xl font-bold">Sound & Voice</h2>
-            <p className="text-foreground/50 mt-2">AI-powered voiceovers, sound design, and audio enhancement</p>
-          </motion.div>
-          <ToolGrid tools={audioTools} delay={0.3} />
-        </section>
-
-        {/* Bottom CTA */}
-        <section className="container max-w-3xl pb-20">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="text-center rounded-2xl bg-gradient-to-br from-cyan-500/10 via-transparent to-blue-500/10 border border-cyan-500/20 p-12"
-          >
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to Transform Your Workflow?</h2>
-            <p className="text-foreground/60 mb-8">All {allToolCount}+ tools, unlimited creativity, one platform.</p>
-            {cta("/workspace", "Get Started Free")}
-          </motion.div>
+        <section
+          id="tool-directory"
+          aria-labelledby="tool-directory-title"
+          className={styles.directory}
+        >
+          <div className={styles.container}>
+            <h2 id="tool-directory-title">Explore all tools</h2>
+            <div className={styles.filterPanel}>
+              <label className={styles.searchBox}>
+                <Search size={20} aria-hidden="true" />
+                <span className="sr-only">Search tools</span>
+                <input
+                  ref={searchInput}
+                  type="text"
+                  inputMode="search"
+                  autoComplete="off"
+                  placeholder="Search tools"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              {query && (
+                <button
+                  type="button"
+                  className={styles.clearSearch}
+                  aria-label="Clear search"
+                  onClick={clearSearch}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <div className={styles.chips} role="group" aria-label="Tool categories">
+              <button
+                type="button"
+                className={styles.chip}
+                aria-pressed={category === "all"}
+                onClick={() => setCategory("all")}
+              >
+                All tools
+              </button>
+              {toolGroups.map((group) => (
+                <button
+                  type="button"
+                  key={group.id}
+                  className={styles.chip}
+                  aria-pressed={category === group.id}
+                  onClick={() => setCategory(group.id)}
+                >
+                  {group.name}
+                </button>
+              ))}
+            </div>
+            <p className={styles.resultCount} role="status">
+              {resultCount === 1 ? "1 tool" : `${resultCount} tools`}
+            </p>
+            {groups.length === 0 && (
+              <div className={styles.empty}>
+                <p>No tools match your search and category.</p>
+                <button type="button" className={styles.secondary} onClick={resetFilters}>
+                  Reset filters
+                </button>
+              </div>
+            )}
+            {groups.map((group) => (
+              <section
+                key={group.id}
+                aria-labelledby={`tools-${group.id}`}
+                className={styles.group}
+              >
+                <div className={styles.groupHeading}>
+                  <h3 id={`tools-${group.id}`}>{group.name}</h3>
+                  {group.id === "18-plus" && (
+                    <Link className={styles.ageLink} href="/uncensored?start=1">
+                      Open 18+ Studio <ArrowRight size={16} aria-hidden="true" />
+                    </Link>
+                  )}
+                </div>
+                <ToolGrid tools={group.tools} />
+              </section>
+            ))}
+          </div>
         </section>
       </div>
     </PageLayout>

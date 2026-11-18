@@ -21,7 +21,7 @@ const PUBLIC_PAGES = [
     path: "/pricing",
     contains: ["Plans for Every Creator", "Start free with 50 credits/day"],
   },
-  { path: "/tools", contains: ["Tools"] },
+  { path: "/tools", contains: ["AI tools for", "Explore all tools"] },
   { path: "/gallery", contains: ["Gallery"] },
   { path: "/marketplace", contains: ["Marketplace"] },
 ];
@@ -79,6 +79,43 @@ for (const page of PUBLIC_PAGES) {
     }
   });
 }
+
+test("tool directory combines search and categories and can reset", async ({
+  page,
+}) => {
+  await page.goto("/tools", { waitUntil: "domcontentloaded" });
+  const directory = page.getByRole("region", { name: "Explore all tools" });
+  const search = directory.getByRole("textbox", { name: "Search tools" });
+  const all = directory.getByRole("button", { name: "All tools", exact: true });
+  const editing = directory.getByRole("button", { name: "Edit images" });
+  const audio = directory.getByRole("button", { name: "Music & audio" });
+  const soundEffects = directory.getByRole("link", { name: /Sound Effects/ });
+  const status = directory.getByRole("status");
+
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await audio.click();
+  await expect(audio).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    directory.getByRole("link", { name: /Image Upscaler/ })
+  ).toHaveCount(0);
+
+  await search.fill("custom sound");
+  await expect(status).toHaveText("1 tool");
+  await expect(soundEffects).toHaveAttribute("href", "/tools/sound-effects");
+
+  await editing.click();
+  await expect(editing).toHaveAttribute("aria-pressed", "true");
+  await expect(status).toHaveText("0 tools");
+  await expect(soundEffects).toHaveCount(0);
+
+  await directory.getByRole("button", { name: "Reset filters" }).click();
+  await expect(all).toHaveAttribute("aria-pressed", "true");
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
+  await expect(
+    directory.getByRole("link", { name: /Image Upscaler/ })
+  ).toBeVisible();
+});
 
 test("homepage What's New section is visible", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
