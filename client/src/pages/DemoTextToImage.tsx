@@ -1,28 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import {
-  Sparkles,
-  Loader2,
-  Wand2,
-  Lock,
-  CheckCircle2,
-  Download,
-  ArrowRight,
-} from "lucide-react";
+import type { FormEvent } from "react";
+import { ArrowRight, Download, Loader2, Wand2 } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
+import {
+  DEMO_WORKSPACE_PATH,
+  saveDemoImagePrompt,
+} from "@/lib/demoImageHandoff";
+import styles from "./DemoTextToImage.module.css";
 
 declare global {
   interface Window {
-    fbq?: (event: string, name: string, params?: Record<string, unknown>) => void;
+    fbq?: (
+      event: string,
+      name: string,
+      params?: Record<string, unknown>
+    ) => void;
   }
 }
 
@@ -37,296 +37,264 @@ declare global {
 function trackDemoActivation(): void {
   try {
     if (typeof window !== "undefined" && typeof window.fbq === "function") {
-      window.fbq("trackCustom", "DemoGenerationCompleted", { content_type: "demo" });
+      window.fbq("trackCustom", "DemoGenerationCompleted", {
+        content_type: "demo",
+      });
     }
   } catch {
     /* measurement failure must never surface to the visitor */
   }
 }
 
-const DEMO_PROMPTS = [
-  "An astronaut riding a horse on Mars at sunset, photorealistic",
-  "A cyberpunk Tokyo street market in heavy rain, neon reflections",
-  "A snow leopard wearing a tiny crown, studio portrait, soft lighting",
-  "A futuristic floating city above the clouds, dramatic golden hour",
-  "A magical library inside a hollow tree, glowing books, ethereal",
+const PROMPT_LIMIT = 500;
+const EXAMPLES = [
+  {
+    label: "Neon street",
+    prompt:
+      "A quiet Tokyo side street in heavy rain, neon reflections, cinematic photography",
+  },
+  {
+    label: "Wildlife portrait",
+    prompt:
+      "A snow leopard on a rocky ledge at dawn, soft light, detailed wildlife portrait",
+  },
+  {
+    label: "Floating city",
+    prompt:
+      "A futuristic city floating above the clouds, dramatic golden hour, wide angle",
+  },
+  {
+    label: "Enchanted library",
+    prompt:
+      "A magical library inside a hollow tree, glowing books, warm light, fantasy illustration",
+  },
 ];
 
-/**
- * Public demo page — one free generation per IP per day, no signup.
- *
- * Conversion choreography:
- *   1) prompt input + 5 example prompts to remove "what do I type?" friction
- *   2) one-click generate, no model picker, no settings (cognitive load = 0)
- *   3) result + soft watermark text + "make 100+ more" CTA wired to /signin
- *
- * The CTA is the whole point — bouncing visitors from this page is fine,
- * losing the converted ones to a sign-up wall isn't.
- */
+interface DemoResult {
+  url: string;
+  prompt: string;
+}
+
 export default function DemoTextToImage() {
+  const { isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState("");
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultPrompt, setResultPrompt] = useState<string | null>(null);
-
-  const generate = trpc.demo.generate.useMutation({
-    onSuccess: (data) => {
-      if (data.status === "completed" && data.url) {
-        setResultUrl(data.url);
-        setResultPrompt(data.prompt ?? prompt);
-        track("generation_completed", { kind: "demo" });
-        trackDemoActivation();
-        toast.success("Done! Sign up to make more.");
-      } else {
-        const err = ("error" in data && data.error) || "";
-        // Adult prompt — hand it to the uncensored funnel rather than serving
-        // it free and anonymously on the demo's no-safety chain.
-        if (isAdultRedirect(err)) {
-          toast.info("That one needs Uncensored mode — taking you there…");
-          window.location.href = buildAdultRedirectUrl(prompt);
-          return;
-        }
-        toast.error(err || "Generation failed");
-      }
-    },
-    onError: (err) => {
-      if (isAdultRedirect(err.message)) {
-        window.location.href = buildAdultRedirectUrl(prompt);
-        return;
-      }
-      toast.error(err.message);
-    },
-  });
-
-  // Continuity from the homepage "Try It Now" box: if it handed us a prompt
-  // via ?prompt=, prefill it and fire one generation immediately so the
-  // "I typed → it generated" illusion survives the page hop.
+  const [result, setResult] = useState<DemoResult | null>(null);
+  const [error, setError] = useState("");
+  const [handoffUnavailable, setHandoffUnavailable] = useState(false);
   const autoRan = useRef(false);
-  useEffect(() => {
-    if (autoRan.current) return;
-    const incoming = new URLSearchParams(window.location.search).get("prompt");
-    const trimmed = (incoming ?? "").trim().slice(0, 500);
-    if (trimmed.length >= 3) {
-      autoRan.current = true;
-      setPrompt(trimmed);
-      setResultUrl(null);
-      track("generation_started", { kind: "demo", source: "autogen" });
-      generate.mutate({ prompt: trimmed });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const promptInput = useRef<HTMLTextAreaElement>(null);
 
-  const isLoading = generate.isPending;
-  const handleGenerate = () => {
-    const trimmed = prompt.trim();
-    if (trimmed.length < 3) {
-      toast.error("Tell us what to make — at least a few words.");
+  function showFailure(message: string, submittedPrompt: string) {
+    if (isAdultRedirect(message)) {
+      toast.info("That one needs Uncensored mode — taking you there…");
+      window.location.href = buildAdultRedirectUrl(submittedPrompt);
       return;
     }
-    setResultUrl(null);
+    setError(message || "Generation failed. Please try again.");
+  }
+
+  const { mutate, isPending } = trpc.demo.generate.useMutation({
+    onSuccess: (data, submitted) => {
+      if (data.status === "completed" && data.url) {
+        setResult({ url: data.url, prompt: data.prompt ?? submitted.prompt });
+        setHandoffUnavailable(false);
+        track("generation_completed", { kind: "demo" });
+        trackDemoActivation();
+        return;
+      }
+      showFailure(("error" in data && data.error) || "", submitted.prompt);
+    },
+    onError: (err, submitted) => showFailure(err.message, submitted.prompt),
+  });
+
+  // A submission from the homepage carries the prompt and starts once here.
+  useEffect(() => {
+    if (autoRan.current) return;
+    autoRan.current = true;
+    const incoming = new URLSearchParams(window.location.search).get("prompt");
+    const trimmed = (incoming ?? "").trim().slice(0, PROMPT_LIMIT);
+    if (trimmed.length < 3) return;
+
+    setPrompt(trimmed);
+    track("generation_started", { kind: "demo", source: "autogen" });
+    mutate({ prompt: trimmed });
+  }, [mutate]);
+
+  function handleGenerate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = prompt.trim();
+    if (isPending || trimmed.length < 3) return;
+    setError("");
     track("generation_started", { kind: "demo" });
-    generate.mutate({ prompt: trimmed });
-  };
+    mutate({ prompt: trimmed });
+  }
+
+  const workspacePath = handoffUnavailable ? "/workspace" : DEMO_WORKSPACE_PATH;
+  const workspaceHref = isAuthenticated
+    ? workspacePath
+    : getLoginUrl(workspacePath);
 
   return (
     <PageLayout>
-      <div className="container max-w-5xl py-12 md:py-20">
-        {/* Hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 p-6 md:p-10 text-center mb-10 shadow-2xl"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.18),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(6,182,212,0.16),transparent_60%)] pointer-events-none" />
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium mb-4 backdrop-blur-md">
-              <Sparkles className="h-3.5 w-3.5" />
-              Free Instant Demo — No Signup, No Card Required
-            </div>
-            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
-              Try AI Image Generation{" "}
-              <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                Free
-              </span>
+      <div className={styles.page}>
+        <div className={styles.container}>
+          <header className={styles.intro}>
+            <p className={styles.eyebrow}>DreamForgeX Image Studio</p>
+            <h1>
+              Try AI Image Generation <em>Free</em>
             </h1>
-            <p className="text-base md:text-lg text-white/75 max-w-2xl mx-auto mb-6">
-              One free photorealistic generation per day. See what DreamForgeX can render in seconds — then unlock 100+ studio tools, 4K upscaling, and Uncensored Pro.
+            <p>
+              Describe an image or start with an example. No account required.
             </p>
-            <div className="grid grid-cols-4 gap-2.5 max-w-2xl mx-auto">
-              {[
-                { src: "/showcase/gallery-2.jpg", label: "Cyberpunk" },
-                { src: "/showcase/uncensored-char-aria-nordic.jpg", label: "Portrait" },
-                { src: "/showcase/gallery-10.jpg", label: "Fantasy" },
-                { src: "/showcase/gallery-4.jpg", label: "Sci-Fi" },
-              ].map((art) => (
-                <div key={art.label} className="relative rounded-xl overflow-hidden aspect-[16/10] border border-white/15 group">
-                  <img src={art.src} alt={art.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end p-2">
-                    <span className="text-[10px] font-semibold text-white/90">{art.label}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
+          </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Input */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="rounded-2xl border border-border/50 bg-card/40 p-5">
-              <label className="text-sm font-medium mb-2 block">Describe an image</label>
-              <Textarea
+          <div className={styles.studio}>
+            <form onSubmit={handleGenerate} className={styles.composer}>
+              <div className={styles.promptHeader}>
+                <label htmlFor="demo-prompt">Describe an image</label>
+                <span aria-hidden="true">
+                  {prompt.length}/{PROMPT_LIMIT}
+                </span>
+              </div>
+              <textarea
+                ref={promptInput}
+                id="demo-prompt"
+                className={styles.prompt}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="An astronaut riding a horse on Mars at sunset, photorealistic..."
+                onChange={event => setPrompt(event.target.value)}
+                placeholder="A glass greenhouse on a rainy mountainside, warm light, wide angle…"
                 rows={5}
-                className="resize-none mb-3"
-                maxLength={500}
-                disabled={isLoading}
+                maxLength={PROMPT_LIMIT}
+                disabled={isPending}
               />
-              <Button
-                onClick={handleGenerate}
-                disabled={isLoading || prompt.trim().length < 3}
-                className="w-full gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
-                size="lg"
+              <div
+                className={styles.examples}
+                role="group"
+                aria-labelledby="demo-examples"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-4 w-4" />
-                    Generate (free)
-                  </>
-                )}
-              </Button>
-              <p className="text-[11px] text-muted-foreground mt-2 text-center">
-                One free image per day per IP. Sign up for unlimited.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border/50 bg-card/40 p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-3">
-                Try these
-              </p>
-              <div className="space-y-2">
-                {DEMO_PROMPTS.map((p) => (
+                <p id="demo-examples">Example prompts</p>
+                {EXAMPLES.map(example => (
                   <button
-                    key={p}
+                    key={example.label}
                     type="button"
-                    onClick={() => setPrompt(p)}
-                    disabled={isLoading}
-                    className="block w-full text-left text-xs px-3 py-2 rounded-md bg-background/40 hover:bg-accent border border-border/30 transition-colors disabled:opacity-50"
+                    disabled={isPending}
+                    onClick={() => {
+                      setPrompt(example.prompt);
+                      setError("");
+                      promptInput.current?.focus();
+                    }}
                   >
-                    {p}
+                    {example.label}
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-
-          {/* Output */}
-          <div className="lg:col-span-3">
-            <div className="aspect-square w-full rounded-2xl bg-card/40 border border-border/50 overflow-hidden flex items-center justify-center relative">
-              {isLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
-                  <p className="text-sm text-muted-foreground">
-                    Conjuring pixels…
-                  </p>
-                </div>
-              )}
-              {!isLoading && resultUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={resultUrl}
-                  alt={resultPrompt ?? "Generated image"}
-                  className="w-full h-full object-contain"
-                />
-              )}
-              {!isLoading && !resultUrl && (
-                <div className="text-center px-8 max-w-sm">
-                  <Wand2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    Your generation will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {resultUrl && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-5 rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-purple-500/10 p-5"
-              >
-                <div className="flex items-center gap-2 mb-2 text-emerald-300 text-sm font-medium">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Done — that's your free one for today.
-                </div>
-                <h3 className="text-xl font-semibold mb-1">
-                  Want to make 100 more this month?
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Sign up free for 50 credits/day, 100+ tools, video gen, and
-                  no daily limit.
+              <div className={styles.controls}>
+                <button
+                  type="submit"
+                  className={styles.primary}
+                  disabled={isPending || prompt.trim().length < 3}
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 size={18} aria-hidden="true" /> Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 size={18} aria-hidden="true" /> Generate (free)
+                    </>
+                  )}
+                </button>
+                <p className={styles.quota}>
+                  One free image every 24 hours per IP address.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => (window.location.href = getLoginUrl())}
-                    className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
-                  >
-                    Sign up free
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    asChild
-                  >
+              </div>
+              {error && (
+                <p role="alert" className={styles.error}>
+                  {error}
+                </p>
+              )}
+            </form>
+
+            <section className={styles.output} aria-labelledby="demo-result">
+              <div className={styles.outputHeader}>
+                <h2 id="demo-result">Image preview</h2>
+                <span className={styles.status} role="status">
+                  {isPending
+                    ? "Generating…"
+                    : result
+                      ? "Image ready"
+                      : "No image yet"}
+                </span>
+              </div>
+              <div className={styles.stage} aria-busy={isPending}>
+                {isPending ? (
+                  <div className={styles.loading}>
+                    <Loader2 size={32} aria-hidden="true" />
+                    <p>Creating your image</p>
+                  </div>
+                ) : result ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    className={styles.resultImage}
+                    src={result.url}
+                    alt={result.prompt}
+                  />
+                ) : (
+                  <figure className={styles.placeholder}>
+                    <img
+                      src="/showcase/forge-image.webp"
+                      alt="A chrome figure in dramatic studio lighting"
+                    />
+                    <figcaption>Sample image</figcaption>
+                  </figure>
+                )}
+              </div>
+              {result && !isPending && (
+                <div className={styles.resultActions}>
+                  <div className={styles.resultLinks}>
                     <a
-                      href={resultUrl}
-                      download={`dreamforgex-demo.png`}
+                      className={styles.secondary}
+                      href={result.url}
+                      download="dreamforgex-demo.png"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
+                      <Download size={17} aria-hidden="true" /> Download image
                     </a>
-                  </Button>
+                    <a
+                      className={styles.primary}
+                      href={workspaceHref}
+                      onClick={event => {
+                        if (
+                          !handoffUnavailable &&
+                          !saveDemoImagePrompt(result.prompt)
+                        ) {
+                          event.preventDefault();
+                          setHandoffUnavailable(true);
+                        }
+                      }}
+                    >
+                      Continue in Workspace{" "}
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </a>
+                  </div>
+                  <p aria-live="polite">
+                    {handoffUnavailable
+                      ? "This browser couldn’t save the prompt. You can still continue in Workspace."
+                      : isAuthenticated
+                        ? "Your prompt carries over in this tab."
+                        : "Sign in here to carry your prompt into Workspace."}
+                  </p>
                 </div>
-              </motion.div>
-            )}
+              )}
+            </section>
           </div>
-        </div>
 
-        {/* Why DreamForgeX */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { icon: Sparkles, title: "100+ AI tools", desc: "From upscaling to virtual try-on, character consistency to video generation." },
-            { icon: Lock, title: "Your work stays yours", desc: "Commercial license on all paid plans, no watermarks." },
-            { icon: Wand2, title: "30+ models, one bill", desc: "Flux, Veo, Kling, Ideogram, Sora — all in one credit pool." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-border/50 bg-card/40 p-5">
-              <f.icon className="h-5 w-5 text-cyan-400 mb-2.5" />
-              <h3 className="font-semibold mb-1">{f.title}</h3>
-              <p className="text-sm text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
+          <nav className={styles.footer} aria-label="More ways to create">
+            <a href="/tools">Browse AI tools</a>
+            <a href="/uncensored">Uncensored mode (18+)</a>
+          </nav>
         </div>
-
-        {/* Discreet 18+ entry — captures unfiltered intent without putting
-            adult positioning in front of SFW visitors, and gives /uncensored
-            an internal inbound link. */}
-        <p className="mt-10 text-center text-xs text-muted-foreground/70">
-          Looking for unfiltered generation?{" "}
-          <a
-            href="/uncensored"
-            className="underline underline-offset-2 hover:text-rose-400 transition-colors"
-          >
-            Uncensored mode (18+)
-          </a>
-        </p>
       </div>
     </PageLayout>
   );
