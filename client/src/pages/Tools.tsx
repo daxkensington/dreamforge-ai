@@ -131,7 +131,7 @@ const creativeTools: GridTool[] = [
 const videoTools: GridTool[] = [
   { title: "Text-to-Video", desc: "Generate video from text prompts", icon: Video, href: "/tools/text-to-video", img: "/showcase/tool-t2v.jpg" },
   { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg" },
-  { title: "Music Video Studio", desc: "Create AI music videos from your photo", icon: Film, href: "/tools/music-video", img: "/showcase/tool-music-video.jpg", badge: "New" },
+  { title: "Music Video Studio", desc: "Create a video clip and add audio in the timeline", icon: Film, href: "/tools/music-video", img: "/showcase/tool-music-video.jpg", badge: "New" },
   { title: "Social Templates", desc: "TikTok, Reels & Shorts templates", icon: Smartphone, href: "/tools/social-templates", img: "/showcase/tool-social-templates.jpg", badge: "New" },
   { title: "Viral Clip Maker", desc: "AI picks best moments for clips", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-clip-maker.jpg", badge: "New" },
 ];
