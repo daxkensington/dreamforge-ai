@@ -10,6 +10,10 @@ import { toast } from "sonner";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
+import {
+  DEMO_WORKSPACE_PATH,
+  saveDemoImagePrompt,
+} from "@/lib/demoImageHandoff";
 import styles from "./DemoTextToImage.module.css";
 
 declare global {
@@ -76,6 +80,7 @@ export default function DemoTextToImage() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [error, setError] = useState("");
+  const [handoffUnavailable, setHandoffUnavailable] = useState(false);
   const autoRan = useRef(false);
   const promptInput = useRef<HTMLTextAreaElement>(null);
 
@@ -92,6 +97,7 @@ export default function DemoTextToImage() {
     onSuccess: (data, submitted) => {
       if (data.status === "completed" && data.url) {
         setResult({ url: data.url, prompt: data.prompt ?? submitted.prompt });
+        setHandoffUnavailable(false);
         track("generation_completed", { kind: "demo" });
         trackDemoActivation();
         return;
@@ -123,9 +129,7 @@ export default function DemoTextToImage() {
     mutate({ prompt: trimmed });
   }
 
-  const workspacePath = result
-    ? `/workspace?${new URLSearchParams({ prompt: result.prompt })}`
-    : "/workspace";
+  const workspacePath = handoffUnavailable ? "/workspace" : DEMO_WORKSPACE_PATH;
   const workspaceHref = isAuthenticated
     ? workspacePath
     : getLoginUrl(workspacePath);
@@ -257,15 +261,29 @@ export default function DemoTextToImage() {
                     >
                       <Download size={17} aria-hidden="true" /> Download image
                     </a>
-                    <a className={styles.primary} href={workspaceHref}>
+                    <a
+                      className={styles.primary}
+                      href={workspaceHref}
+                      onClick={event => {
+                        if (
+                          !handoffUnavailable &&
+                          !saveDemoImagePrompt(result.prompt)
+                        ) {
+                          event.preventDefault();
+                          setHandoffUnavailable(true);
+                        }
+                      }}
+                    >
                       Continue in Workspace{" "}
                       <ArrowRight size={17} aria-hidden="true" />
                     </a>
                   </div>
-                  <p>
-                    {isAuthenticated
-                      ? "Your prompt carries over."
-                      : "Sign in to carry your prompt into Workspace."}
+                  <p aria-live="polite">
+                    {handoffUnavailable
+                      ? "This browser couldn’t save the prompt. You can still continue in Workspace."
+                      : isAuthenticated
+                        ? "Your prompt carries over in this tab."
+                        : "Sign in here to carry your prompt into Workspace."}
                   </p>
                 </div>
               )}

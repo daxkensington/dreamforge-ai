@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { track } from "@/lib/analytics";
+import { takeDemoImagePrompt } from "@/lib/demoImageHandoff";
 import { getTrainingImageCredits } from "@shared/training";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
@@ -174,12 +175,19 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wizardPrompt = params.get("prompt");
-    if (wizardPrompt) setPrompt(wizardPrompt);
+    const fromDemo = initialMediaType === "image" && params.get("from") === "demo";
+    const demoPrompt = fromDemo ? takeDemoImagePrompt() : null;
+    const initialPrompt = wizardPrompt || demoPrompt;
+    if (initialPrompt) setPrompt(initialPrompt);
     if (initialMediaType === "video") workspaceAutogenArmed = false;
     else if (params.get("autogen") === "1" && wizardPrompt)
       workspaceAutogenArmed = true;
     if (wizardPrompt || params.get("autogen")) {
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (fromDemo) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("from");
+      window.history.replaceState(window.history.state, "", url);
     }
   }, [initialMediaType]);
   const [negativePrompt, setNegativePrompt] = useState("");

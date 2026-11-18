@@ -2,9 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 const demoPath = "/demo/text-to-image";
 const fixtureImage = "/showcase/forge-preview.webp";
+const promptHandoffKey = "dreamforgex-demo-image-prompt";
 
 async function mockDemo(page: Page, result: Record<string, string>) {
   const submittedPrompts: string[] = [];
+  let signedIn = false;
+  let workspaceGenerations = 0;
   await page.route("**/api/trpc/**", async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -15,8 +18,15 @@ async function mockDemo(page: Page, result: Record<string, string>) {
     const input = request.method() === "POST" ? request.postDataJSON() : null;
 
     const results = procedures.map((procedure, index) => {
-      if (procedure !== "demo.generate")
+      if (procedure === "auth.me" && signedIn) {
+        return {
+          result: { data: { json: { id: 123, name: "Demo visitor" } } },
+        };
+      }
+      if (procedure === "generation.create") workspaceGenerations += 1;
+      if (procedure !== "demo.generate") {
         return { result: { data: { json: null } } };
+      }
 
       const payload = batched ? input?.[index]?.json : input?.json;
       submittedPrompts.push(payload.prompt);
@@ -24,17 +34,25 @@ async function mockDemo(page: Page, result: Record<string, string>) {
     });
     await route.fulfill({ json: batched ? results : results[0] });
   });
-  return submittedPrompts;
+  return {
+    submittedPrompts,
+    signIn: () => {
+      signedIn = true;
+    },
+    workspaceGenerations: () => workspaceGenerations,
+  };
 }
 
 test("an editable example produces an image and carries its prompt into Workspace", async ({
   page,
-  baseURL,
 }) => {
-  const submittedPrompts = await mockDemo(page, {
-    status: "completed",
-    url: fixtureImage,
-  });
+  const { submittedPrompts, signIn, workspaceGenerations } = await mockDemo(
+    page,
+    {
+      status: "completed",
+      url: fixtureImage,
+    }
+  );
   await page.goto(demoPath);
 
   const promptField = page.getByRole("textbox", { name: "Describe an image" });
@@ -65,22 +83,45 @@ test("an editable example produces an image and carries its prompt into Workspac
   const workspaceLink = page.getByRole("link", {
     name: "Continue in Workspace",
   });
-  await expect(workspaceLink).toHaveAttribute("href", /^\/auth\/signin\?next=/);
-  const signInUrl = new URL(
-    (await workspaceLink.getAttribute("href"))!,
-    baseURL
+  const signInPath = `/auth/signin?next=${encodeURIComponent("/workspace?from=demo")}`;
+  await expect(workspaceLink).toHaveAttribute("href", signInPath);
+  expect(
+    await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
+  ).toBeNull();
+
+  await page.route(
+    url => url.pathname === "/auth/signin",
+    route =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<h1>Sign-in fixture</h1>",
+      })
   );
-  const workspaceUrl = new URL(signInUrl.searchParams.get("next")!, baseURL);
-  expect(workspaceUrl.pathname).toBe("/workspace");
-  expect(workspaceUrl.searchParams.get("prompt")).toBe(submittedPrompt);
-  expect([...workspaceUrl.searchParams.keys()]).toEqual(["prompt"]);
+  await workspaceLink.click();
+  await expect(
+    page.getByRole("heading", { name: "Sign-in fixture" })
+  ).toBeVisible();
+  expect(
+    await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
+  ).toBe(submittedPrompt);
+
+  signIn();
+  await page.goto("/workspace?from=demo");
+  await expect(
+    page.getByPlaceholder(/^Describe a fictional scene/)
+  ).toHaveValue(submittedPrompt);
+  await expect(page).toHaveURL(/\/workspace$/);
+  expect(
+    await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
+  ).toBeNull();
+  expect(workspaceGenerations()).toBe(0);
 });
 
 test("an incoming prompt auto-submits once and shows a failed generation inline", async ({
   page,
 }) => {
   const failure = "The demo could not generate this image. Please try again.";
-  const submittedPrompts = await mockDemo(page, {
+  const { submittedPrompts } = await mockDemo(page, {
     status: "failed",
     error: failure,
   });
