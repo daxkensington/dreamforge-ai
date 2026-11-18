@@ -80,6 +80,50 @@ for (const page of PUBLIC_PAGES) {
   });
 }
 
+test("gallery example opens an editable demo prompt without generating", async ({
+  page,
+  baseURL,
+}) => {
+  let generationRequests = 0;
+  const trpcPath = "/api/trpc/";
+  await page.route(
+    url =>
+      url.pathname.startsWith(trpcPath) &&
+      decodeURIComponent(url.pathname.slice(trpcPath.length))
+        .split(",")
+        .includes("demo.generate"),
+    async route => {
+      generationRequests += 1;
+      await route.abort();
+    }
+  );
+
+  await page.goto("/gallery", { waitUntil: "domcontentloaded" });
+  const example = page
+    .getByRole("region", { name: "Featured showcase", exact: true })
+    .getByRole("link", { name: /Try this prompt/ })
+    .first();
+  await expect(example).toHaveAttribute(
+    "href",
+    /^\/demo\/text-to-image#draft=/
+  );
+  const destination = new URL((await example.getAttribute("href"))!, baseURL);
+  const draft = new URLSearchParams(destination.hash.slice(1)).get("draft");
+  const expectedPrompt =
+    "Bioluminescent underwater cathedral with jellyfish stained glass";
+  expect(draft).toBe(expectedPrompt);
+
+  await example.click();
+  const editor = page.getByRole("textbox", { name: "Describe an image" });
+  await expect(editor).toHaveValue(expectedPrompt);
+  await expect(editor).toBeEditable();
+  await expect(page).toHaveURL(new URL("/demo/text-to-image", baseURL).href);
+  await expect(
+    page.getByRole("button", { name: "Generate (free)" })
+  ).toBeEnabled();
+  expect(generationRequests).toBe(0);
+});
+
 test("tool directory combines search and categories and can reset", async ({
   page,
 }) => {
