@@ -110,6 +110,51 @@ test("an editable example produces an image and carries its prompt into Workspac
   expect(workspaceGenerations()).toBe(0);
 });
 
+test("a guest Workspace visit preserves the demo draft until sign-in", async ({
+  page,
+}) => {
+  const { signIn, workspaceGenerations } = await mockDemo(page, {});
+  const draft = "A quiet greenhouse reflected in a misty lake";
+  const workspacePath = "/workspace?from=demo";
+  await page.goto(demoPath);
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), {
+    key: promptHandoffKey,
+    value: draft,
+  });
+
+  await page.goto(workspacePath);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Make it in Workspace" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sign in to Workspace" })
+  ).toHaveAttribute(
+    "href",
+    `/auth/signin?next=${encodeURIComponent(workspacePath)}`
+  );
+  await expect(
+    page.getByRole("link", { name: "Try the free image demo" })
+  ).toHaveAttribute("href", demoPath);
+  await expect(page).toHaveURL(/\/workspace\?from=demo$/);
+  expect(
+    await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
+  ).toBe(draft);
+
+  signIn();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Workspace", exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByPlaceholder(/^Describe a fictional scene/)
+  ).toHaveValue(draft);
+  await expect(page).toHaveURL(/\/workspace$/);
+  expect(
+    await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
+  ).toBeNull();
+  expect(workspaceGenerations()).toBe(0);
+});
+
 test("an incoming prompt auto-submits once and shows a failed generation inline", async ({
   page,
 }) => {

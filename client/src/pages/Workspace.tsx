@@ -33,7 +33,6 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Sparkles,
-  Wand2,
   Image,
   Loader2,
   CheckCircle,
@@ -58,6 +57,7 @@ import {
 import { useState, useMemo, useEffect, useRef } from "react";
 import { track } from "@/lib/analytics";
 import { takeDemoImagePrompt } from "@/lib/demoImageHandoff";
+import { WorkspaceEntry, WorkspaceMasthead } from "@/components/WorkspaceEntry";
 import { getTrainingImageCredits } from "@shared/training";
 import { motion, AnimatePresence } from "framer-motion";
 import { StylePresets } from "@/components/StylePresets";
@@ -175,21 +175,26 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wizardPrompt = params.get("prompt");
-    const fromDemo = initialMediaType === "image" && params.get("from") === "demo";
-    const demoPrompt = fromDemo ? takeDemoImagePrompt() : null;
-    const initialPrompt = wizardPrompt || demoPrompt;
-    if (initialPrompt) setPrompt(initialPrompt);
+    if (wizardPrompt) setPrompt(wizardPrompt);
     if (initialMediaType === "video") workspaceAutogenArmed = false;
     else if (params.get("autogen") === "1" && wizardPrompt)
       workspaceAutogenArmed = true;
     if (wizardPrompt || params.get("autogen")) {
       window.history.replaceState({}, "", window.location.pathname);
-    } else if (fromDemo) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("from");
-      window.history.replaceState(window.history.state, "", url);
     }
   }, [initialMediaType]);
+
+  // A guest needs this marker and draft after sign-in, even if their session expired.
+  useEffect(() => {
+    if (!isAuthenticated || initialMediaType !== "image") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("from") !== "demo") return;
+
+    const demoPrompt = takeDemoImagePrompt();
+    if (demoPrompt) setPrompt(demoPrompt);
+    url.searchParams.delete("from");
+    window.history.replaceState(window.history.state, "", url);
+  }, [initialMediaType, isAuthenticated]);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(768);
   const [height, setHeight] = useState(768);
@@ -816,6 +821,13 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
   }
 
   if (!isAuthenticated) {
+    if (initialMediaType === "image") {
+      return (
+        <PageLayout>
+          <WorkspaceEntry signInHref={getLoginUrl()} />
+        </PageLayout>
+      );
+    }
     return (
       <PageLayout>
         <div className="container py-24 text-center">
@@ -848,57 +860,11 @@ export default function Workspace({ initialMediaType = "image" }: { initialMedia
 
   return (
     <PageLayout>
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-purple-900/10" />
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px]" />
-        </div>
-        <div className="container relative py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-medium mb-3">
-                <Wand2 className="h-3 w-3" />
-                AI Creative Studio
-              </div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-                Create{" "}
-                <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                  Something Amazing
-                </span>
-              </h1>
-              <p className="text-muted-foreground max-w-md">
-                Describe your vision and let AI bring it to life — images,
-                videos, and animations powered by 30+ AI models.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {[
-                "/showcase/gallery-13.jpg",
-                "/showcase/gallery-17.jpg",
-                "/showcase/gallery-20.jpg",
-              ].map((img, i) => (
-                <div
-                  key={i}
-                  className="h-20 w-20 rounded-xl overflow-hidden border border-white/10 opacity-70"
-                >
-                  <img
-                    src={img}
-                    alt="AI generated showcase"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <WorkspaceMasthead />
 
-      <div className="container py-8 md:py-10">
+      <div className="container py-5 md:py-6">
         {/* Mini Stats Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
             {
               label: "Total",
