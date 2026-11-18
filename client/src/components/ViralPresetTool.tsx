@@ -21,7 +21,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShareButton } from "@/components/ShareButton";
 import type { LucideIcon } from "lucide-react";
 
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+// Leave room for multipart encoding below Vercel's 4.5 MB request limit.
+const MAX_PHOTO_MIB = 4;
+const MAX_PHOTO_BYTES = MAX_PHOTO_MIB * 1024 * 1024;
 const PHOTO_TYPES = [
   "image/jpeg",
   "image/png",
@@ -114,7 +116,7 @@ export function ViralPresetTool({
     if (file.size === 0 || file.size > MAX_PHOTO_BYTES) {
       setPhoto({
         status: "failed",
-        message: "Choose a non-empty image up to 10 MB.",
+        message: `Choose a non-empty image up to ${MAX_PHOTO_MIB} MiB.`,
       });
       return;
     }
@@ -283,8 +285,8 @@ export function ViralPresetTool({
                     id={`${photoInputId}-help`}
                     className="mt-2 text-xs text-muted-foreground"
                   >
-                    JPG, PNG, WebP, GIF or AVIF up to 10 MB. A clear
-                    front-facing photo works best.
+                    JPG, PNG, WebP, GIF or AVIF up to {MAX_PHOTO_MIB} MiB. A
+                    clear front-facing photo works best.
                   </p>
                   {photo.status === "failed" && (
                     <p role="alert" className="mt-2 text-sm text-destructive">

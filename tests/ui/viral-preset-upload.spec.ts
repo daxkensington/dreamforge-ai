@@ -83,6 +83,19 @@ test("viral preset retries a photo upload and submits only the current storage U
     await page.reload();
     await expect(input).toBeEnabled();
 
+    await input.setInputFiles({
+      name: "too-large.webp",
+      mimeType: "image/webp",
+      buffer: Buffer.alloc(4 * 1024 * 1024 + 1),
+    });
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: "Choose a non-empty image up to 4 MiB." })
+    ).toBeVisible();
+    await expect(generate).toBeDisabled();
+    expect(filenames).toEqual([]);
+
     const oldFile = {
       name: "old.webp",
       mimeType: "image/webp",
