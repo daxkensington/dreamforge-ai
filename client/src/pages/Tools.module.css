@@ -1,0 +1,552 @@
+.page {
+  --forge-background: #0a0b0a;
+  --forge-surface: #121412;
+  --forge-raised: #181b16;
+  --forge-line: #30352b;
+  --forge-text: #f4f5ee;
+  --forge-muted: #b1b5a9;
+  --forge-lime: #dafa64;
+  min-height: 100%;
+  background: var(--forge-background);
+  color: var(--forge-text);
+  color-scheme: dark;
+}
+
+.page :where(a, button, input):focus-visible {
+  outline: 2px solid var(--forge-lime);
+  outline-offset: 4px;
+}
+
+.container {
+  width: min(100% - clamp(2rem, 7vw, 6rem), 1280px);
+  margin-inline: auto;
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-bottom: 1px solid var(--forge-line);
+  background: #080a07;
+}
+
+.heroInner {
+  display: grid;
+  width: min(100% - clamp(2rem, 7vw, 6rem), 1280px);
+  align-items: center;
+  min-height: clamp(17rem, 28vw, 23rem);
+  margin-inline: auto;
+  padding-block: clamp(2.3rem, 4.5vw, 3.75rem);
+}
+
+.heroArt {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 0 auto;
+  width: 75%;
+  mask-image: linear-gradient(90deg, transparent 4%, #000 74%);
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.heroArt img {
+  object-fit: cover;
+  object-position: 78% 48%;
+}
+
+.heroCopy {
+  max-width: min(43rem, 68%);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--forge-lime);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.73rem;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0.7rem rgb(218 250 100 / 60%);
+  content: "";
+}
+
+.hero h1 {
+  margin-top: 0.9rem;
+  font-size: clamp(2.75rem, 5.45vw, 4.7rem);
+  font-weight: 760;
+  line-height: 0.96;
+  letter-spacing: -0.077em;
+  text-wrap: balance;
+}
+
+.hero h1 em {
+  color: var(--forge-lime);
+  font-style: normal;
+}
+
+.heroCopy > p:not(.eyebrow) {
+  max-width: 32rem;
+  margin-top: 1rem;
+  color: var(--forge-muted);
+  font-size: clamp(1rem, 1.6vw, 1.13rem);
+  line-height: 1.65;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.35rem;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.95rem;
+  border: 1px solid;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.primary {
+  border-color: var(--forge-lime);
+  background: var(--forge-lime);
+  color: #1a210a;
+}
+
+.primary:hover {
+  border-color: #eeffa7;
+  background: #eeffa7;
+}
+
+.secondary {
+  border-color: var(--forge-line);
+  background: #12150f;
+  color: var(--forge-text);
+}
+
+.secondary:hover {
+  border-color: #727b63;
+  background: #1b2116;
+}
+
+.primary svg,
+.secondary svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.featured {
+  padding-block: clamp(1.75rem, 4vw, 3.1rem);
+}
+
+.featured h2,
+.directory h2 {
+  font-size: clamp(1.65rem, 3.4vw, 2.55rem);
+  font-weight: 730;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.featuredGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.65rem, 1.7vw, 1.25rem);
+  margin-top: 1.1rem;
+}
+
+.featuredCard {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: clamp(10rem, 17vw, 14rem);
+  align-items: flex-end;
+  overflow: hidden;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.8rem;
+  background: var(--forge-surface);
+  transition: border-color 150ms ease;
+}
+
+.featuredCard::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(
+    0deg,
+    rgb(7 10 5 / 99%) 2%,
+    rgb(7 10 5 / 86%) 34%,
+    transparent 82%
+  );
+  content: "";
+}
+
+.featuredImage {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.featuredCopy {
+  display: grid;
+  width: 100%;
+  gap: 0.23rem;
+  padding: clamp(0.7rem, 1.7vw, 1.2rem);
+  color: var(--forge-muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.featuredCopy svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--forge-lime);
+}
+
+.featuredTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  color: var(--forge-text);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.directory {
+  scroll-margin-top: 5.75rem;
+  padding-block: clamp(1.8rem, 4.5vw, 3.6rem) clamp(3.75rem, 8vw, 6.25rem);
+  border-top: 1px solid var(--forge-line);
+}
+
+.filterPanel {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+.searchBox {
+  display: flex;
+  min-width: 0;
+  min-height: 3rem;
+  flex: 1;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.65rem;
+  background: var(--forge-surface);
+  color: var(--forge-muted);
+  cursor: text;
+}
+
+.searchBox:focus-within {
+  border-color: var(--forge-lime);
+  outline: 1px solid var(--forge-lime);
+  outline-offset: 2px;
+}
+
+.searchBox > svg {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.searchBox input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.8rem;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--forge-text);
+  font: inherit;
+}
+
+.searchBox input:focus-visible {
+  outline: none;
+}
+
+.searchBox input::placeholder {
+  color: var(--forge-muted);
+}
+
+.searchBox input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clearSearch {
+  display: inline-flex;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding-inline: 0.55rem;
+  border-radius: 0.55rem;
+  color: var(--forge-text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.clearSearch:hover {
+  background: var(--forge-raised);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+  margin-top: 0.65rem;
+}
+
+.chip {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.78rem;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.55rem;
+  background: var(--forge-surface);
+  color: var(--forge-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.chip:hover {
+  border-color: #727b63;
+  color: var(--forge-text);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--forge-lime);
+  background: #273117;
+  color: var(--forge-lime);
+}
+
+.resultCount {
+  margin-block: 1.2rem 0;
+  color: var(--forge-muted);
+  font-size: 0.875rem;
+}
+
+.group {
+  margin-top: clamp(1.65rem, 4vw, 3rem);
+}
+
+.groupHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.78rem;
+  font-size: clamp(1.17rem, 2.6vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.22;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.65rem, 1.7vw, 1.25rem);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.72rem;
+  background: var(--forge-surface);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.card:hover,
+.featuredCard:hover {
+  border-color: #8caa46;
+}
+
+.card:hover {
+  background: var(--forge-raised);
+}
+
+.cardImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #1a1d17;
+}
+
+.cardBody {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 0.35rem;
+  padding: clamp(0.65rem, 1.5vw, 1rem);
+  color: var(--forge-muted);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.cardBody svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--forge-lime);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--forge-text);
+  font-size: clamp(0.92rem, 1.8vw, 1.08rem);
+  font-weight: 690;
+  line-height: 1.24;
+}
+
+.cardTitle h4 {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.cardTitle svg {
+  flex: none;
+}
+
+.badge {
+  position: absolute;
+  top: 0.48rem;
+  right: 0.48rem;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid rgb(244 245 238 / 22%);
+  border-radius: 0.3rem;
+  background: #171b15;
+  color: var(--forge-text);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  padding: clamp(1rem, 3vw, 1.65rem);
+  border: 1px solid var(--forge-line);
+  border-radius: 0.7rem;
+  background: var(--forge-surface);
+  color: var(--forge-muted);
+}
+
+.empty :where(h2, h3, strong) {
+  color: var(--forge-text);
+}
+
+.ageLink {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f0bbba;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.ageLink:hover {
+  color: #ffe2e1;
+}
+
+@media (max-width: 58rem) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 43rem) {
+  .heroCopy {
+    max-width: 28rem;
+  }
+
+  .heroArt {
+    width: 100%;
+    mask-image: linear-gradient(90deg, transparent 3%, #000 100%);
+    opacity: 0.33;
+  }
+
+  .heroArt img {
+    object-position: 68% center;
+  }
+
+  .featuredGrid,
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .featuredCard {
+    min-height: 9.5rem;
+  }
+}
+
+@media (max-width: 22rem) {
+  .hero h1 {
+    font-size: 2.9rem;
+  }
+
+  .featuredGrid,
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page :is(.primary, .secondary, .featuredCard, .chip, .card) {
+    transition: none;
+  }
+}
