@@ -65,7 +65,10 @@ test("viral preset retries a photo upload and submits only the current storage U
 
   try {
     await page.goto("/tools/action-figure");
-    const input = page.getByLabel("Upload your photo");
+    const input = page.getByRole("main").getByRole("button", {
+      name: "Upload your photo",
+      exact: true,
+    });
     const generate = page.getByRole("button", {
       name: "Generate",
       exact: true,
