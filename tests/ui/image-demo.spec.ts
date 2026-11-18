@@ -89,17 +89,10 @@ test("an editable example produces an image and carries its prompt into Workspac
     await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
   ).toBeNull();
 
-  await page.route(
-    url => url.pathname === "/auth/signin",
-    route =>
-      route.fulfill({
-        contentType: "text/html",
-        body: "<h1>Sign-in fixture</h1>",
-      })
-  );
   await workspaceLink.click();
+  await expect(page).toHaveURL(new URL(signInPath, page.url()).toString());
   await expect(
-    page.getByRole("heading", { name: "Sign-in fixture" })
+    page.getByRole("heading", { name: "DreamForge", exact: true })
   ).toBeVisible();
   expect(
     await page.evaluate(key => sessionStorage.getItem(key), promptHandoffKey)
