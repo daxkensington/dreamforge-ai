@@ -132,18 +132,25 @@ export const TOOL_CREDIT_COSTS: Record<string, number> = {
 };
 
 // ─── URL slug → tool key aliases ─────────────────────────────────────────
-// Some routes use slugs that don't match the credit-cost key. Listed here
-// so CreditCostBadge can resolve them via auto-derivation from the URL.
+// Route slugs can differ from the operation key charged by the tool mutation.
+// CreditCostBadge uses these aliases to display that operation's cost.
 export const TOOL_SLUG_ALIASES: Record<string, string> = {
-  upscaler: "upscale",
+  upscaler: "super-resolution",
   background: "background-remove",
   "face-enhancer": "face-enhance",
   "color-grading": "color-grade",
   "object-eraser": "object-remove",
   "image-blender": "image-merge",
-  inpainting: "image-merge",
-  outpainting: "panorama",
+  inpainting: "text-to-image",
+  outpainting: "text-to-image",
   variations: "image-to-image",
+  "3d-generator": "3d-generate",
+  "color-palette": "prompt-assist",
+  "image-to-prompt": "prompt-assist",
+  "prompt-builder": "prompt-assist",
+  "text-effects": "text-to-image",
+  texture: "texture-gen",
+  "tshirt-designer": "tshirt-design",
 };
 
 /** Look up a tool's credit cost from a URL slug, applying known aliases. */

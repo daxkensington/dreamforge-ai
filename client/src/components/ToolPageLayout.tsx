@@ -1,8 +1,7 @@
 import PageLayout from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lock, ArrowRight, Eye, Flame } from "lucide-react";
+import { ArrowLeft, Lock, ArrowRight, Flame } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { ToolSEOBlock } from "@/components/ToolSEOBlock";
@@ -10,6 +9,7 @@ import { ToolPageSchemas } from "@/components/ToolPageSchemas";
 import { CreditCostBadge } from "@/components/CreditCostBadge";
 import ToolSamples from "@/components/ToolSamples";
 import type { LucideIcon } from "lucide-react";
+import styles from "./ToolPageLayout.module.css";
 
 interface ToolPageLayoutProps {
   title: string;
@@ -36,7 +36,7 @@ export default function ToolPageLayout({
   toolKey,
   costCredits,
 }: ToolPageLayoutProps) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [location] = useLocation();
   // Auto-derive toolKey from "/tools/<slug>" so we don't have to touch
   // every individual tool page. CreditCostBadge silently no-ops if the
@@ -45,91 +45,50 @@ export default function ToolPageLayout({
 
   return (
     <PageLayout>
-      <div className="min-h-[calc(100vh-4rem)]">
-        {/* Header */}
-        <section className="border-b border-border/50 bg-card/30">
-          <div className="container py-6">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <Link href="/tools">
-                <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-muted-foreground hover:text-foreground">
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  All Tools
-                </Button>
-              </Link>
-
-              <div className="flex items-start gap-4">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
-                  <Icon className="h-6 w-6 text-white" />
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <div className={`container ${styles.headerInner}`}>
+            <Link href="/tools" className={styles.back}>
+              <ArrowLeft size={16} aria-hidden="true" /> All Tools
+            </Link>
+            <div className={styles.intro}>
+              <div className={`${styles.icon} bg-gradient-to-br ${gradient}`}>
+                <Icon size={22} aria-hidden="true" />
+              </div>
+              <div className={styles.copy}>
+                <div className={styles.title}>
+                  <h1>{title}</h1>
+                  <CreditCostBadge toolKey={derivedKey} costCredits={costCredits} />
                 </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    <h1 className="text-2xl font-bold">{title}</h1>
-                    <CreditCostBadge toolKey={derivedKey} costCredits={costCredits} />
-                  </div>
-                  <p className="text-sm text-muted-foreground">{description}</p>
+                <p className={styles.description}>{description}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {!loading && !isAuthenticated && (
+          <section className={styles.gate} aria-label="Tool access">
+            <div className={`container ${styles.gateInner}`}>
+              <div className={styles.gateCopy}>
+                <div className={styles.gateIcon}>
+                  <Lock size={18} aria-hidden="true" />
+                </div>
+                <div>
+                  <p>Sign in to use this tool</p>
+                  <p>A free account includes 50 daily credits. Tool costs and plan eligibility vary.</p>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Prominent anon gate — the thin strip that used to live here was
-             easy to miss, so users filled out forms then hit a failed submit.
-             Now it's an unmissable full-width CTA card. Tool content below
-             stays visible so the SEO copy is still crawlable and users see
-             what the tool does — but the gate makes clear it needs login. */}
-        {!isAuthenticated && (
-          <section className="bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-b border-cyan-500/30">
-            <div className="container py-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-start gap-3 flex-1">
-                  <div className="h-10 w-10 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
-                    <Lock className="h-5 w-5 text-cyan-300" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-base mb-0.5">Sign in free to use this tool</p>
-                    <p className="text-sm text-muted-foreground">
-                      50 credits / day on the free plan — no credit card required. You'll need an account before the Generate button below will work.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 shrink-0 w-full md:w-auto">
-                  <Button
-                    className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white flex-1 md:flex-initial"
-                    onClick={() => (window.location.href = getLoginUrl())}
-                  >
-                    Sign in free
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="bg-transparent flex-1 md:flex-initial"
-                    asChild
-                  >
-                    <Link href="/pricing">See pricing</Link>
-                  </Button>
-                </div>
+              <div className={styles.actions}>
+                <a href={getLoginUrl()} className={styles.primary}>
+                  Sign in free <ArrowRight size={16} aria-hidden="true" />
+                </a>
+                <Link href="/pricing" className={styles.secondary}>See pricing</Link>
               </div>
             </div>
           </section>
         )}
 
-        {/* Tool Content — preview banner above for anon users */}
-        {!isAuthenticated && (
-          <div className="container pt-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-              <Eye className="h-3 w-3" />
-              Preview mode — sign in to generate
-            </div>
-          </div>
-        )}
-        <section className="container py-8">
-          {children}
-        </section>
+        <section className={`container ${styles.content}`}>{children}</section>
 
         {/* Uncensored Studio cross-sell strip across all 70+ /tools/* pages */}
         <section className="container pb-6">

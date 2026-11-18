@@ -46,7 +46,13 @@ import { getDb } from "./db";
 import { addCredits, createCheckoutSession, getOrCreateBalance, sanitizeRedirectOrigin, CREDIT_PACKAGES, cancelStripeSubscriptionsForCustomer } from "./stripe";
 import { pricingRouter, activateSubscription, handleMonthlyReset, handleSubscriptionUpdated, handleSubscriptionDeleted } from "./routers/pricing";
 import { getEffectiveSubscriptionTier } from "../shared/subscriptionEntitlement";
-import { SUBSCRIPTION_PLANS, CREDIT_PACKS, LEGACY_CREDIT_PACKAGES, creditPackCheckoutMetadata } from "../shared/creditCosts";
+import {
+  SUBSCRIPTION_PLANS,
+  CREDIT_PACKS,
+  LEGACY_CREDIT_PACKAGES,
+  creditPackCheckoutMetadata,
+  getToolCostFromSlug,
+} from "../shared/creditCosts";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────
 
@@ -172,6 +178,21 @@ beforeEach(() => {
     ],
   });
   vi.mocked(getOrCreateBalance).mockResolvedValue(balanceRow as any);
+});
+
+it.each([
+  ["upscaler", 10],
+  ["inpainting", 5],
+  ["outpainting", 5],
+  ["3d-generator", 15],
+  ["color-palette", 0],
+  ["image-to-prompt", 0],
+  ["prompt-builder", 0],
+  ["text-effects", 5],
+  ["texture", 5],
+  ["tshirt-designer", 10],
+] as const)("shows the charged operation cost for the %s route", (slug, credits) => {
+  expect(getToolCostFromSlug(slug)).toBe(credits);
 });
 
 describe("provider subscription state persistence", () => {

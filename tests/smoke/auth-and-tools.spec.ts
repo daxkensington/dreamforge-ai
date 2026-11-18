@@ -45,7 +45,16 @@ for (const { path, heading } of SAMPLE_TOOLS) {
 
     const main = page.getByRole('main');
     await expect(main.getByRole('heading', { level: 1, name: heading, exact: true })).toBeVisible();
-    await expect(main).toContainText('Sign in free');
+    if (path === '/tools/song-creator') {
+      await expect(main).toContainText('Sign in free');
+    } else {
+      await expect(main.getByRole('link', { name: 'All Tools', exact: true })).toHaveAttribute('href', '/tools');
+      const access = main.getByRole('region', { name: 'Tool access' });
+      await expect(access.getByRole('link', { name: 'Sign in free', exact: true })).toHaveAttribute(
+        'href',
+        `/auth/signin?next=${encodeURIComponent(path)}`
+      );
+    }
     // Check rendered content, not the hidden Next.js RSC not-found template.
     await expect.poll(() => main.innerText()).not.toMatch(/404|page not found|not\s+found/i);
   });
