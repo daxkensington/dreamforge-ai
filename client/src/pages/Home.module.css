@@ -1,0 +1,721 @@
+.home {
+  --forge-background: #0a0b0a;
+  --forge-surface: #121412;
+  --forge-line: #2b2e28;
+  --forge-text: #f4f5ee;
+  --forge-muted: #adb1a6;
+  --forge-lime: #dafa64;
+  color: var(--forge-text);
+  background: var(--forge-background);
+  color-scheme: dark;
+}
+
+.home :where(a, button, input, summary, video):focus-visible {
+  outline: 2px solid var(--forge-lime);
+  outline-offset: 4px;
+}
+
+.wrap {
+  width: min(100% - clamp(2rem, 8vw, 7rem), 1280px);
+  margin-inline: auto;
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  background: #030403;
+}
+
+.heroArt,
+.heroShade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.heroArt {
+  z-index: -2;
+  object-fit: cover;
+  object-position: 65% center;
+}
+
+.heroShade {
+  z-index: -1;
+  background:
+    linear-gradient(
+      90deg,
+      #040504 6%,
+      rgb(4 5 4 / 96%) 20%,
+      rgb(4 5 4 / 72%) 36%,
+      transparent 65%
+    ),
+    linear-gradient(0deg, #060706 0%, transparent 32%);
+}
+
+.heroCopy {
+  max-width: 570px;
+  padding-block: clamp(3.25rem, 6vw, 6.25rem) clamp(2.5rem, 5vw, 4.25rem);
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--forge-lime);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.signal {
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 50%;
+  background: var(--forge-lime);
+  box-shadow: 0 0 14px rgb(218 250 100 / 80%);
+}
+
+.hero h1 {
+  margin-block: 1.15rem 0;
+  font-size: clamp(4rem, 7.6vw, 7rem);
+  font-weight: 760;
+  line-height: 0.92;
+  letter-spacing: -0.085em;
+}
+
+.hero h1 em {
+  color: var(--forge-lime);
+  font-style: normal;
+}
+
+.lead {
+  max-width: 27rem;
+  margin-top: 1.45rem;
+  color: #c3c7ba;
+  font-size: clamp(1rem, 1.5vw, 1.12rem);
+  line-height: 1.6;
+}
+
+.heroActions,
+.heroLinks,
+.ageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+}
+
+.heroActions {
+  margin-top: 1.55rem;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  min-height: 2.875rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 680;
+  text-align: center;
+}
+
+.primary {
+  color: #141808;
+  background: var(--forge-lime);
+}
+
+.primary:hover {
+  background: #edffa3;
+}
+
+.secondary {
+  border-color: #3d4235;
+  color: var(--forge-text);
+  background: rgb(9 11 9 / 46%);
+}
+
+.secondary:hover {
+  border-color: var(--forge-lime);
+  color: var(--forge-lime);
+}
+
+.prompt {
+  max-width: 29rem;
+  margin-top: 1.65rem;
+}
+
+.prompt label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #d5d8cc;
+  font-size: 0.83rem;
+  font-weight: 550;
+}
+
+.promptRow {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border: 1px solid #363a30;
+  border-radius: 0.55rem;
+  background: #141613;
+}
+
+.promptRow:focus-within {
+  border-color: var(--forge-lime);
+}
+
+.promptRow input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.25rem;
+  color: var(--forge-text);
+  font-size: 1rem;
+}
+
+.promptRow input::placeholder {
+  color: #9da295;
+}
+
+.promptRow input:focus-visible {
+  outline: none;
+}
+
+.promptRow button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding-inline: 0.62rem;
+  border-radius: 0.3rem;
+  background: #24291b;
+  color: var(--forge-lime);
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.promptRow button:hover {
+  background: #303b1e;
+}
+
+.heroLinks {
+  gap: 0 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.heroLinks a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--forge-muted);
+  font-size: 0.8rem;
+}
+
+.heroLinks a:hover {
+  color: var(--forge-lime);
+}
+
+.metrics {
+  border-block: 1px solid var(--forge-line);
+  background: #101210;
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.statGrid div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+  gap: 0.28rem;
+  padding: 1.25rem clamp(0.75rem, 3vw, 2.5rem);
+  border-inline-start: 1px solid var(--forge-line);
+}
+
+.statGrid div:last-child {
+  border-inline-end: 1px solid var(--forge-line);
+}
+
+.statGrid dd {
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.065em;
+}
+
+.statGrid dt,
+.providers {
+  color: var(--forge-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.providers {
+  border-top: 1px solid var(--forge-line);
+}
+
+.providers summary {
+  width: fit-content;
+  min-height: 2.75rem;
+  padding: 0.78rem 0 0.65rem;
+  cursor: pointer;
+}
+
+.providers p {
+  padding-bottom: 0.7rem;
+}
+
+.section,
+.lastSection {
+  padding-block: clamp(2rem, 5vw, 4.5rem);
+  scroll-margin-top: 4.5rem;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.4rem 1.25rem;
+  margin-bottom: clamp(0.85rem, 2vw, 1.65rem);
+}
+
+.sectionHead h2,
+.ageCard h2 {
+  font-size: clamp(1.75rem, 4.25vw, 3.4rem);
+  font-weight: 660;
+  line-height: 1.03;
+  letter-spacing: -0.065em;
+}
+
+.sectionHead .kicker {
+  margin-bottom: 0.55rem;
+}
+
+.textLink {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--forge-lime);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.textLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.toolGrid,
+.studioLinks,
+.releases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.toolCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: clip;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.6rem;
+  background: var(--forge-surface);
+}
+
+.toolMedia {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #080a08;
+}
+
+.toolMedia:focus-visible {
+  outline-offset: -4px;
+}
+
+.toolBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.9rem clamp(0.8rem, 1.75vw, 1.25rem) 0.45rem;
+}
+
+.toolBody h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.toolBody h3 svg,
+.studioLinks a svg:first-child,
+.releases a > svg:first-child,
+.pricing li svg {
+  flex-shrink: 0;
+  color: var(--forge-lime);
+}
+
+.toolBody p {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  color: var(--forge-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.toolBody a {
+  margin-top: auto;
+}
+
+.studioLinks {
+  margin-top: 0.75rem;
+}
+
+.studioLinks a,
+.releases a {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.4rem;
+  background: var(--forge-surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.studioLinks a:hover,
+.releases a:hover {
+  border-color: #76834f;
+}
+
+.studioLinks a svg:last-child,
+.releaseArrow {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--forge-muted);
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.gallery figure {
+  position: relative;
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--forge-line);
+  border-radius: 0.5rem;
+  background: var(--forge-surface);
+}
+
+.gallery img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.72;
+  object-fit: cover;
+}
+
+.gallery figcaption {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 1.5rem 0.65rem 0.55rem;
+  background: linear-gradient(transparent, rgb(0 0 0 / 86%));
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 550;
+  line-height: 1.3;
+}
+
+.pricing {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pricing article {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(0.8rem, 2.5vw, 1.5rem);
+  border: 1px solid var(--forge-line);
+  border-radius: 0.55rem;
+  background: var(--forge-surface);
+}
+
+.pricing .featuredPlan {
+  border-color: #82953f;
+  background: #1a2011;
+}
+
+.pricing h3 {
+  font-size: 0.97rem;
+  font-weight: 650;
+}
+
+.price {
+  margin-top: 0.6rem;
+  font-size: clamp(1.95rem, 4vw, 3rem);
+  font-weight: 680;
+  line-height: 1;
+  letter-spacing: -0.065em;
+}
+
+.price span {
+  color: var(--forge-muted);
+  font-size: 0.84rem;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+.pricing ul {
+  display: grid;
+  gap: 0.45rem;
+  margin-block: 0.9rem 1.15rem;
+}
+
+.pricing li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: #c4c7bd;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.pricing li svg {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+}
+
+.pricing a {
+  width: 100%;
+  margin-top: auto;
+}
+
+.releases a {
+  padding-block: 0.85rem;
+}
+
+.releases h3 {
+  font-size: 0.88rem;
+}
+
+.releases p {
+  margin-top: 0.24rem;
+  color: var(--forge-muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.lastSection {
+  padding-top: 0;
+}
+
+.ageCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid #493336;
+  border-radius: 0.55rem;
+  background: #1b1214;
+}
+
+.ageCard h2 {
+  margin-top: 0.5rem;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  letter-spacing: -0.045em;
+}
+
+.ageCard p:not(.ageLabel) {
+  margin-top: 0.6rem;
+  color: #cbbec1;
+  font-size: 0.87rem;
+}
+
+.ageLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #ffabb8;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.ageActions a {
+  color: #ffbfca;
+}
+
+@media (min-width: 1450px) {
+  .hero h1 {
+    font-size: 7.25rem;
+  }
+}
+
+@media (max-width: 880px) {
+  .hero h1 {
+    font-size: clamp(3.8rem, 10vw, 6rem);
+  }
+
+  .heroArt {
+    object-position: 62% center;
+  }
+
+  .heroShade {
+    background:
+      linear-gradient(
+        90deg,
+        rgb(4 5 4 / 99%) 0%,
+        rgb(4 5 4 / 84%) 35%,
+        rgb(4 5 4 / 14%) 88%
+      ),
+      linear-gradient(0deg, #060706 0%, transparent 32%);
+  }
+}
+
+@media (max-width: 660px) {
+  .heroArt,
+  .heroShade {
+    height: clamp(14rem, 62vw, 23rem);
+  }
+
+  .heroArt {
+    object-position: 91% center;
+  }
+
+  .heroShade {
+    background: linear-gradient(
+      0deg,
+      #030403 1%,
+      rgb(3 4 3 / 52%) 35%,
+      transparent 78%
+    );
+  }
+
+  .heroCopy {
+    padding-top: clamp(11rem, 47vw, 17rem);
+    padding-bottom: 1rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(3.25rem, 12vw, 5.25rem);
+  }
+
+  .lead {
+    margin-top: 1rem;
+  }
+
+  .heroActions,
+  .prompt {
+    margin-top: 1.1rem;
+  }
+
+  .statGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statGrid div:nth-child(even) {
+    border-inline-end: 1px solid var(--forge-line);
+  }
+
+  .statGrid div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--forge-line);
+  }
+
+  .statGrid div {
+    padding-block: 0.85rem;
+  }
+
+  .toolGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .toolCard {
+    display: grid;
+    grid-template-columns: 34% minmax(0, 1fr);
+  }
+
+  .toolCard:has(video) {
+    display: flex;
+  }
+
+  .toolCard img {
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .toolBody {
+    padding-block: 0.7rem 0;
+  }
+
+  .toolBody h3 svg {
+    display: none;
+  }
+
+  .studioLinks {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+
+  .gallery,
+  .pricing,
+  .releases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .releaseArrow {
+    display: none;
+  }
+}
+
+@media (max-width: 440px) {
+  .heroActions {
+    gap: 0.5rem;
+  }
+
+  .heroActions a {
+    font-size: 0.78rem;
+    padding-inline: 0.6rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .releases a {
+    align-items: flex-start;
+    padding-inline: 0.55rem;
+  }
+}

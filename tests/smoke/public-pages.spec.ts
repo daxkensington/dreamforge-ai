@@ -13,7 +13,7 @@ import {
  */
 
 const PUBLIC_PAGES = [
-  { path: "/", contains: ["Create Stunning", "Try It Free — No Signup"] },
+  { path: "/", contains: ["Forge it.", "Try It Free — No Signup"] },
   { path: "/about", contains: ["About DreamForgeX", "Browse 100+ Tools"] },
   { path: "/terms", contains: ["Terms of Service", "Acceptable Use"] },
   { path: "/privacy", contains: ["Privacy Policy", "AI model training"] },
@@ -124,6 +124,25 @@ test("homepage What's New section is visible", async ({ page }) => {
   }
 });
 
+test("homepage editing comparison switches examples and supports the keyboard", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const demo = page.getByRole("region", { name: "See the difference." });
+  const slider = demo.getByRole("slider", {
+    name: "Before and after comparison",
+  });
+  await expect(slider).toHaveValue("50");
+  await slider.press("End");
+  await expect(slider).toHaveValue("100");
+
+  const background = demo.getByRole("button", { name: "Background" });
+  await background.click();
+  await expect(background).toHaveAttribute("aria-pressed", "true");
+  await expect(slider).toHaveValue("50");
+  await expect(
+    demo.getByRole("link", { name: "Try Background Editor" })
+  ).toHaveAttribute("href", "/tools/background");
+});
+
 test("homepage keeps pricing and tool discovery within a compact page", async ({
   page,
 }) => {
@@ -183,8 +202,7 @@ test("no broken images on homepage", async ({ page }) => {
       broken.push(`${res.status()} ${res.url()}`);
     }
   });
-  // The looping video must not block document readiness. Explicitly wait for
-  // initial-viewport images to finish, keeping real network error assertions.
+  // Wait for initial-viewport images before checking for network errors.
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect
     .poll(() =>
