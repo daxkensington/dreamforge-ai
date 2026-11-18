@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { buildAdultRedirectUrl, isAdultRedirect } from "@shared/adultRouting";
 import { getLoginUrl } from "@/const";
 import { track } from "@/lib/analytics";
+import { DEMO_PROMPT_LIMIT, readGalleryDemoDraft } from "@/lib/galleryDemoHref";
 import {
   DEMO_WORKSPACE_PATH,
   saveDemoImagePrompt,
@@ -46,7 +47,6 @@ function trackDemoActivation(): void {
   }
 }
 
-const PROMPT_LIMIT = 500;
 const EXAMPLES = [
   {
     label: "Neon street",
@@ -112,7 +112,19 @@ export default function DemoTextToImage() {
     if (autoRan.current) return;
     autoRan.current = true;
     const incoming = new URLSearchParams(window.location.search).get("prompt");
-    const trimmed = (incoming ?? "").trim().slice(0, PROMPT_LIMIT);
+    if (incoming === null) {
+      const draft = readGalleryDemoDraft(window.location.hash);
+      if (draft) {
+        setPrompt(draft);
+        window.history.replaceState(
+          window.history.state,
+          "",
+          window.location.pathname + window.location.search
+        );
+      }
+      return;
+    }
+    const trimmed = incoming.trim().slice(0, DEMO_PROMPT_LIMIT);
     if (trimmed.length < 3) return;
 
     setPrompt(trimmed);
@@ -153,7 +165,7 @@ export default function DemoTextToImage() {
               <div className={styles.promptHeader}>
                 <label htmlFor="demo-prompt">Describe an image</label>
                 <span aria-hidden="true">
-                  {prompt.length}/{PROMPT_LIMIT}
+                  {prompt.length}/{DEMO_PROMPT_LIMIT}
                 </span>
               </div>
               <textarea
@@ -164,7 +176,7 @@ export default function DemoTextToImage() {
                 onChange={event => setPrompt(event.target.value)}
                 placeholder="A glass greenhouse on a rainy mountainside, warm light, wide angle…"
                 rows={5}
-                maxLength={PROMPT_LIMIT}
+                maxLength={DEMO_PROMPT_LIMIT}
                 disabled={isPending}
               />
               <div

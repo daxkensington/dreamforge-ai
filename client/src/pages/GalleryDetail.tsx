@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
+import { DEMO_PROMPT_LIMIT, galleryDemoHref } from "@/lib/galleryDemoHref";
 import {
   ArrowLeft,
   Calendar,
@@ -288,6 +289,22 @@ export default function GalleryDetail() {
                     {gen.prompt}
                   </p>
                 </div>
+                {gen.mediaType === "image" && gen.prompt.trim().length >= 3 && (
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      size="sm"
+                      asChild
+                      className="bg-[#dafa64] text-[#1a210a] hover:bg-[#eeffa7]"
+                    >
+                      <a href={galleryDemoHref(gen.prompt)}>Try this prompt</a>
+                    </Button>
+                    {gen.prompt.trim().length > DEMO_PROMPT_LIMIT && (
+                      <p className="text-xs text-muted-foreground">
+                        The demo opens with the first {DEMO_PROMPT_LIMIT} characters.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {gen.negativePrompt && (
                   <>
                     <h4 className="text-xs font-medium text-muted-foreground mt-3 mb-1">Negative Prompt</h4>

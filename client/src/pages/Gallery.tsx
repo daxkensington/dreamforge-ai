@@ -1,48 +1,96 @@
 import DisclaimerBanner from "@/components/DisclaimerBanner";
 import PageLayout from "@/components/PageLayout";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { galleryDemoHref } from "@/lib/galleryDemoHref";
 import { trpc } from "@/lib/trpc";
-import { motion, AnimatePresence } from "framer-motion";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 import {
-  Search,
-  Image,
-  Eye,
-  X,
+  ArrowDown,
+  ArrowRight,
+  Check,
   ChevronLeft,
   ChevronRight,
-  SlidersHorizontal,
-  Film,
-  Sparkles,
-  ArrowUpDown,
   Download,
-  Loader2,
+  Eye,
+  Film,
+  Image,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
-import { Link } from "wouter";
+import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { toast } from "sonner";
+import { Link } from "wouter";
+import styles from "./Gallery.module.css";
 
 const PAGE_SIZE = 24;
 
 const showcaseImages = [
-  { src: "/showcase/gallery-1.jpg", prompt: "Bioluminescent underwater cathedral with jellyfish stained glass" },
-  { src: "/showcase/gallery-2.jpg", prompt: "Cyberpunk samurai in neon rain, holographic katana" },
-  { src: "/showcase/gallery-3.jpg", prompt: "Enchanted forest library where trees are bookshelves" },
-  { src: "/showcase/gallery-4.jpg", prompt: "Crystalline phoenix emerging from a supernova" },
-  { src: "/showcase/gallery-5.jpg", prompt: "Android woman with clockwork face, art nouveau" },
-  { src: "/showcase/gallery-6.jpg", prompt: "Alien landscape with geometric monuments at sunset" },
+  {
+    src: "/showcase/gallery-1.jpg",
+    title: "Underwater cathedral",
+    prompt: "Bioluminescent underwater cathedral with jellyfish stained glass",
+  },
+  {
+    src: "/showcase/gallery-2.jpg",
+    title: "Neon rain",
+    prompt: "Cyberpunk samurai in neon rain, holographic katana",
+  },
+  {
+    src: "/showcase/gallery-3.jpg",
+    title: "Forest library",
+    prompt: "Enchanted forest library where trees are bookshelves",
+  },
+  {
+    src: "/showcase/gallery-4.jpg",
+    title: "Crystal phoenix",
+    prompt: "Crystalline phoenix emerging from a supernova",
+  },
+  {
+    src: "/showcase/gallery-5.jpg",
+    title: "Clockwork android",
+    prompt: "Android woman with clockwork face, art nouveau",
+  },
+  {
+    src: "/showcase/gallery-6.jpg",
+    title: "Alien monuments",
+    prompt: "Alien landscape with geometric monuments at sunset",
+  },
 ];
 
-type SortOption = "newest" | "oldest" | "most_viewed";
+const modelOptions = [
+  ["built-in-v1", "Built-in v1"],
+  ["stable-diffusion-xl", "SDXL"],
+  ["stable-diffusion-3", "SD 3"],
+  ["animatediff-v2", "AnimateDiff v2"],
+  ["animatediff-lightning", "AnimateDiff Lightning"],
+] as const;
+
+const sortOptions = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  most_viewed: "Most viewed",
+} as const;
+
+type SortOption = keyof typeof sortOptions;
+type GalleryItem =
+  inferRouterOutputs<AppRouter>["gallery"]["list"]["items"][number];
+
+function itemMetadata(item: GalleryItem) {
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    imageUrl: item.generation?.imageUrl,
+    prompt: item.generation?.prompt,
+    model: item.generation?.modelVersion,
+    mediaType: item.generation?.mediaType,
+    dimensions: `${item.generation?.width}x${item.generation?.height}`,
+    tags: item.tags?.map(tag => tag.name),
+    creator: item.userName,
+  };
+}
 
 export default function Gallery() {
   const [search, setSearch] = useState("");
@@ -51,516 +99,436 @@ export default function Gallery() {
   const [modelVersion, setModelVersion] = useState("");
   const [sort, setSort] = useState<SortOption>("newest");
   const [page, setPage] = useState(0);
-  const [showFilters, setShowFilters] = useState(true);
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [isExporting, setIsExporting] = useState(false);
-
-  const { data: tags } = trpc.tags.list.useQuery();
-
-  const queryInput = useMemo(
-    () => ({
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-      search: search || undefined,
-      tagSlugs: selectedTags.length > 0 ? selectedTags : undefined,
-      modelVersion: modelVersion || undefined,
-      sort,
-    }),
-    [page, search, selectedTags.join(","), modelVersion, sort]
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(
+    () => new Map<number, ReturnType<typeof itemMetadata>>()
   );
 
-  const { data: galleryData, isLoading } = trpc.gallery.list.useQuery(queryInput);
-
-  const items = galleryData?.items ?? [];
-  const total = galleryData?.total ?? 0;
+  const { data: tags } = trpc.tags.list.useQuery();
+  const gallery = trpc.gallery.list.useQuery({
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+    search: search || undefined,
+    tagSlugs: selectedTags.length ? selectedTags : undefined,
+    modelVersion: modelVersion || undefined,
+    sort,
+  });
+  const items = gallery.data?.items ?? [];
+  const total = gallery.data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const hasFilters = Boolean(
+    search || selectedTags.length || modelVersion || sort !== "newest"
+  );
+  const filterCount = selectedTags.length + (modelVersion ? 1 : 0);
 
-  const handleSearch = useCallback(() => {
+  const tagsByCategory = useMemo(() => {
+    const groups = new Map<string, NonNullable<typeof tags>>();
+    for (const tag of tags ?? []) {
+      const category = tag.category || "other";
+      const group = groups.get(category);
+      if (group) group.push(tag);
+      else groups.set(category, [tag]);
+    }
+    return Array.from(groups);
+  }, [tags]);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setSearch(searchInput.trim());
     setPage(0);
-  }, [searchInput]);
+  }
 
-  const toggleTag = useCallback((slug: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+  function toggleTag(slug: string) {
+    setSelectedTags(prev =>
+      prev.includes(slug) ? prev.filter(tag => tag !== slug) : [...prev, slug]
     );
     setPage(0);
-  }, []);
+  }
 
-  const clearFilters = useCallback(() => {
+  function clearFilters() {
     setSelectedTags([]);
     setModelVersion("");
     setSearch("");
     setSearchInput("");
     setSort("newest");
     setPage(0);
-  }, []);
+  }
 
-  const hasFilters = selectedTags.length > 0 || search || modelVersion || sort !== "newest";
+  function toggleSelectItem(item: GalleryItem) {
+    setSelectedItems(prev => {
+      const next = new Map(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.set(item.id, itemMetadata(item));
+      return next;
+    });
+  }
 
-  const tagsByCategory = useMemo(() => {
-    if (!tags) return {};
-    const grouped: Record<string, typeof tags> = {};
-    for (const tag of tags) {
-      const cat = tag.category || "other";
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(tag);
-    }
-    return grouped;
-  }, [tags]);
-
-  const toggleSelectItem = (id: number) => {
-    setSelectedItems((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleBulkExport = async () => {
-    if (selectedItems.length === 0) {
-      toast.info("Select items to export by clicking on them");
-      return;
-    }
-    setIsExporting(true);
+  function handleBulkExport() {
+    if (!selectedItems.size) return;
     try {
-      // Download images individually and create a simple export
-      const exportData = items
-        .filter((item) => selectedItems.includes(item.id))
-        .map((item) => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          imageUrl: item.generation?.imageUrl,
-          prompt: item.generation?.prompt,
-          model: item.generation?.modelVersion,
-          mediaType: item.generation?.mediaType,
-          dimensions: `${item.generation?.width}x${item.generation?.height}`,
-          tags: item.tags?.map((t: any) => t.name),
-          creator: item.userName,
-        }));
-
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `dreamforge-export-${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const json = JSON.stringify(Array.from(selectedItems.values()), null, 2);
+      const url = URL.createObjectURL(
+        new Blob([json], { type: "application/json" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `dreamforge-export-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       URL.revokeObjectURL(url);
-      toast.success(`Exported metadata for ${selectedItems.length} items`);
-      setSelectedItems([]);
+      toast.success(
+        `Exported metadata for ${selectedItems.size} ${selectedItems.size === 1 ? "item" : "items"}`
+      );
+      setSelectedItems(new Map());
     } catch {
       toast.error("Export failed");
-    } finally {
-      setIsExporting(false);
     }
-  };
+  }
+
+  function changePage(nextPage: number) {
+    setPage(nextPage);
+    document
+      .getElementById("community-results")
+      ?.scrollIntoView({ block: "start" });
+  }
 
   return (
     <PageLayout>
-      <div className="container py-8 md:py-12">
-        {/* Hero Banner */}
-        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 p-6 md:p-9 mb-8 shadow-2xl">
+      <div className={styles.page}>
+        <header className={styles.hero}>
           <img
             src="/showcase/gallery-1.jpg"
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
+            className={styles.heroArt}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/55" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(6,182,212,0.22),transparent_60%),radial-gradient(ellipse_at_bottom_left,rgba(168,85,247,0.18),transparent_60%)]" />
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-medium mb-3 backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5" />
-                Curated AI Art Showcase
-              </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                Community{" "}
-                <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  Gallery
-                </span>
+          <div className={styles.container}>
+            <div className={styles.heroCopy}>
+              <p className={styles.eyebrow}>DreamForgeX Showcase</p>
+              <h1>
+                Community <em>Gallery</em>
               </h1>
-              <p className="text-sm md:text-base text-white/75 mt-1.5 max-w-xl">
-                Discover stunning AI-generated art, remix prompts in one click, and explore creations from the DreamForgeX community
-                {galleryData && <span className="ml-1 text-cyan-300 font-medium">({total} items)</span>}
+              <p>
+                Explore AI art from DreamForgeX and the community. Pick an image
+                and adapt its prompt to make something of your own.
+              </p>
+              <div className={styles.heroActions}>
+                <a href="#featured-showcase" className={styles.primary}>
+                  Explore the showcase{" "}
+                  <ArrowDown size={16} aria-hidden="true" />
+                </a>
+                <a href="#community-work" className={styles.secondary}>
+                  Browse community work
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className={styles.container}>
+          <section
+            id="featured-showcase"
+            className={styles.section}
+            aria-labelledby="featured-showcase-title"
+          >
+            <div className={styles.sectionHead}>
+              <h2 id="featured-showcase-title">Featured showcase</h2>
+              <p>
+                Start with a DreamForgeX example and edit its prompt in the free
+                demo.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {selectedItems.length > 0 && (
-                <Button
-                  size="sm"
-                  onClick={handleBulkExport}
-                  disabled={isExporting}
-                  className="gap-1.5"
-                >
-                  {isExporting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" />
-                  )}
-                  Export {selectedItems.length} items
-                </Button>
-              )}
-              <DisclaimerBanner compact />
-            </div>
-          </div>
-        </div>
-
-        {/* Featured Showcase */}
-        <div className="mb-12">
-          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Featured Showcase — AI Art by DreamForge
-          </h2>
-          <p className="text-xs text-muted-foreground mb-4">Inspiration from our AI generation engine</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {showcaseImages.map((img) => (
-              <div key={img.src} className="group relative rounded-xl overflow-hidden aspect-[3/4]">
-                <img
-                  src={img.src}
-                  alt={img.prompt}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all duration-500 flex items-end">
-                  <div className="p-3 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                    <p className="text-xs text-white/90 font-medium leading-relaxed">
-                      &ldquo;{img.prompt}&rdquo;
-                    </p>
+            <div className={styles.galleryGrid}>
+              {showcaseImages.map(image => (
+                <article key={image.src} className={styles.showcaseCard}>
+                  <div className={styles.showcaseMedia}>
+                    <img
+                      src={image.src}
+                      alt={image.title}
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Search Bar + Sort */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Search prompts, titles, descriptions..."
-              className="pl-10 h-11"
-            />
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={handleSearch} className="h-11 px-6">
-              Search
-            </Button>
-            <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setPage(0); }}>
-              <SelectTrigger className="h-11 w-36 sm:w-44">
-                <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="most_viewed">Most Viewed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              className={`h-11 gap-2 bg-transparent ${showFilters ? "border-primary text-primary" : ""}`}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Filters</span>
-              {hasFilters && (
-                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                  {selectedTags.length + (search ? 1 : 0) + (modelVersion ? 1 : 0)}
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Filters Panel */}
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden mb-6"
-            >
-              <div className="p-5 rounded-xl border border-border/50 bg-card/50 space-y-4">
-                {Object.entries(tagsByCategory).map(([category, categoryTags]) => (
-                  <div key={category}>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block capitalize">
-                      {category}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {categoryTags.map((tag) => (
-                        <Badge
-                          key={tag.slug}
-                          variant={selectedTags.includes(tag.slug) ? "default" : "outline"}
-                          className={`cursor-pointer transition-all text-xs ${
-                            selectedTags.includes(tag.slug) ? "shadow-sm" : "bg-transparent hover:bg-accent"
-                          }`}
-                          style={
-                            selectedTags.includes(tag.slug) && tag.color
-                              ? { backgroundColor: tag.color + "30", borderColor: tag.color + "50", color: tag.color }
-                              : undefined
-                          }
-                          onClick={() => toggleTag(tag.slug)}
-                        >
-                          {tag.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                <div className="flex items-end gap-4 pt-2">
-                  <div className="w-48">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                      Model Version
-                    </label>
-                    <Select value={modelVersion || "all"} onValueChange={(v) => { setModelVersion(v === "all" ? "" : v); setPage(0); }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All models" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Models</SelectItem>
-                        <SelectItem value="built-in-v1">Built-in v1</SelectItem>
-                        <SelectItem value="stable-diffusion-xl">SDXL</SelectItem>
-                        <SelectItem value="stable-diffusion-3">SD 3</SelectItem>
-                        <SelectItem value="animatediff-v2">AnimateDiff v2</SelectItem>
-                        <SelectItem value="animatediff-lightning">AnimateDiff Lightning</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {hasFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                      <X className="h-3 w-3" />
-                      Clear all filters
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Active Filter Chips (when panel is hidden) */}
-        {hasFilters && !showFilters && (
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="text-xs text-muted-foreground">Active:</span>
-            {search && (
-              <Badge variant="secondary" className="text-xs gap-1">
-                Search: "{search}"
-                <X className="h-3 w-3 cursor-pointer" onClick={() => { setSearch(""); setSearchInput(""); }} />
-              </Badge>
-            )}
-            {selectedTags.map((slug) => {
-              const tag = tags?.find((t) => t.slug === slug);
-              return (
-                <Badge key={slug} variant="secondary" className="text-xs gap-1">
-                  {tag?.name || slug}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => toggleTag(slug)} />
-                </Badge>
-              );
-            })}
-            {modelVersion && (
-              <Badge variant="secondary" className="text-xs gap-1">
-                Model: {modelVersion}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => setModelVersion("")} />
-              </Badge>
-            )}
-            {sort !== "newest" && (
-              <Badge variant="secondary" className="text-xs gap-1">
-                Sort: {sort.replace("_", " ")}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => setSort("newest")} />
-              </Badge>
-            )}
-            <button onClick={clearFilters} className="text-xs text-primary hover:underline ml-2">Clear all</button>
-          </div>
-        )}
-
-        {/* Selection hint */}
-        {items.length > 0 && selectedItems.length === 0 && (
-          <p className="text-[10px] text-muted-foreground mb-4 flex items-center gap-1.5">
-            <Download className="h-3 w-3" />
-            Click items to select them for bulk metadata export
-          </p>
-        )}
-
-        {/* Gallery Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="aspect-[3/4] rounded-xl" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mx-auto mb-4">
-              <Image className="h-8 w-8 text-muted-foreground opacity-30" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">
-              {hasFilters ? "No results match your filters" : "No gallery items yet"}
-            </p>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
-              {hasFilters ? "Try adjusting your search or filter criteria" : "Be the first to share your AI creations with the community"}
-            </p>
-            {hasFilters && (
-              <Button variant="outline" size="sm" onClick={clearFilters} className="bg-transparent">Clear Filters</Button>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, i) => {
-                  const isSelected = selectedItems.includes(item.id);
-                  return (
-                    <motion.div
-                      key={item.id}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ delay: i * 0.03, duration: 0.3 }}
+                  <div className={styles.showcaseBody}>
+                    <h3>{image.title}</h3>
+                    <p>{image.prompt}</p>
+                    <a
+                      className={styles.promptLink}
+                      href={galleryDemoHref(image.prompt)}
+                      aria-label={`Try this prompt: ${image.title}`}
                     >
-                      <div
-                        className={`group rounded-xl border overflow-hidden hover:border-border/80 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 cursor-pointer relative ${
-                          isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/50"
-                        }`}
-                        onClick={(e) => {
-                          if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                            e.preventDefault();
-                            toggleSelectItem(item.id);
-                          }
+                      Try this prompt{" "}
+                      <ArrowRight size={15} aria-hidden="true" />
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section
+            id="community-work"
+            className={styles.community}
+            aria-labelledby="community-work-title"
+          >
+            <div className={styles.sectionHead}>
+              <h2 id="community-work-title">Community work</h2>
+            </div>
+            <div className={styles.toolbar}>
+              <form
+                className={styles.search}
+                role="search"
+                onSubmit={handleSearch}
+              >
+                <label className={styles.searchField}>
+                  <Search size={17} aria-hidden="true" />
+                  <span className="sr-only">Search community work</span>
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={event => setSearchInput(event.target.value)}
+                    placeholder="Search prompts, titles, descriptions"
+                  />
+                </label>
+                <button type="submit" className={styles.primary}>
+                  Search
+                </button>
+              </form>
+              <div className={styles.toolbarActions}>
+                <select
+                  aria-label="Sort community work"
+                  value={sort}
+                  onChange={event => {
+                    setSort(event.target.value as SortOption);
+                    setPage(0);
+                  }}
+                >
+                  {Object.entries(sortOptions).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  aria-expanded={showFilters}
+                  aria-controls="gallery-filters"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <SlidersHorizontal size={16} aria-hidden="true" />
+                  Filters{filterCount > 0 ? ` (${filterCount})` : ""}
+                </button>
+              </div>
+            </div>
+
+            <div
+              id="gallery-filters"
+              className={styles.filterPanel}
+              hidden={!showFilters}
+            >
+              {tagsByCategory.map(([category, categoryTags]) => (
+                <div key={category} className={styles.filterGroup}>
+                  <p>{category}</p>
+                  <div className={styles.filterChips}>
+                    {categoryTags.map(tag => (
+                      <button
+                        key={tag.slug}
+                        type="button"
+                        className={styles.chip}
+                        aria-pressed={selectedTags.includes(tag.slug)}
+                        onClick={() => toggleTag(tag.slug)}
+                      >
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <label className={styles.filterGroup}>
+                <span>Model version</span>
+                <select
+                  value={modelVersion}
+                  onChange={event => {
+                    setModelVersion(event.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <option value="">All models</option>
+                  {modelOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div id="community-results" className={styles.summary}>
+              <p role="status">
+                {gallery.isLoading
+                  ? "Loading community work…"
+                  : gallery.isError
+                    ? "Community work is temporarily unavailable."
+                    : `${total} ${total === 1 ? "result" : "results"}${search ? ` for “${search}”` : ""}`}
+              </p>
+              <div>
+                {hasFilters && (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </button>
+                )}
+                {selectedItems.size > 0 && (
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    onClick={handleBulkExport}
+                  >
+                    <Download size={16} aria-hidden="true" /> Export{" "}
+                    {selectedItems.size} selected
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {gallery.isLoading ? (
+              <div className={styles.communityGrid} aria-hidden="true">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Skeleton className="aspect-square rounded-xl" key={i} />
+                ))}
+              </div>
+            ) : gallery.isError ? (
+              <div className={styles.empty}>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => void gallery.refetch()}
+                >
+                  Retry community work
+                </button>
+              </div>
+            ) : items.length === 0 ? (
+              <div className={styles.empty}>
+                <Image size={30} aria-hidden="true" />
+                <p>
+                  {hasFilters
+                    ? "No work matches those filters."
+                    : "No community work has been shared yet."}
+                </p>
+              </div>
+            ) : (
+              <div className={styles.communityGrid}>
+                {items.map(item => {
+                  const title = item.title || "Untitled artwork";
+                  const generation = item.generation;
+
+                  return (
+                    <article key={item.id} className={styles.communityCard}>
+                      <Link
+                        href={`/gallery/${item.id}`}
+                        onClick={event => {
+                          if (
+                            !event.shiftKey &&
+                            !event.ctrlKey &&
+                            !event.metaKey
+                          )
+                            return;
+                          event.preventDefault();
+                          toggleSelectItem(item);
                         }}
                       >
-                        {/* Selection checkbox */}
-                        <button
-                          className={`absolute top-2 right-2 z-10 h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                            isSelected
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "bg-black/30 border-white/40 text-transparent opacity-0 group-hover:opacity-100"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            toggleSelectItem(item.id);
-                          }}
-                        >
-                          {isSelected && <span className="text-xs font-bold">✓</span>}
-                        </button>
-
-                        <Link href={`/gallery/${item.id}`}>
-                          <div className="aspect-[3/4] bg-muted/30 relative overflow-hidden">
-                            {item.generation?.imageUrl ? (
-                              <img
-                                src={item.generation.imageUrl}
-                                alt={item.title || "AI artwork"}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Image className="h-8 w-8 text-muted-foreground opacity-30" />
-                              </div>
+                        <div className={styles.communityMedia}>
+                          {generation?.imageUrl ? (
+                            <img
+                              src={generation.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : (
+                            <Image size={30} aria-hidden="true" />
+                          )}
+                          {generation?.mediaType === "video" && (
+                            <span className={styles.mediaBadge}>
+                              <Film size={14} aria-hidden="true" />{" "}
+                              {generation.duration || 4}s video
+                            </span>
+                          )}
+                          <span className={styles.viewBadge}>
+                            <Eye size={14} aria-hidden="true" />{" "}
+                            {item.viewCount ?? 0} views
+                          </span>
+                        </div>
+                        <div className={styles.communityBody}>
+                          <h3>{title}</h3>
+                          <p>By {item.userName || "Anonymous"}</p>
+                          <div className={styles.badges}>
+                            {item.featured && <span>Featured</span>}
+                            {generation?.modelVersion && (
+                              <span>{generation.modelVersion}</span>
                             )}
-
-                            {item.generation?.mediaType === "video" && (
-                              <div className="absolute top-2 left-2 video-badge px-2 py-0.5 rounded-md flex items-center gap-1">
-                                <Film className="h-3 w-3 text-white" />
-                                <span className="text-[10px] text-white font-medium">
-                                  {item.generation?.duration || 4}s
-                                </span>
-                              </div>
-                            )}
-
-                            <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/50 backdrop-blur-sm">
-                              <Eye className="h-3 w-3 text-white/80" />
-                              <span className="text-[10px] text-white/80">{item.viewCount ?? 0}</span>
-                            </div>
-
-                            {item.featured && (
-                              <div className="absolute top-2 right-10 px-2 py-0.5 rounded-md bg-primary/80 backdrop-blur-sm">
-                                <span className="text-[10px] text-white font-medium">Featured</span>
-                              </div>
-                            )}
-
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <div className="absolute bottom-3 left-3 right-3">
-                                <span className="text-[10px] text-white/70 font-mono">{item.generation?.modelVersion}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="p-3 space-y-2">
-                            <h3 className="text-sm font-medium line-clamp-1">{item.title || "Untitled"}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-1">by {item.userName || "Anonymous"}</p>
-                            {item.tags && item.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {item.tags.slice(0, 3).map((tag) => (
-                                  <span
-                                    key={tag.slug}
-                                    className="text-[9px] px-1.5 py-0.5 rounded-full border border-border/50 text-muted-foreground"
-                                    style={tag.color ? { borderColor: tag.color + "40", color: tag.color } : undefined}
-                                  >
-                                    {tag.name}
-                                  </span>
-                                ))}
-                                {item.tags.length > 3 && (
-                                  <span className="text-[9px] text-muted-foreground">+{item.tags.length - 3}</span>
-                                )}
-                              </div>
+                            {item.tags?.slice(0, 3).map(tag => (
+                              <span key={tag.slug}>{tag.name}</span>
+                            ))}
+                            {item.tags && item.tags.length > 3 && (
+                              <span>+{item.tags.length - 3}</span>
                             )}
                           </div>
-                        </Link>
-                      </div>
-                    </motion.div>
+                        </div>
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.selection}
+                        aria-label={`Select ${title} for metadata export`}
+                        aria-pressed={selectedItems.has(item.id)}
+                        onClick={() => toggleSelectItem(item)}
+                      >
+                        {selectedItems.has(item.id) && (
+                          <Check size={15} aria-hidden="true" />
+                        )}
+                      </button>
+                    </article>
                   );
                 })}
-              </AnimatePresence>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-10">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="gap-1.5 bg-transparent"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page + 1} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="gap-1.5 bg-transparent"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
             )}
-          </>
-        )}
 
-        <div className="mt-12">
-          <DisclaimerBanner />
+            {totalPages > 1 && (
+              <nav
+                className={styles.pagination}
+                aria-label="Community work pages"
+              >
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => changePage(page - 1)}
+                  disabled={page === 0}
+                >
+                  <ChevronLeft size={16} aria-hidden="true" /> Previous
+                </button>
+                <span>
+                  Page {page + 1} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => changePage(page + 1)}
+                  disabled={page >= totalPages - 1}
+                >
+                  Next <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </nav>
+            )}
+          </section>
+
+          <div className={styles.disclaimer}>
+            <DisclaimerBanner />
+          </div>
         </div>
       </div>
     </PageLayout>
