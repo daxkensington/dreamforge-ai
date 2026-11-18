@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,22 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ShareButton } from "@/components/ShareButton";
 import type { LucideIcon } from "lucide-react";
+
+// Leave room for multipart encoding below Vercel's 4.5 MB request limit.
+const MAX_PHOTO_MIB = 4;
+const MAX_PHOTO_BYTES = MAX_PHOTO_MIB * 1024 * 1024;
+const PHOTO_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+];
+
+type PhotoUpload =
+  | { status: "idle" | "uploading" }
+  | { status: "ready"; url: string }
+  | { status: "failed"; message: string };
 
 export interface ViralPresetToolProps {
   preset:
@@ -60,13 +77,16 @@ export function ViralPresetTool({
   hint,
   showcase,
 }: ViralPresetToolProps) {
-  const [imageUrl, setImageUrl] = useState("");
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const [photo, setPhoto] = useState<PhotoUpload>({ status: "idle" });
+  const uploadRequest = useRef<AbortController | null>(null);
+  const photoInputId = useId();
   const [note, setNote] = useState("");
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultId, setResultId] = useState<number | null>(null);
 
   const transform = trpc.viral.transform.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       if (data.status === "completed" && data.url) {
         setResultUrl(data.url);
         toast.success("Done!");
@@ -74,22 +94,86 @@ export function ViralPresetTool({
         toast.error(("error" in data && data.error) || "Generation failed");
       }
     },
-    onError: (err) => toast.error(err.message),
+    onError: err => toast.error(err.message),
   });
 
   const isLoading = transform.isPending;
+  const imageUrl = photo.status === "ready" ? photo.url : "";
 
-  const handleFileUpload = (file: File) => {
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image must be under 10MB");
+  useEffect(() => () => uploadRequest.current?.abort(), []);
+
+  const handleFileUpload = async (file: File) => {
+    if (!isAuthenticated) return;
+    uploadRequest.current?.abort();
+    uploadRequest.current = null;
+    if (!PHOTO_TYPES.includes(file.type)) {
+      setPhoto({
+        status: "failed",
+        message: "Choose a JPG, PNG, WebP, GIF or AVIF image.",
+      });
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => setImageUrl(e.target?.result as string);
-    reader.readAsDataURL(file);
+    if (file.size === 0 || file.size > MAX_PHOTO_BYTES) {
+      setPhoto({
+        status: "failed",
+        message: `Choose a non-empty image up to ${MAX_PHOTO_MIB} MiB.`,
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    uploadRequest.current = controller;
+    setPhoto({ status: "uploading" });
+
+    try {
+      // The transform endpoint accepts a storage URL, not a base64 file.
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
+      const payload: { url?: unknown; error?: unknown } = await response
+        .json()
+        .catch(() => ({}));
+      if (uploadRequest.current !== controller || controller.signal.aborted)
+        return;
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Upload failed. Select the photo to try again."
+        );
+      }
+      const url = payload?.url;
+      if (
+        typeof url !== "string" ||
+        url.length > 2048 ||
+        !/^https?:\/\//i.test(url)
+      ) {
+        throw new Error(
+          "Upload did not return a usable image. Select the photo to try again."
+        );
+      }
+      setPhoto({ status: "ready", url });
+    } catch (error) {
+      if (uploadRequest.current !== controller || controller.signal.aborted)
+        return;
+      setPhoto({
+        status: "failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Upload failed. Select the photo to try again.",
+      });
+    } finally {
+      if (uploadRequest.current === controller) uploadRequest.current = null;
+    }
   };
 
   const handleGenerate = () => {
+    if (!isAuthenticated || isLoading || uploadRequest.current) return;
     if (!imageUrl) {
       toast.error("Upload a photo first");
       return;
@@ -100,7 +184,9 @@ export function ViralPresetTool({
   };
 
   const handleReset = () => {
-    setImageUrl("");
+    uploadRequest.current?.abort();
+    uploadRequest.current = null;
+    setPhoto({ status: "idle" });
     setNote("");
     setResultUrl(null);
     setResultId(null);
@@ -120,7 +206,7 @@ export function ViralPresetTool({
               Examples
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {showcase.map((src) => (
+              {showcase.map(src => (
                 <Image
                   key={src}
                   src={src}
@@ -141,22 +227,25 @@ export function ViralPresetTool({
             <Card>
               <CardContent className="p-5 space-y-4">
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">
+                  <Label
+                    htmlFor={photoInputId}
+                    className="text-sm font-medium mb-2 block"
+                  >
                     Upload your photo
                   </Label>
-                  <label
-                    className="block aspect-square w-full rounded-xl border-2 border-dashed border-border/60 hover:border-cyan-500/50 transition-colors cursor-pointer overflow-hidden bg-background/40"
-                    aria-label="Upload an image"
-                  >
+                  <div className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/60 hover:border-cyan-500/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-colors overflow-hidden bg-background/40">
                     <input
+                      id={photoInputId}
                       type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleFileUpload(f);
+                      accept={PHOTO_TYPES.join(",")}
+                      aria-describedby={`${photoInputId}-help`}
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                      onChange={e => {
+                        const file = e.currentTarget.files?.[0];
+                        e.currentTarget.value = "";
+                        if (file) void handleFileUpload(file);
                       }}
-                      disabled={isLoading}
+                      disabled={authLoading || !isAuthenticated || isLoading}
                     />
                     {imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -167,14 +256,43 @@ export function ViralPresetTool({
                       />
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 p-4 text-center">
-                        <Upload className="h-8 w-8" />
-                        <p className="text-sm">Click to upload</p>
-                        <p className="text-xs opacity-60">
-                          A clear front-facing photo works best
-                        </p>
+                        {photo.status === "uploading" ? (
+                          <>
+                            <Loader2
+                              className="h-8 w-8 motion-safe:animate-spin"
+                              aria-hidden="true"
+                            />
+                            <p role="status" className="text-sm">
+                              Uploading photo…
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-8 w-8" aria-hidden="true" />
+                            <p className="text-sm">
+                              {authLoading
+                                ? "Checking sign-in…"
+                                : isAuthenticated
+                                  ? "Choose a photo"
+                                  : "Sign in to upload"}
+                            </p>
+                          </>
+                        )}
                       </div>
                     )}
-                  </label>
+                  </div>
+                  <p
+                    id={`${photoInputId}-help`}
+                    className="mt-2 text-xs text-muted-foreground"
+                  >
+                    JPG, PNG, WebP, GIF or AVIF up to {MAX_PHOTO_MIB} MiB. A
+                    clear front-facing photo works best.
+                  </p>
+                  {photo.status === "failed" && (
+                    <p role="alert" className="mt-2 text-sm text-destructive">
+                      {photo.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -186,7 +304,7 @@ export function ViralPresetTool({
                   )}
                   <Textarea
                     value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    onChange={e => setNote(e.target.value)}
                     placeholder={examplePrompts[0]}
                     rows={3}
                     maxLength={300}
@@ -195,7 +313,7 @@ export function ViralPresetTool({
                   />
                   {examplePrompts.length > 1 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {examplePrompts.slice(0, 3).map((p) => (
+                      {examplePrompts.slice(0, 3).map(p => (
                         <button
                           key={p}
                           type="button"
@@ -213,7 +331,7 @@ export function ViralPresetTool({
                 <div className="flex gap-2">
                   <Button
                     onClick={handleGenerate}
-                    disabled={isLoading || !imageUrl}
+                    disabled={isLoading || !isAuthenticated || !imageUrl}
                     className="flex-1 gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
                   >
                     {isLoading ? (

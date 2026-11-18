@@ -2,6 +2,7 @@
  * Long-form SEO copy for each tool page — rendered below the fold by
  * ToolSEOBlock. Generated via scripts/gen-tool-seo-copy.py (Grok JSON mode).
  */
+import { getToolCostFromSlug } from "./creditCosts";
 
 export type ToolSeo = {
   title: string;
@@ -30,7 +31,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How high is the quality of generated 3D models?`, a: `Models feature detailed meshes suitable for previews and basic printing, with resolutions up to 1 million polygons. They may require minor tweaks in software like Blender for professional use. Output quality depends on prompt specificity.` },
-      { q: `Is there a cost to use the 3D Generator?`, a: `Basic generations are free with a daily limit, while premium plans unlock unlimited access and higher resolutions starting at $9/month. No hidden fees apply to downloads. Freelancers can start without commitment.` },
+      { q: `Is there a cost to use the 3D Generator?`, a: `Sign in to use the 3D Generator. Each generation costs ${getToolCostFromSlug("3d-generator")} credits.` },
       { q: `What are the usage rights for generated models?`, a: `You own the rights to models created with your inputs for commercial use, including sales on platforms like Etsy. The tool does not claim ownership. Avoid prompts copying protected designs to stay compliant.` },
     ],
   },
@@ -921,7 +922,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How does the quality of inpainting compare to manual editing?`, a: `The AI produces natural-looking results that blend well with the original image, often matching manual edits for simple tasks. Complex scenes may require minor adjustments. Outputs maintain the source resolution for professional use.` },
-      { q: `Is there a cost to use the inpainting tool?`, a: `Basic generations are free with a daily limit, while unlimited access comes with a subscription starting at $9/month. No hidden fees for downloads. Freelancers can scale based on project volume.` },
+      { q: `Is there a cost to use the inpainting tool?`, a: `Sign in to use Inpainting. Each generation costs ${getToolCostFromSlug("inpainting")} credits.` },
       { q: `What are the usage rights for generated images?`, a: `You own the rights to images you create, suitable for commercial use like client deliverables. Avoid uploading copyrighted material without permission. Edits preserve your original file's licensing.` },
     ],
   },
@@ -1246,7 +1247,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `How does the quality of the outpainted areas compare to the original?`, a: `The AI matches the style, colors, and details of your original image closely. Results are consistent for most uploads, though complex patterns may need minor edits. Outputs maintain sharpness in standard resolutions.` },
-      { q: `Is there a cost to use Outpainting, and what are the limits?`, a: `Basic use is free with watermarks; premium removes them for a subscription fee starting at $9/month. You can process up to 10 images daily on the free tier, with no size limit under 10MB per file.` },
+      { q: `How many credits does Outpainting use?`, a: `Sign in to use Outpainting. Each generation costs ${getToolCostFromSlug("outpainting")} credits.` },
       { q: `What rights do I have over the outpainted images?`, a: `You own full commercial rights to the generated images for your projects. The tool doesn't claim ownership, but avoid uploading copyrighted material without permission.` },
     ],
   },
@@ -2052,7 +2053,7 @@ export const TOOL_SEO_COPY: Record<string, ToolSeo> = {
     ],
     faq: [
       { q: `Does upscaling affect image quality negatively?`, a: `The tool uses AI to add details intelligently, preserving clarity better than basic interpolation. Results are crisp for most inputs under 5MP original size.` },
-      { q: `Is there a cost for using the upscaler?`, a: `Basic upscales are free with watermarks; premium removes them and allows batch processing for $9/month.` },
+      { q: `Is there a cost for using the upscaler?`, a: `Sign in to use the Upscaler. Each 2x or 4x upscale costs ${getToolCostFromSlug("upscaler")} credits.` },
       { q: `Can I use the output commercially?`, a: `Yes, upscaled images retain your original rights and can be sold or used in products without restrictions from the tool.` },
     ],
   },
