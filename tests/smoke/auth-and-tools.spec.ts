@@ -65,5 +65,9 @@ test("anonymous homepage CTA reaches the no-signup demo", async ({ page, baseURL
   ]);
   await expect(page).toHaveURL(url => url.origin === expectedOrigin && url.pathname === '/demo/text-to-image' && !url.search);
   await expect(page.getByRole('heading', { level: 1, name: 'Try AI Image Generation Free', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Generate (free)', exact: true })).toBeDisabled();
+  const generate = page.getByRole('button', { name: 'Generate (free)', exact: true });
+  await expect(generate).toBeDisabled();
+  await page.getByRole('button', { name: 'Neon street', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Describe an image' })).toHaveValue(/neon reflections/);
+  await expect(generate).toBeEnabled();
 });
