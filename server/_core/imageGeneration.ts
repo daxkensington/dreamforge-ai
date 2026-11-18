@@ -62,7 +62,7 @@ export type GenerateImageOptions = {
 };
 
 export type GenerateImageResponse = {
-  url?: string;
+  url: string;
   provenance?: ImageGenerationProvenance;
 };
 
@@ -737,6 +737,7 @@ export async function generateImage(
   // Save to R2 storage
   const key = generateStorageKey("generations", "png");
   const { url } = await storagePut(key, imageBuffer, "image/png");
+  if (typeof url !== "string" || !url.trim()) throw new Error("Image storage returned no usable URL");
 
   return { url, ...(provenance ? { provenance } : {}) };
 }

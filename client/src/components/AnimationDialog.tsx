@@ -77,12 +77,16 @@ export function AnimationDialog({
   generationId,
   sourceUrl,
   onComplete,
+  onVideoReady,
+  beforeNewRequest,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   generationId: number | null;
   sourceUrl?: string | null;
   onComplete: () => void;
+  onVideoReady?: (videoUrl: string) => void;
+  beforeNewRequest?: () => string | null;
 }) {
   const { user } = useAuth();
   const owner = useRef(user?.id);
@@ -130,6 +134,7 @@ export function AnimationDialog({
       if (data.status === "completed") {
         setResultUrl(data.imageUrl);
         setMessage("Your video is ready and saved in generation history.");
+        if (typeof data.imageUrl === "string" && data.imageUrl) onVideoReady?.(data.imageUrl);
         onComplete();
       } else
         setMessage(
@@ -207,6 +212,8 @@ export function AnimationDialog({
     if (current && current.userId !== user.id) return;
     if (!current) {
       if (!generationId || !policy.data?.isConfigured) return;
+      const blocked = beforeNewRequest?.();
+      if (blocked) { setMessage(blocked); return; }
       const description = prompt.trim() || motions[motion].prompt;
       if (description.length < 3) { setMessage("Use at least three characters for the motion description, or leave it blank to use the preset."); return; }
       current = {

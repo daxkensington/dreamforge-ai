@@ -14,7 +14,7 @@ vi.mock("./_core/llm", () => ({
 // Mock credit deduction (always succeeds in tests)
 vi.mock('./stripe', () => ({
   deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 99, needed: 0, transactionId: 700, purchasedCreditsDebited: 0 }),
-  refundCredits: vi.fn().mockResolvedValue(undefined),
+  refundCredits: vi.fn().mockImplementation(async (_user: number, amount: number) => ({ success: true, refunded: amount })),
   CREDIT_COSTS: {
     'text-to-image': 1, 'image-to-image': 1, 'upscale': 2, 'style-transfer': 2,
     'background-edit': 1, 'face-enhance': 2, 'batch-process': 5, 'animate': 3,
@@ -607,38 +607,10 @@ describe("Video Studio Endpoints", () => {
       for (const key of PROVIDER_ENV_KEYS) delete process.env[key];
     });
 
-    it("refunds the 50-credit charge when all providers fail", async () => {
-      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 701, purchasedCreditsDebited: 17 });
-      const result = await caller.video.textToVideo({
-        prompt: "A cinematic mountain flyover at dawn",
-      });
-
-      expect(result.status).toBe("failed");
-      expect(result.videoUrl).toBeNull();
-      expect(deductCredits).toHaveBeenCalledWith(
-        1,
-        50,
-        expect.stringContaining("Text-to-video"),
-      );
-      expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(
-        1,
-        50,
-        expect.stringContaining("Refund"),
-        { purchasedCredits: 17, operationKey: "legacy-refund:701" },
-      );
-    });
-
-    it("refunds when an explicitly selected model is unavailable", async () => {
-      vi.mocked(deductCredits).mockResolvedValueOnce({ success: true, balance: 99, needed: 0, transactionId: 702, purchasedCreditsDebited: 50 });
-      const result = await caller.video.textToVideo({
-        prompt: "Ocean waves crashing on black sand",
-        model: "veo-3",
-      });
-
-      expect(result.status).toBe("failed");
-      expect(refundCredits).toHaveBeenCalledTimes(1);
-      expect(refundCredits).toHaveBeenCalledWith(1, 50, expect.stringContaining("Refund"), { purchasedCredits: 50, operationKey: "legacy-refund:702" });
+    it.each(["auto", "veo-3", "runway-gen4.5"] as const)("rejects unquoted %s submissions before spending credits", async (model) => {
+      await expect(caller.video.textToVideo({ prompt: "Ocean waves on black sand", model })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      expect(deductCredits).not.toHaveBeenCalled();
+      expect(refundCredits).not.toHaveBeenCalled();
     });
 
     it("does not deduct or refund on input validation failures", async () => {

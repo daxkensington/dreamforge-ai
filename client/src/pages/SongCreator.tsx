@@ -764,11 +764,12 @@ export default function SongCreator() {
                     <Music className="h-4 w-4" /> Create Another
                   </Button>
                   <Button className="flex-1 gap-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white" asChild>
-                    <a href={`/tools/music-video?song=${encodeURIComponent(songUrl)}&title=${encodeURIComponent(title)}`}>
+                    <a href="/tools/music-video">
                       <Mic className="h-4 w-4" /> Create Music Video
                     </a>
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">Download your song first, then select the file in Music Video Studio.</p>
               </CardContent>
             </Card>
           </motion.div>

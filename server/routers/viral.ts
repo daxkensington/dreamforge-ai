@@ -14,7 +14,8 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { requireToolActive } from "../_core/toolStatus";
-import { deductCredits, refundCredits, CREDIT_COSTS } from "../stripe";
+import { deductCredits, CREDIT_COSTS } from "../stripe";
+import { refundFailedLegacyTool } from "../_core/legacyToolRefund";
 
 // Preset name → { creditTool, prompt-augmentation }.
 // `creditTool` lookups go through TOOL_CREDIT_COSTS so the user-facing
@@ -122,17 +123,7 @@ export const viralRouter = router({
         });
         return { url, status: "completed" as const, preset: input.preset };
       } catch (error: any) {
-        // Refund the exact charge — the user received no image.
-        try {
-          await refundCredits(
-            ctx.user.id,
-            cost,
-            `Refund: ${preset.label} generation failed — ${(error?.message || "unknown error").slice(0, 100)}`,
-            { purchasedCredits: result.purchasedCreditsDebited ?? 0, operationKey: result.transactionId ? `usage-refund:${result.transactionId}` : undefined },
-          );
-        } catch (refundErr) {
-          console.error("[viral.transform] Credit refund failed:", refundErr);
-        }
+        await refundFailedLegacyTool(ctx.user.id, { ...result, cost }, preset.creditTool, "usage-refund");
         return {
           url: null,
           status: "failed" as const,

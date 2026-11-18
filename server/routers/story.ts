@@ -18,7 +18,8 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { generateImage } from "../_core/imageGeneration";
 import { invokeLLM } from "../_core/llm";
 import { requireToolActive } from "../_core/toolStatus";
-import { deductCredits, refundCredits } from "../stripe";
+import { deductCredits } from "../stripe";
+import { refundCreditsVerified } from "../_core/legacyToolRefund";
 import { getDb } from "../db";
 import { getCharacter } from "../dbExtended";
 import { audioGenerations } from "../../drizzle/schema";
@@ -35,15 +36,6 @@ function totalCost(sceneCount: number, withMusic: boolean): number {
   const perImage = STORY_IMAGE_COST;
   const music = withMusic ? STORY_MUSIC_COST : 0;
   return storyboard + sceneCount * perImage + music;
-}
-
-// Refunds must never throw — a failed refund must not mask the original error.
-async function safeRefund(userId: number, amount: number, reason: string, options?: {purchasedCredits?: number; operationKey?: string}) {
-  try {
-    await refundCredits(userId, amount, reason, options);
-  } catch (err) {
-    console.error("[story] Credit refund failed:", err);
-  }
 }
 
 export const storyRouter = router({
@@ -63,6 +55,17 @@ export const storyRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireToolActive("storyboard");
 
+      // Resolve the optional character before charging, so a lookup error
+      // cannot strand a debit before any story work has begun.
+      let characterClause = "";
+      if (input.characterId) {
+        const char = await getCharacter(input.characterId, ctx.user.id);
+        if (char) {
+          characterClause =
+            ` Main character: ${char.name}. ${char.description ?? ""} ${char.styleNotes ?? ""}`.trim();
+        }
+      }
+
       const cost = totalCost(input.sceneCount, input.withMusic);
       const debit = await deductCredits(
         ctx.user.id,
@@ -77,23 +80,20 @@ export const storyRouter = router({
       }
 
       let remainingPurchased = debit.purchasedCreditsDebited ?? 0;
+      let billingWarning: string | null = null;
       const refund = async (_userId: number, amount: number, reason: string) => {
         const purchased = Math.min(amount, remainingPurchased);
-        await safeRefund(ctx.user.id, amount, reason, { purchasedCredits: purchased,
-          operationKey: debit.transactionId ? `story-refund:${debit.transactionId}:${amount}:${reason.slice(0,40)}` : undefined });
+        const key = debit.transactionId ? `story-refund:${debit.transactionId}:${amount}:${reason.slice(0,40)}` : null;
+        try {
+          if (!key || debit.purchasedCreditsDebited === undefined) throw new Error("Missing debit provenance");
+          await refundCreditsVerified(ctx.user.id, amount, purchased, key, reason);
+        } catch {
+          billingWarning = "A credit refund could not be verified. Please contact support to review your credits.";
+        }
+        // Reserve provenance even if acknowledgement is ambiguous: it may
+        // have committed, so it must not also fund a later music refund.
         remainingPurchased -= purchased;
       };
-
-      // Optional character description prepended to every scene prompt for
-      // visual consistency across scenes — the OpenArt pattern.
-      let characterClause = "";
-      if (input.characterId) {
-        const char = await getCharacter(input.characterId, ctx.user.id);
-        if (char) {
-          characterClause =
-            ` Main character: ${char.name}. ${char.description ?? ""} ${char.styleNotes ?? ""}`.trim();
-        }
-      }
 
       // ─── Step 1: generate storyboard JSON via LLM ───────────────────
       let storyboard: any;
@@ -156,9 +156,9 @@ export const storyRouter = router({
           cost,
           `Refund: story creation failed — ${(err as Error)?.message ?? "storyboard generation failed"}`,
         );
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storyboard generation failed" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: billingWarning ?? "Storyboard generation failed" });
       }
-      if (!storyboard?.scenes?.length) {
+      if (!Array.isArray(storyboard?.scenes) || !storyboard.scenes.length || storyboard.scenes.some((scene: any) => !scene || typeof scene.visual !== "string" || typeof scene.mood !== "string")) {
         // LLM returned unusable output — the user received nothing for the
         // storyboard portion, so refund the entire bundle.
         await refund(
@@ -166,15 +166,16 @@ export const storyRouter = router({
           cost,
           "Refund: story creation failed — storyboard generation returned no scenes",
         );
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storyboard generation failed" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: billingWarning ?? "Storyboard generation failed" });
       }
 
       // ─── Step 2: generate one image per scene ───────────────────────
       // Sequential rather than parallel — most providers throttle and we
       // want determinism in the order returned to the user.
       const scenesWithImages: any[] = [];
-      let failedImages = 0;
-      for (const scene of storyboard.scenes) {
+      const requestedScenes = storyboard.scenes.slice(0, input.sceneCount);
+      let failedImages = Math.max(0, input.sceneCount - requestedScenes.length);
+      for (const scene of requestedScenes) {
         const prompt =
           `${scene.visual}. ${characterClause}. ` +
           `Style: ${input.style} cinematography, ${input.aspectRatio} aspect ratio. ` +
@@ -201,9 +202,11 @@ export const storyRouter = router({
       // ─── Step 3: kick off music generation async ─────────────────────
       let audioGenerationId: number | null = null;
       if (input.withMusic) {
-        const db = await getDb();
-        if (db) {
+          let insertAttempted = false;
           try {
+            const db = await getDb();
+            if (!db) throw new Error("Database unavailable for music");
+            insertAttempted = true;
             const [inserted] = await db
               .insert(audioGenerations)
               .values({
@@ -217,6 +220,7 @@ export const storyRouter = router({
               })
               .returning({ id: audioGenerations.id });
             audioGenerationId = inserted?.id ?? null;
+            if (!audioGenerationId) throw new Error("Music job was not created");
 
             // Fire-and-forget the actual generation. It updates the row in
             // place; the client polls audio.get(id) to retrieve when ready.
@@ -249,8 +253,14 @@ export const storyRouter = router({
             })().catch(() => {});
           } catch (err) {
             console.error("[story] failed to kick off music gen:", err);
+            if (insertAttempted) {
+              // A failed acknowledgement can hide a committed music job.
+              // Do not issue a second refund that could race its recovery.
+              billingWarning = "The music job could not be confirmed. Please contact support to review your credits.";
+            } else {
+              await refund(ctx.user.id, STORY_MUSIC_COST, "Refund: story music could not be started");
+            }
           }
-        }
       }
 
       return {
@@ -260,6 +270,7 @@ export const storyRouter = router({
         mood: storyboard.mood as string,
         scenes: scenesWithImages,
         audioGenerationId,
+        billingWarning,
       };
     }),
 

@@ -20,6 +20,7 @@ vi.mock("./rate-limit", () => ({
 
 import { demoRouter } from "./routers/demo";
 import { enforceIpRateLimit } from "./rate-limit";
+import { generateImage } from "./_core/imageGeneration";
 
 describe("demo.generate", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -35,6 +36,7 @@ describe("demo.generate", () => {
       1,
       24 * 60 * 60 * 1000,
       expect.any(String),
+      { failClosed: true },
     );
   });
 
@@ -47,6 +49,7 @@ describe("demo.generate", () => {
   it("propagates rate-limit denial when quota already used", async () => {
     (enforceIpRateLimit as any).mockRejectedValueOnce(new Error("rate limited"));
     const caller = demoRouter.createCaller({ user: null, session: null, ip: "1.2.3.4" });
-    await expect(caller.generate({ prompt: "x" })).rejects.toThrow();
+    await expect(caller.generate({ prompt: "a cat on a spaceship" })).rejects.toThrow("rate limited");
+    expect(generateImage).not.toHaveBeenCalled();
   });
 });

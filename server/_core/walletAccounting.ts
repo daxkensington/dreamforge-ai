@@ -94,6 +94,24 @@ export async function refundWallet(userId: number, amount: number, reason: strin
   return { success: true, refunded: result.length ? amount : 0 };
 }
 
+/** Prove an idempotent refund committed, including the matching wallet ledger provenance. */
+export async function hasWalletRefundReceipt(userId: number, amount: number, purchased: number, operationKey: string, eventType: "internal.credit_refund" | "internal.job_refund" = "internal.credit_refund"): Promise<boolean> {
+  assertCreditAmount(amount);
+  assertCreditAmount(purchased);
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable for refund verification.");
+  const rows = walletRows(await db.execute(sql`
+    SELECT 1 FROM "webhookEvents" e
+    JOIN "creditTransactions" t ON t."txMetadata"->>'operationKey' = e."eventId"
+    WHERE e."eventId" = ${operationKey} AND e."eventType" = ${eventType}
+      AND e."webhookStatus" = 'processed' AND t."userId" = ${userId}
+      AND t."txType" = 'refund' AND t.amount = ${amount}
+      AND t."txMetadata"->>'purchasedCreditsRestored' = ${String(purchased)}
+    LIMIT 1
+  `));
+  return rows.length === 1;
+}
+
 /** The terminal job claim, refund and receipt form one transaction. Failed rows remain retryable after SQL failure. */
 export async function failLegacyJobAndRefund(input: { table: "generations" | "audioGenerations"; id: number; userId: number; amount: number; reason: string; purchasedCredits?: number }) {
   assertCreditAmount(input.amount);

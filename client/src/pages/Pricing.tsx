@@ -982,9 +982,9 @@ export default function Pricing() {
             <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="border-b border-border/50">
-                  <th className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/7">Feature</th>
+                  <th scope="col" className="text-left py-4 pr-4 font-medium text-muted-foreground w-1/7">Feature</th>
                   {plans.map((plan) => (
-                    <th key={plan.name} className="text-center py-4 px-2 font-semibold">
+                    <th scope="col" key={plan.name} className="text-center py-4 px-2 font-semibold">
                       <div className="flex items-center justify-center gap-1.5">
                         <plan.icon className="h-3.5 w-3.5" />
                         <span className={plan.popular ? "text-violet-400" : ""} style={{ fontSize: "0.8rem" }}>{plan.name}</span>
@@ -996,13 +996,13 @@ export default function Pricing() {
               <tbody>
                 {comparisonFeatures.map((row) => (
                   <tr key={row.label} className="border-b border-border/30">
-                    <td className="py-3 pr-4 text-muted-foreground">{row.label}</td>
+                    <th scope="row" className="py-3 pr-4 text-left font-normal text-muted-foreground">{row.label}</th>
                     {row.values.map((val, ci) => (
                       <td key={ci} className="py-3 px-2 text-center">
                         {val === true ? (
-                          <Check className="h-4 w-4 text-emerald-400 mx-auto" />
+                          <><Check aria-hidden="true" className="h-4 w-4 text-emerald-400 mx-auto" /><span className="sr-only">Included</span></>
                         ) : val === false ? (
-                          <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                          <><X aria-hidden="true" className="h-4 w-4 text-muted-foreground/30 mx-auto" /><span className="sr-only">Not included</span></>
                         ) : (
                           <span className="text-xs">{val}</span>
                         )}

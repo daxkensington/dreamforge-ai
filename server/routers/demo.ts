@@ -79,6 +79,7 @@ export const demoRouter = router({
         1,
         ONE_DAY_MS,
         "You've used your free demo generation for today. Sign up free to continue creating.",
+        { failClosed: true },
       );
 
       try {

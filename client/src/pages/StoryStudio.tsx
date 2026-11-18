@@ -76,6 +76,7 @@ export default function StoryStudio() {
         setStory(data as Story);
         if (data.audioGenerationId) setMusicStatus("pending");
         toast.success("Story ready!");
+        if (data.billingWarning) toast.error(data.billingWarning, { duration: 15000 });
       } else {
         toast.error("Story generation failed");
       }

@@ -15,8 +15,7 @@ import {
   users,
   videoProjects,
 } from "../../drizzle/schema";
-import { getUserCollaboratorRole, getVideoProject, addCollaborator } from "../db";
-import { createNotification } from "../routersPhase15";
+import { getUserCollaboratorRole, getVideoProject } from "../db";
 import { broadcastChatFromServer, getOnlineUsers } from "../_core/websocket";
 
 // ─── Access check helper ────────────────────────────────────────────────────
@@ -202,55 +201,13 @@ export const collaborationRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Only project owner can invite collaborators" });
       }
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // Find user by email
-      const targetUsers = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, input.email))
-        .limit(1);
-
-      if (!targetUsers[0]) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No user found with that email address" });
-      }
-
-      if (targetUsers[0].id === ctx.user.id) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot invite yourself" });
-      }
-
-      const result = await addCollaborator({
-        projectId: input.projectId,
-        userId: targetUsers[0].id,
-        role: input.role,
-        invitedBy: ctx.user.id,
+      // Direct lookup and immediate membership disclose account existence via
+      // both this response and the collaborator roster. Share links require
+      // the recipient to sign in and accept before membership is disclosed.
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Direct email invitations are unavailable. Create a project share link and send it to your collaborator.",
       });
-
-      // Log activity
-      await db.insert(projectActivityLog).values({
-        projectId: input.projectId,
-        userId: ctx.user.id,
-        action: "member_joined",
-        details: {
-          invitedUserId: targetUsers[0].id,
-          invitedUserName: targetUsers[0].name,
-          role: input.role,
-        },
-      });
-
-      // Notify the invited user
-      try {
-        await createNotification(
-          targetUsers[0].id,
-          "collaboration",
-          "Project Invitation",
-          `You've been invited to collaborate on "${project.title}" as ${input.role}`,
-          { projectId: input.projectId }
-        );
-      } catch {}
-
-      return { id: result.id, action: result.action, userName: targetUsers[0].name };
     }),
 
   updateCollaboratorRole: protectedProcedure

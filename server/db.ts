@@ -1253,6 +1253,56 @@ export async function incrementShareTokenUse(tokenId: number) {
     .where(eq(projectShareTokens.id, tokenId));
 }
 
+/** Claim a valid share token and grant membership in one transaction.
+ * The per-project/user lock serializes claims through different tokens; the
+ * conditional token update separately serializes claims of the same token.
+ * The membership change rolls back with the claim if either operation fails.
+ */
+export async function acceptProjectShareToken(token: string, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return acceptProjectShareTokenWithDb(db, token, userId);
+}
+
+/** Exported separately to allow exercising the exact query on a disposable DB. */
+export async function acceptProjectShareTokenWithDb(db: Pick<NonNullable<Awaited<ReturnType<typeof getDb>>>, "execute" | "batch">, token: string, userId: number) {
+  const [, , result]: any = await db.batch([
+    db.execute(sql`SET TRANSACTION ISOLATION LEVEL READ COMMITTED`),
+    db.execute(sql`
+      SELECT pg_advisory_xact_lock(hashtextextended('share-member:' || "projectId"::text || ':' || ${userId}::text, 0))
+      FROM "projectShareTokens" WHERE "token" = ${token}
+    `),
+    db.execute(sql`
+    WITH claimed AS (
+      UPDATE "projectShareTokens"
+      SET "useCount" = "useCount" + 1
+      WHERE "token" = ${token}
+        AND "active" = true
+        AND ("expiresAt" IS NULL OR "expiresAt" > now())
+        AND ("maxUses" IS NULL OR "useCount" < "maxUses")
+      RETURNING "projectId", "sharePermission" AS "permission", "createdBy"
+    ), updated AS (
+      UPDATE "projectCollaborators" c
+      SET "collabRole" = CASE WHEN c."collabRole" = 'editor' THEN c."collabRole" ELSE claimed."permission"::text::"collabRole" END
+      FROM claimed
+      WHERE c."projectId" = claimed."projectId" AND c."userId" = ${userId}
+      RETURNING c."id", c."collabRole"
+    ), inserted AS (
+      INSERT INTO "projectCollaborators" ("projectId", "userId", "collabRole", "invitedBy")
+      SELECT claimed."projectId", ${userId}, claimed."permission"::text::"collabRole", claimed."createdBy"
+      FROM claimed WHERE NOT EXISTS (SELECT 1 FROM updated)
+      RETURNING "id", "collabRole"
+    )
+    SELECT claimed."projectId", COALESCE((SELECT "collabRole" FROM updated LIMIT 1), (SELECT "collabRole" FROM inserted LIMIT 1))::text AS "permission", claimed."createdBy",
+      CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'updated' ELSE 'created' END AS action
+    FROM claimed
+    `),
+  ]);
+  return (result.rows ?? result)[0] as
+    | { projectId: number; permission: "viewer" | "editor"; createdBy: number; action: "updated" | "created" }
+    | undefined;
+}
+
 export async function deactivateShareToken(tokenId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

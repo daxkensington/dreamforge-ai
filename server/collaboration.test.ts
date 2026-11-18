@@ -39,6 +39,7 @@ const mockDeleteVideoProject = vi.fn();
 const mockCreateShareToken = vi.fn();
 const mockGetShareToken = vi.fn();
 const mockIncrementShareTokenUse = vi.fn();
+const mockAcceptProjectShareToken = vi.fn();
 const mockDeactivateShareToken = vi.fn();
 const mockListShareTokens = vi.fn();
 const mockAddCollaborator = vi.fn();
@@ -63,6 +64,7 @@ vi.mock("./db", async (importOriginal) => {
     createShareToken: (...args: any[]) => mockCreateShareToken(...args),
     getShareToken: (...args: any[]) => mockGetShareToken(...args),
     incrementShareTokenUse: (...args: any[]) => mockIncrementShareTokenUse(...args),
+    acceptProjectShareToken: (...args: any[]) => mockAcceptProjectShareToken(...args),
     deactivateShareToken: (...args: any[]) => mockDeactivateShareToken(...args),
     listShareTokens: (...args: any[]) => mockListShareTokens(...args),
     addCollaborator: (...args: any[]) => mockAddCollaborator(...args),
@@ -179,8 +181,7 @@ describe("Collaboration Features", () => {
       });
       // getVideoProject is called to check if user is owner - return null (not owner)
       mockGetVideoProject.mockResolvedValueOnce(null);
-      mockAddCollaborator.mockResolvedValueOnce({ id: 5, action: "added" });
-      mockIncrementShareTokenUse.mockResolvedValueOnce(undefined);
+      mockAcceptProjectShareToken.mockResolvedValueOnce({ projectId: 1, permission: "viewer", createdBy: 1, action: "created" });
 
       const result = await caller2.videoProject.acceptShareLink({
         token: "abc123",
@@ -188,7 +189,15 @@ describe("Collaboration Features", () => {
 
       expect(result.projectId).toBe(1);
       expect(result.role).toBe("viewer");
-      expect(mockAddCollaborator).toHaveBeenCalled();
+      expect(mockAcceptProjectShareToken).toHaveBeenCalledWith("abc123", 2);
+    });
+
+    it("rejects a link revoked or exhausted after its initial lookup", async () => {
+      mockGetShareToken.mockResolvedValueOnce({ id: 10, projectId: 1, permission: "viewer", active: true, expiresAt: null, useCount: 0, maxUses: 1 });
+      mockGetVideoProject.mockResolvedValueOnce(null);
+      mockAcceptProjectShareToken.mockResolvedValueOnce(undefined);
+      await expect(caller2.videoProject.acceptShareLink({ token: "abc123" })).rejects.toThrow("Invalid or expired share link");
+      expect(mockAcceptProjectShareToken).toHaveBeenCalledWith("abc123", 2);
     });
 
     it("should return alreadyOwner if user owns the project", async () => {

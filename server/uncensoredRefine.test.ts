@@ -15,15 +15,22 @@ const state: {
   debited: number;
   refunded: number;
   refineCalls: number;
-} = { user: null, generation: null, debited: 0, refunded: 0, refineCalls: 0 };
+  newRow: any;
+  completionError: boolean;
+  claimed: boolean;
+  receipt: boolean;
+} = { user: null, generation: null, debited: 0, refunded: 0, refineCalls: 0, newRow: null, completionError: false, claimed: true, receipt: false };
 
 vi.mock("./db", () => ({
   getDb: vi.fn(async () => ({
     select: () => ({ from: () => ({ where: () => ({ limit: async () => (state.user ? [state.user] : []) }) }) }),
-    update: () => ({ set: () => ({ where: async () => undefined }) }),
+    update: () => ({ set: () => ({ where: () => ({ returning: async () => {
+      if (state.completionError) throw new Error("completion acknowledgement lost");
+      return state.claimed ? [{ id: 999 }] : [];
+    } }) }) }),
     insert: () => ({ values: async () => undefined }),
   })),
-  getGenerationById: vi.fn(async () => state.generation),
+  getGenerationById: vi.fn(async (id: number) => id === 999 ? state.newRow : state.generation),
   createGeneration: vi.fn(async () => 999),
   updateGeneration: vi.fn(async () => undefined),
 }));
@@ -31,11 +38,16 @@ vi.mock("./db", () => ({
 vi.mock("./stripe", () => ({
   deductCredits: vi.fn(async (_u: number, amount: number) => {
     state.debited += amount;
-    return { success: true, balance: 500, needed: amount };
+    return { success: true, balance: 500, needed: amount, transactionId: 123, purchasedCreditsDebited: 3 };
   }),
   refundCredits: vi.fn(async (_u: number, amount: number) => {
     state.refunded += amount;
   }),
+}));
+
+vi.mock("./_core/walletAccounting", () => ({
+  failLegacyJobAndRefund: vi.fn(async (input: { amount: number }) => { state.refunded += input.amount; return true; }),
+  hasWalletRefundReceipt: vi.fn(async () => state.receipt),
 }));
 
 vi.mock("./_core/imageGeneration", () => ({
@@ -66,6 +78,9 @@ vi.mock("./_core/toolStatus", () => ({
 vi.mock("./rate-limit", () => ({ enforceRateLimit: vi.fn(async () => undefined) }));
 
 import { uncensoredRouter } from "./routers/uncensored";
+import { createGeneration, getGenerationById } from "./db";
+import { refineUnfiltered } from "./_core/imageGeneration";
+import { failLegacyJobAndRefund } from "./_core/walletAccounting";
 
 const OWNER = 7;
 const ctx = (id = OWNER) => ({ user: { id, email: "u@x.com" }, session: null }) as any;
@@ -99,6 +114,7 @@ describe("uncensored.refineImage — ownership gate", () => {
     state.debited = 0;
     state.refunded = 0;
     state.refineCalls = 0;
+    state.newRow = null; state.completionError = false; state.claimed = true; state.receipt = false;
     vi.clearAllMocks();
   });
 
@@ -110,6 +126,42 @@ describe("uncensored.refineImage — ownership gate", () => {
     expect(state.refineCalls).toBe(1);
     expect(state.debited).toBe(10);
     expect(state.refunded).toBe(0);
+  });
+
+  it("atomically claims a known provider failure with exact purchased provenance", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(refineUnfiltered).mockRejectedValueOnce(new Error("provider failed"));
+    await expect(uncensoredRouter.createCaller(ctx()).refineImage(input)).rejects.toThrow(/credits were returned/i);
+    expect(failLegacyJobAndRefund).toHaveBeenCalledWith(expect.objectContaining({ id: 999, userId: OWNER, amount: 10, purchasedCredits: 3 }));
+    expect(state.refunded).toBe(10);
+    expect(createGeneration).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ cost: 10, purchasedCreditsDebited: 3, walletDebitTransactionId: 123 }) }));
+  });
+
+  it("does not blindly refund an insert with an unknown acknowledgement", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    vi.mocked(createGeneration).mockRejectedValueOnce(new Error("insert acknowledgement lost"));
+    await expect(uncensoredRouter.createCaller(ctx()).refineImage(input)).rejects.toThrow(/contact support/i);
+    expect(failLegacyJobAndRefund).not.toHaveBeenCalled();
+    expect(state.refunded).toBe(0);
+    expect(state.refineCalls).toBe(0);
+  });
+
+  it("returns a confirmed completed image after a lost completion acknowledgement", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    state.completionError = true;
+    state.newRow = ownUncensoredImage({ id: 999, imageUrl: "https://dreamforgex.ai/img/generations/new.png" });
+    const result = await uncensoredRouter.createCaller(ctx()).refineImage(input);
+    expect(result).toMatchObject({ generationId: 999, url: state.newRow.imageUrl });
+    expect(getGenerationById).toHaveBeenCalledWith(999);
+    expect(state.refunded).toBe(0);
+  });
+
+  it("does not overwrite a recovery-refunded failed row", async () => {
+    withActivePass(); state.generation = ownUncensoredImage();
+    state.claimed = false; state.receipt = true;
+    state.newRow = ownUncensoredImage({ id: 999, status: "failed", imageUrl: null });
+    await expect(uncensoredRouter.createCaller(ctx()).refineImage(input)).rejects.toThrow(/credits were returned/i);
+    expect(failLegacyJobAndRefund).not.toHaveBeenCalled();
   });
 
   it("REJECTS an image belonging to someone else, spending nothing", async () => {

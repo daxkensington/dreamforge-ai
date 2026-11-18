@@ -59,6 +59,7 @@ export default function UncensoredSheetStudio({
       utils.uncensored.myLibrary.invalidate();
       utils.uncensored.status.invalidate();
       toast.success("Four-view sheet ready.");
+      if (data.billingWarning) toast.error(data.billingWarning, { duration: 15000 });
     },
     onError: (e) => toast.error(e.message),
   });

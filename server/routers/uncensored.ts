@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { claimGenerationBatch, beginGenerationBatch, completeGenerationBatch } from "../_core/generationBatchBilling";
-import { failLegacyJobAndRefund } from "../_core/walletAccounting";
+import { failLegacyJobAndRefund, hasWalletRefundReceipt } from "../_core/walletAccounting";
 /**
  * Uncensored tier router — crypto-paid (BTCPay) entitlement.
  *
@@ -71,6 +71,7 @@ import { deductCredits, refundCredits, getOrCreateBalance } from "../stripe";
 import { CREDIT_COSTS } from "../../shared/creditCosts";
 import { enforceRateLimit } from "../rate-limit";
 import { sendPassActivatedEmail } from "../_core/uncensoredEmail";
+import { refundFailedLegacyTool } from "../_core/legacyToolRefund";
 
 // Uncensored video is GPU-expensive (Wan 2.2, minutes/clip) → pass-gated, no
 // free tier. Two quality tiers: "fast" = 5B TI2V (~90s, 48GB); "hd" = 14B A14B
@@ -142,6 +143,63 @@ type GenerationRow = NonNullable<Awaited<ReturnType<typeof getGenerationById>>>;
  * synchronous path, which Vercel killed at 300s). Nothing can ever finish it.
  */
 const ORPHAN_AFTER_MS = 10 * 60_000;
+
+async function completeUncensoredEdit(userId: number, generationId: number, url: string, key: string): Promise<void> {
+  if (!url) throw new Error("Image storage returned no URL");
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable for completion");
+  const claimed = await db.update(generations).set({ status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key })
+    .where(and(eq(generations.id, generationId), eq(generations.userId, userId), eq(generations.status, "generating")))
+    .returning({ id: generations.id });
+  if (claimed.length !== 1) throw new Error("Generation completion was not claimed");
+}
+
+/** Resolve a synchronous edit failure without racing stale-job refunds or an uncertain completion. */
+async function settleUncensoredEditFailure(input: {
+  userId: number; generationId?: number; cost: number; purchased: number;
+  debitId?: number; completionAttempted: boolean; tool: string;
+}): Promise<{ generationId: number; url: string; cost: number }> {
+  const review = () => new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Generation outcome could not be verified. Please contact support to review your credits." });
+  if (!input.generationId) {
+    // An insert may have committed despite a lost acknowledgement. Its row's
+    // metadata allows stale recovery; a separate refund here could duplicate it.
+    console.error("[uncensored-edit] Generation setup not verified", { userId: input.userId, debitId: input.debitId, tool: input.tool });
+    throw review();
+  }
+  if (input.completionAttempted) {
+    // A completion UPDATE may have committed despite a lost acknowledgement.
+    // Never overwrite or refund it without knowing the terminal state.
+    try {
+      const row = await getGenerationById(input.generationId);
+      if (row?.userId === input.userId && row.status === "completed" && row.imageUrl) {
+        return { generationId: row.id, url: row.imageUrl, cost: input.cost };
+      }
+      if (row?.userId === input.userId && row.status === "failed" &&
+          await hasWalletRefundReceipt(input.userId, input.cost, input.purchased,
+            `job-refund:generations:${input.generationId}`, "internal.job_refund")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Generation failed — your credits were returned." });
+      }
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+      /* Leave the uncertain outcome for reconciliation. */
+    }
+    throw review();
+  }
+  let refunded = false;
+  try {
+    refunded = await failLegacyJobAndRefund({ table: "generations", id: input.generationId, userId: input.userId,
+      amount: input.cost, purchasedCredits: input.purchased, reason: `${input.tool} failed. Credits returned.` });
+  } catch { /* Verify an acknowledgement lost after commit below. */ }
+  if (!refunded) {
+    try {
+      refunded = await hasWalletRefundReceipt(input.userId, input.cost, input.purchased,
+        `job-refund:generations:${input.generationId}`, "internal.job_refund");
+    } catch { /* Do not claim the refund succeeded without proof. */ }
+  }
+  if (!refunded) throw review();
+  await logToolFailure({ toolId: input.tool, errorMessage: "Generation failed", userId: input.userId }).catch(() => undefined);
+  throw new TRPCError({ code: "BAD_REQUEST", message: "Generation failed — your credits were returned." });
+}
 
 /**
  * Bring one paid uncensored image row up to date from its GPU job. Idempotent:
@@ -1122,8 +1180,11 @@ export const uncensoredRouter = router({
         });
       }
 
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
       const style = input.style ?? (src.metadata as any)?.style ?? undefined;
-      const genId = await createGeneration({
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
         negativePrompt: null,
@@ -1140,10 +1201,11 @@ export const uncensoredRouter = router({
           style: style ?? null,
           strength: input.strength,
           cost: UNCENSORED_REFINE_COST,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited,
+          walletDebitTransactionId: debit.transactionId,
         },
       });
 
-      try {
         const imageB64 = await fetchAsBase64(src.imageUrl);
         const buffer = await refineUnfiltered(imageB64, applyUncensoredStyle(input.prompt, style), {
           strength: input.strength,
@@ -1151,21 +1213,13 @@ export const uncensoredRouter = router({
         });
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, buffer, "image/png");
-        await updateGeneration(genId, {
-          status: "completed",
-          imageUrl: url,
-          thumbnailUrl: url,
-          fileKey: key,
-        });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost: UNCENSORED_REFINE_COST };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        // The credit is refunded on every failure path — a refine that produced
-        // nothing must never be billable.
-        await refundCredits(ctx.user.id, UNCENSORED_REFINE_COST, "Uncensored refine failed", { purchasedCredits: Math.min(UNCENSORED_REFINE_COST, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-refine", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Refine failed — your credits were returned.";
-        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost: UNCENSORED_REFINE_COST,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-refine" });
       }
     }),
 
@@ -1199,8 +1253,11 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
 
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
       const scale = input.scale === "4x" ? 4 : 2;
-      const genId = await createGeneration({
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: src.prompt,
         negativePrompt: null,
@@ -1211,10 +1268,10 @@ export const uncensoredRouter = router({
         status: "generating",
         modelVersion: "uncensored-upscale",
         parentGenerationId: src.id,
-        metadata: { uncensored: true, upscale: input.scale, cost, style: (src.metadata as any)?.style ?? null },
+        metadata: { uncensored: true, upscale: input.scale, cost, style: (src.metadata as any)?.style ?? null,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited, walletDebitTransactionId: debit.transactionId },
       });
 
-      try {
         const buf = await fetchImageBuffer(src.imageUrl!);
         let result: Buffer;
         if (isRunPodAvailable()) {
@@ -1228,13 +1285,13 @@ export const uncensoredRouter = router({
         }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
-        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored upscale failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-upscale", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Upscale failed — your credits were returned." });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-upscale" });
       }
     }),
 
@@ -1284,6 +1341,12 @@ export const uncensoredRouter = router({
       const cost = UNCENSORED_IMAGE_COST.sheet;
       const unitCost = Math.round(cost / UNCENSORED_SHEET_VIEWS.length);
       await enforceRateLimit(`uncensored.sheet:user:${ctx.user.id}`, 3, 60_000, "Slow down a moment between sheets.");
+      // Loading the source is independent of paid generation and can fail.
+      // Resolve it before debit rather than stranding a charged request.
+      const imageB64 = await fetchAsBase64(lock.url);
+      const style = input.style ?? lock.style;
+      const loraId = resolveUncensoredLora(style);
+      const aspect = getUncensoredAspect("portrait");
       const debit = await deductCredits(ctx.user.id, cost, "Uncensored character sheet", "usage", { uncensored: true, sheet: true });
       if (!debit.success) {
         throw new TRPCError({
@@ -1292,16 +1355,19 @@ export const uncensoredRouter = router({
         });
       }
 
-      const style = input.style ?? lock.style;
-      const loraId = resolveUncensoredLora(style);
-      const aspect = getUncensoredAspect("portrait");
       const results: { generationId: number; url: string; view: string }[] = [];
-      let failed = 0;
-      const imageB64 = await fetchAsBase64(lock.url);
+      let refunded = 0;
+      let uncertain = 0;
       const customNote = input.customPrompt?.trim() ?? "";
 
       const viewOutcomes = await Promise.all(
-        UNCENSORED_SHEET_VIEWS.map(async (view) => {
+        UNCENSORED_SHEET_VIEWS.map(async (view, viewIndex) => {
+          let genId: number | undefined;
+          let createAttempted = false;
+          let completionAttempted = false;
+          let storedUrl: string | undefined;
+          const purchasedForView = debit.purchasedCreditsDebited === undefined ? undefined : Math.max(0, Math.min(unitCost, (viewIndex + 1) * unitCost - (cost - debit.purchasedCreditsDebited)));
+          try {
           let prompt = `same character identity, same face, same body type. ${view.promptSuffix}`;
           if (input.wardrobe) {
             prompt = applyUncensoredWardrobe(prompt, input.wardrobe);
@@ -1311,7 +1377,8 @@ export const uncensoredRouter = router({
           }
           prompt = applyUncensoredStyle(prompt, style);
           prompt = `${prompt}. Avoid: ${DEFAULT_UNCENSORED_NEGATIVE}`;
-          const genId = await createGeneration({
+          createAttempted = true;
+          genId = await createGeneration({
             userId: ctx.user.id,
             prompt: customNote ? `${view.label} · ${customNote}` : view.label,
             negativePrompt: null,
@@ -1329,40 +1396,62 @@ export const uncensoredRouter = router({
               style: style ?? null,
               wardrobe: input.wardrobe ?? null,
               cost: unitCost,
+              purchasedCreditsDebited: purchasedForView,
               savedCharacterId: lock.savedCharacterId,
               character: true,
             },
           });
-          try {
             const buffer = await refineUnfiltered(imageB64, prompt, { strength: customNote || input.wardrobe ? 0.46 : 0.4, loraId });
             const key = generateStorageKey("generations", "png");
             const { url } = await storagePut(key, buffer, "image/png");
-            await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+            if (!url) throw new Error("Image storage returned no URL");
+            storedUrl = url;
+            completionAttempted = true;
+            await completeUncensoredEdit(ctx.user.id, genId, url, key);
             return { ok: true as const, item: { generationId: genId, url, view: view.id } };
           } catch (err: any) {
-            await updateGeneration(genId, { status: "failed" });
-            await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-            return { ok: false as const };
+            // A lost insert or completion acknowledgement can hide a committed
+            // row. Do not refund it blindly while another path can recover it.
+            if (!genId && createAttempted) return { ok: false as const, uncertain: true as const };
+            if (genId && completionAttempted) {
+              const existing = await getGenerationById(genId).catch(() => undefined);
+              if (existing?.userId === ctx.user.id && existing.status === "completed" && existing.imageUrl === storedUrl && storedUrl) {
+                return { ok: true as const, item: { generationId: genId, url: storedUrl, view: view.id } };
+              }
+              return { ok: false as const, uncertain: true as const };
+            }
+            if (purchasedForView === undefined) return { ok: false as const, uncertain: true as const };
+            if (genId) {
+              try {
+                const claimed = await failLegacyJobAndRefund({ table: "generations", id: genId, userId: ctx.user.id, amount: unitCost, purchasedCredits: purchasedForView, reason: "Character sheet view failed. Credits returned." });
+                if (!claimed && !await hasWalletRefundReceipt(ctx.user.id, unitCost, purchasedForView, `job-refund:generations:${genId}`, "internal.job_refund")) return { ok: false as const, uncertain: true as const };
+              } catch {
+                try {
+                  if (!await hasWalletRefundReceipt(ctx.user.id, unitCost, purchasedForView, `job-refund:generations:${genId}`, "internal.job_refund")) return { ok: false as const, uncertain: true as const };
+                } catch { return { ok: false as const, uncertain: true as const }; }
+              }
+            } else {
+              try {
+                await refundFailedLegacyTool(ctx.user.id, { ...debit, cost: unitCost, purchasedCreditsDebited: purchasedForView }, "uncensored character sheet", "legacy-tool-refund", viewIndex);
+              } catch { return { ok: false as const, uncertain: true as const }; }
+            }
+            await logToolFailure({ toolId: "uncensored-sheet", errorMessage: err?.message ?? String(err), userId: ctx.user.id }).catch(() => undefined);
+            return { ok: false as const, uncertain: false as const };
           }
         }),
       );
 
       for (const outcome of viewOutcomes) {
         if (outcome.ok) results.push(outcome.item);
-        else failed += 1;
+        else if (outcome.uncertain) uncertain += 1;
+        else refunded += unitCost;
       }
 
+      let billingWarning: string | null = uncertain ? "Some views could not be confirmed. Please contact support to review your credits." : null;
       if (results.length === 0) {
-        await refundCredits(ctx.user.id, cost, "Uncensored character sheet failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Character sheet failed — your credits were returned.",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: billingWarning ?? "Character sheet failed — your credits were returned." });
       }
-      if (failed > 0) {
-        await refundCredits(ctx.user.id, unitCost * failed, `Uncensored sheet partial fail ×${failed}`, { purchasedCredits: Math.min(unitCost * failed, debit.purchasedCreditsDebited ?? 0) });
-      }
-      return { images: results, cost: unitCost * results.length };
+      return { images: results, cost: cost - refunded, billingWarning };
     }),
 
   /**
@@ -1386,7 +1475,10 @@ export const uncensoredRouter = router({
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
-      const genId = await createGeneration({
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: src.prompt,
         negativePrompt: null,
@@ -1397,9 +1489,9 @@ export const uncensoredRouter = router({
         status: "generating",
         modelVersion: "uncensored-cutout",
         parentGenerationId: src.id,
-        metadata: { uncensored: true, cutout: true, cost, style: (src.metadata as any)?.style ?? null },
+        metadata: { uncensored: true, cutout: true, cost, style: (src.metadata as any)?.style ?? null,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited, walletDebitTransactionId: debit.transactionId },
       });
-      try {
         const buf = await fetchImageBuffer(src.imageUrl!);
         let result: Buffer;
         if (isRunPodAvailable()) {
@@ -1413,13 +1505,13 @@ export const uncensoredRouter = router({
         }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
-        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored cutout failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-cutout", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Cutout failed — your credits were returned." });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-cutout" });
       }
     }),
 
@@ -1455,7 +1547,10 @@ export const uncensoredRouter = router({
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
-      const genId = await createGeneration({
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: `outfit from #${garment.id} onto #${person.id}`,
         negativePrompt: null,
@@ -1472,9 +1567,10 @@ export const uncensoredRouter = router({
           clothType: input.clothType,
           garmentGenerationId: garment.id,
           cost,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited,
+          walletDebitTransactionId: debit.transactionId,
         },
       });
-      try {
         let result: Buffer;
         const style = (person.metadata as any)?.style ?? undefined;
         const fallbackOutfitRefine = async () => {
@@ -1499,13 +1595,13 @@ export const uncensoredRouter = router({
         }
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, result, "image/png");
-        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored outfit transfer failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-outfit", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Outfit transfer failed — your credits were returned." });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-outfit" });
       }
     }),
 
@@ -1541,12 +1637,15 @@ export const uncensoredRouter = router({
       if (!debit.success) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
       const style = (src.metadata as any)?.style ?? undefined;
       const prompt = applyUncensoredLighting(
         "same person, same pose, same clothes, same composition, only change the lighting",
         lighting.id,
       );
-      const genId = await createGeneration({
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: `${lighting.label} relight`,
         negativePrompt: null,
@@ -1557,9 +1656,9 @@ export const uncensoredRouter = router({
         status: "generating",
         modelVersion: "uncensored-relight",
         parentGenerationId: src.id,
-        metadata: { uncensored: true, relight: true, lighting: lighting.id, strength: input.strength, cost, style: style ?? null },
+        metadata: { uncensored: true, relight: true, lighting: lighting.id, strength: input.strength, cost, style: style ?? null,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited, walletDebitTransactionId: debit.transactionId },
       });
-      try {
         const imageB64 = await fetchAsBase64(src.imageUrl!);
         const buffer = await refineUnfiltered(imageB64, applyUncensoredStyle(prompt, style), {
           strength: input.strength,
@@ -1567,13 +1666,13 @@ export const uncensoredRouter = router({
         });
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, buffer, "image/png");
-        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored relight failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-relight", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Relight failed — your credits were returned." });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-relight" });
       }
     }),
 
@@ -1639,8 +1738,11 @@ export const uncensoredRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: `Not enough credits — this needs ${cost}, you have ${debit.balance}.` });
       }
 
+      let genId: number | undefined;
+      let completionAttempted = false;
+      try {
       const style = input.style ?? (src.metadata as any)?.style ?? undefined;
-      const genId = await createGeneration({
+      genId = await createGeneration({
         userId: ctx.user.id,
         prompt: input.prompt,
         negativePrompt: null,
@@ -1651,10 +1753,10 @@ export const uncensoredRouter = router({
         status: "generating",
         modelVersion: "uncensored-inpaint",
         parentGenerationId: src.id,
-        metadata: { uncensored: true, inpaint: true, style: style ?? null, strength: input.strength, cost },
+        metadata: { uncensored: true, inpaint: true, style: style ?? null, strength: input.strength, cost,
+          purchasedCreditsDebited: debit.purchasedCreditsDebited, walletDebitTransactionId: debit.transactionId },
       });
 
-      try {
         const imageB64 = await fetchAsBase64(src.imageUrl!);
         const painted = await refineUnfiltered(
           imageB64,
@@ -1665,14 +1767,13 @@ export const uncensoredRouter = router({
         const blended = await blendMasked(sourceBuf, painted, maskBuf);
         const key = generateStorageKey("generations", "png");
         const { url } = await storagePut(key, blended, "image/png");
-        await updateGeneration(genId, { status: "completed", imageUrl: url, thumbnailUrl: url, fileKey: key });
+        if (!url) throw new Error("Image storage returned no URL");
+        completionAttempted = true;
+        await completeUncensoredEdit(ctx.user.id, genId, url, key);
         return { generationId: genId, url, cost };
       } catch (err: any) {
-        await updateGeneration(genId, { status: "failed" });
-        await refundCredits(ctx.user.id, cost, "Uncensored inpaint failed", { purchasedCredits: Math.min(cost, debit.purchasedCreditsDebited ?? 0) });
-        await logToolFailure({ toolId: "uncensored-inpaint", errorMessage: err?.message ?? String(err), userId: ctx.user.id });
-        const msg = typeof err?.userMessage === "string" ? err.userMessage : "Inpaint failed — your credits were returned.";
-        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        return settleUncensoredEditFailure({ userId: ctx.user.id, generationId: genId, cost,
+          purchased: debit.purchasedCreditsDebited, debitId: debit.transactionId, completionAttempted, tool: "uncensored-inpaint" });
       }
     }),
 

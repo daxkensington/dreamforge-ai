@@ -12,12 +12,13 @@ vi.mock("./_core/toolStatus", () => ({
   logToolFailure: vi.fn().mockResolvedValue(undefined),
   runAutoDegradeScan: vi.fn().mockResolvedValue({ flipped: 0 }),
 }));
+vi.mock("./_core/walletAccounting", () => ({ hasWalletRefundReceipt: vi.fn().mockResolvedValue(false) }));
 vi.mock("./stripe", async () => {
   const actual = await vi.importActual<any>("./stripe");
   return {
     ...actual,
-    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 90, needed: 10 }),
-    refundCredits: vi.fn().mockResolvedValue(undefined),
+    deductCredits: vi.fn().mockResolvedValue({ success: true, balance: 90, needed: 10, transactionId: 123, purchasedCreditsDebited: 0 }),
+    refundCredits: vi.fn(async (_user: number, amount: number) => ({ success: true, refunded: amount })),
   };
 });
 
@@ -112,5 +113,12 @@ describe("viral.transform", () => {
       expect.stringContaining("Refund"),
       expect.any(Object),
     );
+  });
+
+  it("signals support if a failed refund is unverified", async () => {
+    const { generateImage } = await import("./_core/imageGeneration");
+    vi.mocked(generateImage).mockRejectedValueOnce(new Error("provider down"));
+    vi.mocked(refundCredits).mockRejectedValueOnce(new Error("refund unavailable"));
+    await expect(viralRouter.createCaller(authCtx).transform({ preset: "action-figure", imageUrl: "https://cdn.example.com/face.jpg" })).rejects.toThrow(/contact support/i);
   });
 });
