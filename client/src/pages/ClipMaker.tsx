@@ -7,6 +7,7 @@ import {
   exportTimeline,
   inspectTimelineFile,
   MIN_UNPADDED_EXPORT_SECONDS,
+  validateClipRecording,
   VIDEO_SOURCE_MAX_BYTES,
 } from "@/components/timeline/timelineMedia";
 import { emptyTimeline } from "@shared/timeline";
@@ -149,6 +150,9 @@ export default function ClipMaker() {
             setProgress({ fraction, label });
         },
       });
+      if (controller.signal.aborted) return;
+      setProgress({ fraction: 1, label: "Checking the exported clip" });
+      await validateClipRecording(output.blob, duration, controller.signal);
       if (exporting.current === controller && !controller.signal.aborted) {
         setResult({
           url: URL.createObjectURL(output.blob),

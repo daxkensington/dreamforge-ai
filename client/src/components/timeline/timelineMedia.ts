@@ -34,6 +34,25 @@ async function finiteDuration(element: HTMLMediaElement, signal?: AbortSignal) {
   if (element.currentTime > 0) { const reset = eventReady(element, "seeked", signal); element.currentTime = 0; await reset; }
   return duration;
 }
+
+async function inspectMediaDuration(source: Blob, kind: "video" | "audio", signal?: AbortSignal) {
+  const url = URL.createObjectURL(source);
+  const element = document.createElement(kind);
+  try {
+    element.preload = "auto";
+    const ready = eventReady(element, "loadedmetadata", signal);
+    element.src = url;
+    element.load();
+    await ready;
+    return await finiteDuration(element, signal);
+  } finally {
+    element.pause();
+    element.removeAttribute("src");
+    element.load();
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function inspectTimelineFile(file: File): Promise<{ kind: "image" | "video" | "audio"; duration: number }> {
   const kind = file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : file.type.startsWith("video/") ? "video" : null;
   if (!kind) throw new Error("Choose an image, video or audio file");
@@ -41,14 +60,22 @@ export async function inspectTimelineFile(file: File): Promise<{ kind: "image" |
     ? VIDEO_SOURCE_MAX_BYTES
     : (kind === "image" ? 10 : 20) * 1024 * 1024;
   if (file.size > maxBytes) throw new Error(`File exceeds the ${maxBytes / 1024 / 1024} MiB ${kind} limit`);
+  if (kind !== "image") return { kind, duration: await inspectMediaDuration(file, kind) };
   const url = URL.createObjectURL(file);
   try {
-    if (kind === "image") { const image = new Image(); image.src = url; await image.decode(); return { kind, duration: 5 }; }
-    const element = document.createElement(kind === "audio" ? "audio" : "video");
-    element.preload = "auto"; const ready = eventReady(element, "loadedmetadata"); element.src = url; element.load();
-    try { await ready; return { kind, duration: await finiteDuration(element) }; }
-    finally { element.pause(); element.removeAttribute("src"); element.load(); }
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return { kind, duration: 5 };
   } finally { URL.revokeObjectURL(url); }
+}
+
+export async function validateClipRecording(blob: Blob, duration: number, signal: AbortSignal) {
+  const actual = await inspectMediaDuration(blob, "video", signal);
+  // Frame and audio packet boundaries can round the container duration.
+  if (Math.abs(actual - duration) > 0.25) {
+    throw new Error("The recorded clip did not match the selected duration. Keep this tab visible and try exporting again.");
+  }
 }
 
 export async function createTimelineRenderer(doc: TimelineDocument, canvas: HTMLCanvasElement, options: {
