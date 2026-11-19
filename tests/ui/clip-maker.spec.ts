@@ -6,6 +6,13 @@ test("trims a local video into a downloadable portrait clip without a server wri
   await page.route("**/api/**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path === "/api/trpc/analytics.track" && request.method() === "POST") {
+      const event = request.postDataJSON()?.json;
+      if (event?.event === "page_view" && event.path === "/tools/clip-maker" && typeof event.anonId === "string") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+    }
     const apiWrite = request.method() !== "GET" && request.method() !== "HEAD";
     if (apiWrite && /^\/api\/(?:trpc|upload|media)(?:\/|$)/.test(path)) {
       serverWrites.push(path);
