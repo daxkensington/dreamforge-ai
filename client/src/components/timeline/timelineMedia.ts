@@ -1,6 +1,17 @@
 import { activeClips, selectRecordingFormat, timelineDuration, type Clip, type TimelineDocument } from "@shared/timeline";
 
 type Asset = { element: HTMLImageElement | HTMLMediaElement; url: string; gain?: GainNode; source?: MediaElementAudioSourceNode };
+export const VIDEO_SOURCE_MAX_BYTES = 25 * 1024 * 1024;
+export const MIN_UNPADDED_EXPORT_SECONDS = 1;
+const MAX_RENDER_BYTES = 256 * 1024 * 1024;
+const RENDER_LIMIT_MESSAGE = "Media exceeds the 25 MiB per clip / 256 MiB project rendering limit";
+
+const EXPORT_FRAME_SIZES = {
+  landscape: [1280, 720],
+  portrait: [720, 1280],
+  square: [720, 720],
+} as const;
+
 const abortError = () => new DOMException("Operation cancelled", "AbortError");
 function eventReady(element: HTMLMediaElement, event: string, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -23,23 +34,53 @@ async function finiteDuration(element: HTMLMediaElement, signal?: AbortSignal) {
   if (element.currentTime > 0) { const reset = eventReady(element, "seeked", signal); element.currentTime = 0; await reset; }
   return duration;
 }
+
+async function inspectMediaDuration(source: Blob, kind: "video" | "audio", signal?: AbortSignal) {
+  const url = URL.createObjectURL(source);
+  const element = document.createElement(kind);
+  try {
+    element.preload = "auto";
+    const ready = eventReady(element, "loadedmetadata", signal);
+    element.src = url;
+    element.load();
+    await ready;
+    return await finiteDuration(element, signal);
+  } finally {
+    element.pause();
+    element.removeAttribute("src");
+    element.load();
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function inspectTimelineFile(file: File): Promise<{ kind: "image" | "video" | "audio"; duration: number }> {
   const kind = file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : file.type.startsWith("video/") ? "video" : null;
   if (!kind) throw new Error("Choose an image, video or audio file");
-  const maxBytes = (kind === "image" ? 10 : kind === "audio" ? 20 : 25) * 1024 * 1024;
+  const maxBytes = kind === "video"
+    ? VIDEO_SOURCE_MAX_BYTES
+    : (kind === "image" ? 10 : 20) * 1024 * 1024;
   if (file.size > maxBytes) throw new Error(`File exceeds the ${maxBytes / 1024 / 1024} MiB ${kind} limit`);
+  if (kind !== "image") return { kind, duration: await inspectMediaDuration(file, kind) };
   const url = URL.createObjectURL(file);
   try {
-    if (kind === "image") { const image = new Image(); image.src = url; await image.decode(); return { kind, duration: 5 }; }
-    const element = document.createElement(kind === "audio" ? "audio" : "video");
-    element.preload = "auto"; const ready = eventReady(element, "loadedmetadata"); element.src = url; element.load();
-    try { await ready; return { kind, duration: await finiteDuration(element) }; }
-    finally { element.pause(); element.removeAttribute("src"); element.load(); }
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return { kind, duration: 5 };
   } finally { URL.revokeObjectURL(url); }
+}
+
+export async function validateClipRecording(blob: Blob, duration: number, signal: AbortSignal) {
+  const actual = await inspectMediaDuration(blob, "video", signal);
+  // Frame and audio packet boundaries can round the container duration.
+  if (Math.abs(actual - duration) > 0.25) {
+    throw new Error("The recorded clip did not match the selected duration. Keep this tab visible and try exporting again.");
+  }
 }
 
 export async function createTimelineRenderer(doc: TimelineDocument, canvas: HTMLCanvasElement, options: {
   signal: AbortSignal; onLoad?: (fraction: number) => void; audioContext?: AudioContext; destination?: AudioNode;
+  localSources?: ReadonlyMap<string, Blob>;
 }) {
   const context = canvas.getContext("2d"); if (!context) throw new Error("Canvas rendering is unavailable");
   const assets = new Map<string, Asset>(); let totalBytes = 0; let disposed = false; let playbackError: Error | null = null;
@@ -53,24 +94,34 @@ export async function createTimelineRenderer(doc: TimelineDocument, canvas: HTML
   };
   options.signal.addEventListener("abort", cleanup, { once: true });
   try {
-    const media = doc.clips.filter(clip => clip.sourceUrl && clip.type !== "text");
+    const media = doc.clips.filter(clip =>
+      clip.type !== "text" && (clip.sourceUrl || options.localSources?.has(clip.id))
+    );
     for (const [i, clip] of media.entries()) {
       if (options.signal.aborted) throw abortError();
-      let response: Response;
-      const mediaSignal = AbortSignal.any([options.signal, AbortSignal.timeout(30000)]);
-      try { response = await fetch(clip.sourceUrl!, { signal: mediaSignal, credentials: "same-origin" }); }
-      catch (error) { if (options.signal.aborted) throw error; throw new Error(`Cannot load “${clip.name ?? clip.type}”. The source must allow CORS and still be available.`); }
-      if (!response.ok) throw new Error(`Cannot load “${clip.name ?? clip.type}” (HTTP ${response.status}). Check media access or re-upload it.`);
-      const reader = response.body?.getReader(); if (!reader) throw new Error("Media streaming is unavailable");
-      const chunks: Uint8Array<ArrayBuffer>[] = []; let bytes = 0;
-      try {
-        while (true) { const part = await reader.read(); if (part.done) break;
-          bytes += part.value.byteLength; totalBytes += part.value.byteLength;
-          if (bytes > 25 * 1024 * 1024 || totalBytes > 256 * 1024 * 1024) { await reader.cancel(); throw new Error("Media exceeds the 25 MiB per clip / 256 MiB project rendering limit"); }
-          chunks.push(part.value as Uint8Array<ArrayBuffer>);
-        }
-      } finally { reader.releaseLock(); }
-      const url = URL.createObjectURL(new Blob(chunks, { type: response.headers.get("content-type") ?? "application/octet-stream" }));
+      let source = options.localSources?.get(clip.id);
+      if (source) {
+        totalBytes += source.size;
+        if (source.size > VIDEO_SOURCE_MAX_BYTES || totalBytes > MAX_RENDER_BYTES)
+          throw new Error(RENDER_LIMIT_MESSAGE);
+      } else {
+        let response: Response;
+        const mediaSignal = AbortSignal.any([options.signal, AbortSignal.timeout(30000)]);
+        try { response = await fetch(clip.sourceUrl!, { signal: mediaSignal, credentials: "same-origin" }); }
+        catch (error) { if (options.signal.aborted) throw error; throw new Error(`Cannot load “${clip.name ?? clip.type}”. The source must allow CORS and still be available.`); }
+        if (!response.ok) throw new Error(`Cannot load “${clip.name ?? clip.type}” (HTTP ${response.status}). Check media access or re-upload it.`);
+        const reader = response.body?.getReader(); if (!reader) throw new Error("Media streaming is unavailable");
+        const chunks: Uint8Array<ArrayBuffer>[] = []; let bytes = 0;
+        try {
+          while (true) { const part = await reader.read(); if (part.done) break;
+            bytes += part.value.byteLength; totalBytes += part.value.byteLength;
+            if (bytes > VIDEO_SOURCE_MAX_BYTES || totalBytes > MAX_RENDER_BYTES) { await reader.cancel(); throw new Error(RENDER_LIMIT_MESSAGE); }
+            chunks.push(part.value as Uint8Array<ArrayBuffer>);
+          }
+        } finally { reader.releaseLock(); }
+        source = new Blob(chunks, { type: response.headers.get("content-type") ?? "application/octet-stream" });
+      }
+      const url = URL.createObjectURL(source);
       const kind = clip.mediaKind ?? "video";
       if (kind === "image") {
         const image = new Image(); assets.set(clip.id, { element: image, url }); image.src = url; await image.decode();
@@ -127,25 +178,33 @@ export async function createTimelineRenderer(doc: TimelineDocument, canvas: HTML
   return { draw, dispose: cleanup };
 }
 
-export async function exportTimeline(document: TimelineDocument, options: { signal: AbortSignal; onProgress: (fraction: number, label: string) => void; onDiagnostic?: (event: string, detail: Record<string, unknown>) => void }) {
+export async function exportTimeline(document: TimelineDocument, options: {
+  signal: AbortSignal;
+  onProgress: (fraction: number, label: string) => void;
+  onDiagnostic?: (event: string, detail: Record<string, unknown>) => void;
+  frame?: keyof typeof EXPORT_FRAME_SIZES;
+  localSources?: ReadonlyMap<string, Blob>;
+}) {
   if (typeof MediaRecorder === "undefined" || !HTMLCanvasElement.prototype.captureStream || typeof AudioContext === "undefined") throw new Error("This browser does not support video recording. Use a current Chrome, Edge, Firefox or Safari.");
   const format = selectRecordingFormat(mime => MediaRecorder.isTypeSupported(mime));
   options.onDiagnostic?.("format", { selected: format?.mime, duration: timelineDuration(document.clips) });
   if (!format) throw new Error("No supported WebM or MP4 recording codec is available");
   if (!document.clips.length) throw new Error("Add at least one clip before exporting");
-  const canvas = window.document.createElement("canvas"); canvas.width = 1280; canvas.height = 720;
+  const [width, height] = EXPORT_FRAME_SIZES[options.frame ?? "landscape"];
+  const canvas = window.document.createElement("canvas"); canvas.width = width; canvas.height = height;
   const audio = new AudioContext();
   const destination = audio.createMediaStreamDestination();
   // Keep a continuous audio sample clock during silent gaps and encoder
   // startup. A destination fed only by paused elements may emit no samples.
   const silence = audio.createConstantSource(); silence.offset.value = 0; silence.connect(destination);
   let renderer: Awaited<ReturnType<typeof createTimelineRenderer>> | undefined;
-  let stream: MediaStream | undefined, recorder: MediaRecorder | undefined, frame = 0;
+  let stream: MediaStream | undefined, recorder: MediaRecorder | undefined;
+  let warmupFrame = 0;
   let drawTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     await audio.resume();
     silence.start();
-    renderer = await createTimelineRenderer(document, canvas, { signal: options.signal, audioContext: audio, destination,
+    renderer = await createTimelineRenderer(document, canvas, { signal: options.signal, audioContext: audio, destination, localSources: options.localSources,
       onLoad: fraction => options.onProgress(fraction * .1, "Loading media") });
     if (options.signal.aborted) throw abortError();
     renderer.draw(document, 0, false);
@@ -154,7 +213,8 @@ export async function exportTimeline(document: TimelineDocument, options: { sign
     recorder = new MediaRecorder(stream, { mimeType: format.mime, videoBitsPerSecond: 4_000_000 });
     const chunks: Blob[] = []; let recordedBytes = 0;
     const duration = timelineDuration(document.clips), recording = recorder;
-    let frameCount = 0, warmupFrames = 0;
+    const needsWarmup = duration < MIN_UNPADDED_EXPORT_SECONDS;
+    let frameCount = 0;
     await new Promise<void>((resolve, reject) => {
       let failure: Error | undefined;
       let started: number | undefined;
@@ -165,9 +225,11 @@ export async function exportTimeline(document: TimelineDocument, options: { sign
       const visibility = () => { if (window.document.hidden) fail(new Error("Export stopped because the tab was hidden. Keep this tab visible during real-time recording.")); };
       recording.ondataavailable = event => { options.onDiagnostic?.("data", { bytes: event.data.size, mime: event.data.type, timecode: event.timecode, frames: frameCount }); if (event.data.size) { chunks.push(event.data); recordedBytes += event.data.size; if (recordedBytes > 512 * 1024 * 1024) fail(new Error("Export exceeded the 512 MiB browser recording limit")); } };
       recording.onerror = () => fail(new Error("The browser failed to record this timeline"));
-      const cleanup = () => { clearTimeout(startupTimer); clearTimeout(stopTimer); clearTimeout(drawTimer); options.signal.removeEventListener("abort", abort); window.document.removeEventListener("visibilitychange", visibility); };
-      recording.onstop = () => { options.onDiagnostic?.("stop", { bytes: recordedBytes, frames: frameCount, warmupFrames, audioTime: audio.currentTime, mime: recording.mimeType, state: recording.state, recordedSeconds: started === undefined ? 0 : (performance.now() - started) / 1000 }); cleanup(); failure ? reject(failure) : resolve(); };
+      const cleanup = () => { cancelAnimationFrame(warmupFrame); clearTimeout(startupTimer); clearTimeout(stopTimer); clearTimeout(drawTimer); options.signal.removeEventListener("abort", abort); window.document.removeEventListener("visibilitychange", visibility); };
+      recording.onstop = () => { options.onDiagnostic?.("stop", { bytes: recordedBytes, frames: frameCount, audioTime: audio.currentTime, mime: recording.mimeType, state: recording.state, recordedSeconds: started === undefined ? 0 : (performance.now() - started) / 1000 }); cleanup(); failure ? reject(failure) : resolve(); };
       options.signal.addEventListener("abort", abort, { once: true }); window.document.addEventListener("visibilitychange", visibility);
+      if (window.document.hidden) return visibility();
+      const videoTrack = stream!.getVideoTracks?.()[0] as CanvasCaptureMediaStreamTrack | undefined;
       const tick = () => {
         if (String(recording.state) === "inactive") return;
         const time = Math.min(duration, (performance.now() - started!) / 1000);
@@ -175,38 +237,50 @@ export async function exportTimeline(document: TimelineDocument, options: { sign
         const beforeDraw = performance.now();
         frameCount++;
         try { renderer!.draw(document, time, true); } catch (error) { fail(error instanceof Error ? error : new Error("Rendering failed")); return; }
-        (stream!.getVideoTracks?.()[0] as CanvasCaptureMediaStreamTrack | undefined)?.requestFrame?.();
+        videoTrack?.requestFrame?.();
         options.onProgress(.1 + .9 * time / duration, "Recording in real time — keep this tab visible");
         if (recording.state === "inactive") return;
         drawTimer = setTimeout(tick, Math.max(1, 1000 / 30 - (performance.now() - beforeDraw)));
       };
-      // start() only queues encoder startup. Timing the clip before onstart
-      // can stop short exports before a single encoded frame is accepted.
+      const beginPlayback = () => {
+        clearTimeout(startupTimer);
+        cancelAnimationFrame(warmupFrame);
+        started = performance.now();
+        renderer!.draw(document, 0, true);
+        videoTrack?.requestFrame?.();
+        stopTimer = setTimeout(() => { if (recording.state !== "inactive") recording.stop(); }, duration * 1000);
+        drawTimer = setTimeout(tick, 1000 / 30);
+      };
       recording.onstart = () => {
         options.onDiagnostic?.("start", { mime: recording.mimeType, state: recording.state });
-        if (recording.state === "inactive") return;
-        clearTimeout(startupTimer); started = performance.now();
-        stopTimer = setTimeout(() => { if (recording.state !== "inactive") recording.stop(); }, duration * 1000);
-        cancelAnimationFrame(frame);
-        try { renderer!.draw(document, 0, true); drawTimer = setTimeout(tick, 1000 / 30); } catch (error) { fail(error instanceof Error ? error : new Error("Rendering failed")); }
+        if (!needsWarmup || recording.state === "inactive") return;
+        try { beginPlayback(); } catch (error) { fail(error instanceof Error ? error : new Error("Rendering failed")); }
       };
-      startupTimer = setTimeout(() => fail(new Error("The browser video encoder did not start. Try again with this tab active.")), 15000);
-      options.onProgress(.1, "Starting video encoder");
       const prime = () => {
         if (started !== undefined || recording.state === "inactive") return;
-        warmupFrames++;
-        try { renderer!.draw(document, 0, false); (stream!.getVideoTracks?.()[0] as CanvasCaptureMediaStreamTrack | undefined)?.requestFrame?.(); }
+        try { renderer!.draw(document, 0, false); videoTrack?.requestFrame?.(); }
         catch (error) { fail(error instanceof Error ? error : new Error("Rendering failed")); return; }
-        frame = requestAnimationFrame(prime);
+        warmupFrame = requestAnimationFrame(prime);
       };
-      try { recording.start(100); prime(); } catch (error) { fail(error instanceof Error ? error : new Error("Recording failed")); }
+      // Browsers can mux frames before delivering onstart. Begin with real
+      // content except for subsecond timelines, which can otherwise be empty.
+      try {
+        options.onProgress(.1, "Starting video encoder");
+        recording.start(100);
+        if (needsWarmup) {
+          startupTimer = setTimeout(() => fail(new Error("The browser video encoder did not start. Try again with this tab active.")), 15000);
+          prime();
+        } else {
+          beginPlayback();
+        }
+      } catch (error) { fail(error instanceof Error ? error : new Error("Recording failed")); }
     });
     if (options.signal.aborted) throw abortError();
     const actualMime = recorder.mimeType || format.mime;
     const blob = new Blob(chunks, { type: actualMime }); if (!blob.size) throw new Error("The browser returned an empty recording");
     return { blob, mime: actualMime, extension: actualMime.startsWith("video/mp4") ? "mp4" : "webm" };
   } finally {
-    cancelAnimationFrame(frame); clearTimeout(drawTimer); if (recorder && recorder.state !== "inactive") recorder.stop();
+    clearTimeout(drawTimer); if (recorder && recorder.state !== "inactive") recorder.stop();
     renderer?.dispose(); stream?.getTracks().forEach(track => track.stop()); destination.stream.getTracks().forEach(track => track.stop());
     try { silence.stop(); } catch { /* resume may have failed before source start */ } silence.disconnect(); await audio.close();
   }

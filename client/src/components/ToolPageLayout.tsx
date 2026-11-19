@@ -25,6 +25,8 @@ interface ToolPageLayoutProps {
   toolKey?: string;
   /** Optional: override credit cost when no static key fits. */
   costCredits?: number;
+  /** Local tools can run before sign-in. */
+  requiresSignIn?: boolean;
 }
 
 export default function ToolPageLayout({
@@ -35,6 +37,7 @@ export default function ToolPageLayout({
   children,
   toolKey,
   costCredits,
+  requiresSignIn = true,
 }: ToolPageLayoutProps) {
   const { isAuthenticated, loading } = useAuth();
   const [location] = useLocation();
@@ -66,7 +69,7 @@ export default function ToolPageLayout({
           </div>
         </header>
 
-        {!loading && !isAuthenticated && (
+        {requiresSignIn && !loading && !isAuthenticated && (
           <section className={styles.gate} aria-label="Tool access">
             <div className={`container ${styles.gateInner}`}>
               <div className={styles.gateCopy}>

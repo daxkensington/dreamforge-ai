@@ -136,7 +136,7 @@ const videoTools: GridTool[] = [
   { title: "Image-to-Video", desc: "Animate still images", icon: Film, href: "/tools/image-to-video", img: "/showcase/tool-i2v.jpg" },
   { title: "Music Video Studio", desc: "Animate an image and loop it over your song", icon: Film, href: "/tools/music-video", img: "/showcase/tool-music-video.jpg", badge: "New" },
   { title: "Social Templates", desc: "TikTok, Reels & Shorts templates", icon: Smartphone, href: "/tools/social-templates", img: "/showcase/tool-social-templates.jpg", badge: "New" },
-  { title: "Viral Clip Maker", desc: "AI picks best moments for clips", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-clip-maker.jpg", badge: "New" },
+  { title: "Clip Maker", desc: "Trim and download short clips in your browser", icon: Scissors, href: "/tools/clip-maker", img: "/showcase/tool-clip-maker.jpg", badge: "New" },
 ];
 
 // ─── Workflow Tools ──────────────────────────────────────────────────────────
