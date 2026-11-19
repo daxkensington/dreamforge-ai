@@ -369,15 +369,15 @@ const TEMPLATES: ProjectTemplate[] = [
   },
   {
     id: "short-form-clips",
-    title: "Short-Form Clip Pack",
+    title: "Short-Form Clip",
     description:
-      "TikTok, Reels, and Shorts-ready vertical video clips with captions, transitions, and trending visual styles.",
+      "Trim a video into a landscape, portrait, or square clip and download it with its audio.",
     category: "video",
     preview: "/showcase/tool-clip-maker.jpg",
-    tools: ["Clip Maker", "Caption Writer", "Text to Video"],
-    credits: 50,
-    pieces: 6,
-    difficulty: "Intermediate",
+    tools: ["Clip Maker"],
+    credits: 0,
+    pieces: 1,
+    difficulty: "Beginner",
     link: "/tools/clip-maker",
   },
   {
@@ -645,11 +645,11 @@ function TemplateCard({
           <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-[10px] text-white/70">
               <Layers className="h-3 w-3" />
-              {t.pieces} pieces
+              {t.pieces} {t.pieces === 1 ? "piece" : "pieces"}
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-white/70">
               <Zap className="h-3 w-3 text-amber-400" />
-              ~{t.credits} credits
+              {t.credits ? `~${t.credits} credits` : "Free"}
             </div>
           </div>
         </div>
@@ -685,7 +685,8 @@ function TemplateCard({
               {t.difficulty}
             </Badge>
             <span className="inline-flex items-center gap-1 text-[11px] text-cyan-400 font-medium group-hover:gap-2 transition-all">
-              Use Template <ArrowRight className="h-3 w-3" />
+              {t.id === "short-form-clips" ? "Open Clip Maker" : "Use Template"}{" "}
+              <ArrowRight className="h-3 w-3" />
             </span>
           </div>
         </CardContent>
