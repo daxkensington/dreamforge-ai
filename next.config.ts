@@ -16,11 +16,24 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+const gaMeasurementId = /^G-[A-Z0-9]+$/.test(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "")
+  ? process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  : "";
+
+const scriptSrcDirective = gaMeasurementId
+  ? "script-src 'self' 'unsafe-inline' https://connect.facebook.net https://www.googletagmanager.com"
+  : "script-src 'self' 'unsafe-inline' https://connect.facebook.net";
+
+const connectSrcDirective = gaMeasurementId
+  ? "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://www.facebook.com https://graph.facebook.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com"
+  : "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://www.facebook.com https://graph.facebook.com";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   // 'unsafe-inline' required by Next.js inline bootstrap/flight scripts.
   // connect.facebook.net is the Meta Pixel loader (app/MetaPixel.tsx).
-  "script-src 'self' 'unsafe-inline' https://connect.facebook.net",
+  // googletagmanager.com is added only when NEXT_PUBLIC_GA_MEASUREMENT_ID is valid.
+  scriptSrcDirective,
   "style-src 'self' 'unsafe-inline'",
   // Gallery/media are served from R2/S3 https origins; data:/blob: for previews.
   "img-src 'self' data: blob: https:",
@@ -28,7 +41,7 @@ const contentSecurityPolicy = [
   // Sentry events go through the same-origin /monitoring tunnel (tunnelRoute
   // in the Sentry wrapper below); the sentry.io origins cover direct sends.
   // facebook.com is the Meta Pixel event endpoint (fbq XHR to /tr).
-  "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://www.facebook.com https://graph.facebook.com",
+  connectSrcDirective,
   // next/font serves fonts from same-origin; data: for inline icon fonts.
   "font-src 'self' data:",
   // The Uncensored page embeds the BTCPay invoice in an iframe

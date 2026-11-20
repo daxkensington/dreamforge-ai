@@ -1,13 +1,16 @@
 "use client";
 
+import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { track } from "@/lib/analytics";
+import { track, validGaMeasurementId } from "@/lib/analytics";
+
+const GA_ID = validGaMeasurementId(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID);
 
 /**
- * First-party page views. The Meta Pixel already fires PageView, but it is
- * ad-attribution: blocked for a large share of visitors and not queryable, so
- * it cannot answer "where in the funnel do people stop".
+ * First-party page views + optional GA4 loader when NEXT_PUBLIC_GA_MEASUREMENT_ID
+ * is set to a valid G-XXXX measurement ID. When unset, renders nothing so
+ * current production HTML and network requests stay 100% unchanged.
  */
 export function Analytics() {
   const pathname = usePathname();
@@ -19,5 +22,7 @@ export function Analytics() {
     track("page_view");
   }, [pathname]);
 
-  return null;
+  if (!GA_ID) return null;
+
+  return <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />;
 }
